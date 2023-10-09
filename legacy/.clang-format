@@ -1,0 +1,19 @@
+# https://releases.llvm.org/16.0.0/tools/clang/docs/ClangFormatStyleOptions.html
+
+BasedOnStyle:  LLVM
+
+ColumnLimit:     120
+AllowShortFunctionsOnASingleLine: Empty
+IndentWidth:     4
+InsertBraces:    true
+InsertNewlineAtEOF: true
+LineEnding:      CRLF
+NamespaceIndentation: All
+PointerAlignment: Left
+
+# class foo {
+# private:
+#     int m;
+# };
+IndentAccessModifiers: false
+AccessModifierOffset: -4
