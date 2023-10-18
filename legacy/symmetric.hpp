@@ -1,7 +1,6 @@
 #pragma once
 
 #include <map>
-#include <optional>
 
 #include "rule.hpp"
 
@@ -12,8 +11,7 @@ namespace legacy {
     class regulated_partition {
         partitionT m_map;
         int m_k;
-
-        mutable std::optional<vector<vector<int>>> m_groups;
+        vector<vector<int>> m_groups;
 
     public:
         /* implicit */ regulated_partition(const partitionT& partition) : m_map{partition} {
@@ -45,6 +43,10 @@ namespace legacy {
             }
             assert(max_sofar + 1 == m_k);
 #endif
+            m_groups.resize(m_k);
+            for (int code = 0; code < 512; ++code) {
+                m_groups[m_map[code]].push_back(code);
+            }
         }
 
         // TODO: what does this imply to coding?
@@ -61,8 +63,22 @@ namespace legacy {
             return m_map[code];
         }
 
-        // TODO: matches_as_???
-        [[nodiscard]] bool matches(const ruleT& rule, bool as_flip = false) {
+        ruleT dispatch(const bool* prule, bool as_flip) const {
+            // assert prule[m_k-1] is ???
+            ruleT::array_base rule;
+            for (int code = 0; code < 512; ++code) {
+                if (!as_flip) {
+                    rule[code] = prule[m_map[code]];
+                } else {
+                    bool s = (code >> 4) & 1;
+                    rule[code] = prule[m_map[code]] ? !s : s;
+                }
+            }
+            return rule;
+        }
+
+        // TODO: "as_flip" might need be renamed...
+        [[nodiscard]] bool matches(const ruleT& rule, bool as_flip) const {
             enum state : int { unknown = -1, isfalse = false, istrue = true };
             array<state, 512 /* >=m_k */> seen;
             seen.fill(unknown);
@@ -85,9 +101,8 @@ namespace legacy {
             return true;
         }
 
-        // NOTICE: not thread-safe.
         [[nodiscard]] bool subdivides(const partitionT& part) const {
-            for (const auto& group : groups()) {
+            for (const auto& group : m_groups) {
                 for (auto code : group) {
                     if (part[code] != part[group[0]]) {
                         return false;
@@ -97,18 +112,8 @@ namespace legacy {
             return true;
         }
 
-        // NOTICE: not thread-safe.
-        // TODO: should I emphasis on this?
-        [[nodiscard]] const vector<vector<int>>& groups() const {
-            if (!m_groups.has_value()) {
-                vector<vector<int>> groups(m_k);
-                for (int code = 0; code < 512; ++code) {
-                    int pcode = m_map[code];
-                    groups[pcode].push_back(code);
-                }
-                m_groups.emplace(std::move(groups));
-            }
-            return *m_groups;
+        const vector<vector<int>>& groups() const {
+            return m_groups;
         }
     };
 

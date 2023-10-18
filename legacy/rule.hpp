@@ -49,6 +49,7 @@ namespace legacy {
         using array_base = array<bool, 512>;
 
         constexpr ruleT() : array_base{} {}
+        constexpr ruleT(const array_base& base) : array_base{base} {}
 
         bool map(int code) const {
             assert(code >= 0 && code < 512);
@@ -131,6 +132,7 @@ namespace legacy {
         using array_base = array<bool, sym.k>;
 
         constexpr sruleT() : array_base{} {}
+        constexpr sruleT(const array_base& base) : array_base{base} {}
 
         // The implicit conversion interpret this as the map from env-code to the new state.
         /* implicit */ operator ruleT() const {
