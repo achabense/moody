@@ -43,55 +43,6 @@ public:
     }
 };
 
-// TODO: support shifting...
-
-class rule_runner {
-    legacy::ruleT m_rule;
-    legacy::tileT m_tile;
-    legacy::tileT m_side;
-    int m_gen = 0;
-
-public:
-    tile_filler filler;
-
-    const legacy::ruleT& rule() const {
-        return m_rule;
-    }
-
-    const legacy::tileT& tile() const {
-        return m_tile;
-    }
-
-    int gen() const {
-        return m_gen;
-    }
-
-    void reset_rule(const legacy::ruleT& rule) {
-        m_rule = rule;
-        reset_tile();
-    }
-
-    void reset_tile() {
-        filler.random_fill(m_tile);
-        m_gen = 0;
-    }
-
-    void change_seed() {
-        filler.disturb();
-        reset_tile();
-    }
-
-    void run(int count) {
-        for (int i = 0; i < count; ++i) {
-            m_tile.gather().apply(m_rule, m_side);
-            m_tile.swap(m_side);
-        }
-        m_gen += count;
-    }
-
-    rule_runner(legacy::shapeT shape) : m_tile(shape), m_side(shape, legacy::tileT::no_clear) {}
-};
-
 // TODO: allow resizing the grid.
 // TODO: rule editor... (based on mini-window, click the pixel to set...)..
 // TODO: where to add gol?
@@ -189,69 +140,110 @@ public:
     }
 };
 
-// TODO: does this belong to runner?
-class rule_recorder {
+// TODO: support shifting...
+// TODO: !!!! recheck when to "restart"..
+class rule_runner {
+    legacy::ruleT m_rule;
+    legacy::tileT m_tile;
+    legacy::tileT m_side;
+    int m_gen = 0;
+
+    // TODO: reconsider this design...
     std::vector<legacy::compress> m_record;
     int m_pos = -1; // always<=size()-1.// TODO: how to make m_pos always valid?
 
 public:
-    int size() const {
+    // partly detachable?
+    tile_filler* m_filler = nullptr;
+
+    const legacy::ruleT& rule() const {
+        return m_rule;
+    }
+
+    const legacy::tileT& tile() const {
+        return m_tile;
+    }
+
+    int gen() const {
+        return m_gen;
+    }
+
+    int record_size() const {
         return m_record.size();
     }
-    int pos() const {
+
+    int record_pos() const {
         return m_pos;
     }
 
-    legacy::ruleT take(const legacy::ruleT& rule) {
+    void reset_rule(const legacy::ruleT& rule) {
         // TODO: refine logic, search around...
         // TODO: let histroy hold one rule to avoid awkwardness...
-        legacy::compress cmpr(rule);
-        if (!m_record.empty()) {
-            if (m_record[m_pos] == cmpr) {
-                return rule;
-            }
+        if (m_record.empty() || m_rule != rule) {
+            m_record.emplace_back(rule);
+            m_pos = m_record.size() - 1;
+
+            m_rule = rule;
+            restart();
         }
-        m_record.push_back(cmpr);
-        m_pos = m_record.size() - 1;
-        return rule;
     }
 
-    legacy::ruleT take(rule_maker& maker) {
-        return take(maker.make());
+    void reset_rule(rule_maker& maker) {
+        reset_rule(maker.make());
     }
 
-    // TODO: combine logic...
-    legacy::ruleT next(rule_maker* maker) {
+    void next(rule_maker& maker) {
         assert(m_pos + 1 <= m_record.size());
         if (m_pos + 1 != m_record.size()) {
-            ++m_pos;
-            return legacy::ruleT(m_record[m_pos]);
-        } else if (maker) {
-            return take(*maker);
+            m_rule = legacy::ruleT(m_record[++m_pos]);
+            restart();
         } else {
-            return legacy::ruleT(m_record[m_pos]);
+            reset_rule(maker);
         }
     }
 
-    // TODO: when is current needed? should really consider combining to the runner...
-
-    // TODO: how to make prev() always available?
-    legacy::ruleT prev() {
-        assert(m_pos != -1);
+    void prev() {
+        assert(m_pos != -1); // TODO: needed? enough?
         if (m_pos > 0) {
-            --m_pos;
+            m_rule = legacy::ruleT(m_record[--m_pos]);
+            restart(); // TODO: conditional or not?
         }
-        return legacy::ruleT(m_record[m_pos]);
     }
+
+    // TODO: --> reset_tile?
+    void restart() {
+        m_filler->random_fill(m_tile);
+        m_gen = 0;
+    }
+
+    void reseed() {
+        m_filler->disturb();
+        restart();
+    }
+
+    void run(int count) {
+        for (int i = 0; i < count; ++i) {
+            m_tile.gather().apply(m_rule, m_side);
+            m_tile.swap(m_side);
+        }
+        m_gen += count;
+    }
+
+    void shift(int dy, int dx) {
+        m_tile.shift(dy, dx, m_side);
+        m_tile.swap(m_side);
+    }
+
+    rule_runner(legacy::shapeT shape) : m_tile(shape), m_side(shape, legacy::tileT::no_clear) {}
+    // TODO: incomplete: m_filler!=nullptr, and m_record.!empty...
 };
 
+rule_maker maker(time(0));
+tile_filler filler;
 rule_runner runner({.height = 240, .width = 320});
 
 constexpr int pergen_min = 1, pergen_max = 10;
 int pergen = 1;
-
-rule_maker maker(time(0));
-rule_recorder recorder;
 
 bool cal_rate = true;
 
@@ -283,7 +275,9 @@ int main(int, char**) {
         return 0;
     }
 
-    runner.reset_rule(recorder.take(maker));
+    runner.m_filler = &filler;
+    runner.reset_rule(maker);
+
     tile_image img(renderer, runner.tile()); // TODO: can be
     bool paused = false;
 
@@ -388,28 +382,24 @@ int main(int, char**) {
                     auto rule_str = to_string(runner.rule());                    // how to reuse the resource?
                     ImGui::TextUnformatted(wrap_rule_string(rule_str).c_str());
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_::ImGuiMouseButton_Right)) {
-                        ImGui::LogToClipboard();
-                        ImGui::LogText(rule_str.c_str()); // TODO: looks strange...
-                        ImGui::LogFinish();
+                        ImGui::SetClipboardText(rule_str.c_str()); // TODO: notify...
                     }
                     ImGui::EndTooltip();
                 }
-                // TODO: still in the image...
                 // TODO: how to drag to resize?
                 if (ImGui::IsItemHovered()) {
-                    // TODO: scrolling...
                     // TODO: should be supported in certain areas... add more ways to control!
                     if (io.MouseWheel < 0) {
                         paused = false;
-                        runner.reset_rule(recorder.next(&maker));
-                    } else if (io.MouseWheel > 0 && recorder.pos() != 0) { // TODO: should cursor!=0 be used?
-                        paused = false;
-                        runner.reset_rule(recorder.prev()); // TODO: can "reset_rule" ignore same rule?
+                        runner.next(maker);
+                    } else if (io.MouseWheel > 0 /* && recorder.pos() != 0*/) { // TODO: should cursor!=0 be used?
+                        paused = false; // TODO: ¡ü has behavioral change here..
+                        runner.prev();
                     }
                 }
 
-                ImGui::Text("Total:%d At:%d%s", recorder.size(), recorder.pos(),
-                            recorder.pos() + 1 == recorder.size() ? "(last)" : ""); // TODO: random-access...
+                ImGui::Text("Total:%d At:%d%s", runner.record_size(), runner.record_pos(),
+                            runner.record_pos() + 1 == runner.record_size() ? "(last)" : ""); // TODO: random-access...
             }
 
             ImGui::SeparatorText("Rule");
@@ -421,12 +411,12 @@ int main(int, char**) {
                 changed |= ImGui::RadioButton("flip", &maker.interpret_as, rule_maker::as_flip);
                 ImGui::SameLine();
                 if (changed) {
-                    runner.reset_rule(recorder.take(maker));
+                    runner.reset_rule(maker);
                 }
                 // TODO: inconsistent?
                 ImGui::SameLine();
                 if (ImGui::Button("New rule")) {
-                    runner.reset_rule(recorder.take(maker));
+                    runner.reset_rule(maker);
                 }
 
                 ImGui::SameLine();
@@ -448,7 +438,7 @@ int main(int, char**) {
                         ImGui::SetTooltip(found_str.empty() ? ":|" : wrap_rule_string(found_str).c_str());
                     }
                     if (clicked && !found_str.empty()) {
-                        runner.reset_rule(recorder.take(legacy::from_string<legacy::ruleT>(found_str)));
+                        runner.reset_rule(legacy::from_string<legacy::ruleT>(found_str));
                     }
                 }
             }
@@ -460,7 +450,7 @@ int main(int, char**) {
                 snprintf(str, 40, "Rule density [%d-%d]", 0, rule_maker::max_density);
                 // TODO: better input
                 if (ImGui::SliderInt(str, &maker.density, 0, rule_maker::max_density, "%d", ImGuiSliderFlags_NoInput)) {
-                    runner.reset_rule(recorder.take(maker));
+                    runner.reset_rule(maker);
                 }
             }
 
@@ -492,19 +482,19 @@ int main(int, char**) {
 
                 ImGui::SameLine();
                 if (ImGui::Button("Restart")) {
-                    runner.reset_tile();
+                    runner.restart();
+                    // runner.reset_tile();
                 }
-                // TODO: should init state be maintained individually?
                 ImGui::SameLine();
                 if (ImGui::Button("Restart with new seed")) {
-                    runner.change_seed();
+                    runner.reseed();
                 }
             }
 
             {
-                if (ImGui::SliderFloat("Init density [0.0-1.0]", &runner.filler.density, 0.0f, 1.0f, "%.3f",
+                if (ImGui::SliderFloat("Init density [0.0-1.0]", &runner.m_filler->density, 0.0f, 1.0f, "%.3f",
                                        ImGuiSliderFlags_NoInput)) {
-                    runner.reset_tile();
+                    runner.restart();
                 }
             }
 
