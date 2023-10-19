@@ -28,20 +28,7 @@
 #error This backend requires SDL 2.0.17+ because of SDL_RenderGeometry() function
 #endif
 
-// TODO: add ctor...
-class tile_filler {
-    std::mt19937_64 m_rand{0};
-
-public:
-    float density = 0.5;
-
-    void disturb() {
-        (void)m_rand();
-    }
-    void random_fill(legacy::tileT& tile) const {
-        tile.random_fill(density, std::mt19937_64{m_rand});
-    }
-};
+////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: allow resizing the grid.
 // TODO: rule editor... (based on mini-window, click the pixel to set...)..
@@ -59,69 +46,29 @@ public:
 // TODO: fine-grained rule edition...
 // TODO: file container. easy ways to add fav...
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////
-// TODO: editor, very hard...
-struct rule_maker2 {
-    void random_fill(bool* begin, int size, int density) {
-        assert(size > 0);
-        density = std::clamp(density, 0, size);
-        std::fill_n(begin, size, false);
-        std::fill_n(begin, density, true);
-        std::shuffle(begin, begin + size, m_rand);
-    }
+// TODO: add ctor...
+class tile_filler {
+    std::mt19937_64 m_rand{0};
 
-    bool want_spatial_symmetry = true;
-    bool want_state_symmetry = false;
+public:
+    tile_filler(uint64_t seed = 0) : m_rand{seed} {}
 
-    std::mt19937_64 m_rand;
+    float density = 0.5;
 
-    static constexpr int as_abs = 0;
-    static constexpr int as_flip = 1;
-    int interpret_as = as_abs;
-
-    // a series of filters...
-    // TODO: construct...
-    // TODO: user-defined?
-    enum sym_mode : int {
-        none, // arbitary
-        spatial_symmetric,
-        spatial_state_symmetric,
-
-        gol
-    } m_sym{};
-
-    rule_maker2(uint64_t seed = time(0)) : m_rand{seed} {}
     void disturb() {
-        // TODO: explain...
         (void)m_rand();
     }
-
-    int density{};
-    int max_density() const {
-        switch (m_sym) {
-        case none:
-            return 512;
-        }
-    }
-
-    legacy::ruleT make() {
-        legacy::ruleT::array_base rule; // todo: zeroed-out...
-        switch (m_sym) {
-        case none:
-            random_fill(rule.data(), 512, density);
-        case spatial_symmetric:;
-        }
-        return rule;
+    void random_fill(legacy::tileT& tile) const {
+        tile.random_fill(density, std::mt19937_64{m_rand});
     }
 };
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TODO: density is actually for generation, not matching with cursor now...
 class rule_maker {
     std::mt19937_64 m_rand;
 
 public:
-    rule_maker(uint64_t seed) : m_rand{seed} {}
+    rule_maker(uint64_t seed = time(nullptr)) : m_rand{seed} {}
 
     // density ¡Ê [0, max_density]
     static constexpr int max_density = legacy::sym.k;
@@ -140,21 +87,80 @@ public:
     }
 };
 
+// TODO: editor, very hard...
+struct rule_maker_v2 {
+    void random_fill(bool* begin, int size, int count) {
+        assert(size > 0);
+        count = std::clamp(count, 0, size);
+        std::fill_n(begin, size, false);
+        std::fill_n(begin, count, true);
+        std::shuffle(begin, begin + size, m_rand);
+    }
+
+    bool lock_sym_spatial = true;
+    bool lock_sym_state = true;
+
+    std::mt19937_64 m_rand;
+
+    static constexpr int as_abs = 0;
+    static constexpr int as_flip = 1;
+    int interpret_as = as_abs;
+
+    // a series of filters...
+    // TODO: construct...
+    // TODO: user-defined?
+    enum sym_mode : int {
+        none, // arbitary
+        spatial_symmetric,
+        spatial_state_symmetric,
+
+        gol
+    } m_sym{};
+
+    rule_maker_v2(uint64_t seed = time(0)) : m_rand{seed} {}
+    void disturb() {
+        // TODO: explain...
+        (void)m_rand();
+    }
+
+    int density{};
+    int max_density() const {
+        switch (m_sym) {
+        case none:
+            return 512;
+        }
+    }
+
+    legacy::ruleT make() {
+        legacy::ruleT::array_base rule; // todo: zeroed-out...
+        switch (m_sym) {
+        case none:
+            random_fill(rule.data(), 512, density);
+        case spatial_symmetric:
+            return rule;
+        }
+        return rule;
+    }
+};
+
 // TODO: support shifting...
 // TODO: !!!! recheck when to "restart"..
+
 class rule_runner {
     legacy::ruleT m_rule;
     legacy::tileT m_tile;
     legacy::tileT m_side;
     int m_gen = 0;
 
-    // TODO: reconsider this design...
-    std::vector<legacy::compress> m_record;
-    int m_pos = -1; // always<=size()-1.// TODO: how to make m_pos always valid?
+    friend class rule_recorder;
+    void reset_rule(const legacy::ruleT& rule) {
+        m_rule = rule;
+        restart();
+    }
 
 public:
-    // partly detachable?
-    tile_filler* m_filler = nullptr;
+    // TODO: clarify ownership...
+    tile_filler* m_filler = nullptr; // source.
 
     const legacy::ruleT& rule() const {
         return m_rule;
@@ -168,57 +174,9 @@ public:
         return m_gen;
     }
 
-    int record_size() const {
-        return m_record.size();
-    }
-
-    int record_pos() const {
-        return m_pos;
-    }
-
-    void reset_rule(const legacy::ruleT& rule) {
-        // TODO: refine logic, search around...
-        // TODO: let histroy hold one rule to avoid awkwardness...
-        if (m_record.empty() || m_rule != rule) {
-            m_record.emplace_back(rule);
-            m_pos = m_record.size() - 1;
-
-            m_rule = rule;
-            restart();
-        }
-    }
-
-    void reset_rule(rule_maker& maker) {
-        reset_rule(maker.make());
-    }
-
-    void next(rule_maker& maker) {
-        assert(m_pos + 1 <= m_record.size());
-        if (m_pos + 1 != m_record.size()) {
-            m_rule = legacy::ruleT(m_record[++m_pos]);
-            restart();
-        } else {
-            reset_rule(maker);
-        }
-    }
-
-    void prev() {
-        assert(m_pos != -1); // TODO: needed? enough?
-        if (m_pos > 0) {
-            m_rule = legacy::ruleT(m_record[--m_pos]);
-            restart(); // TODO: conditional or not?
-        }
-    }
-
-    // TODO: --> reset_tile?
     void restart() {
         m_filler->random_fill(m_tile);
         m_gen = 0;
-    }
-
-    void reseed() {
-        m_filler->disturb();
-        restart();
     }
 
     void run(int count) {
@@ -229,18 +187,92 @@ public:
         m_gen += count;
     }
 
+    // TODO: support in gui.
+    // TODO: should the filler be shifted too? if so then must be tile-based...
     void shift(int dy, int dx) {
         m_tile.shift(dy, dx, m_side);
         m_tile.swap(m_side);
     }
 
     rule_runner(legacy::shapeT shape) : m_tile(shape), m_side(shape, legacy::tileT::no_clear) {}
-    // TODO: incomplete: m_filler!=nullptr, and m_record.!empty...
 };
 
-rule_maker maker(time(0));
+class rule_recorder {
+    std::vector<legacy::compress> m_record;
+    int m_pos = -1; // always<=size()-1.// TODO: how to make m_pos always valid?
+
+    void invariants() const {
+        if (!m_record.empty()) {
+            assert(m_pos >= 0);
+        }
+        assert(m_pos >= 0 && m_pos < m_record.size());
+    }
+
+public:
+    // TODO: init_state is problematic...
+    // TODO: can this be null?
+    rule_runner* m_runner = nullptr; // notify. // TODO: shared_ptr?
+    rule_maker* m_maker = nullptr;   // source.
+
+    // TODO: analyser... (notify...)
+
+    bool empty() const {
+        return m_record.empty();
+    }
+
+    int size() const {
+        return m_record.size();
+    }
+
+    int pos() const {
+        return m_pos;
+    }
+
+    // TODO: look for better names...
+    void take(const legacy::ruleT& rule) {
+        // TODO: refine logic, search around...
+        // TODO: let histroy hold one rule to avoid awkwardness...
+        // assert(m_runner->rule() == *pos); // TODO:redesign this function.
+        if (m_record.empty() || m_runner->rule() != rule) {
+            m_record.emplace_back(rule);
+            m_pos = m_record.size() - 1;
+
+            m_runner->reset_rule(rule);
+        }
+    }
+
+    void new_rule() {
+        if (m_maker) {
+            take(m_maker->make());
+        }
+    }
+
+    // TODO: radom-access mode...
+    // TODO: current...
+
+    void next() {
+        assert(m_pos + 1 <= m_record.size());
+        if (m_pos + 1 != m_record.size()) {
+            m_runner->reset_rule(legacy::ruleT(m_record[++m_pos]));
+        } else {
+            new_rule();
+        }
+    }
+
+    void prev() {
+        assert(m_pos != -1); // TODO: needed? enough?
+        if (m_pos > 0) {
+            m_runner->reset_rule(legacy::ruleT(m_record[--m_pos]));
+        }
+    }
+
+    // TODO: ctor...maker-ctor as...
+};
+
+rule_maker maker;
 tile_filler filler;
 rule_runner runner({.height = 240, .width = 320});
+rule_recorder recorder;
 
 constexpr int pergen_min = 1, pergen_max = 10;
 int pergen = 1;
@@ -275,8 +307,11 @@ int main(int, char**) {
         return 0;
     }
 
+    // init:
     runner.m_filler = &filler;
-    runner.reset_rule(maker);
+    recorder.m_runner = &runner;
+    recorder.m_maker = &maker;
+    recorder.new_rule(); // first rule...
 
     tile_image img(renderer, runner.tile()); // TODO: can be
     bool paused = false;
@@ -391,15 +426,15 @@ int main(int, char**) {
                     // TODO: should be supported in certain areas... add more ways to control!
                     if (io.MouseWheel < 0) {
                         paused = false;
-                        runner.next(maker);
+                        recorder.next();
                     } else if (io.MouseWheel > 0 /* && recorder.pos() != 0*/) { // TODO: should cursor!=0 be used?
                         paused = false; // TODO: ¡ü has behavioral change here..
-                        runner.prev();
+                        recorder.prev();
                     }
                 }
 
-                ImGui::Text("Total:%d At:%d%s", runner.record_size(), runner.record_pos(),
-                            runner.record_pos() + 1 == runner.record_size() ? "(last)" : ""); // TODO: random-access...
+                ImGui::Text("Total:%d At:%d%s", recorder.size(), recorder.pos(),
+                            recorder.pos() + 1 == recorder.size() ? "(last)" : ""); // TODO: random-access...
             }
 
             ImGui::SeparatorText("Rule");
@@ -411,12 +446,12 @@ int main(int, char**) {
                 changed |= ImGui::RadioButton("flip", &maker.interpret_as, rule_maker::as_flip);
                 ImGui::SameLine();
                 if (changed) {
-                    runner.reset_rule(maker);
+                    recorder.new_rule();
                 }
                 // TODO: inconsistent?
                 ImGui::SameLine();
                 if (ImGui::Button("New rule")) {
-                    runner.reset_rule(maker);
+                    recorder.new_rule();
                 }
 
                 ImGui::SameLine();
@@ -438,7 +473,7 @@ int main(int, char**) {
                         ImGui::SetTooltip(found_str.empty() ? ":|" : wrap_rule_string(found_str).c_str());
                     }
                     if (clicked && !found_str.empty()) {
-                        runner.reset_rule(legacy::from_string<legacy::ruleT>(found_str));
+                        recorder.take(legacy::from_string<legacy::ruleT>(found_str));
                     }
                 }
             }
@@ -450,7 +485,7 @@ int main(int, char**) {
                 snprintf(str, 40, "Rule density [%d-%d]", 0, rule_maker::max_density);
                 // TODO: better input
                 if (ImGui::SliderInt(str, &maker.density, 0, rule_maker::max_density, "%d", ImGuiSliderFlags_NoInput)) {
-                    runner.reset_rule(maker);
+                    recorder.new_rule();
                 }
             }
 
@@ -487,7 +522,8 @@ int main(int, char**) {
                 }
                 ImGui::SameLine();
                 if (ImGui::Button("Restart with new seed")) {
-                    runner.reseed();
+                    runner.m_filler->disturb();
+                    runner.restart();
                 }
             }
 

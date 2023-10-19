@@ -105,6 +105,7 @@ namespace legacy {
         }
 
     public:
+        // TODO: return span instead?
         bool* line(int y) {
             assert(y >= 0 && y < m_shape.height);
             return _line(y + 1) + 1;
@@ -232,6 +233,14 @@ namespace legacy {
             return true;
         }
 
+        // TODO: should this be supported? only useful in torus space...
+        void shift(int dy, int dx, tileT& dest) {
+            assert(this != &dest);
+            dest.resize(m_shape);
+
+            // TODO: extra assertion...
+            // TODO:...
+        }
         // experimental...
     };
 } // namespace legacy
