@@ -45,11 +45,39 @@ namespace legacy {
     }
 
     // Unambiguously refer to the map from env-code to the new state.
+    // TODO: reconsider inheritance-based approach...
+    // TODO: should allow implicit conversion?
+    // TODO: recheck...
+
+    // TODO: is it suitable to declare a namespace-enum for this?
+    enum interpret_mode : bool { ABS, XOR };
+
     struct ruleT : public array<bool, 512> {
         using array_base = array<bool, 512>;
 
         constexpr ruleT() : array_base{} {}
-        constexpr ruleT(const array_base& base) : array_base{base} {}
+        // TODO: better documentation, as xor or flip
+        // TODO: explain; better logic structures...
+        // TODO: better names...
+        constexpr ruleT(const array_base& base, interpret_mode mode) : array_base{base} {
+            if (mode == XOR) {
+                for (int code = 0; code < 512; ++code) {
+                    bool s = (code >> 4) & 1; // TODO: helper-function...
+                    operator[](code) = operator[](code) ? !s : s;
+                }
+            }
+        }
+
+        array_base to_base(interpret_mode mode) const {
+            array_base r{*this};
+            if (mode == XOR) {
+                for (int code = 0; code < 512; ++code) {
+                    bool s = (code >> 4) & 1; // TODO: helper-function...
+                    r[code] = r[code] == s ? false : true;
+                }
+            }
+            return r;
+        }
 
         bool map(int code) const {
             assert(code >= 0 && code < 512);

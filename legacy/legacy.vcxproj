@@ -160,7 +160,7 @@
     <ClInclude Include="imgui_sdl2\imgui_impl_sdlrenderer2.h" />
     <ClInclude Include="rule_setter.hpp" />
     <ClInclude Include="serialize.hpp" />
-    <ClInclude Include="symmetric.hpp" />
+    <ClInclude Include="symmetry.hpp" />
     <ClInclude Include="tile.hpp" />
     <ClInclude Include="rule.hpp" />
   </ItemGroup>

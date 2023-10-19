@@ -20,254 +20,12 @@
 #include "imgui_sdl2/imgui_impl_sdl2.h"
 #include "imgui_sdl2/imgui_impl_sdlrenderer2.h"
 
+#include "app.hpp"
 #include "image.hpp"
-#include "rule.hpp"
-#include "serialize.hpp"
 
 #if !SDL_VERSION_ATLEAST(2, 0, 17)
 #error This backend requires SDL 2.0.17+ because of SDL_RenderGeometry() function
 #endif
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// TODO: allow resizing the grid.
-// TODO: rule editor... (based on mini-window, click the pixel to set...)..
-// TODO: where to add gol?
-// TODO: add pace.
-// TODO: (important) small window...
-
-// TODO: notify on quit...
-// TODO!!!!!support more run-mode...
-// TODO: restart should...
-// TODO: run_extra..
-// TODO: some settings should leave states in paused state...
-// TODO: rnd-mode for tile...(stable vs arbitary...)
-// TODO: right click to enable/disable miniwindow...
-// TODO: fine-grained rule edition...
-// TODO: file container. easy ways to add fav...
-
-// TODO: add ctor...
-class tile_filler {
-    std::mt19937_64 m_rand{0};
-
-public:
-    tile_filler(uint64_t seed = 0) : m_rand{seed} {}
-
-    float density = 0.5;
-
-    void disturb() {
-        (void)m_rand();
-    }
-    void random_fill(legacy::tileT& tile) const {
-        tile.random_fill(density, std::mt19937_64{m_rand});
-    }
-};
-
-// TODO: density is actually for generation, not matching with cursor now...
-class rule_maker {
-    std::mt19937_64 m_rand;
-
-public:
-    rule_maker(uint64_t seed = time(nullptr)) : m_rand{seed} {}
-
-    // density ¡Ê [0, max_density]
-    static constexpr int max_density = legacy::sym.k;
-    int density = max_density * 0.3;
-
-    static constexpr int as_abs = 0;
-    static constexpr int as_flip = 1; // as_xor?
-    int interpret_as = as_flip;
-
-    // TODO: refine making logic...
-    // TODO: as this is already decoupled, support different modes.
-    legacy::ruleT make() {
-        legacy::sruleT srule; // TODO: unnecessary value initialization...
-        srule.random_fill(density, m_rand);
-        return interpret_as == as_abs ? srule : srule.as_flip();
-    }
-};
-
-// TODO: editor, very hard...
-struct rule_maker_v2 {
-    void random_fill(bool* begin, int size, int count) {
-        assert(size > 0);
-        count = std::clamp(count, 0, size);
-        std::fill_n(begin, size, false);
-        std::fill_n(begin, count, true);
-        std::shuffle(begin, begin + size, m_rand);
-    }
-
-    bool lock_sym_spatial = true;
-    bool lock_sym_state = true;
-
-    std::mt19937_64 m_rand;
-
-    static constexpr int as_abs = 0;
-    static constexpr int as_flip = 1;
-    int interpret_as = as_abs;
-
-    // a series of filters...
-    // TODO: construct...
-    // TODO: user-defined?
-    enum sym_mode : int {
-        none, // arbitary
-        spatial_symmetric,
-        spatial_state_symmetric,
-
-        gol
-    } m_sym{};
-
-    rule_maker_v2(uint64_t seed = time(0)) : m_rand{seed} {}
-    void disturb() {
-        // TODO: explain...
-        (void)m_rand();
-    }
-
-    int density{};
-    int max_density() const {
-        switch (m_sym) {
-        case none:
-            return 512;
-        }
-    }
-
-    legacy::ruleT make() {
-        legacy::ruleT::array_base rule; // todo: zeroed-out...
-        switch (m_sym) {
-        case none:
-            random_fill(rule.data(), 512, density);
-        case spatial_symmetric:
-            return rule;
-        }
-        return rule;
-    }
-};
-
-// TODO: support shifting...
-// TODO: !!!! recheck when to "restart"..
-
-class rule_runner {
-    legacy::ruleT m_rule;
-    legacy::tileT m_tile;
-    legacy::tileT m_side;
-    int m_gen = 0;
-
-    friend class rule_recorder;
-    void reset_rule(const legacy::ruleT& rule) {
-        m_rule = rule;
-        restart();
-    }
-
-public:
-    // TODO: clarify ownership...
-    tile_filler* m_filler = nullptr; // source.
-
-    const legacy::ruleT& rule() const {
-        return m_rule;
-    }
-
-    const legacy::tileT& tile() const {
-        return m_tile;
-    }
-
-    int gen() const {
-        return m_gen;
-    }
-
-    void restart() {
-        m_filler->random_fill(m_tile);
-        m_gen = 0;
-    }
-
-    void run(int count) {
-        for (int i = 0; i < count; ++i) {
-            m_tile.gather().apply(m_rule, m_side);
-            m_tile.swap(m_side);
-        }
-        m_gen += count;
-    }
-
-    // TODO: support in gui.
-    // TODO: should the filler be shifted too? if so then must be tile-based...
-    void shift(int dy, int dx) {
-        m_tile.shift(dy, dx, m_side);
-        m_tile.swap(m_side);
-    }
-
-    rule_runner(legacy::shapeT shape) : m_tile(shape), m_side(shape, legacy::tileT::no_clear) {}
-};
-
-class rule_recorder {
-    std::vector<legacy::compress> m_record;
-    int m_pos = -1; // always<=size()-1.// TODO: how to make m_pos always valid?
-
-    void invariants() const {
-        if (!m_record.empty()) {
-            assert(m_pos >= 0);
-        }
-        assert(m_pos >= 0 && m_pos < m_record.size());
-    }
-
-public:
-    // TODO: init_state is problematic...
-    // TODO: can this be null?
-    rule_runner* m_runner = nullptr; // notify. // TODO: shared_ptr?
-    rule_maker* m_maker = nullptr;   // source.
-
-    // TODO: analyser... (notify...)
-
-    bool empty() const {
-        return m_record.empty();
-    }
-
-    int size() const {
-        return m_record.size();
-    }
-
-    int pos() const {
-        return m_pos;
-    }
-
-    // TODO: look for better names...
-    void take(const legacy::ruleT& rule) {
-        // TODO: refine logic, search around...
-        // TODO: let histroy hold one rule to avoid awkwardness...
-        // assert(m_runner->rule() == *pos); // TODO:redesign this function.
-        if (m_record.empty() || m_runner->rule() != rule) {
-            m_record.emplace_back(rule);
-            m_pos = m_record.size() - 1;
-
-            m_runner->reset_rule(rule);
-        }
-    }
-
-    void new_rule() {
-        if (m_maker) {
-            take(m_maker->make());
-        }
-    }
-
-    // TODO: radom-access mode...
-    // TODO: current...
-
-    void next() {
-        assert(m_pos + 1 <= m_record.size());
-        if (m_pos + 1 != m_record.size()) {
-            m_runner->reset_rule(legacy::ruleT(m_record[++m_pos]));
-        } else {
-            new_rule();
-        }
-    }
-
-    void prev() {
-        assert(m_pos != -1); // TODO: needed? enough?
-        if (m_pos > 0) {
-            m_runner->reset_rule(legacy::ruleT(m_record[--m_pos]));
-        }
-    }
-
-    // TODO: ctor...maker-ctor as...
-};
 
 rule_maker maker;
 tile_filler filler;
@@ -282,7 +40,7 @@ bool cal_rate = true;
 // looks *extremely* horrible and inefficient
 // TODO: use imgui line wrapping....
 std::string wrap_rule_string(const std::string& str) {
-    return str.substr(0, 32) + "-\n" + str.substr(32, 32) + "-\n" + str.substr(64, 32) + "-\n" + str.substr(96, 32);
+    return str.substr(0, 32) + "\n" + str.substr(32, 16) + "...";
 }
 
 int main(int, char**) {
@@ -310,8 +68,10 @@ int main(int, char**) {
     // init:
     runner.m_filler = &filler;
     recorder.m_runner = &runner;
-    recorder.m_maker = &maker;
-    recorder.new_rule(); // first rule...
+    // TODO: is this correct design?
+    recorder.attach_maker(&maker);
+    // recorder.m_maker = &maker;
+    // recorder.new_rule(); // first rule...
 
     tile_image img(renderer, runner.tile()); // TODO: can be
     bool paused = false;
@@ -330,7 +90,6 @@ int main(int, char**) {
     ImGui_ImplSDLRenderer2_Init(renderer);
 
     // Our state
-    int frame = 0;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     // Main loop
@@ -362,8 +121,6 @@ int main(int, char**) {
         ImGui::NewFrame();
 
         // TODO: remove this when suitable...
-        // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code
-        // to learn more about Dear ImGui!).
         ImGui::ShowDemoWindow();
 
         {
@@ -372,26 +129,23 @@ int main(int, char**) {
                              ImGuiWindowFlags_::ImGuiWindowFlags_AlwaysAutoResize);
 
             {
+                static int frame = 0;
                 ImGui::Text("(%.1f FPS) Frame:%d\n"
                             "Width:%d,Height:%d",
                             io.Framerate, frame++, img.width(), img.height());
             }
 
             {
-                img.update(runner.tile());
-
                 ImVec2 pos = ImGui::GetCursorScreenPos();
+
+                img.update(runner.tile());
                 auto img_texture = img.texture();
                 ImVec2 img_size = ImVec2(img.width(), img.height());
                 ImGui::Image(img_texture, img_size);
 
                 // TODO: should be draggable...
-                // mostly copied from imgui_demo.cpp, works but looks terrible...
-                auto&& io = ImGui::GetIO();
-                ImVec2 uv_min = ImVec2(0.0f, 0.0f); // Top-left
-                ImVec2 uv_max = ImVec2(1.0f, 1.0f); // Lower-right
-                ImVec4 border_col = ImGui::GetStyleColorVec4(ImGuiCol_Border);
                 if (ImGui::BeginItemTooltip()) {
+                    auto&& io = ImGui::GetIO();
                     const float region_sz = 32.0f;
                     float region_x = io.MousePos.x - pos.x - region_sz * 0.5f;
                     float region_y = io.MousePos.y - pos.y - region_sz * 0.5f;
@@ -409,82 +163,91 @@ int main(int, char**) {
                     ImVec2 uv0 = ImVec2((region_x) / img_size.x, (region_y) / img_size.y);
                     ImVec2 uv1 = ImVec2((region_x + region_sz) / img_size.x, (region_y + region_sz) / img_size.y);
                     ImGui::Image(img_texture, ImVec2(region_sz * zoom, region_sz * zoom), uv0, uv1);
-                    ImGui::EndTooltip();
-                }
 
-                if (ImGui::BeginItemTooltip()) {
                     ImGui::TextUnformatted("Right click to copy to clipboard:"); // TODO: show successful / fail...
                     auto rule_str = to_string(runner.rule());                    // how to reuse the resource?
                     ImGui::TextUnformatted(wrap_rule_string(rule_str).c_str());
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_::ImGuiMouseButton_Right)) {
                         ImGui::SetClipboardText(rule_str.c_str()); // TODO: notify...
                     }
+                    ImGui::TextUnformatted("Left click to copy from clipboard:");
+                    std::string found_str;
+                    const char* text = ImGui::GetClipboardText();
+                    // TODO: needed?
+                    if (text) {
+                        std::string str = text;
+                        // TODO: the logic should be in <seralize.h>...
+                        std::regex find_rule("[0-9a-z]{128}");
+                        std::smatch match_result;
+                        if (std::regex_search(str, match_result, find_rule)) {
+                            found_str = match_result[0];
+                        }
+                    }
+                    ImGui::TextUnformatted(found_str.empty() ? "(none)" : wrap_rule_string(found_str).c_str());
+                    if (ImGui::IsMouseClicked(ImGuiMouseButton_::ImGuiMouseButton_Left) && !found_str.empty()) {
+                        recorder.take(legacy::from_string<legacy::ruleT>(found_str));
+                    }
                     ImGui::EndTooltip();
                 }
+
                 // TODO: how to drag to resize?
                 if (ImGui::IsItemHovered()) {
                     // TODO: should be supported in certain areas... add more ways to control!
-                    if (io.MouseWheel < 0) {
+                    if (io.MouseWheel < 0) { // scroll down
                         paused = false;
                         recorder.next();
-                    } else if (io.MouseWheel > 0 /* && recorder.pos() != 0*/) { // TODO: should cursor!=0 be used?
-                        paused = false; // TODO: ¡ü has behavioral change here..
+                    } else if (io.MouseWheel > 0) { // scroll up
+                        paused = false;
                         recorder.prev();
                     }
                 }
 
                 ImGui::Text("Total:%d At:%d%s", recorder.size(), recorder.pos(),
                             recorder.pos() + 1 == recorder.size() ? "(last)" : ""); // TODO: random-access...
+
+                // how to activate only on Enter?
+                // static char _goto[20]{};
+                // if (ImGui::InputText("Goto", _goto,std::size(_goto))) {
+                //     putchar('\a');
+                // }
             }
 
-            ImGui::SeparatorText("Rule");
+            ImGui::SeparatorText("Rule generator");
 
             {
-                bool changed = false; // TODO problematic... rul_env should be able to feel the changes...
-                changed |= ImGui::RadioButton("plain", &maker.interpret_as, rule_maker::as_abs);
-                ImGui::SameLine();
-                changed |= ImGui::RadioButton("flip", &maker.interpret_as, rule_maker::as_flip);
-                ImGui::SameLine();
-                if (changed) {
-                    recorder.new_rule();
+                bool new_rule = false;
+
+                // TODO: horribly hard to maintain...
+                // is reinter ok?
+                if (ImGui::Combo("Mode", reinterpret_cast<int*>(&maker.g_mode),
+                                 "none(deprecated)\0sub_spatial\0sub_spatial2\0spatial\0spatial_paired\0spatial_"
+                                 "state\0permutation\0\0")) {
+                    maker.density = maker.max_density() * 0.3;
+                    new_rule = true;
                 }
-                // TODO: inconsistent?
+
+                // TODO: too sensitive...
+                // TODO: is it suitable to restart immediately?
+                char str[40];
+                snprintf(str, 40, "Rule density [%d-%d]", 0, maker.max_density());
+                if (ImGui::SliderInt(str, &maker.density, 0, maker.max_density(), "%d", ImGuiSliderFlags_NoInput)) {
+                    new_rule = true;
+                }
+
+                auto prev = maker.interpret_as;
+                ImGui::RadioButton("plain", &maker.interpret_as, legacy::ABS);
+                ImGui::SameLine();
+                ImGui::RadioButton("flip", &maker.interpret_as, legacy::XOR);
+                if (maker.interpret_as != prev) {
+                    new_rule = true;
+                }
+
                 ImGui::SameLine();
                 if (ImGui::Button("New rule")) {
-                    recorder.new_rule();
+                    new_rule = true;
                 }
 
-                ImGui::SameLine();
-                {
-                    bool clicked = ImGui::Button("Paste from clipboard");
-                    std::string found_str;
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNone)) {
-                        const char* text = ImGui::GetClipboardText();
-                        // TODO: needed?
-                        if (text) {
-                            std::string str = text;
-                            // TODO: the logic should be in <seralize.h>...
-                            std::regex find_rule("[0-9a-z]{128}");
-                            std::smatch match_result;
-                            if (std::regex_search(str, match_result, find_rule)) {
-                                found_str = match_result[0];
-                            }
-                        }
-                        ImGui::SetTooltip(found_str.empty() ? ":|" : wrap_rule_string(found_str).c_str());
-                    }
-                    if (clicked && !found_str.empty()) {
-                        recorder.take(legacy::from_string<legacy::ruleT>(found_str));
-                    }
-                }
-            }
-
-            // TODO: ¡ý too sensitive...
-            // TODO: auto-wrapping... after input from console...
-            {
-                char str[40];
-                snprintf(str, 40, "Rule density [%d-%d]", 0, rule_maker::max_density);
-                // TODO: better input
-                if (ImGui::SliderInt(str, &maker.density, 0, rule_maker::max_density, "%d", ImGuiSliderFlags_NoInput)) {
+                if (new_rule) {
                     recorder.new_rule();
                 }
             }
@@ -495,8 +258,7 @@ int main(int, char**) {
             {
                 ImGui::Text("Gen:%d", runner.gen());
 
-                // TODO: is "Life" correct?
-                ImGui::Checkbox("Calculate life rate", &cal_rate);
+                ImGui::Checkbox("Calculate density", &cal_rate);
                 if (cal_rate) {
                     ImGui::SameLine();
                     auto [h, w] = runner.tile().shape();
@@ -510,7 +272,7 @@ int main(int, char**) {
 
                 ImGui::SameLine();
                 ImGui::PushButtonRepeat(true); // accept consecutive clicks... TODO: too fast...
-                if (ImGui::Button(">>1")) {    // todo: reword...
+                if (ImGui::Button("+1")) {
                     runner.run(1);
                 }
                 ImGui::PopButtonRepeat();
@@ -521,20 +283,18 @@ int main(int, char**) {
                     // runner.reset_tile();
                 }
                 ImGui::SameLine();
-                if (ImGui::Button("Restart with new seed")) {
+                if (ImGui::Button("Reseed")) {
                     runner.m_filler->disturb();
                     runner.restart();
                 }
             }
 
             {
-                if (ImGui::SliderFloat("Init density [0.0-1.0]", &runner.m_filler->density, 0.0f, 1.0f, "%.3f",
+                // TODO: (?) currently suitable to restart immediately...
+                if (ImGui::SliderFloat("Density [0.0-1.0]", &runner.m_filler->density, 0.0f, 1.0f, "%.3f",
                                        ImGuiSliderFlags_NoInput)) {
                     runner.restart();
                 }
-            }
-
-            {
                 ImGui::SliderInt("Per gen [1-10]", &pergen, pergen_min, pergen_max, "%d",
                                  ImGuiSliderFlags_NoInput); // TODO: use sprintf for pergen_min and pergen_max.
             }
