@@ -58,7 +58,7 @@ namespace legacy {
         constexpr ruleT() : array_base{} {}
         // TODO: better documentation, as xor or flip
         // TODO: explain; better logic structures...
-        // TODO: better names...
+        // TODO: from_base???
         constexpr ruleT(const array_base& base, interpret_mode mode) : array_base{base} {
             if (mode == XOR) {
                 for (int code = 0; code < 512; ++code) {

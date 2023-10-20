@@ -32,8 +32,7 @@ class tile_filler {
     std::mt19937_64 m_rand;
 
 public:
-    // Intentionally for stableness
-    tile_filler(uint64_t seed = 0) : m_rand{seed} {}
+    explicit tile_filler(uint64_t seed) : m_rand{seed} {}
 
     float density = 0.5;
 
@@ -84,7 +83,7 @@ struct rule_maker {
     // TODO: the enum is problematic...
     int interpret_as = legacy::ABS;
 
-    rule_maker(uint64_t seed = time(0)) : m_rand{seed} {
+    explicit rule_maker(uint64_t seed) : m_rand{seed} {
         density = max_density() * 0.3;
     }
     void disturb() { // TODO: explain...
@@ -116,7 +115,6 @@ struct rule_maker {
     }
 
     legacy::ruleT make() {
-        // TODO: all array_base...
         legacy::ruleT::array_base grule{}; // TODO: is it safe not to do value init?
         random_fill(grule.data(), max_density(), density);
         legacy::ruleT::array_base rule = current_partition().dispatch_from(grule);
@@ -126,7 +124,6 @@ struct rule_maker {
 
 // TODO: support shifting...
 // TODO: !!!! recheck when to "restart"..
-
 class rule_runner {
     legacy::ruleT m_rule;
     legacy::tileT m_tile, m_side;

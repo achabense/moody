@@ -27,13 +27,18 @@
 #error This backend requires SDL 2.0.17+ because of SDL_RenderGeometry() function
 #endif
 
-rule_maker maker;
-tile_filler filler;
+rule_maker maker(/* seed= */ time(0));
+tile_filler filler(/* seed= */ 0);
 rule_runner runner({.height = 240, .width = 320});
 rule_recorder recorder;
 
+// TODO: how to generalize this?
 constexpr int pergen_min = 1, pergen_max = 10;
 int pergen = 1;
+
+// TODO: when is this needed?
+static constexpr int start_min = 0, start_max = 20;
+int start_from = 0;
 
 bool cal_rate = true;
 
@@ -296,12 +301,17 @@ int main(int, char**) {
                     runner.restart();
                 }
                 ImGui::SliderInt("Per gen [1-10]", &pergen, pergen_min, pergen_max, "%d",
-                                 ImGuiSliderFlags_NoInput); // TODO: use sprintf for pergen_min and pergen_max.
+                                 ImGuiSliderFlags_NoInput); // TODO: use sprintf for pergen_min and pergen_max,
+                                                            // start_min, start_max...
+                ImGui::SliderInt("Start gen [0-20]", &start_from, start_min, start_max, "%d", ImGuiSliderFlags_NoInput);
             }
 
             ImGui::End();
 
             // run tile (TODO: should be here?)
+            if (runner.gen() == 0) {
+                runner.run(start_from);
+            }
             if (!paused) {
                 // TODO: support timing...
                 runner.run(pergen);
