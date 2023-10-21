@@ -30,6 +30,107 @@ namespace {
         }
     }
 
+    namespace _impl_details {
+        struct symT {
+            static const vector<vector<int>> groups;
+
+            int k;               // Number of different groups.
+            array<int, 512> map; // Map env code to the group it belongs to.
+            consteval symT() {
+                map.fill(-1);
+                int color = 0;
+                for (int code = 0; code < 512; code++) {
+                    if (map[code] == -1) {
+                        equiv(code, color++);
+                    }
+                }
+                k = color;
+            }
+
+        private:
+            // TODO: "color" might be confusing
+            constexpr void equiv(int code, int color) {
+                if (map[code] != -1) {
+                    assert(map[code] == color);
+                    return;
+                }
+                map[code] = color;
+                // clang-format off
+                auto [q, w, e,
+                      a, s, d,
+                      z, x, c] = decode(code);
+                equiv(encode(z, x, c,
+                             a, s, d,
+                             q, w, e), color); // upside-down
+                equiv(encode(e, w, q,
+                             d, s, a,
+                             c, x, z), color); // "leftside-right"
+                equiv(encode(q, a, z,
+                             w, s, x,
+                             e, d, c), color); // diagonal
+                // TODO: temporary...
+                // equiv(encode(a, q, w,
+                //              z, s, e,
+                //              x, c, d), color); // rotate
+                // TODO: temporary... how to incorporate this?
+                equiv(encode(!q, !w, !e,
+                             !a, !s, !d,
+                             !z, !x, !c), color); // ?!
+                // clang-format on
+            }
+        };
+
+        inline constexpr symT sym;
+
+        inline const vector<vector<int>> symT::groups = [] {
+            vector<vector<int>> groups(sym.k);
+            for (int code = 0; code < 512; ++code) {
+                groups[sym.map[code]].push_back(code);
+            }
+            return groups;
+        }();
+    } // namespace _impl_details
+
+    using _impl_details::sym;
+
+    struct sruleT : public array<bool, sym.k> {
+        using array_base = array<bool, sym.k>;
+
+        constexpr sruleT() : array_base{} {}
+        constexpr sruleT(const array_base& base) : array_base{base} {}
+
+        // The implicit conversion interpret this as the map from env-code to the new state.
+        /* implicit */ operator ruleT() const {
+            ruleT rule{};
+            for (int code = 0; code < 512; ++code) {
+                rule[code] = at(sym.map[code]);
+            }
+            return rule;
+        }
+
+        // Interpret this as ???...TODO...
+        ruleT as_flip() const {
+            ruleT rule{};
+            for (int code = 0; code < 512; ++code) {
+                bool s = (code >> 4) & 1;
+                rule[code] = at(sym.map[code]) ? !s : s;
+            }
+            return rule;
+        }
+
+        // provide minimal support for creating randomized rules.
+        void random_fill(int ct, auto&& rnd) {
+            ct = std::clamp(ct, 0, sym.k);
+            fill(false);
+            std::fill_n(begin(), ct, true);
+            shuffle(rnd);
+        }
+
+        void shuffle(auto&& rnd) {
+            std::shuffle(begin(), end(), rnd);
+        }
+    };
+
     // TODO: explain...
     consteval void test_symmetry() {
         int max = sym.map[0];
@@ -40,16 +141,6 @@ namespace {
             }
         }
     }
-
-    // TODO: test that identity doesn't ...
-    inline constexpr ruleT rule_identity = [] {
-        ruleT rule{};
-        for (int code = 0; code < 512; ++code) {
-            bool s = (code >> 4) & 1;
-            rule[code] = s;
-        }
-        return rule;
-    }();
 
     void test_symmetry_2() {
         std::mt19937 rnd(uint32_t(time(0)));

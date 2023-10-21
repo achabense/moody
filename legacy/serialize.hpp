@@ -5,29 +5,7 @@
 #include "rule.hpp"
 
 namespace legacy {
-    // TODO: general way to do serialization...
     // TODO: regex...
-    // unlike std::bitset, this uses uint8_t as underlying ...
-    template <int size> class bitsetT {
-        static_assert(CHAR_BIT == 8);
-        static constexpr int sizeW = (size + 7) / 8;
-        uint8_t bits[sizeW];
-
-        constexpr bitsetT() : bits{} {}
-
-        bool get(int i) const {
-            assert(i >= 0 && i < size);
-            int wpos = i / 8, bpos = i % 8;
-            return (bits[wpos] >> bpos) & 0b1;
-        }
-
-        void set(int i, bool b) {
-            assert(i >= 0 && i < size);
-            int wpos = i / 8, bpos = i % 8;
-            bits[wpos] |= uint8_t(b) << bpos;
-        }
-    };
-
     class compress {
         array<uint8_t, 64> bits{}; // as bitset.
     public:

@@ -60,9 +60,6 @@ struct rule_maker {
         std::shuffle(begin, begin + size, m_rand);
     }
 
-    bool lock_sym_spatial = true;
-    bool lock_sym_state = true;
-
     std::mt19937_64 m_rand;
     // TODO: "density" might not be suitable name...
     // density ¡Ê [0, max_density]

@@ -27,7 +27,7 @@
 #error This backend requires SDL 2.0.17+ because of SDL_RenderGeometry() function
 #endif
 
-rule_maker maker(/* seed= */ time(0));
+rule_maker maker(/* seed= */ time(nullptr));
 tile_filler filler(/* seed= */ 0);
 rule_runner runner({.height = 240, .width = 320});
 rule_recorder recorder;
@@ -37,7 +37,7 @@ constexpr int pergen_min = 1, pergen_max = 10;
 int pergen = 1;
 
 // TODO: when is this needed?
-static constexpr int start_min = 0, start_max = 20;
+constexpr int start_min = 0, start_max = 20;
 int start_from = 0;
 
 bool cal_rate = true;
@@ -137,7 +137,7 @@ int main(int, char**) {
                 static int frame = 0;
                 ImGui::Text("(%.1f FPS) Frame:%d\n"
                             "Width:%d,Height:%d",
-                            io.Framerate, frame++, img.width(), img.height());
+                            io.Framerate, frame++, img.width(), img.height()); // TODO: why img?
             }
 
             {
@@ -189,6 +189,7 @@ int main(int, char**) {
                         }
                     }
                     ImGui::TextUnformatted(found_str.empty() ? "(none)" : wrap_rule_string(found_str).c_str());
+                    // TODO: not suitable to use left click...
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_::ImGuiMouseButton_Left) && !found_str.empty()) {
                         recorder.take(legacy::from_string<legacy::ruleT>(found_str));
                     }
@@ -296,7 +297,7 @@ int main(int, char**) {
 
             {
                 // TODO: (?) currently suitable to restart immediately...
-                if (ImGui::SliderFloat("Density [0.0-1.0]", &runner.m_filler->density, 0.0f, 1.0f, "%.3f",
+                if (ImGui::SliderFloat("Init density [0.0-1.0]", &runner.m_filler->density, 0.0f, 1.0f, "%.3f",
                                        ImGuiSliderFlags_NoInput)) {
                     runner.restart();
                 }
