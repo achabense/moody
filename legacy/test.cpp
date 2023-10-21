@@ -1,3 +1,6 @@
+// should be totally rewritten in the future.
+
+#if 0
 #include <random>
 
 #include "rule.hpp"
@@ -192,3 +195,4 @@ namespace legacy {
         puts("$");
     }
 } // namespace legacy
+#endif

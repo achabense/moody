@@ -129,7 +129,7 @@ namespace legacy {
         }
 
     private:
-        // This could be used to support arbitary-sized space. TODO: rephrase...
+        // This could be used to support arbitrary-sized space. TODO: rephrase...
         const tileT& gather( // clang-format off
             const tileT* q, const tileT* w, const tileT* e,
             const tileT* a, /*    this   */ const tileT* d,
@@ -189,25 +189,6 @@ namespace legacy {
             return working;
         }
 
-        // TODO: why member function?
-        // todo: less useful than for_each...
-        // todo: use bernoulli_distribution instead...
-        void random_fill(double density, auto&& rnd) {
-            density = std::clamp(density, 0.0, 1.0);
-            auto [height, width] = m_shape;
-            int area = height * width;
-            bool* to_shuffle = new bool[area];
-
-            std::fill_n(to_shuffle, area, false);
-            std::fill_n(to_shuffle, area * density, true);
-            std::shuffle(to_shuffle, to_shuffle + area, rnd);
-
-            for (int y = 0; y < height; ++y) {
-                memcpy(line(y), to_shuffle + y * width, width);
-            }
-            delete[] to_shuffle;
-        }
-
         // TODO: heavy?
         // TODO: too trivial and app-specific?
         // for-each-line?
@@ -232,15 +213,5 @@ namespace legacy {
             }
             return true;
         }
-
-        // TODO: should this be supported? only useful in torus space...
-        void shift(int dy, int dx, tileT& dest) {
-            assert(this != &dest);
-            dest.resize(m_shape);
-
-            // TODO: extra assertion...
-            // TODO:...
-        }
-        // experimental...
     };
 } // namespace legacy

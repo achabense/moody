@@ -23,10 +23,19 @@
 // TODO: restart should...
 // TODO: run_extra..
 // TODO: some settings should leave states in paused state...
-// TODO: rnd-mode for tile...(stable vs arbitary...)
+// TODO: rnd-mode for tile...(stable vs arbitrary...)
 // TODO: right click to enable/disable miniwindow...
 // TODO: fine-grained rule edition...
 // TODO: file container. easy ways to add fav...
+
+// TODO: really?
+/* implicitly inline */ void random_fill(bool* begin, bool* end, int count, auto&& rand) {
+    int dist = end - begin;
+    assert(dist > 0);
+    std::fill(begin, end, false);
+    std::fill(begin, begin + std::clamp(count, 0, dist), true);
+    std::shuffle(begin, end, rand);
+}
 
 class tile_filler {
     std::mt19937_64 m_rand;
@@ -36,11 +45,21 @@ public:
 
     float density = 0.5;
 
-    void disturb() { // TODO: explain...
+    void disturb() {
+        // enough to make totally different result:
         (void)m_rand();
     }
-    void random_fill(legacy::tileT& tile) const {
-        tile.random_fill(density, std::mt19937_64{m_rand});
+    void fill(legacy::tileT& tile) const {
+        auto [height, width] = tile.shape();
+        int area = height * width;
+        bool* data = new bool[area];
+
+        random_fill(data, data + area, area * density, std::mt19937_64{m_rand});
+        for (int y = 0; y < height; ++y) {
+            memcpy(tile.line(y), data + y * width, width);
+        }
+
+        delete[] data;
     }
 };
 
@@ -51,16 +70,10 @@ public:
 // TODO: how to support user-defined partition?
 // TODO: what's the relation with analyzer/ editor?
 // TODO: how to interact with recorder automatically?
-struct rule_maker {
-    void random_fill(bool* begin, int size, int count) {
-        assert(size > 0);
-        count = std::clamp(count, 0, size);
-        std::fill_n(begin, size, false);
-        std::fill_n(begin, count, true);
-        std::shuffle(begin, begin + size, m_rand);
-    }
-
+class rule_maker {
     std::mt19937_64 m_rand;
+
+public:
     // TODO: "density" might not be suitable name...
     // density ¡Ê [0, max_density]
     int density = 0; // TODO: rename. TODO: revert density setting?
@@ -82,9 +95,6 @@ struct rule_maker {
 
     explicit rule_maker(uint64_t seed) : m_rand{seed} {
         density = max_density() * 0.3;
-    }
-    void disturb() { // TODO: explain...
-        (void)m_rand();
     }
 
     const legacy::partitionT& current_partition() const {
@@ -113,7 +123,7 @@ struct rule_maker {
 
     legacy::ruleT make() {
         legacy::ruleT::array_base grule{}; // TODO: is it safe not to do value init?
-        random_fill(grule.data(), max_density(), density);
+        random_fill(grule.data(), grule.data() + max_density(), density, m_rand);
         legacy::ruleT::array_base rule = current_partition().dispatch_from(grule);
         return legacy::ruleT(rule, (legacy::interpret_mode)interpret_as);
     }
@@ -149,7 +159,7 @@ public:
     }
 
     void restart() {
-        m_filler->random_fill(m_tile);
+        m_filler->fill(m_tile);
         m_gen = 0;
     }
 
@@ -161,12 +171,7 @@ public:
         m_gen += count;
     }
 
-    // TODO: support in gui.
-    // TODO: should the filler be shifted too? if so then must be tile-based...
-    void shift(int dy, int dx) {
-        m_tile.shift(dy, dx, m_side);
-        m_tile.swap(m_side);
-    }
+    // TODO: support "shift"; should the filler be shifted too? if so then must be tile-based...
 
     rule_runner(legacy::shapeT shape) : m_tile(shape), m_side(shape, legacy::tileT::no_clear) {}
 };
@@ -185,10 +190,10 @@ class rule_recorder {
 public:
     // TODO: init_state is problematic...
     // TODO: can this be null?
-    // TODO: nullibility? ownership?
+    // TODO: nullability? ownership?
     rule_runner* m_runner = nullptr; // notify. // TODO: shared_ptr?
     rule_maker* m_maker = nullptr;   // source.
-    // TODO: analyser... (notify...)
+    // TODO: analyzer... (notify...)
 
     // ????
     void attach_maker(rule_maker* maker) {
