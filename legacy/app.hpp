@@ -43,18 +43,22 @@ class tile_filler {
 public:
     explicit tile_filler(uint64_t seed) : m_rand{seed} {}
 
-    float density = 0.5;
+    float density = 0.5; // ¡Ê [0.0f, 1.0f]
 
     void disturb() {
-        // enough to make totally different result:
+        // Enough to make totally different result:
         (void)m_rand();
     }
-    void fill(legacy::tileT& tile) const {
-        auto [height, width] = tile.shape();
-        int area = height * width;
-        bool* data = new bool[area];
+    void fill(legacy::tileT& tile, const legacy::rectT* resize = nullptr) const {
+        if (resize) {
+            tile.resize(*resize);
+        }
 
+        int width = tile.width(), height = tile.height();
+        int area = width * height;
+        bool* data = new bool[area];
         random_fill(data, data + area, area * density, std::mt19937_64{m_rand});
+
         for (int y = 0; y < height; ++y) {
             memcpy(tile.line(y), data + y * width, width);
         }
@@ -173,7 +177,7 @@ public:
 
     // TODO: support "shift"; should the filler be shifted too? if so then must be tile-based...
 
-    rule_runner(legacy::shapeT shape) : m_tile(shape), m_side(shape, legacy::tileT::no_clear) {}
+    rule_runner(legacy::rectT size) : m_tile(size), m_side(size) {}
 };
 
 class rule_recorder {
@@ -252,4 +256,29 @@ public:
     }
 
     // TODO: ctor...maker-ctor as...
+};
+
+// TODO: use this instead...
+class tile_runner {
+    legacy::tileT m_tile, m_side;
+    bool initialized = false;
+
+public:
+    tile_runner(legacy::rectT size) : m_tile(size), m_side(size) {}
+
+    void reset(const tile_filler& filler, const legacy::rectT* resize = nullptr) {
+        filler.fill(m_tile, resize);
+        initialized = true;
+    }
+
+    const legacy::tileT& tile() const {
+        assert(initialized);
+        return m_tile;
+    }
+
+    void run(const legacy::ruleT& rule) {
+        assert(initialized);
+        m_tile.gather().apply(rule, m_side);
+        m_tile.swap(m_side);
+    }
 };

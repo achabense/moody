@@ -29,7 +29,7 @@
 
 rule_maker maker(/* seed= */ time(nullptr));
 tile_filler filler(/* seed= */ 0);
-rule_runner runner({.height = 240, .width = 320});
+rule_runner runner({.width = 320, .height = 240});
 rule_recorder recorder;
 
 // TODO: how to generalize this?
@@ -267,9 +267,8 @@ int main(int, char**) {
                 ImGui::Checkbox("Calculate density", &cal_rate);
                 if (cal_rate) {
                     ImGui::SameLine();
-                    auto [h, w] = runner.tile().shape();
                     int count = runner.tile().count();
-                    ImGui::Text("(%f)", float(count) / (h * w));
+                    ImGui::Text("(%f)", float(count) / runner.tile().area());
                 }
             }
 

@@ -39,7 +39,7 @@ public:
     }
 
     void update(const legacy::tileT& tile) {
-        auto [h, w] = tile.shape();
+        int w = tile.width(), h = tile.height();
         assert(w == m_w && h == m_h);
 
         for (int y = 0; y < h; ++y) {
