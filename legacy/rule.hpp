@@ -52,6 +52,7 @@ namespace legacy {
     // TODO: is it suitable to declare a namespace-enum for this?
     enum interpret_mode : bool { ABS, XOR };
 
+    // TODO: make from_base, to_base, global functions?
     struct ruleT : public array<bool, 512> {
         using array_base = array<bool, 512>;
 

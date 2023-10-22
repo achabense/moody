@@ -79,7 +79,7 @@ class rule_maker {
 
 public:
     // TODO: "density" might not be suitable name...
-    // density ¡Ê [0, max_density]
+    // density ¡Ê [0, max_density()]
     int density = 0; // TODO: rename. TODO: revert density setting?
 
     // TODO: aside from filters, the problem is, [what] to support?
@@ -258,6 +258,9 @@ public:
     // TODO: ctor...maker-ctor as...
 };
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+// in developement...
+
 // TODO: use this instead...
 class tile_runner {
     legacy::tileT m_tile, m_side;
@@ -280,5 +283,107 @@ public:
         assert(initialized);
         m_tile.gather().apply(rule, m_side);
         m_tile.swap(m_side);
+    }
+};
+
+struct scannerT {
+    const legacy::partitionT* const partition;
+    std::array<bool, 512> grule;
+    bool matches;
+
+    void scan(const legacy::ruleT::array_base& rule, bool force) {
+        matches = partition->matches(rule) || force; // TODO: "|| force" suitable?
+        if (matches) {
+            partition->gather_from(rule);
+        }
+    }
+};
+
+class rule_editor {
+    std::mt19937_64 m_rand;
+
+public:
+    std::vector<scannerT> scanlist; // must not be empty...
+    int using_partition = 0;
+
+    std::array<bool, 512> m_grule; // grouped by using-partition.
+    const legacy::partitionT* m_partition;
+
+    bool matches = false;
+    legacy::ruleT::array_base m_rulebase;
+    int interpret_as = legacy::ABS; // TODO: the enum is problematic...
+
+    legacy::ruleT to_rule() const {
+        return legacy::ruleT(m_rulebase, (legacy::interpret_mode)interpret_as);
+    }
+
+    // TODO: the cost will never be significant.
+    void take_rule(const legacy::ruleT& rule) {
+        m_rulebase = rule.to_base((legacy::interpret_mode)interpret_as);
+        for (auto& scanner : scanlist) {
+            scanner.scan(rule, false);
+        }
+    }
+
+    // TODO: support masking mode?
+    enum update_mode {
+        randomized,
+        addition,
+        permutation,
+    } m_mode;
+
+    void update() {
+        switch (m_mode) {}
+    }
+
+    // TODO: "density" might not be suitable name...
+    // density ¡Ê [0, max_density]
+    int density = 0; // TODO: rename. TODO: revert density setting?
+
+    // TODO: aside from filters, the problem is, [what] to support?
+    // TODO: partially symmetric rules?
+    enum generator : int {
+        none, // arbitrary 512 str, not used.
+        sub_spatial,
+        sub_spatial2,
+        spatial,
+        spatial_paired,
+        spatial_state,
+        perm
+    } g_mode = spatial; // TODO: how to control this?
+
+    explicit rule_editor(uint64_t seed) : m_rand{seed} {
+        density = max_density() * 0.3;
+    }
+
+    const legacy::partitionT& current_partition() const {
+        switch (g_mode) {
+        case none: // TODO: extremely inefficient...
+            return legacy::partition::none;
+        case sub_spatial:
+            return legacy::partition::sub_spatial;
+        case sub_spatial2:
+            return legacy::partition::sub_spatial2;
+        case spatial:
+            return legacy::partition::spatial;
+        case spatial_paired:
+            return legacy::partition::spatial_paired;
+        case spatial_state:
+            return legacy::partition::spatial_state;
+        case perm:
+            return legacy::partition::permutation;
+        default:
+            abort(); // TODO ...
+        }
+    }
+    int max_density() const {
+        return current_partition().k();
+    }
+
+    legacy::ruleT make() {
+        legacy::ruleT::array_base grule{}; // TODO: is it safe not to do value init?
+        random_fill(grule.data(), grule.data() + max_density(), density, m_rand);
+        legacy::ruleT::array_base rule = current_partition().dispatch_from(grule);
+        return legacy::ruleT(rule, (legacy::interpret_mode)interpret_as);
     }
 };

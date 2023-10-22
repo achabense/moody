@@ -78,8 +78,9 @@ int main(int, char**) {
     // recorder.m_maker = &maker;
     // recorder.new_rule(); // first rule...
 
-    tile_image img(renderer, runner.tile()); // TODO: can be
+    tile_image img(renderer, runner.tile()); // TODO: ...
     bool paused = false;
+    bool show_rule_editor = true;
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -125,6 +126,40 @@ int main(int, char**) {
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
+        if (show_rule_editor &&
+            ImGui::Begin("Rule editor", &show_rule_editor, ImGuiWindowFlags_::ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::TextUnformatted("This is rule editor");
+
+            auto rule_str = to_string(runner.rule()); // how to reuse the resource?
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 16);
+            ImGui::TextUnformatted(rule_str.c_str());
+            ImGui::PopTextWrapPos();
+
+            auto rule = runner.rule();
+            auto& part = legacy::partition::spatial;
+            int k = part.k();
+            auto grule = part.gather_from(rule);
+            if (ImGui::TreeNode("x")) {
+                for (int j = 0; j < k; j++) {
+                    static char __[20];
+                    snprintf(__, 20, "%3d:%d", j, grule[j]);
+                    if (j % 8 != 0) {
+                        ImGui::SameLine();
+                    }
+                    if (ImGui::Button(__)) {
+                        bool to = !grule[j];
+                        for (auto code : part.groups()[j]) {
+                            rule[code] = to;
+                        }
+                        recorder.take(rule);
+                    }
+                }
+                ImGui::TreePop();
+            }
+
+            ImGui::End();
+        }
+
         // TODO: remove this when suitable...
         ImGui::ShowDemoWindow();
 
@@ -132,6 +167,7 @@ int main(int, char**) {
             ImGui::Begin("-v-", nullptr,
                          ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse |
                              ImGuiWindowFlags_::ImGuiWindowFlags_AlwaysAutoResize);
+            ImGui::Checkbox("Rule editor", &show_rule_editor);
 
             {
                 static int frame = 0;
