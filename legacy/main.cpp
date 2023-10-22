@@ -225,7 +225,7 @@ int main(int, char**) {
                     if (text) {
                         std::string str = text;
                         // TODO: the logic should be in <seralize.h>...
-                        std::regex find_rule("[0-9a-z]{128}");
+                        std::regex find_rule("[0-9a-zA-Z]{128}");
                         std::smatch match_result;
                         if (std::regex_search(str, match_result, find_rule)) {
                             found_str = match_result[0];
@@ -336,6 +336,7 @@ int main(int, char**) {
             }
 
             {
+                // TODO: toooo ugly...
                 // TODO: (?) currently suitable to restart immediately...
                 if (ImGui::SliderFloat("Init density [0.0-1.0]", &runner.m_filler->density, 0.0f, 1.0f, "%.3f",
                                        ImGuiSliderFlags_NoInput)) {

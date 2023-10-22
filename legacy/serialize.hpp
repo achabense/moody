@@ -1,7 +1,5 @@
 #pragma once
 
-#include <bitset>
-
 #include "rule.hpp"
 
 namespace legacy {
@@ -83,6 +81,8 @@ namespace legacy {
                 return ch - '0';
             } else if (ch >= 'a' && ch <= 'f') {
                 return 10 + ch - 'a';
+            } else if (ch >= 'A' && ch <= 'F') /* legacy */ {
+                return 10 + ch - 'A';
             } else {
                 throw std::invalid_argument(source_str);
             }
