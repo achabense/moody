@@ -40,6 +40,12 @@ int pergen = 1;
 constexpr int start_min = 0, start_max = 20;
 int start_from = 0;
 
+// TODO: support pace formally...
+// ~paceless, take another thread... (need locks)
+// enum pace_mode { per_frame, per_duration };
+constexpr int skip_min = 0, skip_max = 20;
+int skip_per_frame = 0;
+
 bool cal_rate = true;
 
 // looks *extremely* horrible and inefficient
@@ -74,7 +80,7 @@ int main(int, char**) {
     runner.m_filler = &filler;
     recorder.m_runner = &runner;
     // TODO: is this correct design?
-    recorder.attach_maker(&maker);
+    recorder.take(maker.make());
     // recorder.m_maker = &maker;
     // recorder.new_rule(); // first rule...
 
@@ -97,6 +103,8 @@ int main(int, char**) {
 
     // Our state
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
+    static int frame = 0;
 
     // Main loop
     bool done = false;
@@ -131,7 +139,7 @@ int main(int, char**) {
             ImGui::TextUnformatted("This is rule editor");
 
             auto rule_str = to_string(runner.rule()); // how to reuse the resource?
-            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 16);
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 18); // TODO: "fontsize" is height
             ImGui::TextUnformatted(rule_str.c_str());
             ImGui::PopTextWrapPos();
 
@@ -146,7 +154,7 @@ int main(int, char**) {
                     if (j % 8 != 0) {
                         ImGui::SameLine();
                     }
-                    if (ImGui::Button(__)) {
+                    if (ImGui::SmallButton(__)) {
                         bool to = !grule[j];
                         for (auto code : part.groups()[j]) {
                             rule[code] = to;
@@ -170,7 +178,6 @@ int main(int, char**) {
             ImGui::Checkbox("Rule editor", &show_rule_editor);
 
             {
-                static int frame = 0;
                 ImGui::Text("(%.1f FPS) Frame:%d\n"
                             "Width:%d,Height:%d",
                             io.Framerate, frame++, img.width(), img.height()); // TODO: why img?
@@ -205,13 +212,13 @@ int main(int, char**) {
                     ImVec2 uv1 = ImVec2((region_x + region_sz) / img_size.x, (region_y + region_sz) / img_size.y);
                     ImGui::Image(img_texture, ImVec2(region_sz * zoom, region_sz * zoom), uv0, uv1);
 
-                    ImGui::TextUnformatted("Right click to copy to clipboard:"); // TODO: show successful / fail...
+                    ImGui::TextUnformatted("Rclick to copy to clipboard:"); // TODO: show successful / fail...
                     auto rule_str = to_string(runner.rule());                    // how to reuse the resource?
                     ImGui::TextUnformatted(wrap_rule_string(rule_str).c_str());
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_::ImGuiMouseButton_Right)) {
                         ImGui::SetClipboardText(rule_str.c_str()); // TODO: notify...
                     }
-                    ImGui::TextUnformatted("Left click to copy from clipboard:");
+                    ImGui::TextUnformatted("Lclick to copy from clipboard:");
                     std::string found_str;
                     const char* text = ImGui::GetClipboardText();
                     // TODO: needed?
@@ -236,10 +243,8 @@ int main(int, char**) {
                 if (ImGui::IsItemHovered()) {
                     // TODO: should be supported in certain areas... add more ways to control!
                     if (io.MouseWheel < 0) { // scroll down
-                        paused = false;
                         recorder.next();
                     } else if (io.MouseWheel > 0) { // scroll up
-                        paused = false;
                         recorder.prev();
                     }
                 }
@@ -290,7 +295,7 @@ int main(int, char**) {
                 }
 
                 if (new_rule) {
-                    recorder.new_rule();
+                    recorder.take(maker.make());
                 }
             }
 
@@ -340,6 +345,7 @@ int main(int, char**) {
                                  ImGuiSliderFlags_NoInput); // TODO: use sprintf for pergen_min and pergen_max,
                                                             // start_min, start_max...
                 ImGui::SliderInt("Start gen [0-20]", &start_from, start_min, start_max, "%d", ImGuiSliderFlags_NoInput);
+                ImGui::SliderInt("Rpf [0-20]", &skip_per_frame, skip_min, skip_max, "%d", ImGuiSliderFlags_NoInput);
             }
 
             ImGui::End();
@@ -350,7 +356,9 @@ int main(int, char**) {
             }
             if (!paused) {
                 // TODO: support timing...
-                runner.run(pergen);
+                if (frame % (skip_per_frame + 1) == 0) {
+                    runner.run(pergen);
+                }
             }
         }
 

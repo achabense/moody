@@ -1,6 +1,7 @@
 #pragma once
 
 #include <random>
+#include <unordered_map>
 
 #include "rule.hpp"
 #include "serialize.hpp"
@@ -182,6 +183,8 @@ public:
 
 class rule_recorder {
     std::vector<legacy::compress> m_record;
+    std::unordered_map<legacy::compress, int> m_map;
+
     int m_pos = -1; // always<=size()-1.// TODO: how to make m_pos always valid?
 
     void invariants() const {
@@ -196,14 +199,7 @@ public:
     // TODO: can this be null?
     // TODO: nullability? ownership?
     rule_runner* m_runner = nullptr; // notify. // TODO: shared_ptr?
-    rule_maker* m_maker = nullptr;   // source.
     // TODO: analyzer... (notify...)
-
-    // ????
-    void attach_maker(rule_maker* maker) {
-        m_maker = maker;
-        new_rule();
-    }
 
     bool empty() const {
         return m_record.empty();
@@ -218,21 +214,21 @@ public:
     }
 
     // TODO: look for better names...
+    // TODO: reconsider what should be done when already exists...
     void take(const legacy::ruleT& rule) {
-        // TODO: refine logic, search around...
-        // TODO: let history hold one rule to avoid awkwardness...
-        // assert(m_runner->rule() == *pos); // TODO:redesign this function.
-        if (m_record.empty() || m_runner->rule() != rule) {
-            m_record.emplace_back(rule);
+        legacy::compress cmpr(rule);
+        auto find = m_map.find(cmpr);
+        if (find != m_map.end()) {
+            m_pos = find->second;
+        } else {
+            m_record.push_back(cmpr);
             m_pos = m_record.size() - 1;
-
-            m_runner->reset_rule(rule);
+            m_map.emplace(cmpr, m_pos);
         }
-    }
 
-    void new_rule() {
-        if (m_maker) {
-            take(m_maker->make());
+        // TODO: this is awkward...
+        if (m_runner->rule() != rule) {
+            m_runner->reset_rule(rule);
         }
     }
 
@@ -243,8 +239,6 @@ public:
         assert(m_pos + 1 <= m_record.size());
         if (m_pos + 1 != m_record.size()) {
             m_runner->reset_rule(legacy::ruleT(m_record[++m_pos]));
-        } else {
-            new_rule();
         }
     }
 
