@@ -1,9 +1,10 @@
 #pragma once
 
+#include <regex>
+
 #include "rule.hpp"
 
 namespace legacy {
-    // TODO: regex...
     class compress {
         array<uint8_t, 64> bits{}; // as bitset.
     public:
@@ -95,6 +96,11 @@ namespace legacy {
 
     inline string to_string(const ruleT& rule) {
         return string(compress(rule));
+    }
+
+    inline const std::regex& rulestr_regex() {
+        static std::regex reg("[0-9a-zA-Z]{128}", std::regex_constants::optimize);
+        return reg;
     }
 
     // TODO: unreliable...

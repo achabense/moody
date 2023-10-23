@@ -37,7 +37,7 @@ constexpr int pergen_min = 1, pergen_max = 10;
 int pergen = 1;
 
 // TODO: when is this needed?
-constexpr int start_min = 0, start_max = 20;
+constexpr int start_min = 0, start_max = 100;
 int start_from = 0;
 
 // TODO: support pace formally...
@@ -52,6 +52,62 @@ bool cal_rate = true;
 // TODO: use imgui line wrapping....
 std::string wrap_rule_string(const std::string& str) {
     return str.substr(0, 32) + "\n" + str.substr(32, 16) + "...";
+}
+
+legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule) {
+    static const legacy::partitionT* parts[]{&legacy::partition::none, &legacy::partition::spatial,
+                                             &legacy::partition::permutation};
+    static const char* names[]{"none", "spatial", "permutation"};
+
+    legacy::ruleT rule = old_rule;
+    if (show) {
+        bool shown = ImGui::Begin("Rule editor", &show);
+        if (shown) {
+            ImGui::TextUnformatted("This is rule editor");
+
+            auto rule_str = to_string(rule);                   // how to reuse the resource?
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 18); // TODO: "fontsize" is height
+            ImGui::TextUnformatted(rule_str.c_str());
+            ImGui::PopTextWrapPos();
+
+            // How to specify the first "BeginTabItem"?
+            if (ImGui::BeginTabBar("##Type")) {
+                for (int i = 0; i < std::size(parts); ++i) {
+                    const auto& part = *parts[i];
+                    bool matches = part.matches(rule); // implicit conversion...
+                    if (!matches) {
+                        ImGui::BeginDisabled();
+                        ImGui::BeginTabItem(names[i]);
+                        ImGui::EndDisabled();
+                    } else if(ImGui::BeginTabItem(names[i])){
+                        const int k = part.k();
+                        auto grule = part.gather_from(rule);
+
+                        // buttons. TODO: better visual; show group members.
+                        for (int j = 0; j < k; j++) {
+                            static char __[20]; // "static" not needed?
+                            snprintf(__, 20, "%3d:%d", j, grule[j]);
+                            if (j % 8 != 0) {
+                                ImGui::SameLine();
+                            }
+                            if (ImGui::SmallButton(__)) {
+                                bool to = !grule[j];
+                                for (auto code : part.groups()[j]) {
+                                    rule[code] = to;
+                                }
+                            }
+                        }
+
+                        ImGui::EndTabItem();
+                    }
+                }
+
+                ImGui::EndTabBar();
+            }
+        }
+        ImGui::End();
+    }
+    return rule;
 }
 
 int main(int, char**) {
@@ -134,38 +190,11 @@ int main(int, char**) {
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
-        if (show_rule_editor &&
-            ImGui::Begin("Rule editor", &show_rule_editor, ImGuiWindowFlags_::ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImGui::TextUnformatted("This is rule editor");
-
-            auto rule_str = to_string(runner.rule()); // how to reuse the resource?
-            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 18); // TODO: "fontsize" is height
-            ImGui::TextUnformatted(rule_str.c_str());
-            ImGui::PopTextWrapPos();
-
-            auto rule = runner.rule();
-            auto& part = legacy::partition::spatial;
-            int k = part.k();
-            auto grule = part.gather_from(rule);
-            if (ImGui::TreeNode("x")) {
-                for (int j = 0; j < k; j++) {
-                    static char __[20];
-                    snprintf(__, 20, "%3d:%d", j, grule[j]);
-                    if (j % 8 != 0) {
-                        ImGui::SameLine();
-                    }
-                    if (ImGui::SmallButton(__)) {
-                        bool to = !grule[j];
-                        for (auto code : part.groups()[j]) {
-                            rule[code] = to;
-                        }
-                        recorder.take(rule);
-                    }
-                }
-                ImGui::TreePop();
-            }
-
-            ImGui::End();
+        // TODO: editor works poorly with recorder...
+        // TODO: shouldnt be here...
+        auto edited = rule_editor(show_rule_editor, runner.rule());
+        if (edited != runner.rule()) {
+            recorder.take(edited);
         }
 
         // TODO: remove this when suitable...
@@ -197,7 +226,7 @@ int main(int, char**) {
                     const float region_sz = 32.0f;
                     float region_x = io.MousePos.x - pos.x - region_sz * 0.5f;
                     float region_y = io.MousePos.y - pos.y - region_sz * 0.5f;
-                    const float zoom = 4.0f; // TODO: constexpr; should be settable between 4 and 8.
+                    const float zoom = 4.0f; // TODO: should be settable between 4 and 8.
                     if (region_x < 0.0f) {
                         region_x = 0.0f;
                     } else if (region_x > img_size.x - region_sz) {
@@ -213,7 +242,7 @@ int main(int, char**) {
                     ImGui::Image(img_texture, ImVec2(region_sz * zoom, region_sz * zoom), uv0, uv1);
 
                     ImGui::TextUnformatted("Rclick to copy to clipboard:"); // TODO: show successful / fail...
-                    auto rule_str = to_string(runner.rule());                    // how to reuse the resource?
+                    auto rule_str = to_string(runner.rule());               // how to reuse the resource?
                     ImGui::TextUnformatted(wrap_rule_string(rule_str).c_str());
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_::ImGuiMouseButton_Right)) {
                         ImGui::SetClipboardText(rule_str.c_str()); // TODO: notify...
@@ -221,18 +250,16 @@ int main(int, char**) {
                     ImGui::TextUnformatted("Lclick to copy from clipboard:");
                     std::string found_str;
                     const char* text = ImGui::GetClipboardText();
-                    // TODO: needed?
+                    // TODO: can text return nullptr?
                     if (text) {
                         std::string str = text;
-                        // TODO: the logic should be in <seralize.h>...
-                        std::regex find_rule("[0-9a-zA-Z]{128}");
                         std::smatch match_result;
-                        if (std::regex_search(str, match_result, find_rule)) {
+                        if (std::regex_search(str, match_result, legacy::rulestr_regex())) {
                             found_str = match_result[0];
                         }
                     }
                     ImGui::TextUnformatted(found_str.empty() ? "(none)" : wrap_rule_string(found_str).c_str());
-                    // TODO: not suitable to use left click...
+                    // TODO: left click is problematic here...
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_::ImGuiMouseButton_Left) && !found_str.empty()) {
                         recorder.take(legacy::from_string<legacy::ruleT>(found_str));
                     }
@@ -294,6 +321,34 @@ int main(int, char**) {
                     new_rule = true;
                 }
 
+#if 0
+                ImGui::SameLine();
+                if (ImGui::Button("Copy rule")) {
+                    auto rule_str = to_string(runner.rule());
+                    ImGui::SetClipboardText(rule_str.c_str());
+                }
+                if (ImGui::BeginItemTooltip()) {
+                    auto rule_str = to_string(runner.rule());
+                    ImGui::TextUnformatted(wrap_rule_string(rule_str).c_str());
+                    ImGui::EndTooltip();
+                }
+
+                ImGui::SameLine();
+                if (ImGui::Button("Paste rule")) {
+                    std::string found_str;
+                    const char* text = ImGui::GetClipboardText();
+                    if (text) {
+                        std::string str = text;
+                        // TODO: the logic should be in <seralize.h>...
+                        std::regex find_rule("[0-9a-zA-Z]{128}");
+                        std::smatch match_result;
+                        if (std::regex_search(str, match_result, find_rule)) {
+                            recorder.take(legacy::from_string<legacy::ruleT>(match_result[0]));
+                            new_rule = false;
+                        }
+                    }
+                }
+#endif
                 if (new_rule) {
                     recorder.take(maker.make());
                 }
@@ -342,11 +397,12 @@ int main(int, char**) {
                                        ImGuiSliderFlags_NoInput)) {
                     runner.restart();
                 }
+                ImGui::SliderInt("Start gen [0-100]", &start_from, start_min, start_max, "%d",
+                                 ImGuiSliderFlags_NoInput);
                 ImGui::SliderInt("Per gen [1-10]", &pergen, pergen_min, pergen_max, "%d",
                                  ImGuiSliderFlags_NoInput); // TODO: use sprintf for pergen_min and pergen_max,
                                                             // start_min, start_max...
-                ImGui::SliderInt("Start gen [0-20]", &start_from, start_min, start_max, "%d", ImGuiSliderFlags_NoInput);
-                ImGui::SliderInt("Rpf [0-20]", &skip_per_frame, skip_min, skip_max, "%d", ImGuiSliderFlags_NoInput);
+                ImGui::SliderInt("Speed [0-20]", &skip_per_frame, skip_min, skip_max, "%d", ImGuiSliderFlags_NoInput);
             }
 
             ImGui::End();
@@ -356,7 +412,6 @@ int main(int, char**) {
                 runner.run(start_from);
             }
             if (!paused) {
-                // TODO: support timing...
                 if (frame % (skip_per_frame + 1) == 0) {
                     runner.run(pergen);
                 }

@@ -37,6 +37,11 @@ namespace legacy {
         return {q, w, e, a, s, d, z, x, c};
     }
 
+    // Equivalent to decode(code).s.
+    constexpr bool decode_s(int code) {
+        return (code >> 4) & 1;
+    }
+
     // Equivalent to envT(...).encode().
     constexpr int encode(bool q, bool w, bool e, bool a, bool s, bool d, bool z, bool x, bool c) {
         int code = (q << 0) | (w << 1) | (e << 2) | (a << 3) | (s << 4) | (d << 5) | (z << 6) | (x << 7) | (c << 8);
@@ -63,7 +68,7 @@ namespace legacy {
         constexpr ruleT(const array_base& base, interpret_mode mode) : array_base{base} {
             if (mode == XOR) {
                 for (int code = 0; code < 512; ++code) {
-                    bool s = (code >> 4) & 1; // TODO: helper-function...
+                    bool s = decode_s(code);
                     operator[](code) = operator[](code) ? !s : s;
                 }
             }
@@ -73,8 +78,7 @@ namespace legacy {
             array_base r{*this};
             if (mode == XOR) {
                 for (int code = 0; code < 512; ++code) {
-                    bool s = (code >> 4) & 1; // TODO: helper-function...
-                    r[code] = r[code] == s ? false : true;
+                    r[code] = r[code] == decode_s(code) ? false : true;
                 }
             }
             return r;
