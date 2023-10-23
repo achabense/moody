@@ -38,6 +38,7 @@
     std::shuffle(begin, end, rand);
 }
 
+// TODO: seed-only? (for easier reproduction...)
 class tile_filler {
     std::mt19937_64 m_rand;
 
@@ -199,6 +200,8 @@ public:
 };
 
 // TODO: how to suitably deal with empty state?????
+// TODO: support file...
+// TODO: more obvious ways to record important rules...
 class rule_recorder {
     std::vector<legacy::compress> m_record;
     std::unordered_map<legacy::compress, int> m_map;

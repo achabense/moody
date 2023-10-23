@@ -55,7 +55,7 @@ std::string wrap_rule_string(const std::string& str) {
 
 // TODO: clumsy...
 // TODO: how to get renderer from backend?
-legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, SDL_Renderer* renderer) {
+legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image& icons) {
     static const legacy::partitionT* parts[]{&legacy::partition::none, &legacy::partition::spatial,
                                              &legacy::partition::permutation};
     static const char* names[]{"none", "spatial", "permutation"};
@@ -86,12 +86,10 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, SDL_Rendere
         for (int i = 0; i < std::size(parts); ++i) {
             const auto& part = *parts[i];
             bool matches = part.matches(rule); // implicit conversion...
-            if (!matches) {
-                ImGui::BeginDisabled();
-            }
             if (ImGui::BeginTabItem(names[i])) {
                 if (!matches) {
-                    ImGui::TextUnformatted("Not matching"); // TODO: en able forced-gather...
+                    ImGui::TextUnformatted("Not matching"); // TODO: enable forced-gather...
+                    ImGui::BeginDisabled();
                     // TODO: when !matches, turn off grule contents in the disabled button...
                 }
 
@@ -101,7 +99,22 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, SDL_Rendere
                 // buttons. TODO: better visual; show group members.
                 for (int j = 0; j < k; j++) {
                     static char label[20]; // is "static" needed?
-                    snprintf(label, 20, "[%d]###%d", grule[j], j);
+
+                    if (matches) {
+                        snprintf(label, 20, " %d ###%d", grule[j], j);
+                    } else {
+                        // TODO: refine...
+                        const auto& group = part.groups()[j];
+                        bool m = true;
+                        bool head = rule[group[0]];
+                        for (auto code : group) {
+                            if (rule[code] != rule[group[0]]) {
+                                m = false;
+                            }
+                        }
+                        snprintf(label, 20, " %s ###%d", m ? (grule[j] ? "1" : "0") : "x", j);
+                    }
+
                     if (j % 8 != 0) {
                         ImGui::SameLine();
                     }
@@ -124,26 +137,20 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, SDL_Rendere
                             if (x++ % 8 != 0) {
                                 ImGui::SameLine();
                             }
-                            // TODO: data_leak...
-                            static code_image* images[512]{};
-                            static bool init = false;
-                            if (!init) {
-                                for (int code = 0; code < 512; ++code) {
-                                    images[code] = new code_image(renderer, code);
-                                }
-                                init = true;
-                            }
+
+                            constexpr int zoom = 8;
                             // for bordercol...
-                            ImGui::Image(images[code]->texture(), ImVec2(code_image::width(), code_image::height()),
-                                         ImVec2(0, 0), ImVec2(1, 1), ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
+                            ImGui::Image(icons.texture(), ImVec2(3 * zoom, 3 * zoom), ImVec2(0, code * (1.0f / 512)),
+                                         ImVec2(1, (code + 1) * (1.0f / 512)), ImVec4(1, 1, 1, 1),
+                                         ImVec4(0.5, 0.5, 0.5, 1));
                         }
                         ImGui::EndTooltip();
                     }
                 }
+                if (!matches) {
+                    ImGui::EndDisabled();
+                }
                 ImGui::EndTabItem();
-            }
-            if (!matches) {
-                ImGui::EndDisabled();
             }
         }
 
@@ -209,6 +216,8 @@ int main(int, char**) {
     recorder.take(gol_rule()); // first rule...
 
     tile_image img(renderer, runner.tile()); // TODO: ...
+    code_image icons(renderer);              // TODO: how to get "renderer" from backend?
+
     bool paused = false;
     bool show_rule_editor = true;
     bool show_demo_window = false; // TODO: remove this in the future...
@@ -262,7 +271,7 @@ int main(int, char**) {
         // TODO: editor works poorly with recorder...
         // TODO: shouldnt be here...
         if (show_rule_editor) {
-            auto edited = rule_editor(show_rule_editor, runner.rule(), renderer);
+            auto edited = rule_editor(show_rule_editor, runner.rule(), icons);
             if (edited != runner.rule()) {
                 recorder.take(edited);
             }
