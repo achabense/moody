@@ -30,9 +30,6 @@
     <ClInclude Include="serialize.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="rule_setter.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="imgui_sdl2\imgui_impl_sdl2.h">
       <Filter>imgui_sdl2</Filter>
     </ClInclude>
@@ -82,6 +79,9 @@
     </ClCompile>
     <ClCompile Include="imgui\imgui_widgets.cpp">
       <Filter>imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="examples.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

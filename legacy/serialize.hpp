@@ -5,6 +5,8 @@
 #include "rule.hpp"
 
 namespace legacy {
+    // TODO: compressT?
+    // TODO: exception works horribly... use expected instead?
     class compress {
         array<uint8_t, 64> bits{}; // as bitset.
     public:

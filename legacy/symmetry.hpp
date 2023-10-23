@@ -74,23 +74,23 @@ namespace legacy {
 
         // TODO: rename variable...
         // TODO: must be member function?
-        ruleT::array_base gather_from(const ruleT::array_base& rule) const {
-            ruleT::array_base grule{};
+        ruleT_base gather_from(const ruleT_base& rule) const {
+            ruleT_base grule{};
             for (int j = 0; j < k(); ++j) {
                 grule[j] = rule[m_groups[j][0]];
             }
             return grule;
         }
 
-        ruleT::array_base dispatch_from(const ruleT::array_base& grule) const {
-            ruleT::array_base rule;
+        ruleT_base dispatch_from(const ruleT_base& grule) const {
+            ruleT_base rule;
             for (int code = 0; code < 512; ++code) {
                 rule[code] = grule[map(code)];
             }
             return rule;
         }
 
-        bool matches(const ruleT::array_base& rule) const {
+        bool matches(const ruleT_base& rule) const {
             for (int code = 0; code < 512; ++code) {
                 if (rule[code] != rule[head_for(code)]) {
                     return false;

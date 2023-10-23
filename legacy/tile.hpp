@@ -73,18 +73,19 @@ namespace legacy {
 
         // TODO: explain why const
         bool* _line(int _y) const {
+            assert(_y >= 0 && _y < padded_height());
             return m_data + _y * padded_width();
         }
 
     public:
         // TODO: return span instead?
         bool* line(int y) {
-            assert(y >= 0 && y < m_size.height);
+            assert(y >= 0 && y < height());
             return _line(y + 1) + 1;
         }
 
         const bool* line(int y) const {
-            assert(y >= 0 && y < m_size.height);
+            assert(y >= 0 && y < height());
             return _line(y + 1) + 1;
         }
 

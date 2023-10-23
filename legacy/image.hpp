@@ -7,6 +7,7 @@
 
 // TODO: pixel format might be problematic...
 // TODO: in namespace or not? better name?
+// TODO: able to deal with resized tile...
 class tile_image {
     int m_w, m_h;
     std::unique_ptr<Uint32[]> m_pixels;

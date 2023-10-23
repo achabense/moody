@@ -55,7 +55,7 @@ namespace legacy {
     // TODO: recheck...
 
     // TODO: is it suitable to declare a namespace-enum for this?
-    enum interpret_mode : bool { ABS, XOR };
+    enum interpret_mode : int { ABS = false, XOR = true };
 
     // TODO: make from_base, to_base, global functions?
     struct ruleT : public array<bool, 512> {
@@ -97,4 +97,6 @@ namespace legacy {
             return map(encode(q, w, e, a, s, d, z, x, c));
         }
     };
+
+    using ruleT_base = ruleT::array_base;
 } // namespace legacy

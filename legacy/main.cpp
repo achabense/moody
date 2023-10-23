@@ -79,7 +79,7 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule) {
                         ImGui::BeginDisabled();
                         ImGui::BeginTabItem(names[i]);
                         ImGui::EndDisabled();
-                    } else if(ImGui::BeginTabItem(names[i])){
+                    } else if (ImGui::BeginTabItem(names[i])) {
                         const int k = part.k();
                         auto grule = part.gather_from(rule);
 
@@ -110,6 +110,30 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule) {
     return rule;
 }
 
+// TODO: awful... need to be avoided...
+template <class Enum> auto* underlying_address(Enum& ptr) {
+    return reinterpret_cast<std::underlying_type_t<Enum>*>(std::addressof(ptr));
+}
+
+// TODO: is it suitable to start with gol?
+auto gol_rule() {
+    // b3 s23
+    legacy::ruleT rule;
+    for (int code = 0; code < 512; ++code) {
+        auto [q, w, e, a, s, d, z, x, c] = legacy::decode(code);
+        int count = q + w + e + a + d + z + x + c;
+        bool expected;
+        if (count == 2) {
+            rule[code] = s;
+        } else if (count == 3) {
+            rule[code] = true;
+        } else {
+            rule[code] = false;
+        }
+    }
+    return rule;
+}
+
 int main(int, char**) {
     // Setup SDL
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0) {
@@ -136,9 +160,10 @@ int main(int, char**) {
     runner.m_filler = &filler;
     recorder.m_runner = &runner;
     // TODO: is this correct design?
-    recorder.take(maker.make());
-    // recorder.m_maker = &maker;
-    // recorder.new_rule(); // first rule...
+
+    // TODO: is this acceptable?
+    //recorder.take(maker.make());
+    recorder.take(gol_rule()); // first rule...
 
     tile_image img(renderer, runner.tile()); // TODO: ...
     bool paused = false;
@@ -291,11 +316,9 @@ int main(int, char**) {
             {
                 bool new_rule = false;
 
-                // TODO: horribly hard to maintain...
                 // is reinter ok?
-                if (ImGui::Combo("Mode", reinterpret_cast<int*>(&maker.g_mode),
-                                 "none(deprecated)\0sub_spatial\0sub_spatial2\0spatial\0spatial_paired\0spatial_"
-                                 "state\0permutation\0\0")) {
+                if (ImGui::Combo("Mode", underlying_address(maker.g_mode), maker.mode_names,
+                                 std::size(maker.mode_names))) {
                     maker.density = maker.max_density() * 0.3;
                     new_rule = true;
                 }
@@ -309,9 +332,9 @@ int main(int, char**) {
                 }
 
                 auto prev = maker.interpret_as;
-                ImGui::RadioButton("plain", &maker.interpret_as, legacy::ABS);
+                ImGui::RadioButton("plain", underlying_address(maker.interpret_as), legacy::ABS);
                 ImGui::SameLine();
-                ImGui::RadioButton("flip", &maker.interpret_as, legacy::XOR);
+                ImGui::RadioButton("flip", underlying_address(maker.interpret_as), legacy::XOR);
                 if (maker.interpret_as != prev) {
                     new_rule = true;
                 }

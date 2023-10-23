@@ -85,6 +85,8 @@ public:
 
     // TODO: aside from filters, the problem is, [what] to support?
     // TODO: partially symmetric rules?
+    static constexpr const char* mode_names[]{"none(deprecated)", "sub_spatial",   "sub_spatial2", "spatial",
+                                              "spatial_paired",   "spatial_state", "permutation"};
     enum generator : int {
         none, // arbitrary 512 str, not used.
         sub_spatial,
@@ -95,14 +97,16 @@ public:
         perm
     } g_mode = spatial; // TODO: how to control this?
 
+    // TODO: explain what this is exactly...
     // TODO: the enum is problematic...
-    int interpret_as = legacy::ABS;
+    legacy::interpret_mode interpret_as = legacy::ABS;
 
     explicit rule_maker(uint64_t seed) : m_rand{seed} {
         density = max_density() * 0.3;
     }
 
     const legacy::partitionT& current_partition() const {
+        std::underlying_type_t<legacy::interpret_mode>;
         switch (g_mode) {
         case none: // TODO: extremely inefficient...
             return legacy::partition::none;
@@ -127,10 +131,10 @@ public:
     }
 
     legacy::ruleT make() {
-        legacy::ruleT::array_base grule{}; // TODO: is it safe not to do value init?
+        legacy::ruleT_base grule{}; // TODO: is it safe not to do value init?
         random_fill(grule.data(), grule.data() + max_density(), density, m_rand);
-        legacy::ruleT::array_base rule = current_partition().dispatch_from(grule);
-        return legacy::ruleT(rule, (legacy::interpret_mode)interpret_as);
+        legacy::ruleT_base rule = current_partition().dispatch_from(grule);
+        return legacy::ruleT(rule, interpret_as);
     }
 };
 
@@ -181,6 +185,7 @@ public:
     rule_runner(legacy::rectT size) : m_tile(size), m_side(size) {}
 };
 
+// TODO: how to suitably deal with empty state?????
 class rule_recorder {
     std::vector<legacy::compress> m_record;
     std::unordered_map<legacy::compress, int> m_map;
@@ -285,7 +290,7 @@ struct scannerT {
     std::array<bool, 512> grule;
     bool matches;
 
-    void scan(const legacy::ruleT::array_base& rule, bool force) {
+    void scan(const legacy::ruleT_base& rule, bool force) {
         matches = partition->matches(rule) || force; // TODO: "|| force" suitable?
         if (matches) {
             partition->gather_from(rule);
@@ -304,7 +309,7 @@ public:
     const legacy::partitionT* m_partition;
 
     bool matches = false;
-    legacy::ruleT::array_base m_rulebase;
+    legacy::ruleT_base m_rulebase;
     int interpret_as = legacy::ABS; // TODO: the enum is problematic...
 
     legacy::ruleT to_rule() const {
