@@ -180,7 +180,20 @@ public:
         m_gen += count;
     }
 
-    // TODO: support "shift"; should the filler be shifted too? if so then must be tile-based...
+    // TODO: should the filler be shifted too? if so then must be tile-based...
+    // TODO: recheck logic...
+    void shift_xy(int dx, int dy) {
+        dx = ((-dx % m_tile.width()) + m_tile.width()) % m_tile.width();
+        dy = ((-dy % m_tile.height()) + m_tile.height()) % m_tile.height();
+        for (int y = 0; y < m_tile.height(); ++y) {
+            bool* source = m_tile.line((y + dy) % m_tile.height());
+            bool* dest = m_side.line(y);
+            std::copy_n(source, m_tile.width(), dest);
+            std::rotate(dest, dest + dx, dest + m_tile.width());
+        }
+
+        m_tile.swap(m_side);
+    }
 
     rule_runner(legacy::rectT size) : m_tile(size), m_side(size) {}
 };

@@ -48,65 +48,67 @@ int skip_per_frame = 0;
 
 bool cal_rate = true;
 
-// looks *extremely* horrible and inefficient
-// TODO: use imgui line wrapping....
+// TODO: looks horrible and inefficient
 std::string wrap_rule_string(const std::string& str) {
     return str.substr(0, 32) + "\n" + str.substr(32, 16) + "...";
 }
 
+// TODO: clumsy...
 legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule) {
     static const legacy::partitionT* parts[]{&legacy::partition::none, &legacy::partition::spatial,
                                              &legacy::partition::permutation};
     static const char* names[]{"none", "spatial", "permutation"};
 
+    assert(show);
+    if (!ImGui::Begin("Rule editor", &show)) {
+        ImGui::End();
+        return old_rule;
+    }
+
+    // visible:
+    ImGui::TextUnformatted("This is rule editor");
+
     legacy::ruleT rule = old_rule;
-    if (show) {
-        bool shown = ImGui::Begin("Rule editor", &show);
-        if (shown) {
-            ImGui::TextUnformatted("This is rule editor");
+    auto rule_str = to_string(rule);                   // how to reuse the resource?
+    ImGui::PushTextWrapPos(ImGui::GetFontSize() * 18); // TODO: "fontsize" is height
+    ImGui::TextUnformatted(rule_str.c_str());
+    ImGui::PopTextWrapPos();
 
-            auto rule_str = to_string(rule);                   // how to reuse the resource?
-            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 18); // TODO: "fontsize" is height
-            ImGui::TextUnformatted(rule_str.c_str());
-            ImGui::PopTextWrapPos();
+    // How to specify the first "BeginTabItem"?
+    if (ImGui::BeginTabBar("##Type")) {
+        for (int i = 0; i < std::size(parts); ++i) {
+            const auto& part = *parts[i];
+            bool matches = part.matches(rule); // implicit conversion...
+            if (!matches) {
+                ImGui::BeginDisabled();
+                ImGui::BeginTabItem(names[i]);
+                ImGui::EndDisabled();
+            } else if (ImGui::BeginTabItem(names[i])) {
+                const int k = part.k();
+                auto grule = part.gather_from(rule);
 
-            // How to specify the first "BeginTabItem"?
-            if (ImGui::BeginTabBar("##Type")) {
-                for (int i = 0; i < std::size(parts); ++i) {
-                    const auto& part = *parts[i];
-                    bool matches = part.matches(rule); // implicit conversion...
-                    if (!matches) {
-                        ImGui::BeginDisabled();
-                        ImGui::BeginTabItem(names[i]);
-                        ImGui::EndDisabled();
-                    } else if (ImGui::BeginTabItem(names[i])) {
-                        const int k = part.k();
-                        auto grule = part.gather_from(rule);
-
-                        // buttons. TODO: better visual; show group members.
-                        for (int j = 0; j < k; j++) {
-                            static char __[20]; // "static" not needed?
-                            snprintf(__, 20, "%3d:%d", j, grule[j]);
-                            if (j % 8 != 0) {
-                                ImGui::SameLine();
-                            }
-                            if (ImGui::SmallButton(__)) {
-                                bool to = !grule[j];
-                                for (auto code : part.groups()[j]) {
-                                    rule[code] = to;
-                                }
-                            }
+                // buttons. TODO: better visual; show group members.
+                for (int j = 0; j < k; j++) {
+                    static char __[20]; // is "static" needed?
+                    snprintf(__, 20, "%3d:%d", j, grule[j]);
+                    if (j % 8 != 0) {
+                        ImGui::SameLine();
+                    }
+                    if (ImGui::SmallButton(__)) {
+                        bool to = !grule[j];
+                        for (auto code : part.groups()[j]) {
+                            rule[code] = to;
                         }
-
-                        ImGui::EndTabItem();
                     }
                 }
 
-                ImGui::EndTabBar();
+                ImGui::EndTabItem();
             }
         }
-        ImGui::End();
+
+        ImGui::EndTabBar();
     }
+    ImGui::End();
     return rule;
 }
 
@@ -162,12 +164,13 @@ int main(int, char**) {
     // TODO: is this correct design?
 
     // TODO: is this acceptable?
-    //recorder.take(maker.make());
+    // recorder.take(maker.make());
     recorder.take(gol_rule()); // first rule...
 
     tile_image img(renderer, runner.tile()); // TODO: ...
     bool paused = false;
     bool show_rule_editor = true;
+    bool show_demo_window = false; // TODO: remove this in the future...
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -217,20 +220,25 @@ int main(int, char**) {
 
         // TODO: editor works poorly with recorder...
         // TODO: shouldnt be here...
-        auto edited = rule_editor(show_rule_editor, runner.rule());
-        if (edited != runner.rule()) {
-            recorder.take(edited);
+        if (show_rule_editor) {
+            auto edited = rule_editor(show_rule_editor, runner.rule());
+            if (edited != runner.rule()) {
+                recorder.take(edited);
+            }
         }
 
         // TODO: remove this when suitable...
-        ImGui::ShowDemoWindow();
+        if (show_demo_window) {
+            ImGui::ShowDemoWindow(&show_demo_window);
+        }
 
         {
             ImGui::Begin("-v-", nullptr,
                          ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse |
                              ImGuiWindowFlags_::ImGuiWindowFlags_AlwaysAutoResize);
             ImGui::Checkbox("Rule editor", &show_rule_editor);
-
+            ImGui::SameLine();
+            ImGui::Checkbox("Demo window", &show_demo_window);
             {
                 ImGui::Text("(%.1f FPS) Frame:%d\n"
                             "Width:%d,Height:%d",
@@ -243,10 +251,13 @@ int main(int, char**) {
                 img.update(runner.tile());
                 auto img_texture = img.texture();
                 ImVec2 img_size = ImVec2(img.width(), img.height());
-                ImGui::Image(img_texture, img_size);
 
-                // TODO: should be draggable...
-                if (ImGui::BeginItemTooltip()) {
+                ImGui::ImageButton(img_texture, img_size);
+
+                // TODO: refine dragging logic...
+                if (ImGui::IsItemHovered() && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+                    runner.shift_xy(io.MouseDelta.x, io.MouseDelta.y);
+                } else if (ImGui::BeginItemTooltip()) {
                     auto&& io = ImGui::GetIO();
                     const float region_sz = 32.0f;
                     float region_x = io.MousePos.x - pos.x - region_sz * 0.5f;
@@ -272,33 +283,32 @@ int main(int, char**) {
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_::ImGuiMouseButton_Right)) {
                         ImGui::SetClipboardText(rule_str.c_str()); // TODO: notify...
                     }
-                    ImGui::TextUnformatted("Lclick to copy from clipboard:");
-                    std::string found_str;
-                    const char* text = ImGui::GetClipboardText();
-                    // TODO: can text return nullptr?
-                    if (text) {
-                        std::string str = text;
-                        std::smatch match_result;
-                        if (std::regex_search(str, match_result, legacy::rulestr_regex())) {
-                            found_str = match_result[0];
+                    ImGui::TextUnformatted("Ctrl+Lclick to paste from clipboard:");
+                    if (io.KeyCtrl) {
+                        std::string found_str;
+                        const char* text = ImGui::GetClipboardText();
+                        // TODO: can text return nullptr?
+                        if (text) {
+                            std::string str = text;
+                            std::smatch match_result;
+                            if (std::regex_search(str, match_result, legacy::rulestr_regex())) {
+                                found_str = match_result[0];
+                            }
+                        }
+                        ImGui::TextUnformatted(found_str.empty() ? "(none)" : wrap_rule_string(found_str).c_str());
+                        // TODO: left click is problematic here...
+                        if (ImGui::IsMouseClicked(ImGuiMouseButton_::ImGuiMouseButton_Left) && !found_str.empty()) {
+                            recorder.take(legacy::from_string<legacy::ruleT>(found_str));
                         }
                     }
-                    ImGui::TextUnformatted(found_str.empty() ? "(none)" : wrap_rule_string(found_str).c_str());
-                    // TODO: left click is problematic here...
-                    if (ImGui::IsMouseClicked(ImGuiMouseButton_::ImGuiMouseButton_Left) && !found_str.empty()) {
-                        recorder.take(legacy::from_string<legacy::ruleT>(found_str));
-                    }
-                    ImGui::EndTooltip();
-                }
 
-                // TODO: how to drag to resize?
-                if (ImGui::IsItemHovered()) {
-                    // TODO: should be supported in certain areas... add more ways to control!
                     if (io.MouseWheel < 0) { // scroll down
                         recorder.next();
                     } else if (io.MouseWheel > 0) { // scroll up
                         recorder.prev();
                     }
+
+                    ImGui::EndTooltip();
                 }
 
                 ImGui::Text("Total:%d At:%d%s", recorder.size(), recorder.pos(),
@@ -420,8 +430,10 @@ int main(int, char**) {
                                        ImGuiSliderFlags_NoInput)) {
                     runner.restart();
                 }
+                ImGui::BeginDisabled();
                 ImGui::SliderInt("Start gen [0-100]", &start_from, start_min, start_max, "%d",
                                  ImGuiSliderFlags_NoInput);
+                ImGui::EndDisabled();
                 ImGui::SliderInt("Per gen [1-10]", &pergen, pergen_min, pergen_max, "%d",
                                  ImGuiSliderFlags_NoInput); // TODO: use sprintf for pergen_min and pergen_max,
                                                             // start_min, start_max...
