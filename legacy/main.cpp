@@ -54,10 +54,15 @@ std::string wrap_rule_string(const std::string& str) {
 }
 
 // TODO: clumsy...
-legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule) {
+// TODO: how to get renderer from backend?
+legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, SDL_Renderer* renderer) {
     static const legacy::partitionT* parts[]{&legacy::partition::none, &legacy::partition::spatial,
                                              &legacy::partition::permutation};
     static const char* names[]{"none", "spatial", "permutation"};
+
+    // TODO: not quite useful is "center-agnostic" mode is not supported...
+    static bool center_neutral = true; // TODO: this is not symmetry trait, but still significant...
+    // TODO: how to deal with rules with
 
     assert(show);
     if (!ImGui::Begin("Rule editor", &show)) {
@@ -73,6 +78,8 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule) {
     ImGui::PushTextWrapPos(ImGui::GetFontSize() * 18); // TODO: "fontsize" is height
     ImGui::TextUnformatted(rule_str.c_str());
     ImGui::PopTextWrapPos();
+    // TODO: incomplete... "center-agnostic" is not symmetry trait but still a trait of rule...
+    ImGui::Checkbox("Sync center", &center_neutral);
 
     // How to specify the first "BeginTabItem"?
     if (ImGui::BeginTabBar("##Type")) {
@@ -81,28 +88,62 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule) {
             bool matches = part.matches(rule); // implicit conversion...
             if (!matches) {
                 ImGui::BeginDisabled();
-                ImGui::BeginTabItem(names[i]);
-                ImGui::EndDisabled();
-            } else if (ImGui::BeginTabItem(names[i])) {
+            }
+            if (ImGui::BeginTabItem(names[i])) {
+                if (!matches) {
+                    ImGui::TextUnformatted("Not matching"); // TODO: en able forced-gather...
+                    // TODO: when !matches, turn off grule contents in the disabled button...
+                }
+
                 const int k = part.k();
                 auto grule = part.gather_from(rule);
 
                 // buttons. TODO: better visual; show group members.
                 for (int j = 0; j < k; j++) {
-                    static char __[20]; // is "static" needed?
-                    snprintf(__, 20, "%3d:%d", j, grule[j]);
+                    static char label[20]; // is "static" needed?
+                    snprintf(label, 20, "[%d]###%d", grule[j], j);
                     if (j % 8 != 0) {
                         ImGui::SameLine();
                     }
-                    if (ImGui::SmallButton(__)) {
+                    if (ImGui::Button(label)) {
                         bool to = !grule[j];
                         for (auto code : part.groups()[j]) {
                             rule[code] = to;
                         }
+                        if (center_neutral) {
+                            // TODO: this looks horrible too...
+                            // TODO: how to light up the paired-button?
+                            for (auto code : part.group_for(part.groups()[j][0] ^ 16)) {
+                                rule[code] = to;
+                            }
+                        }
+                    }
+                    if (ImGui::BeginItemTooltip()) {
+                        int x = 0;
+                        for (int code : part.groups()[j]) {
+                            if (x++ % 8 != 0) {
+                                ImGui::SameLine();
+                            }
+                            // TODO: data_leak...
+                            static code_image* images[512]{};
+                            static bool init = false;
+                            if (!init) {
+                                for (int code = 0; code < 512; ++code) {
+                                    images[code] = new code_image(renderer, code);
+                                }
+                                init = true;
+                            }
+                            // for bordercol...
+                            ImGui::Image(images[code]->texture(), ImVec2(code_image::width(), code_image::height()),
+                                         ImVec2(0, 0), ImVec2(1, 1), ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
+                        }
+                        ImGui::EndTooltip();
                     }
                 }
-
                 ImGui::EndTabItem();
+            }
+            if (!matches) {
+                ImGui::EndDisabled();
             }
         }
 
@@ -221,7 +262,7 @@ int main(int, char**) {
         // TODO: editor works poorly with recorder...
         // TODO: shouldnt be here...
         if (show_rule_editor) {
-            auto edited = rule_editor(show_rule_editor, runner.rule());
+            auto edited = rule_editor(show_rule_editor, runner.rule(), renderer);
             if (edited != runner.rule()) {
                 recorder.take(edited);
             }
