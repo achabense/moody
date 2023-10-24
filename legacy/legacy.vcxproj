@@ -158,6 +158,7 @@
     <ClInclude Include="imgui\imgui_internal.h" />
     <ClInclude Include="imgui_sdl2\imgui_impl_sdl2.h" />
     <ClInclude Include="imgui_sdl2\imgui_impl_sdlrenderer2.h" />
+    <ClInclude Include="rule_traits.hpp" />
     <ClInclude Include="serialize.hpp" />
     <ClInclude Include="symmetry.hpp" />
     <ClInclude Include="tile.hpp" />

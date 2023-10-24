@@ -22,6 +22,7 @@
 
 #include "app.hpp"
 #include "image.hpp"
+#include "rule_traits.hpp"
 
 #if !SDL_VERSION_ATLEAST(2, 0, 17)
 #error This backend requires SDL 2.0.17+ because of SDL_RenderGeometry() function
@@ -60,8 +61,8 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image&
                                              &legacy::partition::permutation};
     static const char* names[]{"none", "spatial", "permutation"};
 
-    // TODO: not quite useful is "center-agnostic" mode is not supported...
-    static bool center_neutral = true; // TODO: this is not symmetry trait, but still significant...
+    // TODO: not quite useful, as "center-agnostic" mode is currently not supported...
+    static bool center_neutral = false; // TODO: this is not symmetry trait, but still significant...
     // TODO: how to deal with rules with
 
     assert(show);
@@ -80,6 +81,10 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image&
     ImGui::PopTextWrapPos();
     // TODO: incomplete... "center-agnostic" is not symmetry trait but still a trait of rule...
     ImGui::Checkbox("Sync center", &center_neutral);
+
+    ImGui::Text("Spatial symmtric:%d\nState_symmetric:%d\nABS_agnostic:%d XOR_agnostic:%d",
+                legacy::spatial_symmetric(rule), legacy::state_symmetric(rule), legacy::center_agnostic_abs(rule),
+                legacy::center_agnostic_xor(rule));
 
     // How to specify the first "BeginTabItem"?
     if (ImGui::BeginTabBar("##Type")) {
