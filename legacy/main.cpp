@@ -71,8 +71,6 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image&
         return old_rule;
     }
 
-    ImGui::TextUnformatted("This is rule editor");
-
     legacy::ruleT rule = old_rule;
     auto rule_str = to_string(rule);                   // how to reuse the resource?
     ImGui::PushTextWrapPos(ImGui::GetFontSize() * 18); // TODO: "fontsize" is height
@@ -97,7 +95,7 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image&
 
                 // buttons. TODO: better visual; show group members.
                 for (int j = 0; j < k; j++) {
-                    static char label[20]; // is "static" needed?
+                    static char label[20]; // is "static" needed? TODO: nope...
 
                     bool m = true;
                     for (auto code : groups[j]) {
@@ -284,10 +282,9 @@ int main(int, char**) {
             ImGui::ShowDemoWindow(&show_demo_window);
         }
 
-        {
-            ImGui::Begin("-v-", nullptr,
+        if (ImGui::Begin("-v-", nullptr,
                          ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse |
-                             ImGuiWindowFlags_::ImGuiWindowFlags_AlwaysAutoResize);
+                             ImGuiWindowFlags_::ImGuiWindowFlags_AlwaysAutoResize)) {
             ImGui::Checkbox("Rule editor", &show_rule_editor);
             ImGui::SameLine();
             ImGui::Checkbox("Demo window", &show_demo_window);
@@ -439,9 +436,7 @@ int main(int, char**) {
                 }
             }
 
-            // TODO: use fixed-point...
             ImGui::SeparatorText("Tile");
-
             {
                 ImGui::Text("Gen:%d", runner.gen());
 
@@ -491,17 +486,16 @@ int main(int, char**) {
                                                             // start_min, start_max...
                 ImGui::SliderInt("Speed [0-20]", &skip_per_frame, skip_min, skip_max, "%d", ImGuiSliderFlags_NoInput);
             }
+        }
+        ImGui::End();
 
-            ImGui::End();
-
-            // run tile (TODO: should be here?)
-            if (runner.gen() == 0) {
-                runner.run(start_from);
-            }
-            if (!paused) {
-                if (frame % (skip_per_frame + 1) == 0) {
-                    runner.run(pergen);
-                }
+        // run tile (TODO: should be here?)
+        if (runner.gen() == 0) {
+            runner.run(start_from);
+        }
+        if (!paused) {
+            if (frame % (skip_per_frame + 1) == 0) {
+                runner.run(pergen);
             }
         }
 
