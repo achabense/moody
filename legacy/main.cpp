@@ -174,7 +174,12 @@ auto gol_rule() {
     return rule;
 }
 
-int main(int, char**) {
+int main(int argc, char** argv) {
+    // TODO: should be able to "open" a rulelist file...
+
+    // TODO: what's the effect in "/SUBSYSTEM:WINDOWS" release mode?
+    puts("This will be shown only in debug mode");
+
     // Setup SDL
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0) {
         printf("Error: %s\n", SDL_GetError());
@@ -345,7 +350,7 @@ int main(int, char**) {
                             }
                         }
                         ImGui::TextUnformatted(found_str.empty() ? "(none)" : wrap_rule_string(found_str).c_str());
-                        // TODO: left click is problematic here...
+                        // TODO: redesign copy/paste... especially lclick-paste is problematic...
                         if (ImGui::IsMouseClicked(ImGuiMouseButton_::ImGuiMouseButton_Left) && !found_str.empty()) {
                             recorder.take(legacy::from_string<legacy::ruleT>(found_str));
                         }
@@ -403,34 +408,6 @@ int main(int, char**) {
                     new_rule = true;
                 }
 
-#if 0
-                ImGui::SameLine();
-                if (ImGui::Button("Copy rule")) {
-                    auto rule_str = to_string(runner.rule());
-                    ImGui::SetClipboardText(rule_str.c_str());
-                }
-                if (ImGui::BeginItemTooltip()) {
-                    auto rule_str = to_string(runner.rule());
-                    ImGui::TextUnformatted(wrap_rule_string(rule_str).c_str());
-                    ImGui::EndTooltip();
-                }
-
-                ImGui::SameLine();
-                if (ImGui::Button("Paste rule")) {
-                    std::string found_str;
-                    const char* text = ImGui::GetClipboardText();
-                    if (text) {
-                        std::string str = text;
-                        // TODO: the logic should be in <seralize.h>...
-                        std::regex find_rule("[0-9a-zA-Z]{128}");
-                        std::smatch match_result;
-                        if (std::regex_search(str, match_result, find_rule)) {
-                            recorder.take(legacy::from_string<legacy::ruleT>(match_result[0]));
-                            new_rule = false;
-                        }
-                    }
-                }
-#endif
                 if (new_rule) {
                     recorder.take(maker.make());
                 }
