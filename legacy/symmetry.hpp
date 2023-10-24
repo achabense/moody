@@ -302,6 +302,35 @@ namespace legacy {
             return part;
         }();
 
+        inline const partitionT ro45_only = [] {
+            partitionT::array_base part;
+            part.fill(-1);
+
+            auto equiv = [&](int code, int color, auto& equiv) -> void {
+                if (part[code] != -1) {
+                    assert(part[code] == color);
+                    return;
+                }
+                part[code] = color;
+                // clang-format off
+            auto [q, w, e,
+                  a, s, d,
+                  z, x, c] = decode(code);
+            equiv(encode(w, e, d,
+                         q, s, c,
+                         a, z, x), color, equiv);
+                // clang-format on
+            };
+
+            int color = 0;
+            for (int code = 0; code < 512; code++) {
+                if (part[code] == -1) {
+                    equiv(code, color++, equiv);
+                }
+            }
+            return part;
+        }();
+
         inline const partitionT permutation = [] {
             partitionT::array_base part;
             for (int code = 0; code < 512; ++code) {

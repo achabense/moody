@@ -204,7 +204,7 @@ public:
 // TODO: more obvious ways to record important rules...
 class rule_recorder {
     std::vector<legacy::compress> m_record;
-    std::unordered_map<legacy::compress, int> m_map;
+    // std::unordered_map<legacy::compress, int> m_map;
 
     int m_pos = -1; // always<=size()-1.// TODO: how to make m_pos always valid?
 
@@ -236,19 +236,12 @@ public:
 
     // TODO: look for better names...
     // TODO: reconsider what should be done when already exists...
+    // TODO: next/prev work still poorly with generator, editor etc...
     void take(const legacy::ruleT& rule) {
-        legacy::compress cmpr(rule);
-        auto find = m_map.find(cmpr);
-        if (find != m_map.end()) {
-            m_pos = find->second;
-        } else {
-            m_record.push_back(cmpr);
+        // TODO: requiring syntronized...
+        if (m_record.empty() || m_runner->rule() != rule) {
+            m_record.emplace_back(rule);
             m_pos = m_record.size() - 1;
-            m_map.emplace(cmpr, m_pos);
-        }
-
-        // TODO: this is awkward...
-        if (m_runner->rule() != rule) {
             m_runner->reset_rule(rule);
         }
     }
@@ -271,7 +264,54 @@ public:
     }
 
     // TODO: ctor...maker-ctor as...
+
+    // TODO: reconsider m_pos logic...
+
+    void append(const std::vector<legacy::compress>& vec) {
+        m_record.insert(m_record.end(), vec.begin(), vec.end());
+        if (!m_record.empty() && m_pos == -1) {
+            m_runner->reset_rule(legacy::ruleT(m_record[m_pos = 0]));
+        }
+    }
+
+    void replace(std::vector<legacy::compress> vec) {
+        if (!vec.empty()) {
+            m_record.swap(vec);
+            m_runner->reset_rule(legacy::ruleT(m_record[m_pos = 0]));
+        }
+        // else???
+    }
 };
+
+// TODO: refine...
+// TODO: forbid exception...
+std::vector<legacy::compress> read_rule_from_file(const char* filename) {
+    std::vector<legacy::compress> vec;
+
+    if (FILE* fp = fopen(filename, "rb")) {
+        fseek(fp, 0, SEEK_END);
+        int size = ftell(fp);
+        if (size > 1000000) {
+            fclose(fp);
+        } else {
+            std::vector<char> data(size);
+            fseek(fp, 0, SEEK_SET);
+            int read = fread(data.data(), 1, size, fp);
+            fclose(fp);
+            assert(read == size); // TODO: how to deal with this?
+
+            const char *begin = data.data(), *end = begin + data.size();
+            const auto& regex = legacy::rulestr_regex();
+            std::cmatch match;
+            while (std::regex_search(begin, end, match, regex)) {
+                std::string s = match[0];
+                vec.emplace_back(s);
+                begin = match.suffix().first; // wtf?
+            }
+        }
+    }
+    return vec;
+}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 // in developement...

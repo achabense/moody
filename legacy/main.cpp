@@ -57,12 +57,12 @@ std::string wrap_rule_string(const std::string& str) {
 // TODO: clumsy...
 // TODO: how to get renderer from backend?
 legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image& icons) {
-    static const legacy::partitionT* parts[]{&legacy::partition::none, &legacy::partition::spatial,
-                                             &legacy::partition::permutation};
-    static const char* names[]{"none", "spatial", "permutation"};
+    static const legacy::partitionT* parts[]{&legacy::partition::none, &legacy::partition::ro45_only,
+                                             &legacy::partition::spatial, &legacy::partition::permutation};
+    static const char* names[]{"none", "ro45-only", "spatial", "permutation"};
 
     // TODO: not quite useful, as "center-agnostic" mode is currently not supported...
-    static bool center_neutral = false; // TODO: this is not symmetry trait, but still significant...
+    // static bool center_neutral = false; // TODO: this is not symmetry trait, but still significant...
     // TODO: how to deal with rules with
 
     assert(show);
@@ -71,7 +71,6 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image&
         return old_rule;
     }
 
-    // visible:
     ImGui::TextUnformatted("This is rule editor");
 
     legacy::ruleT rule = old_rule;
@@ -80,7 +79,7 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image&
     ImGui::TextUnformatted(rule_str.c_str());
     ImGui::PopTextWrapPos();
     // TODO: incomplete... "center-agnostic" is not symmetry trait but still a trait of rule...
-    ImGui::Checkbox("Sync center", &center_neutral);
+    // ImGui::Checkbox("Sync center", &center_neutral);
 
     ImGui::Text("Spatial symmtric:%d\nState_symmetric:%d\nABS_agnostic:%d XOR_agnostic:%d",
                 legacy::spatial_symmetric(rule), legacy::state_symmetric(rule), legacy::center_agnostic_abs(rule),
@@ -90,14 +89,9 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image&
     if (ImGui::BeginTabBar("##Type")) {
         for (int i = 0; i < std::size(parts); ++i) {
             const auto& part = *parts[i];
-            bool matches = part.matches(rule); // implicit conversion...
-            if (ImGui::BeginTabItem(names[i])) {
-                if (!matches) {
-                    ImGui::TextUnformatted("Not matching"); // TODO: enable forced-gather...
-                    ImGui::BeginDisabled();
-                    // TODO: when !matches, turn off grule contents in the disabled button...
-                }
+            const auto& groups = part.groups();
 
+            if (ImGui::BeginTabItem(names[i])) {
                 const int k = part.k();
                 auto grule = part.gather_from(rule);
 
@@ -105,40 +99,32 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image&
                 for (int j = 0; j < k; j++) {
                     static char label[20]; // is "static" needed?
 
-                    if (matches) {
-                        snprintf(label, 20, " %d ###%d", grule[j], j);
-                    } else {
-                        // TODO: refine...
-                        const auto& group = part.groups()[j];
-                        bool m = true;
-                        bool head = rule[group[0]];
-                        for (auto code : group) {
-                            if (rule[code] != rule[group[0]]) {
-                                m = false;
-                            }
+                    bool m = true;
+                    for (auto code : groups[j]) {
+                        if (rule[code] != rule[groups[j][0]]) {
+                            m = false;
                         }
-                        snprintf(label, 20, " %s ###%d", m ? (grule[j] ? "1" : "0") : "x", j);
                     }
+                    snprintf(label, 20, " %s ###%d", m ? (grule[j] ? "1" : "0") : "x", j);
 
                     if (j % 8 != 0) {
                         ImGui::SameLine();
                     }
+                    if (!m) {
+                        ImGui::BeginDisabled();
+                    }
                     if (ImGui::Button(label)) {
                         bool to = !grule[j];
-                        for (auto code : part.groups()[j]) {
+                        for (auto code : groups[j]) {
                             rule[code] = to;
                         }
-                        if (center_neutral) {
-                            // TODO: this looks horrible too...
-                            // TODO: how to light up the paired-button?
-                            for (auto code : part.group_for(part.groups()[j][0] ^ 16)) {
-                                rule[code] = to;
-                            }
-                        }
+                    }
+                    if (!m) {
+                        ImGui::EndDisabled();
                     }
                     if (ImGui::BeginItemTooltip()) {
                         int x = 0;
-                        for (int code : part.groups()[j]) {
+                        for (int code : groups[j]) {
                             if (x++ % 8 != 0) {
                                 ImGui::SameLine();
                             }
@@ -148,12 +134,13 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image&
                             ImGui::Image(icons.texture(), ImVec2(3 * zoom, 3 * zoom), ImVec2(0, code * (1.0f / 512)),
                                          ImVec2(1, (code + 1) * (1.0f / 512)), ImVec4(1, 1, 1, 1),
                                          ImVec4(0.5, 0.5, 0.5, 1));
+                            if (!m) {
+                                ImGui::SameLine();
+                                ImGui::TextUnformatted(rule[code] ? ":1" : ":0");
+                            }
                         }
                         ImGui::EndTooltip();
                     }
-                }
-                if (!matches) {
-                    ImGui::EndDisabled();
                 }
                 ImGui::EndTabItem();
             }
@@ -218,8 +205,18 @@ int main(int, char**) {
 
     // TODO: is this acceptable?
     // recorder.take(maker.make());
-    recorder.take(gol_rule()); // first rule...
 
+    // TODO: must be non-empty; "init" method...
+    recorder.take(gol_rule()); // first rule...
+    // Test:
+    for (char c = 'a'; c <= 'f'; ++c) {
+        std::string path = R"(C:\*redacted*\Desktop\automata\rules_of_interest\ro4 )";
+        path += c;
+        path += ".txt";
+        recorder.append(read_rule_from_file(path.c_str()));
+    }
+
+    // TODO: raii works terribly with C-style cleanup... can texture be destroyed after renderer?
     tile_image img(renderer, runner.tile()); // TODO: ...
     code_image icons(renderer);              // TODO: how to get "renderer" from backend?
 
