@@ -87,7 +87,7 @@ public:
     // TODO: aside from filters, the problem is, [what] to support?
     // TODO: partially symmetric rules?
     static constexpr const char* mode_names[]{"none(deprecated)", "sub_spatial",   "sub_spatial2", "spatial",
-                                              "spatial_paired",   "spatial_state", "permutation"};
+                                              "spatial_paired",   "spatial_state", "spatial_ro45", "permutation"};
     enum generator : int {
         none, // arbitrary 512 str, not used.
         sub_spatial,
@@ -95,6 +95,7 @@ public:
         spatial,
         spatial_paired,
         spatial_state,
+        spatial_ro45,
         perm
     } g_mode = spatial; // TODO: how to control this?
 
@@ -121,6 +122,8 @@ public:
             return legacy::partition::spatial_paired;
         case spatial_state:
             return legacy::partition::spatial_state;
+        case spatial_ro45:
+            return legacy::partition::spatial_ro45;
         case perm:
             return legacy::partition::permutation;
         default:
@@ -283,6 +286,19 @@ public:
     }
 };
 
+std::vector<legacy::compress> extract_rules(std::string_view str) {
+    std::vector<legacy::compress> rules;
+
+    const char *begin = str.data(), *end = str.data() + str.size();
+    const auto& regex = legacy::rulestr_regex();
+    std::cmatch match;
+    while (std::regex_search(begin, end, match, regex)) {
+        rules.emplace_back(match[0]);
+        begin = match.suffix().first;
+    }
+    return rules;
+}
+
 // TODO: refine...
 // TODO: forbid exception...
 std::vector<legacy::compress> read_rule_from_file(const char* filename) {
@@ -299,15 +315,7 @@ std::vector<legacy::compress> read_rule_from_file(const char* filename) {
             int read = fread(data.data(), 1, size, fp);
             fclose(fp);
             assert(read == size); // TODO: how to deal with this?
-
-            const char *begin = data.data(), *end = begin + data.size();
-            const auto& regex = legacy::rulestr_regex();
-            std::cmatch match;
-            while (std::regex_search(begin, end, match, regex)) {
-                std::string s = match[0];
-                vec.emplace_back(s);
-                begin = match.suffix().first; // wtf?
-            }
+            vec = extract_rules(std::string_view(data.data(), data.size()));
         }
     }
     return vec;

@@ -111,6 +111,30 @@ namespace legacy {
         }
     };
 
+    inline partitionT make_partition(std::initializer_list<int (*)(int)> mappers) {
+        partitionT::array_base part;
+        part.fill(-1);
+
+        auto equiv = [&](int code, int color, auto& equiv) -> void {
+            if (part[code] != -1) {
+                assert(part[code] == color);
+                return;
+            }
+            part[code] = color;
+            for (auto mapper : mappers) {
+                equiv(mapper(code), color, equiv);
+            }
+        };
+
+        int color = 0;
+        for (int code = 0; code < 512; code++) {
+            if (part[code] == -1) {
+                equiv(code, color++, equiv);
+            }
+        }
+        return part;
+    }
+
     namespace partition {
         // TODO: horribly wasteful...
         inline const partitionT none = [] {
@@ -121,215 +145,55 @@ namespace legacy {
             return part;
         }();
 
-        // TODO: spatial dropped diagonal... what does this symmetric mean?
-        inline const partitionT sub_spatial = [] {
-            partitionT::array_base part;
-            part.fill(-1);
+#define mapto(...)                                                                                                     \
+    +[](int code) {                                                                                                    \
+        auto [q, w, e, a, s, d, z, x, c] = decode(code);                                                               \
+        return encode(__VA_ARGS__);                                                                                    \
+    }
 
-            auto equiv = [&](int code, int color, auto& equiv) -> void {
-                if (part[code] != -1) {
-                    assert(part[code] == color);
-                    return;
-                }
-                part[code] = color;
-                // clang-format off
-            auto [q, w, e,
-                  a, s, d,
-                  z, x, c] = decode(code);
-            equiv(encode(z, x, c,
-                         a, s, d,
-                         q, w, e), color, equiv); // upside-down
-            equiv(encode(e, w, q,
-                         d, s, a,
-                         c, x, z), color, equiv); // "leftside-right"
-                // clang-format on
-            };
+        // z x c
+        // a s d
+        // q w e
+        inline constexpr auto upside_down = mapto(z, x, c, a, s, d, q, w, e);
+        // e w q
+        // d s a
+        // c x z
+        inline constexpr auto leftside_right = mapto(e, w, q, d, s, a, c, x, z);
+        // q a z
+        // w s x
+        // e d c
+        inline constexpr auto main_diag = mapto(q, a, z, w, s, x, e, d, c);
+        // c d e
+        // x s w
+        // z a q
+        inline constexpr auto side_diag = mapto(c, d, e, x, s, w, z, a, q);
+        // w e d
+        // q s c
+        // a z x
+        inline constexpr auto rotate_45 = mapto(w, e, d, q, s, c, a, z, x);
+        // q w e
+        // a !s d
+        // z x c
+        inline constexpr auto s_flipped = mapto(q, w, e, a, !s, d, z, x, c);
+        // !q !w !e
+        // !a !s !d
+        // !z !x !c
+        inline constexpr auto all_flipped = mapto(!q, !w, !e, !a, !s, !d, !z, !x, !c);
 
-            int color = 0;
-            for (int code = 0; code < 512; code++) {
-                if (part[code] == -1) {
-                    equiv(code, color++, equiv);
-                }
-            }
-            return part;
-        }();
+        inline const partitionT sub_spatial = make_partition({upside_down, leftside_right});
 
-        inline const partitionT sub_spatial2 = [] {
-            partitionT::array_base part;
-            part.fill(-1);
+        inline const partitionT sub_spatial2 = make_partition({main_diag, side_diag});
 
-            auto equiv = [&](int code, int color, auto& equiv) -> void {
-                if (part[code] != -1) {
-                    assert(part[code] == color);
-                    return;
-                }
-                part[code] = color;
-                // clang-format off
-            auto [q, w, e,
-                  a, s, d,
-                  z, x, c] = decode(code);
-            equiv(encode(q, a, z,
-                         w, s, x,
-                         e, d, c), color, equiv); // main-diag.
-            equiv(encode(c, d, e,
-                         x, s, w,
-                         z, a, q), color, equiv); // side-diag.
-                // clang-format on
-            };
+        // spatial-symmetric.
+        inline const partitionT spatial = make_partition({upside_down, leftside_right, main_diag});
 
-            int color = 0;
-            for (int code = 0; code < 512; code++) {
-                if (part[code] == -1) {
-                    equiv(code, color++, equiv);
-                }
-            }
-            return part;
-        }();
-
-        // basic symmetric partition.
-        inline const partitionT spatial = [] {
-            partitionT::array_base part;
-            part.fill(-1);
-
-            auto equiv = [&](int code, int color, auto& equiv) -> void {
-                if (part[code] != -1) {
-                    assert(part[code] == color);
-                    return;
-                }
-                part[code] = color;
-                // clang-format off
-            auto [q, w, e,
-                  a, s, d,
-                  z, x, c] = decode(code);
-            equiv(encode(z, x, c,
-                         a, s, d,
-                         q, w, e), color, equiv); // upside-down
-            equiv(encode(e, w, q,
-                         d, s, a,
-                         c, x, z), color, equiv); // "leftside-right"
-            equiv(encode(q, a, z,
-                         w, s, x,
-                         e, d, c), color, equiv); // diagonal
-                // clang-format on
-            };
-
-            int color = 0;
-            for (int code = 0; code < 512; code++) {
-                if (part[code] == -1) {
-                    equiv(code, color++, equiv);
-                }
-            }
-            return part;
-        }();
-
-        inline const partitionT spatial_paired = [] {
-            partitionT::array_base part;
-            part.fill(-1);
-
-            auto equiv = [&](int code, int color, auto& equiv) -> void {
-                if (part[code] != -1) {
-                    assert(part[code] == color);
-                    return;
-                }
-                part[code] = color;
-                // clang-format off
-            auto [q, w, e,
-                  a, s, d,
-                  z, x, c] = decode(code);
-            equiv(encode(z, x, c,
-                         a, s, d,
-                         q, w, e), color, equiv); // upside-down
-            equiv(encode(e, w, q,
-                         d, s, a,
-                         c, x, z), color, equiv); // "leftside-right"
-            equiv(encode(q, a, z,
-                         w, s, x,
-                         e, d, c), color, equiv); // diagonal
-            // tie...
-            equiv(encode(q, w, e,
-                         a, !s, d,
-                         z, x, c), color, equiv);
-                // clang-format on
-            };
-
-            int color = 0;
-            for (int code = 0; code < 512; code++) {
-                if (part[code] == -1) {
-                    equiv(code, color++, equiv);
-                }
-            }
-            return part;
-        }();
+        inline const partitionT spatial_paired = make_partition({upside_down, leftside_right, main_diag, s_flipped});
 
         // TODO: explain.
-        // a special rule that...
-        inline const partitionT spatial_state = [] {
-            partitionT::array_base part;
-            part.fill(-1);
+        inline const partitionT spatial_state = make_partition({upside_down, leftside_right, main_diag, all_flipped});
 
-            auto equiv = [&](int code, int color, auto& equiv) -> void {
-                if (part[code] != -1) {
-                    assert(part[code] == color);
-                    return;
-                }
-                part[code] = color;
-                // clang-format off
-            auto [q, w, e,
-                  a, s, d,
-                  z, x, c] = decode(code);
-            equiv(encode(z, x, c,
-                         a, s, d,
-                         q, w, e), color, equiv); // upside-down
-            equiv(encode(e, w, q,
-                         d, s, a,
-                         c, x, z), color, equiv); // "leftside-right"
-            equiv(encode(q, a, z,
-                         w, s, x,
-                         e, d, c), color, equiv); // diagonal
-            // TODO: this is the only difference...
-            equiv(encode(!q, !w, !e,
-                         !a, !s, !d,
-                         !z, !x, !c), color, equiv);
-                // clang-format on
-            };
-
-            int color = 0;
-            for (int code = 0; code < 512; code++) {
-                if (part[code] == -1) {
-                    equiv(code, color++, equiv);
-                }
-            }
-            return part;
-        }();
-
-        inline const partitionT ro45_only = [] {
-            partitionT::array_base part;
-            part.fill(-1);
-
-            auto equiv = [&](int code, int color, auto& equiv) -> void {
-                if (part[code] != -1) {
-                    assert(part[code] == color);
-                    return;
-                }
-                part[code] = color;
-                // clang-format off
-            auto [q, w, e,
-                  a, s, d,
-                  z, x, c] = decode(code);
-            equiv(encode(w, e, d,
-                         q, s, c,
-                         a, z, x), color, equiv);
-                // clang-format on
-            };
-
-            int color = 0;
-            for (int code = 0; code < 512; code++) {
-                if (part[code] == -1) {
-                    equiv(code, color++, equiv);
-                }
-            }
-            return part;
-        }();
+        inline const partitionT ro45_only = make_partition({rotate_45});
+        inline const partitionT spatial_ro45 = make_partition({upside_down, leftside_right, main_diag, rotate_45});
 
         inline const partitionT permutation = [] {
             partitionT::array_base part;

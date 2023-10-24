@@ -48,6 +48,7 @@ constexpr int skip_min = 0, skip_max = 20;
 int skip_per_frame = 0;
 
 bool cal_rate = true;
+bool anti_flick = true; // TODO: make settable...
 
 // TODO: looks horrible and inefficient
 std::string wrap_rule_string(const std::string& str) {
@@ -467,6 +468,17 @@ int main(int argc, char** argv) {
         ImGui::End();
 
         // run tile (TODO: should be here?)
+        if (anti_flick) {
+            if (runner.rule()[0] == 1 && runner.rule()[511] == 0 && pergen % 2) {
+                if (pergen == 1) {
+                    ++pergen;
+                } else {
+                    assert(pergen >= 2);
+                    --pergen;
+                }
+            }
+            // TODO: how to restore when switch to new rules?
+        }
         if (runner.gen() == 0) {
             runner.run(start_from);
         }
