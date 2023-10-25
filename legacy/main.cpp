@@ -212,12 +212,9 @@ int main(int argc, char** argv) {
 
     // TODO: must be non-empty; "init" method...
     recorder.take(gol_rule()); // first rule...
-    // Test:
-    for (char c = 'a'; c <= 'f'; ++c) {
-        std::string path = R"(C:\*redacted*\Desktop\automata\rules_of_interest\ro4 )";
-        path += c;
-        path += ".txt";
-        recorder.append(read_rule_from_file(path.c_str()));
+    if (argc == 2) {
+        // TODO: add err logger
+        recorder.replace(read_rule_from_file(argv[1]));
     }
 
     // TODO: raii works terribly with C-style cleanup... can texture be destroyed after renderer?
@@ -232,11 +229,12 @@ int main(int argc, char** argv) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
+    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
+
     // Setup Platform/Renderer backends
     ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
     ImGui_ImplSDLRenderer2_Init(renderer);
@@ -273,6 +271,44 @@ int main(int argc, char** argv) {
         ImGui_ImplSDLRenderer2_NewFrame();
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
+
+        ////////////////////////////////////////////////////////////////////////////
+        // TODO: experimental...
+        // TOO clumsy...
+        bool open_popup = false;
+        if (ImGui::BeginMainMenuBar()) {
+            if (ImGui::BeginMenu("File##1234")) {
+                if (ImGui::MenuItem("Open##5678", "...")) {
+                    open_popup = true;
+                }
+                ImGui::EndMenu();
+            }
+            ImGui::EndMainMenuBar();
+        }
+        static bool prev_paused = false; // TODO: should be push/pop mode
+        if (open_popup) {
+            prev_paused = paused;
+            paused = true;
+            ImGui::OpenPopup("Input##0123");
+        }
+        if (ImGui::BeginPopupModal("Input##0123")) {
+            static char buf[100]{}; // TODO: static? init contents?
+            ImGui::InputTextWithHint("##1223", "File-path", buf, 100);
+            // TODO: on-enter?
+            ImGui::SameLine();
+            if (ImGui::Button("Open##214271") && buf[0] != '\0') {
+                recorder.replace(read_rule_from_file(buf));
+                buf[0] = '\0';
+                ImGui::CloseCurrentPopup();
+                paused = prev_paused;
+            }
+            if (ImGui::Button("Cancel##27932811", ImVec2(120, 0))) {
+                ImGui::CloseCurrentPopup();
+                paused = prev_paused;
+            }
+            ImGui::EndPopup();
+        }
+        /////////////////////////////////////////////////////////////////////////
 
         // TODO: editor works poorly with recorder...
         // TODO: shouldnt be here...
