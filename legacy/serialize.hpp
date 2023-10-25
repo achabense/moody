@@ -7,6 +7,7 @@
 namespace legacy {
     // TODO: compressT?
     // TODO: exception works horribly... use expected instead?
+    // TODO: wasteful... overhaul...
     class compress {
         array<uint8_t, 64> bits{}; // as bitset.
     public:
