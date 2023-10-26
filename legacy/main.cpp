@@ -57,6 +57,7 @@ std::string wrap_rule_string(const std::string& str) {
 
 // TODO: clumsy...
 // TODO: how to get renderer from backend?
+// TODO: should be a class...
 legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image& icons) {
     // TODO: support state and paired
     assert(show);
@@ -77,10 +78,16 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image&
                 legacy::spatial_symmetric(rule), legacy::state_symmetric(rule), legacy::center_agnostic_abs(rule),
                 legacy::center_agnostic_xor(rule));
 
+    // TODO: support state&XOR etc...
+    static bool paired = false;
+    ImGui::Checkbox("Paired", &paired);
     // How to specify the first "BeginTabItem"?
+    // ???ImGuiTabItemFlags_SetSelected
     if (ImGui::BeginTabBar("##Type")) {
         for (int i = 0; i < legacy::partition::basic_specification::size; ++i) {
-            const auto& part = legacy::partition::get_partition(legacy::partition::basic_specification(i), {});
+            const auto& part = legacy::partition::get_partition(legacy::partition::basic_specification(i),
+                                                                paired ? legacy::partition::extra_specification::paired
+                                                                     : legacy::partition::extra_specification::none);
             const auto& groups = part.groups();
 
             if (ImGui::BeginTabItem(legacy::partition::basic_specification_names[i])) {
@@ -89,15 +96,12 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image&
 
                 // buttons. TODO: better visual; show group members.
                 for (int j = 0; j < k; j++) {
-                    static char label[20]; // is "static" needed? TODO: nope...
-
                     bool m = true;
                     for (auto code : groups[j]) {
                         if (rule[code] != rule[groups[j][0]]) {
                             m = false;
                         }
                     }
-                    snprintf(label, 20, " %s ###%d", m ? (grule[j] ? "1" : "0") : "x", j);
 
                     if (j % 8 != 0) {
                         ImGui::SameLine();
@@ -105,12 +109,17 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image&
                     if (!m) {
                         ImGui::BeginDisabled();
                     }
-                    if (ImGui::Button(label)) {
+                    ImGui::PushID(j);
+                    // TODO: style...
+                    if (ImGui::ImageButton(icons.texture(), ImVec2(3 * 6, 3 * 6),
+                                           ImVec2(0, groups[j][0] * (1.0f / 512)),
+                                           ImVec2(1, (groups[j][0] + 1) * (1.0f / 512)))) {
                         bool to = !grule[j];
                         for (auto code : groups[j]) {
                             rule[code] = to;
                         }
                     }
+                    ImGui::PopID();
                     if (!m) {
                         ImGui::EndDisabled();
                     }
@@ -128,11 +137,15 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image&
                                          ImVec4(0.5, 0.5, 0.5, 1));
                             if (!m) {
                                 ImGui::SameLine();
+                                ImGui::AlignTextToFramePadding();
                                 ImGui::TextUnformatted(rule[code] ? ":1" : ":0");
                             }
                         }
                         ImGui::EndTooltip();
                     }
+                    ImGui::SameLine();
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::TextUnformatted(m ? (grule[j] ? ":1" : ":0") : ":x"); // TODO: how to remove the spacing?
                 }
                 ImGui::EndTabItem();
             }
@@ -330,11 +343,12 @@ int main(int argc, char** argv) {
             }
 
             {
-                ImVec2 pos = ImGui::GetCursorScreenPos();
+                const ImVec2 pos = ImGui::GetCursorScreenPos();
 
                 img.update(runner.tile());
-                auto img_texture = img.texture();
-                ImVec2 img_size = ImVec2(img.width(), img.height());
+                const auto img_texture = img.texture();
+                const float img_zoom = 1; // TODO: *2 is too big with (320*240)
+                const ImVec2 img_size = ImVec2(img.width() * img_zoom, img.height() * img_zoom);
 
                 ImGui::ImageButton(img_texture, img_size);
 
@@ -418,7 +432,8 @@ int main(int argc, char** argv) {
                 }
                 {
                     auto prev = maker.e_mode;
-                    ImGui::RadioButton("basic", underlying_address(maker.e_mode), legacy::partition::extra_specification::none);
+                    ImGui::RadioButton("basic", underlying_address(maker.e_mode),
+                                       legacy::partition::extra_specification::none);
                     ImGui::SameLine();
                     ImGui::RadioButton("paired", underlying_address(maker.e_mode), legacy::partition::paired);
                     ImGui::SameLine();
@@ -440,6 +455,7 @@ int main(int argc, char** argv) {
 
                 {
                     auto prev = maker.interpret_as;
+                    ImGui::AlignTextToFramePadding();
                     ImGui::TextUnformatted("As"); // TODO: align with radio...
                     ImGui::SameLine();
                     ImGui::RadioButton("ABS", underlying_address(maker.interpret_as), legacy::ABS);

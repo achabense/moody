@@ -114,20 +114,21 @@ namespace legacy {
     };
 
     namespace partition {
+        // TODO: none/orthogonal/diagonal are too noisy; only support when configured...
         enum basic_specification : int {
-            none = 0,
-            orthogonal,
-            diagonal,
-            ro45,
+            // none = 0,
+            // orthogonal,
+            // diagonal,
             spatial,
+            ro45,
             spatial_ro45,
             permutation,
             size
         };
-        static constexpr const char* basic_specification_names[]{"none",    "orthogonal",   "diagonal",   "ro45",
-                                                                 "spatial", "spatial_ro45", "permutation"};
+        static constexpr const char* basic_specification_names[]{/*"none",    "orthogonal",   "diagonal",   */
+                                                                 "spatial", "ro45", "spatial_ro45", "permutation"};
         inline namespace s {
-            // TODO: currently "basic" to avoid conflict with none..
+            // TODO: currently in a new namespace to avoid enumrator clash...
             enum extra_specification : int { none = 0, paired, state, size };
         } // namespace s
 
@@ -200,11 +201,13 @@ namespace legacy {
 #undef mapto
 
             static const std::initializer_list<mapperP> args[basic_specification::size]{
+                /*
                 {},                                                     // none.
                 {upside_down, leftside_right},                          // orthogonal
                 {main_diag, side_diag},                                 // diagonal
-                {rotate_45},                                            // ro45
+                */
                 {upside_down, leftside_right, main_diag /*side_diag*/}, // spatial
+                {rotate_45},                                            // ro45
                 {upside_down, leftside_right, main_diag, rotate_45},    // spatial_ro45
                 {rotate_45, perm_specific}                              // permutation
             };
