@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <optional>
 
 #include "rule.hpp"
 
@@ -90,6 +91,7 @@ namespace legacy {
             return rule;
         }
 
+        // TODO: bad name...
         bool matches(const ruleT_base& rule) const {
             for (int code = 0; code < 512; ++code) {
                 if (rule[code] != rule[head_for(code)]) {
@@ -111,103 +113,125 @@ namespace legacy {
         }
     };
 
-    inline partitionT make_partition(std::initializer_list<int (*)(int)> mappers) {
-        partitionT::array_base part;
-        part.fill(-1);
-
-        auto equiv = [&](int code, int color, auto& equiv) -> void {
-            if (part[code] != -1) {
-                assert(part[code] == color);
-                return;
-            }
-            part[code] = color;
-            for (auto mapper : mappers) {
-                equiv(mapper(code), color, equiv);
-            }
-        };
-
-        int color = 0;
-        for (int code = 0; code < 512; code++) {
-            if (part[code] == -1) {
-                equiv(code, color++, equiv);
-            }
-        }
-        return part;
-    }
-
     namespace partition {
-        // TODO: horribly wasteful...
-        inline const partitionT none = [] {
-            partitionT::array_base part;
-            for (int code = 0; code < 512; ++code) {
-                part[code] = code;
-            }
-            return part;
-        }();
+        enum basic_specification : int {
+            none = 0,
+            orthogonal,
+            diagonal,
+            ro45,
+            spatial,
+            spatial_ro45,
+            permutation,
+            size
+        };
+        static constexpr const char* basic_specification_names[]{"none",    "orthogonal",   "diagonal",   "ro45",
+                                                                 "spatial", "spatial_ro45", "permutation"};
+        inline namespace s {
+            // TODO: currently "basic" to avoid conflict with none..
+            enum extra_specification : int { none = 0, paired, state, size };
+        } // namespace s
+
+        static constexpr const char* extra_specification_names[]{"basic", "paired", "state"};
+
+        inline const partitionT& get_partition(basic_specification basic, extra_specification extr) {
+            using mapperP = int (*)(int);
+
+            constexpr auto make_partition = [](const vector<mapperP>& mappers) -> partitionT {
+                partitionT::array_base part;
+                part.fill(-1);
+
+                auto equiv = [&](int code, int color, auto& equiv) -> void {
+                    if (part[code] != -1) {
+                        assert(part[code] == color);
+                        return;
+                    }
+                    part[code] = color;
+                    for (auto mapper : mappers) {
+                        equiv(mapper(code), color, equiv);
+                    }
+                };
+
+                int color = 0;
+                for (int code = 0; code < 512; code++) {
+                    if (part[code] == -1) {
+                        equiv(code, color++, equiv);
+                    }
+                }
+                return part;
+            };
 
 #define mapto(...)                                                                                                     \
     +[](int code) {                                                                                                    \
         auto [q, w, e, a, s, d, z, x, c] = decode(code);                                                               \
         return encode(__VA_ARGS__);                                                                                    \
     }
+            // z x c
+            // a s d
+            // q w e
+            constexpr mapperP upside_down = mapto(z, x, c, a, s, d, q, w, e);
+            // e w q
+            // d s a
+            // c x z
+            constexpr mapperP leftside_right = mapto(e, w, q, d, s, a, c, x, z);
+            // q a z
+            // w s x
+            // e d c
+            constexpr mapperP main_diag = mapto(q, a, z, w, s, x, e, d, c);
+            // c d e
+            // x s w
+            // z a q
+            constexpr mapperP side_diag = mapto(c, d, e, x, s, w, z, a, q);
+            // w e d
+            // q s c
+            // a z x
+            constexpr mapperP rotate_45 = mapto(w, e, d, q, s, c, a, z, x);
+            // q w e
+            // a !s d
+            // z x c
+            constexpr mapperP s_flipped = mapto(q, w, e, a, !s, d, z, x, c);
+            // !q !w !e
+            // !a !s !d
+            // !z !x !c
+            constexpr mapperP all_flipped = mapto(!q, !w, !e, !a, !s, !d, !z, !x, !c);
+            // w q e
+            // a s d
+            // z x c
+            constexpr mapperP perm_specific = mapto(w, q, e, a, s, d, z, x, c);
+#undef mapto
 
-        // z x c
-        // a s d
-        // q w e
-        inline constexpr auto upside_down = mapto(z, x, c, a, s, d, q, w, e);
-        // e w q
-        // d s a
-        // c x z
-        inline constexpr auto leftside_right = mapto(e, w, q, d, s, a, c, x, z);
-        // q a z
-        // w s x
-        // e d c
-        inline constexpr auto main_diag = mapto(q, a, z, w, s, x, e, d, c);
-        // c d e
-        // x s w
-        // z a q
-        inline constexpr auto side_diag = mapto(c, d, e, x, s, w, z, a, q);
-        // w e d
-        // q s c
-        // a z x
-        inline constexpr auto rotate_45 = mapto(w, e, d, q, s, c, a, z, x);
-        // q w e
-        // a !s d
-        // z x c
-        inline constexpr auto s_flipped = mapto(q, w, e, a, !s, d, z, x, c);
-        // !q !w !e
-        // !a !s !d
-        // !z !x !c
-        inline constexpr auto all_flipped = mapto(!q, !w, !e, !a, !s, !d, !z, !x, !c);
-
-        inline const partitionT sub_spatial = make_partition({upside_down, leftside_right});
-
-        inline const partitionT sub_spatial2 = make_partition({main_diag, side_diag});
-
-        // spatial-symmetric.
-        inline const partitionT spatial = make_partition({upside_down, leftside_right, main_diag});
-
-        inline const partitionT spatial_paired = make_partition({upside_down, leftside_right, main_diag, s_flipped});
-
-        // TODO: explain.
-        inline const partitionT spatial_state = make_partition({upside_down, leftside_right, main_diag, all_flipped});
-
-        inline const partitionT ro45_only = make_partition({rotate_45});
-        inline const partitionT spatial_ro45 = make_partition({upside_down, leftside_right, main_diag, rotate_45});
-
-        inline const partitionT permutation = [] {
-            partitionT::array_base part;
-            for (int code = 0; code < 512; ++code) {
-                // clang-format off
-            auto [q, w, e,
-                  a, s, d,
-                  z, x, c] = decode(code);
-                // clang-format on
-                part[code] = q + w + e + a + d + z + x + c + (s ? 100 : 0);
+            static const std::initializer_list<mapperP> args[basic_specification::size]{
+                {},                                                     // none.
+                {upside_down, leftside_right},                          // orthogonal
+                {main_diag, side_diag},                                 // diagonal
+                {rotate_45},                                            // ro45
+                {upside_down, leftside_right, main_diag /*side_diag*/}, // spatial
+                {upside_down, leftside_right, main_diag, rotate_45},    // spatial_ro45
+                {rotate_45, perm_specific}                              // permutation
+            };
+            static std::optional<partitionT> parts[basic_specification::size][extra_specification::size];
+            // apparently not thread-safe... TODO: should be thread safe or not?
+            if (!parts[basic][extr]) {
+                vector<mapperP> arg = args[basic];
+                switch (extr) {
+                case extra_specification::none:
+                    break;
+                case extra_specification::paired:
+                    arg.push_back(s_flipped);
+                    break;
+                case extra_specification::state:
+                    arg.push_back(all_flipped);
+                    break;
+                default:
+                    abort();
+                }
+                parts[basic][extr].emplace(make_partition(arg));
             }
-            return part;
-        }();
+            return *parts[basic][extr];
+        }
+
+        inline const partitionT& get_partition_spatial() {
+            return get_partition(basic_specification::spatial, extra_specification::none);
+        }
     } // namespace partition
-    // TODO: sub-namespace...
 
 } // namespace legacy

@@ -58,14 +58,7 @@ std::string wrap_rule_string(const std::string& str) {
 // TODO: clumsy...
 // TODO: how to get renderer from backend?
 legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image& icons) {
-    static const legacy::partitionT* parts[]{&legacy::partition::none, &legacy::partition::ro45_only,
-                                             &legacy::partition::spatial, &legacy::partition::permutation};
-    static const char* names[]{"none", "ro45-only", "spatial", "permutation"};
-
-    // TODO: not quite useful, as "center-agnostic" mode is currently not supported...
-    // static bool center_neutral = false; // TODO: this is not symmetry trait, but still significant...
-    // TODO: how to deal with rules with
-
+    // TODO: support state and paired
     assert(show);
     if (!ImGui::Begin("Rule editor", &show)) {
         ImGui::End();
@@ -86,11 +79,11 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image&
 
     // How to specify the first "BeginTabItem"?
     if (ImGui::BeginTabBar("##Type")) {
-        for (int i = 0; i < std::size(parts); ++i) {
-            const auto& part = *parts[i];
+        for (int i = 0; i < legacy::partition::basic_specification::size; ++i) {
+            const auto& part = legacy::partition::get_partition(legacy::partition::basic_specification(i), {});
             const auto& groups = part.groups();
 
-            if (ImGui::BeginTabItem(names[i])) {
+            if (ImGui::BeginTabItem(legacy::partition::basic_specification_names[i])) {
                 const int k = part.k();
                 auto grule = part.gather_from(rule);
 
@@ -418,10 +411,23 @@ int main(int argc, char** argv) {
                 bool new_rule = false;
 
                 // is reinter ok?
-                if (ImGui::Combo("Mode", underlying_address(maker.g_mode), maker.mode_names,
-                                 std::size(maker.mode_names))) {
+                if (ImGui::Combo("##MainMode", underlying_address(maker.b_mode), maker.b_mode_names,
+                                 std::size(maker.b_mode_names))) {
                     maker.density = maker.max_density() * 0.3;
                     new_rule = true;
+                }
+                {
+                    auto prev = maker.e_mode;
+                    ImGui::RadioButton("basic", underlying_address(maker.e_mode), legacy::partition::extra_specification::none);
+                    ImGui::SameLine();
+                    ImGui::RadioButton("paired", underlying_address(maker.e_mode), legacy::partition::paired);
+                    ImGui::SameLine();
+                    // TODO: explain...
+                    ImGui::RadioButton("state", underlying_address(maker.e_mode), legacy::partition::state);
+                    if (maker.e_mode != prev) {
+                        maker.density = maker.max_density() * 0.3;
+                        new_rule = true;
+                    }
                 }
 
                 // TODO: too sensitive...
@@ -432,12 +438,16 @@ int main(int argc, char** argv) {
                     new_rule = true;
                 }
 
-                auto prev = maker.interpret_as;
-                ImGui::RadioButton("plain", underlying_address(maker.interpret_as), legacy::ABS);
-                ImGui::SameLine();
-                ImGui::RadioButton("flip", underlying_address(maker.interpret_as), legacy::XOR);
-                if (maker.interpret_as != prev) {
-                    new_rule = true;
+                {
+                    auto prev = maker.interpret_as;
+                    ImGui::TextUnformatted("As"); // TODO: align with radio...
+                    ImGui::SameLine();
+                    ImGui::RadioButton("ABS", underlying_address(maker.interpret_as), legacy::ABS);
+                    ImGui::SameLine();
+                    ImGui::RadioButton("XOR", underlying_address(maker.interpret_as), legacy::XOR);
+                    if (maker.interpret_as != prev) {
+                        new_rule = true;
+                    }
                 }
 
                 ImGui::SameLine();
@@ -491,14 +501,14 @@ int main(int argc, char** argv) {
                                        ImGuiSliderFlags_NoInput)) {
                     runner.restart();
                 }
-                ImGui::BeginDisabled();
-                ImGui::SliderInt("Start gen [0-100]", &start_from, start_min, start_max, "%d",
-                                 ImGuiSliderFlags_NoInput);
-                ImGui::EndDisabled();
                 ImGui::SliderInt("Per gen [1-10]", &pergen, pergen_min, pergen_max, "%d",
                                  ImGuiSliderFlags_NoInput); // TODO: use sprintf for pergen_min and pergen_max,
                                                             // start_min, start_max...
                 ImGui::SliderInt("Speed [0-20]", &skip_per_frame, skip_min, skip_max, "%d", ImGuiSliderFlags_NoInput);
+                ImGui::BeginDisabled();
+                ImGui::SliderInt("Start gen [0-100]", &start_from, start_min, start_max, "%d",
+                                 ImGuiSliderFlags_NoInput);
+                ImGui::EndDisabled();
             }
         }
         ImGui::End();

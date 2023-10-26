@@ -86,49 +86,22 @@ public:
 
     // TODO: aside from filters, the problem is, [what] to support?
     // TODO: partially symmetric rules?
-    static constexpr const char* mode_names[]{"none(deprecated)", "sub_spatial",   "sub_spatial2", "spatial",
-                                              "spatial_paired",   "spatial_state", "spatial_ro45", "permutation"};
-    enum generator : int {
-        none, // arbitrary 512 str, not used.
-        sub_spatial,
-        sub_spatial2,
-        spatial,
-        spatial_paired,
-        spatial_state,
-        spatial_ro45,
-        perm
-    } g_mode = spatial; // TODO: how to control this?
 
     // TODO: explain what this is exactly...
     // TODO: the enum is problematic...
     legacy::interpret_mode interpret_as = legacy::ABS;
+    // TODO: explain e_mode...
+    static constexpr auto& b_mode_names = legacy::partition::basic_specification_names;
+    static constexpr auto& e_mode_names = legacy::partition::extra_specification_names;
+    legacy::partition::basic_specification b_mode = legacy::partition::spatial;
+    legacy::partition::extra_specification e_mode = legacy::partition::extra_specification::none;
 
     explicit rule_maker(uint64_t seed) : m_rand{seed} {
         density = max_density() * 0.3;
     }
 
     const legacy::partitionT& current_partition() const {
-        std::underlying_type_t<legacy::interpret_mode>;
-        switch (g_mode) {
-        case none: // TODO: extremely inefficient...
-            return legacy::partition::none;
-        case sub_spatial:
-            return legacy::partition::sub_spatial;
-        case sub_spatial2:
-            return legacy::partition::sub_spatial2;
-        case spatial:
-            return legacy::partition::spatial;
-        case spatial_paired:
-            return legacy::partition::spatial_paired;
-        case spatial_state:
-            return legacy::partition::spatial_state;
-        case spatial_ro45:
-            return legacy::partition::spatial_ro45;
-        case perm:
-            return legacy::partition::permutation;
-        default:
-            abort(); // TODO ...
-        }
+        return legacy::partition::get_partition(b_mode, e_mode);
     }
     int max_density() const {
         return current_partition().k();
