@@ -60,7 +60,9 @@ std::string wrap_rule_string(const std::string& str) {
 // TODO: should be a class...
 legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image& icons) {
     assert(show);
-    if (!ImGui::Begin("Rule editor", &show, ImGuiWindowFlags_::ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (!ImGui::Begin("Rule editor", &show,
+                      ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse |
+                          ImGuiWindowFlags_::ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::End();
         return old_rule;
     }
@@ -361,7 +363,7 @@ int main(int argc, char** argv) {
                 const ImVec2 pos = ImGui::GetCursorScreenPos();
 
                 img.update(runner.tile());
-                const auto img_texture = img.texture();
+                SDL_Texture* const img_texture = img.texture();
                 const float img_zoom = 1; // TODO: *2 is too big with (320*240)
                 const ImVec2 img_size = ImVec2(img.width() * img_zoom, img.height() * img_zoom);
 
@@ -429,63 +431,56 @@ int main(int argc, char** argv) {
 
                 ImGui::Text("Total:%d At:%d%s", recorder.size(), recorder.pos(),
                             recorder.pos() + 1 == recorder.size() ? "(last)" : ""); // TODO: random-access...
-
-                // how to activate only on Enter?
-                // static char _goto[20]{};
-                // if (ImGui::InputText("Goto", _goto,std::size(_goto))) {
-                //     putchar('\a');
-                // }
             }
 
             ImGui::SeparatorText("Rule generator");
 
             {
-                bool new_rule = false;
+                auto b_mode = maker.b_mode;
+                auto e_mode = maker.e_mode;
+                auto density = maker.density;
+                auto interpret_as = maker.interpret_as;
 
                 // is reinter ok?
-                if (ImGui::Combo("##MainMode", underlying_address(maker.b_mode), maker.b_mode_names,
-                                 std::size(maker.b_mode_names))) {
-                    maker.density = maker.max_density() * 0.3;
-                    new_rule = true;
-                }
-                {
-                    auto prev = maker.e_mode;
-                    ImGui::RadioButton("basic", underlying_address(maker.e_mode),
-                                       legacy::partition::extra_specification::none);
-                    ImGui::SameLine();
-                    ImGui::RadioButton("paired", underlying_address(maker.e_mode), legacy::partition::paired);
-                    ImGui::SameLine();
-                    // TODO: explain...
-                    ImGui::RadioButton("state", underlying_address(maker.e_mode), legacy::partition::state);
-                    if (maker.e_mode != prev) {
-                        maker.density = maker.max_density() * 0.3;
-                        new_rule = true;
-                    }
-                }
+                ImGui::Combo("##MainMode", underlying_address(b_mode), maker.b_mode_names,
+                             std::size(maker.b_mode_names));
+
+                // e_mode:
+                ImGui::RadioButton("basic", underlying_address(e_mode), legacy::partition::extra_specification::none);
+                ImGui::SameLine();
+                ImGui::RadioButton("paired", underlying_address(e_mode), legacy::partition::paired);
+                ImGui::SameLine();
+                // TODO: explain...
+                ImGui::RadioButton("state", underlying_address(e_mode), legacy::partition::state);
 
                 // TODO: too sensitive...
                 // TODO: is it suitable to restart immediately?
                 char str[40];
-                snprintf(str, 40, "Rule density [%d-%d]", 0, maker.max_density());
-                if (ImGui::SliderInt(str, &maker.density, 0, maker.max_density(), "%d", ImGuiSliderFlags_NoInput)) {
-                    new_rule = true;
-                }
+                snprintf(str, 40, "Rule density [0-%d]", maker.max_density());
+                ImGui::SliderInt(str, &density, 0, maker.max_density(), "%d", ImGuiSliderFlags_NoInput);
 
-                {
-                    auto prev = maker.interpret_as;
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::TextUnformatted("As");
-                    ImGui::SameLine();
-                    ImGui::RadioButton("ABS", underlying_address(maker.interpret_as), legacy::ABS);
-                    ImGui::SameLine();
-                    ImGui::RadioButton("XOR", underlying_address(maker.interpret_as), legacy::XOR);
-                    if (maker.interpret_as != prev) {
-                        new_rule = true;
-                    }
-                }
+                ImGui::AlignTextToFramePadding();
+                ImGui::TextUnformatted("As");
+                ImGui::SameLine();
+                ImGui::RadioButton("ABS", underlying_address(interpret_as), legacy::ABS);
+                ImGui::SameLine();
+                ImGui::RadioButton("XOR", underlying_address(interpret_as), legacy::XOR);
 
                 ImGui::SameLine();
-                if (ImGui::Button("New rule")) {
+                bool new_rule = ImGui::Button("New rule");
+
+                if (maker.density != density) {
+                    maker.density = density;
+                    new_rule = true;
+                }
+                if (maker.b_mode != b_mode || maker.e_mode != e_mode) {
+                    maker.b_mode = b_mode;
+                    maker.e_mode = e_mode;
+                    maker.density = maker.max_density() * 0.3;
+                    new_rule = true;
+                }
+                if (maker.interpret_as != interpret_as) {
+                    maker.interpret_as = interpret_as;
                     new_rule = true;
                 }
 
@@ -496,8 +491,9 @@ int main(int argc, char** argv) {
 
             ImGui::SeparatorText("Tile");
             {
-                ImGui::Text("Gen:%d", runner.gen());
-
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Gen:%3d", runner.gen());
+                ImGui::SameLine();
                 ImGui::Checkbox("Calculate density", &cal_rate);
                 if (cal_rate) {
                     ImGui::SameLine();
@@ -507,12 +503,21 @@ int main(int argc, char** argv) {
             }
 
             {
+                if (ImGui::SliderFloat("Init density [0.0-1.0]", &runner.m_filler->density, 0.0f, 1.0f, "%.3f",
+                                       ImGuiSliderFlags_NoInput)) {
+                    runner.restart();
+                }
+
                 ImGui::Checkbox("Pause", &paused);
 
                 ImGui::SameLine();
                 ImGui::PushButtonRepeat(true); // accept consecutive clicks... TODO: too fast...
                 if (ImGui::Button("+1")) {
                     runner.run(1);
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("+p")) {
+                    runner.run(pergen); // TODO: should combine...
                 }
                 ImGui::PopButtonRepeat();
 
@@ -531,10 +536,7 @@ int main(int argc, char** argv) {
             {
                 // TODO: toooo ugly...
                 // TODO: (?) currently suitable to restart immediately...
-                if (ImGui::SliderFloat("Init density [0.0-1.0]", &runner.m_filler->density, 0.0f, 1.0f, "%.3f",
-                                       ImGuiSliderFlags_NoInput)) {
-                    runner.restart();
-                }
+
                 ImGui::SliderInt("Per gen [1-10]", &pergen, pergen_min, pergen_max, "%d",
                                  ImGuiSliderFlags_NoInput); // TODO: use sprintf for pergen_min and pergen_max,
                                                             // start_min, start_max...

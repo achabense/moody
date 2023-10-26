@@ -93,6 +93,7 @@ public:
     // TODO: explain e_mode...
     static constexpr auto& b_mode_names = legacy::partition::basic_specification_names;
     static constexpr auto& e_mode_names = legacy::partition::extra_specification_names;
+    // TODO: the naming is horrible...
     legacy::partition::basic_specification b_mode = legacy::partition::spatial;
     legacy::partition::extra_specification e_mode = legacy::partition::extra_specification::none;
 
@@ -342,3 +343,46 @@ struct scannerT {
 // export as file...
 // current-record???->which notify which?
 // TODO: empty state?
+#if 0
+struct rule_editor {
+    legacy::partition::basic_specification part{};
+    legacy::partition::extra_specification extr{};
+
+    legacy::interpret_mode as_flip = {}; // TODO: should really be a plain bool...
+    legacy::ruleT_base m_rule;
+
+
+
+
+    void load(legacy::ruleT& rule) {
+        m_rule = rule.to_base(as_flip);
+        
+
+
+
+    }
+
+    legacy::ruleT release() const {
+        return legacy::ruleT(m_rule, as_flip);
+    }
+
+    // without affecting actual rule... TODO: why?
+    void flip_as_flip() {
+        legacy::ruleT rule = release();
+        as_flip = {}; // TODO...
+        load(rule);
+    }
+
+    bool matches[512];
+    bool all_matches{};
+
+    int count;
+    bool flicky;
+
+    bool data[512];
+
+    void* recorder;
+
+    void load(legacy::ruleT& rule) {}
+};
+#endif
