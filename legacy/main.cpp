@@ -59,9 +59,8 @@ std::string wrap_rule_string(const std::string& str) {
 // TODO: how to get renderer from backend?
 // TODO: should be a class...
 legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image& icons) {
-    // TODO: support state and paired
     assert(show);
-    if (!ImGui::Begin("Rule editor", &show)) {
+    if (!ImGui::Begin("Rule editor", &show, ImGuiWindowFlags_::ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::End();
         return old_rule;
     }
@@ -69,25 +68,31 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image&
     legacy::ruleT rule = old_rule;
     auto rule_str = to_string(rule);                   // how to reuse the resource?
     ImGui::PushTextWrapPos(ImGui::GetFontSize() * 18); // TODO: "fontsize" is height
+    ImGui::TextUnformatted("Rule str:");
+    // TODO: better visual; use editor::member instead...
     ImGui::TextUnformatted(rule_str.c_str());
     ImGui::PopTextWrapPos();
-    // TODO: incomplete... "center-agnostic" is not symmetry trait but still a trait of rule...
-    // ImGui::Checkbox("Sync center", &center_neutral);
 
+    if (ImGui::Button("Copy to clipboard")) {
+        ImGui::SetClipboardText(rule_str.c_str());
+    }
+
+    // TODO: are these info useful?
     ImGui::Text("Spatial symmtric:%d\nState_symmetric:%d\nABS_agnostic:%d XOR_agnostic:%d",
                 legacy::spatial_symmetric(rule), legacy::state_symmetric(rule), legacy::center_agnostic_abs(rule),
                 legacy::center_agnostic_xor(rule));
 
     // TODO: support state&XOR etc...
+    // TODO: for s-paired/xor-paired partitions, reorder group elements for better visual...
     static bool paired = false;
     ImGui::Checkbox("Paired", &paired);
-    // How to specify the first "BeginTabItem"?
+    // TODO: How to specify the first "BeginTabItem"?
     // ???ImGuiTabItemFlags_SetSelected
     if (ImGui::BeginTabBar("##Type")) {
         for (int i = 0; i < legacy::partition::basic_specification::size; ++i) {
             const auto& part = legacy::partition::get_partition(legacy::partition::basic_specification(i),
                                                                 paired ? legacy::partition::extra_specification::paired
-                                                                     : legacy::partition::extra_specification::none);
+                                                                       : legacy::partition::extra_specification::none);
             const auto& groups = part.groups();
 
             if (ImGui::BeginTabItem(legacy::partition::basic_specification_names[i])) {
@@ -106,12 +111,16 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image&
                     if (j % 8 != 0) {
                         ImGui::SameLine();
                     }
+
+                    // TODO: should be able to resolve conflicts...
                     if (!m) {
                         ImGui::BeginDisabled();
+                        // TODO: better visual...
+                        ImGui::PushStyleColor(ImGuiCol_::ImGuiCol_Button, ImVec4(0.8, 0, 0, 1));
                     }
                     ImGui::PushID(j);
-                    // TODO: style...
-                    if (ImGui::ImageButton(icons.texture(), ImVec2(3 * 6, 3 * 6),
+                    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
+                    if (ImGui::ImageButton(icons.texture(), ImVec2(3 * 8, 3 * 8),
                                            ImVec2(0, groups[j][0] * (1.0f / 512)),
                                            ImVec2(1, (groups[j][0] + 1) * (1.0f / 512)))) {
                         bool to = !grule[j];
@@ -119,9 +128,11 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image&
                             rule[code] = to;
                         }
                     }
+                    ImGui::PopStyleVar();
                     ImGui::PopID();
                     if (!m) {
                         ImGui::EndDisabled();
+                        ImGui::PopStyleColor();
                     }
                     if (ImGui::BeginItemTooltip()) {
                         int x = 0;
@@ -163,6 +174,7 @@ template <class Enum> auto* underlying_address(Enum& ptr) {
 }
 
 // TODO: is it suitable to start with gol?
+// TODO: suitable or not, this should not be in main.cpp...
 auto gol_rule() {
     // b3 s23
     legacy::ruleT rule;
@@ -180,6 +192,9 @@ auto gol_rule() {
     }
     return rule;
 }
+
+// TODO: should enable guide-mode (with a switch...)
+// TODO: imgui_widgets_extension; see TextDisabled for details...
 
 int main(int argc, char** argv) {
     // TODO: should be able to "open" a rulelist file...
@@ -350,13 +365,16 @@ int main(int argc, char** argv) {
                 const float img_zoom = 1; // TODO: *2 is too big with (320*240)
                 const ImVec2 img_size = ImVec2(img.width() * img_zoom, img.height() * img_zoom);
 
+                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
                 ImGui::ImageButton(img_texture, img_size);
+                ImGui::PopStyleVar();
 
                 // TODO: refine dragging logic...
                 if (ImGui::IsItemHovered() && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
                     runner.shift_xy(io.MouseDelta.x, io.MouseDelta.y);
                 } else if (ImGui::BeginItemTooltip()) {
-                    auto&& io = ImGui::GetIO();
+                    auto& io = ImGui::GetIO();
+                    // TODO: rewrite logic...
                     const float region_sz = 32.0f;
                     float region_x = io.MousePos.x - pos.x - region_sz * 0.5f;
                     float region_y = io.MousePos.y - pos.y - region_sz * 0.5f;
@@ -456,7 +474,7 @@ int main(int argc, char** argv) {
                 {
                     auto prev = maker.interpret_as;
                     ImGui::AlignTextToFramePadding();
-                    ImGui::TextUnformatted("As"); // TODO: align with radio...
+                    ImGui::TextUnformatted("As");
                     ImGui::SameLine();
                     ImGui::RadioButton("ABS", underlying_address(maker.interpret_as), legacy::ABS);
                     ImGui::SameLine();
