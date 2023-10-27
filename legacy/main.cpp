@@ -300,10 +300,9 @@ int main(int argc, char** argv) {
         // TOO clumsy...
         bool open_popup = false;
         if (ImGui::BeginMainMenuBar()) {
-            if (ImGui::BeginMenu("File##1234")) {
-                if (ImGui::MenuItem("Open##5678", "...")) {
-                    open_popup = true;
-                }
+            if (ImGui::BeginMenu("Open##1234")) {
+                // if (ImGui::MenuItem("Open##5678", "...")) {}
+                open_popup = true;
                 ImGui::EndMenu();
             }
             ImGui::EndMainMenuBar();
@@ -312,9 +311,9 @@ int main(int argc, char** argv) {
         if (open_popup) {
             prev_paused = paused;
             paused = true;
-            ImGui::OpenPopup("Input##0123");
+            ImGui::OpenPopup("Open file##0123");
         }
-        if (ImGui::BeginPopupModal("Input##0123")) {
+        if (ImGui::BeginPopupModal("Open file##0123", NULL, ImGuiWindowFlags_::ImGuiWindowFlags_AlwaysAutoResize)) {
             static char buf[100]{}; // TODO: static? init contents?
             ImGui::InputTextWithHint("##1223", "File-path", buf, 100);
             // TODO: on-enter?
@@ -416,7 +415,7 @@ int main(int argc, char** argv) {
                         ImGui::TextUnformatted(found_str.empty() ? "(none)" : wrap_rule_string(found_str).c_str());
                         // TODO: redesign copy/paste... especially lclick-paste is problematic...
                         if (ImGui::IsMouseClicked(ImGuiMouseButton_::ImGuiMouseButton_Left) && !found_str.empty()) {
-                            recorder.take(legacy::from_string<legacy::ruleT>(found_str));
+                            recorder.take(legacy::to_rule(found_str));
                         }
                     }
 
@@ -536,7 +535,6 @@ int main(int argc, char** argv) {
             {
                 // TODO: toooo ugly...
                 // TODO: (?) currently suitable to restart immediately...
-
                 ImGui::SliderInt("Per gen [1-10]", &pergen, pergen_min, pergen_max, "%d",
                                  ImGuiSliderFlags_NoInput); // TODO: use sprintf for pergen_min and pergen_max,
                                                             // start_min, start_max...
@@ -551,7 +549,7 @@ int main(int argc, char** argv) {
 
         // run tile (TODO: should be here?)
         if (anti_flick) {
-            if (runner.rule()[0] == 1 && runner.rule()[511] == 0 && pergen % 2) {
+            if (legacy::will_flick(runner.rule()) && pergen % 2) {
                 if (pergen == 1) {
                     ++pergen;
                 } else {

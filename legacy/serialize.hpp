@@ -5,54 +5,103 @@
 #include "rule.hpp"
 
 namespace legacy {
-    // TODO: compressT?
-    // TODO: exception works horribly... use expected instead?
-    // TODO: wasteful... overhaul...
-    class compress {
-        array<uint8_t, 64> bits{}; // as bitset.
+    namespace _impl_details {
+        inline uint8_t get_half(const ruleT& rule, int i) {
+            assert(i >= 0 && i < 128);
+            i *= 4;
+            // ~ bool is implicitly promoted to int.
+            return (rule[i] << 0) | (rule[i + 1] << 1) | (rule[i + 2] << 2) | (rule[i + 3] << 3);
+        }
+
+        inline void put_half(ruleT& rule, int i, uint8_t half) {
+            assert(i >= 0 && i < 128);
+            i *= 4;
+            rule[i] = (half >> 0) & 1;
+            rule[i + 1] = (half >> 1) & 1;
+            rule[i + 2] = (half >> 2) & 1;
+            rule[i + 3] = (half >> 3) & 1;
+        }
+
+        // TODO: reconsider using A-F instead...
+        inline char to_hex(uint8_t half) {
+            assert(half < 16);
+            return "0123456789abcdef"[half];
+        }
+
+        inline uint8_t from_hex(char ch) {
+            if (ch >= '0' && ch <= '9') {
+                return ch - '0';
+            } else if (ch >= 'a' && ch <= 'f') {
+                return 10 + ch - 'a';
+            } else /* for backward compat */ {
+                assert(ch >= 'A' && ch <= 'F');
+                return 10 + ch - 'A';
+            }
+        }
+    } // namespace _impl_details
+
+    // TODO: support "to_str(rule,char*)" when needed...
+    inline string to_string(const ruleT& rule) {
+        string str(128, '\0');
+        for (int i = 0; i < 128; ++i) {
+            str[i] = _impl_details::to_hex(_impl_details::get_half(rule, i));
+        }
+        assert(str[128] == '\0'); // ~ should be guaranteed by str's ctor.
+        return str;
+    }
+
+    // TODO: rename; inconvenient to use...
+    inline const std::regex& rulestr_regex() {
+        static std::regex reg("[0-9a-zA-Z]{128}", std::regex_constants::optimize);
+        return reg;
+    }
+
+    // TODO: support string_view version when needed...
+    inline ruleT to_rule(const string& str) {
+        assert(std::regex_match(str, rulestr_regex()));
+        ruleT rule{};
+        for (int i = 0; i < 128; ++i) {
+            _impl_details::put_half(rule, i, _impl_details::from_hex(str[i]));
+        }
+        return rule;
+    }
+
+    class compressT {
+        array<uint8_t, 64> bits; // as bitset.
     public:
-        explicit compress(const ruleT& rule) : bits() {
-            for (int i = 0; i < 512; ++i) {
-                set(i, rule[i]);
+        explicit compressT(const ruleT& rule) : bits{} {
+            for (int w = 0; w < 64; ++w) {
+                uint8_t low = _impl_details::get_half(rule, w * 2);
+                uint8_t high = _impl_details::get_half(rule, w * 2 + 1);
+                bits[w] = low | high << 4;
             }
         }
 
         explicit operator ruleT() const {
             ruleT rule{};
-            for (int i = 0; i < 512; ++i) {
-                rule[i] = get(i);
+            for (int w = 0; w < 64; ++w) {
+                _impl_details::put_half(rule, w * 2, bits[w] & 0b1111); // low
+                _impl_details::put_half(rule, w * 2 + 1, bits[w] >> 4); // high
             }
             return rule;
         }
 
-        explicit operator string() const {
-            string str;
-            for (int wpos = 0; wpos < 64; ++wpos) {
-                uint8_t word = bits[wpos];
-                str.push_back(to_hex(word & 0b1111)); // low.
-                str.push_back(to_hex(word >> 4));     // high.
-            }
-            assert(str.size() == 128);
-            return str;
-        }
-
-        explicit compress(const string& str) : bits() {
-            if (str.size() < 128) {
-                throw std::invalid_argument(str);
-            }
-            int s = 0;
-            for (int wpos = 0; wpos < 64; ++wpos) {
-                uint8_t low = from_hex(str[s++], str);
-                uint8_t high = from_hex(str[s++], str);
-                bits[wpos] = low | (high << 4);
+        explicit compressT(const string& str) : bits{} {
+            assert(std::regex_match(str, rulestr_regex()));
+            for (int w = 0; w < 64; ++w) {
+                uint8_t low = _impl_details::from_hex(str[w * 2]);
+                uint8_t high = _impl_details::from_hex(str[w * 2 + 1]);
+                bits[w] = low | high << 4;
             }
         }
 
-        friend bool operator==(const compress& l, const compress& r) {
+        // TODO: support "operator string()" when needed...
+
+        friend bool operator==(const compressT& l, const compressT& r) {
             return l.bits == r.bits;
         }
 
-        friend bool operator<(const compress& l, const compress& r) {
+        friend bool operator<(const compressT& l, const compressT& r) {
             return l.bits < r.bits;
         }
 
@@ -61,65 +110,11 @@ namespace legacy {
             string as_bytes(bits.begin(), bits.end());
             return std::hash<string>{}(as_bytes);
         }
-
-    private:
-        bool get(int i) const {
-            assert(i >= 0 && i < 512);
-            int wpos = i / 8, bpos = i % 8;
-            return (bits[wpos] >> bpos) & 0b1;
-        }
-
-        void set(int i, bool b) {
-            assert(i >= 0 && i < 512);
-            int wpos = i / 8, bpos = i % 8;
-            bits[wpos] |= uint8_t(b) << bpos;
-        }
-
-        static char to_hex(uint8_t half) {
-            assert(half < 16);
-            return "0123456789abcdef"[half];
-        }
-
-        static uint8_t from_hex(char ch, const string& source_str) {
-            if (ch >= '0' && ch <= '9') {
-                return ch - '0';
-            } else if (ch >= 'a' && ch <= 'f') {
-                return 10 + ch - 'a';
-            } else if (ch >= 'A' && ch <= 'F') /* legacy */ {
-                return 10 + ch - 'A';
-            } else {
-                throw std::invalid_argument(source_str);
-            }
-        }
     };
-
-    inline string to_string(const compress& cmpr) {
-        return string(cmpr);
-    }
-
-    inline string to_string(const ruleT& rule) {
-        return string(compress(rule));
-    }
-
-    inline const std::regex& rulestr_regex() {
-        static std::regex reg("[0-9a-zA-Z]{128}", std::regex_constants::optimize);
-        return reg;
-    }
-
-    // TODO: unreliable...
-    template <class T> inline T from_string(const string&) = delete;
-
-    template <> inline compress from_string<compress>(const string& str) {
-        return compress(str);
-    }
-
-    template <> inline ruleT from_string<ruleT>(const string& str) {
-        return ruleT(compress(str));
-    }
 } // namespace legacy
 
-template <> struct std::hash<legacy::compress> {
-    size_t operator()(const legacy::compress& cmpr) const {
+template <> struct std::hash<legacy::compressT> {
+    size_t operator()(const legacy::compressT& cmpr) const {
         return cmpr.hash();
     }
 };

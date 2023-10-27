@@ -40,6 +40,10 @@ namespace legacy {
         return true;
     }
 
+    inline bool will_flick(const ruleT& rule) {
+        return rule[0] == 1 && rule[511] == 0; // TODO: more robust encoding?
+    }
+
     // TODO: how to incoporate this fact in the program?
     // spatial symmetry
     // state symm etry
