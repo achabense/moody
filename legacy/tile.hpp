@@ -23,6 +23,7 @@ namespace legacy {
             m_data = new bool[padded_area()]{/* false... */};
         }
 
+        // conceptually write-only after this call...
         void resize(rectT size) {
             if (m_size != size) {
                 tileT resized(size);
@@ -34,6 +35,7 @@ namespace legacy {
             delete[] m_data;
         }
 
+        // TODO: support copy when needed...
         tileT(const tileT&) = delete;
         tileT& operator=(const tileT&) = delete;
 

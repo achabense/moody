@@ -51,7 +51,25 @@ namespace legacy {
             m_k = regulate.next;
             m_groups.resize(m_k);
             for (int code = 0; code < 512; ++code) {
-                m_groups[m_map[code]].push_back(code);
+                if (!decode_s(code)) {
+                    m_groups[m_map[code]].push_back(code);
+                }
+            }
+            // TODO: temporary; should be dealt with by get_partition...
+            bool paired = m_map[0] == m_map[16];
+            bool state = m_map[0] == m_map[511];
+            if (!state) {
+                for (int code = 0; code < 512; ++code) {
+                    if (decode_s(code)) {
+                        m_groups[m_map[code]].push_back(code);
+                    }
+                }
+            } else {
+                for (int code = 511; code >= 0; --code) {
+                    if (decode_s(code)) {
+                        m_groups[m_map[code]].push_back(code);
+                    }
+                }
             }
         }
 

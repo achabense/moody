@@ -119,7 +119,7 @@ public:
 // TODO: support shifting...
 // TODO: !!!! recheck when to "restart"..
 class rule_runner {
-    legacy::ruleT m_rule;
+    legacy::ruleT m_rule{};
     legacy::tileT m_tile, m_side;
     int m_gen = 0;
 

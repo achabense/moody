@@ -55,6 +55,11 @@ std::string wrap_rule_string(const std::string& str) {
     return str.substr(0, 32) + "\n" + str.substr(32, 16) + "...";
 }
 
+// TODO: awful... need to be avoided...
+template <class Enum> auto* underlying_address(Enum& ptr) {
+    return reinterpret_cast<std::underlying_type_t<Enum>*>(std::addressof(ptr));
+}
+
 // TODO: clumsy...
 // TODO: how to get renderer from backend?
 // TODO: should be a class...
@@ -67,8 +72,7 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image&
         return old_rule;
     }
 
-    legacy::ruleT rule = old_rule;
-    auto rule_str = to_string(rule);                   // how to reuse the resource?
+    auto rule_str = to_string(old_rule);               // how to reuse the resource?
     ImGui::PushTextWrapPos(ImGui::GetFontSize() * 18); // TODO: "fontsize" is height
     ImGui::TextUnformatted("Rule str:");
     // TODO: better visual; use editor::member instead...
@@ -81,20 +85,31 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image&
 
     // TODO: are these info useful?
     ImGui::Text("Spatial symmtric:%d\nState_symmetric:%d\nABS_agnostic:%d XOR_agnostic:%d",
-                legacy::spatial_symmetric(rule), legacy::state_symmetric(rule), legacy::center_agnostic_abs(rule),
-                legacy::center_agnostic_xor(rule));
+                legacy::spatial_symmetric(old_rule), legacy::state_symmetric(old_rule),
+                legacy::center_agnostic_abs(old_rule), legacy::center_agnostic_xor(old_rule));
 
     // TODO: support state&XOR etc...
     // TODO: for s-paired/xor-paired partitions, reorder group elements for better visual...
-    static bool paired = false;
-    ImGui::Checkbox("Paired", &paired);
+    static legacy::partition::extra_specification extr = {};
+
+    // TODO: combine with rule_maker's
+    ImGui::RadioButton("basic", underlying_address(extr), legacy::partition::extra_specification::none);
+    ImGui::SameLine();
+    ImGui::RadioButton("paired", underlying_address(extr), legacy::partition::paired);
+    ImGui::SameLine();
+    ImGui::RadioButton("state", underlying_address(extr), legacy::partition::state);
+
+    static bool as_flip = false; // TODO: for as_flip, use characters other than "0" "1"
+    ImGui::Checkbox("As-Flip", &as_flip);
+
+    legacy::ruleT_base rule = old_rule.to_base(as_flip ? legacy::interpret_mode::XOR : legacy::interpret_mode::ABS);
+
     // TODO: How to specify the first "BeginTabItem"?
     // ???ImGuiTabItemFlags_SetSelected
+    // TODO: when will it return false?
     if (ImGui::BeginTabBar("##Type")) {
         for (int i = 0; i < legacy::partition::basic_specification::size; ++i) {
-            const auto& part = legacy::partition::get_partition(legacy::partition::basic_specification(i),
-                                                                paired ? legacy::partition::extra_specification::paired
-                                                                       : legacy::partition::extra_specification::none);
+            const auto& part = legacy::partition::get_partition(legacy::partition::basic_specification(i), extr);
             const auto& groups = part.groups();
 
             if (ImGui::BeginTabItem(legacy::partition::basic_specification_names[i])) {
@@ -167,32 +182,7 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image&
         ImGui::EndTabBar();
     }
     ImGui::End();
-    return rule;
-}
-
-// TODO: awful... need to be avoided...
-template <class Enum> auto* underlying_address(Enum& ptr) {
-    return reinterpret_cast<std::underlying_type_t<Enum>*>(std::addressof(ptr));
-}
-
-// TODO: is it suitable to start with gol?
-// TODO: suitable or not, this should not be in main.cpp...
-auto gol_rule() {
-    // b3 s23
-    legacy::ruleT rule;
-    for (int code = 0; code < 512; ++code) {
-        auto [q, w, e, a, s, d, z, x, c] = legacy::decode(code);
-        int count = q + w + e + a + d + z + x + c;
-        bool expected;
-        if (count == 2) {
-            rule[code] = s;
-        } else if (count == 3) {
-            rule[code] = true;
-        } else {
-            rule[code] = false;
-        }
-    }
-    return rule;
+    return legacy::ruleT(rule, as_flip ? legacy::interpret_mode::XOR : legacy::interpret_mode::ABS);
 }
 
 // TODO: should enable guide-mode (with a switch...)
@@ -234,7 +224,7 @@ int main(int argc, char** argv) {
     // recorder.take(maker.make());
 
     // TODO: must be non-empty; "init" method...
-    recorder.take(gol_rule()); // first rule...
+    recorder.take(legacy::game_of_life()); // first rule...
     if (argc == 2) {
         // TODO: add err logger
         recorder.replace(read_rule_from_file(argv[1]));
