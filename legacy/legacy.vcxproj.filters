@@ -45,7 +45,7 @@
     <ClInclude Include="image.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="symmetry.hpp">
+    <ClInclude Include="partition.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="app.hpp">

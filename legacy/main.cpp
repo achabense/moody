@@ -34,7 +34,7 @@ rule_runner runner({.width = 320, .height = 240});
 rule_recorder recorder;
 
 // TODO: how to generalize this?
-constexpr int pergen_min = 1, pergen_max = 10;
+constexpr int pergen_min = 1, pergen_max = 20;
 int pergen = 1;
 
 // TODO: when is this needed?
@@ -109,13 +109,14 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image&
     // TODO: when will it return false?
     if (ImGui::BeginTabBar("##Type")) {
         for (int i = 0; i < legacy::partition::basic_specification::size; ++i) {
+            if (ImGui::BeginTabItem(legacy::partition::basic_specification_names[i])) {
             const auto& part = legacy::partition::get_partition(legacy::partition::basic_specification(i), extr);
             const auto& groups = part.groups();
 
-            if (ImGui::BeginTabItem(legacy::partition::basic_specification_names[i])) {
                 const int k = part.k();
                 auto grule = part.gather_from(rule);
 
+                ImGui::PushStyleVar(ImGuiStyleVar_::ImGuiStyleVar_ItemSpacing, ImVec2(4, 4));
                 // buttons. TODO: better visual; show group members.
                 for (int j = 0; j < k; j++) {
                     bool m = true;
@@ -175,6 +176,8 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image&
                     ImGui::AlignTextToFramePadding();
                     ImGui::TextUnformatted(m ? (grule[j] ? ":1" : ":0") : ":x"); // TODO: how to remove the spacing?
                 }
+                ImGui::PopStyleVar();
+
                 ImGui::EndTabItem();
             }
         }
@@ -305,16 +308,9 @@ int main(int argc, char** argv) {
         }
         if (ImGui::BeginPopupModal("Open file##0123", NULL, ImGuiWindowFlags_::ImGuiWindowFlags_AlwaysAutoResize)) {
             static char buf[100]{}; // TODO: static? init contents?
-            ImGui::InputTextWithHint("##1223", "File-path", buf, 100);
-            // TODO: on-enter?
-            ImGui::SameLine();
-            if (ImGui::Button("Open##214271") && buf[0] != '\0') {
+            if (ImGui::InputTextWithHint("##1223", "File-path", buf, 100, ImGuiInputTextFlags_EnterReturnsTrue)) {
                 recorder.replace(read_rule_from_file(buf));
                 buf[0] = '\0';
-                ImGui::CloseCurrentPopup();
-                paused = prev_paused;
-            }
-            if (ImGui::Button("Cancel##27932811", ImVec2(120, 0))) {
                 ImGui::CloseCurrentPopup();
                 paused = prev_paused;
             }
@@ -492,7 +488,7 @@ int main(int argc, char** argv) {
             }
 
             {
-                if (ImGui::SliderFloat("Init density [0.0-1.0]", &runner.m_filler->density, 0.0f, 1.0f, "%.3f",
+                if (ImGui::SliderFloat("Init density [0-1]", &runner.m_filler->density, 0.0f, 1.0f, "%.3f",
                                        ImGuiSliderFlags_NoInput)) {
                     runner.restart();
                 }
@@ -525,10 +521,11 @@ int main(int argc, char** argv) {
             {
                 // TODO: toooo ugly...
                 // TODO: (?) currently suitable to restart immediately...
-                ImGui::SliderInt("Per gen [1-10]", &pergen, pergen_min, pergen_max, "%d",
+                ImGui::SliderInt("Per gen [1-20]", &pergen, pergen_min, pergen_max, "%d",
                                  ImGuiSliderFlags_NoInput); // TODO: use sprintf for pergen_min and pergen_max,
                                                             // start_min, start_max...
-                ImGui::SliderInt("Speed [0-20]", &skip_per_frame, skip_min, skip_max, "%d", ImGuiSliderFlags_NoInput);
+                ImGui::SliderInt("Gap Frame [0-20]", &skip_per_frame, skip_min, skip_max, "%d",
+                                 ImGuiSliderFlags_NoInput);
                 ImGui::BeginDisabled();
                 ImGui::SliderInt("Start gen [0-100]", &start_from, start_min, start_max, "%d",
                                  ImGuiSliderFlags_NoInput);

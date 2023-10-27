@@ -5,7 +5,7 @@
 
 #include "rule.hpp"
 #include "serialize.hpp"
-#include "symmetry.hpp"
+#include "partition.hpp"
 #include "tile.hpp"
 
 // TODO: partition traits... e.g. can ABS make sense, or can FLIP make sense...
