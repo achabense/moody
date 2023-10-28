@@ -3,9 +3,9 @@
 #include <random>
 #include <unordered_map>
 
+#include "partition.hpp"
 #include "rule.hpp"
 #include "serialize.hpp"
-#include "partition.hpp"
 #include "tile.hpp"
 
 // TODO: partition traits... e.g. can ABS make sense, or can FLIP make sense...
@@ -323,19 +323,6 @@ public:
     }
 };
 
-struct scannerT {
-    const legacy::partitionT* const partition;
-    std::array<bool, 512> grule;
-    bool matches;
-
-    void scan(const legacy::ruleT_base& rule, bool force) {
-        matches = partition->matches(rule) || force; // TODO: "|| force" suitable?
-        if (matches) {
-            partition->gather_from(rule);
-        }
-    }
-};
-
 // TODO: should allow multiple record.
 // "current_record" ~editor~modify-each...
 // extract a rule and set as ...
@@ -343,46 +330,3 @@ struct scannerT {
 // export as file...
 // current-record???->which notify which?
 // TODO: empty state?
-#if 0
-struct rule_editor {
-    legacy::partition::basic_specification part{};
-    legacy::partition::extra_specification extr{};
-
-    legacy::interpret_mode as_flip = {}; // TODO: should really be a plain bool...
-    legacy::ruleT_base m_rule;
-
-
-
-
-    void load(legacy::ruleT& rule) {
-        m_rule = rule.to_base(as_flip);
-        
-
-
-
-    }
-
-    legacy::ruleT release() const {
-        return legacy::ruleT(m_rule, as_flip);
-    }
-
-    // without affecting actual rule... TODO: why?
-    void flip_as_flip() {
-        legacy::ruleT rule = release();
-        as_flip = {}; // TODO...
-        load(rule);
-    }
-
-    bool matches[512];
-    bool all_matches{};
-
-    int count;
-    bool flicky;
-
-    bool data[512];
-
-    void* recorder;
-
-    void load(legacy::ruleT& rule) {}
-};
-#endif

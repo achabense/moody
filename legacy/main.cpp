@@ -63,7 +63,7 @@ template <class Enum> auto* underlying_address(Enum& ptr) {
 // TODO: clumsy...
 // TODO: how to get renderer from backend?
 // TODO: should be a class...
-legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image& icons) {
+legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& icons) {
     assert(show);
     if (!ImGui::Begin("Rule editor", &show,
                       ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse |
@@ -88,8 +88,6 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image&
                 legacy::spatial_symmetric(old_rule), legacy::state_symmetric(old_rule),
                 legacy::center_agnostic_abs(old_rule), legacy::center_agnostic_xor(old_rule));
 
-    // TODO: support state&XOR etc...
-    // TODO: for s-paired/xor-paired partitions, reorder group elements for better visual...
     static legacy::partition::extra_specification extr = {};
 
     // TODO: combine with rule_maker's
@@ -141,9 +139,8 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image&
                     if (ImGui::ImageButton(icons.texture(), ImVec2(3 * 8, 3 * 8),
                                            ImVec2(0, groups[j][0] * (1.0f / 512)),
                                            ImVec2(1, (groups[j][0] + 1) * (1.0f / 512)))) {
-                        bool to = !grule[j];
                         for (auto code : groups[j]) {
-                            rule[code] = to;
+                            rule[code] = !rule[code];
                         }
                     }
                     ImGui::PopStyleVar();
@@ -190,6 +187,9 @@ legacy::ruleT rule_editor(bool& show, const legacy::ruleT& old_rule, code_image&
 
 // TODO: should enable guide-mode (with a switch...)
 // TODO: imgui_widgets_extension; see TextDisabled for details...
+// TODO: changes upon the same rule should be grouped together... how? (editor++)...
+// TODO: support seeding...(how to save?) some patterns are located in certain seed states...
+// TODO: how to capture certain patterns? (editor++)...
 
 int main(int argc, char** argv) {
     // TODO: should be able to "open" a rulelist file...
@@ -321,7 +321,7 @@ int main(int argc, char** argv) {
         // TODO: editor works poorly with recorder...
         // TODO: shouldnt be here...
         if (show_rule_editor) {
-            auto edited = rule_editor(show_rule_editor, runner.rule(), icons);
+            auto edited = edit_rule(show_rule_editor, runner.rule(), icons);
             if (edited != runner.rule()) {
                 recorder.take(edited);
             }
@@ -329,7 +329,8 @@ int main(int argc, char** argv) {
 
         // TODO: remove this when suitable...
         if (show_demo_window) {
-            ImGui::ShowDemoWindow(&show_demo_window);
+            // ImGui::ShowDemoWindow(&show_demo_window);
+            ImGui::ShowMetricsWindow(&show_demo_window);
         }
 
         if (ImGui::Begin("-v-", nullptr,
@@ -338,12 +339,12 @@ int main(int argc, char** argv) {
             ImGui::Checkbox("Rule editor", &show_rule_editor);
             ImGui::SameLine();
             ImGui::Checkbox("Demo window", &show_demo_window);
-            {
-                ImGui::Text("(%.1f FPS) Frame:%d\n"
-                            "Width:%d,Height:%d",
-                            io.Framerate, frame++, img.width(), img.height()); // TODO: why img?
-            }
+            ImGui::Text("(%.1f FPS) Frame:%d\n", io.Framerate, frame++);
+            ImGui::Separator();
 
+            // tile:
+            ImGui::Text("Width:%d,Height:%d,Density:%f", runner.tile().width(), runner.tile().height(),
+                        float(runner.tile().count()) / runner.tile().area());
             {
                 const ImVec2 pos = ImGui::GetCursorScreenPos();
 
@@ -358,6 +359,7 @@ int main(int argc, char** argv) {
 
                 // TODO: refine dragging logic...
                 if (ImGui::IsItemHovered() && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+                    // TODO: will not work properly when img_zoom!=1...
                     runner.shift_xy(io.MouseDelta.x, io.MouseDelta.y);
                 } else if (ImGui::BeginItemTooltip()) {
                     auto& io = ImGui::GetIO();
@@ -478,13 +480,6 @@ int main(int argc, char** argv) {
             {
                 ImGui::AlignTextToFramePadding();
                 ImGui::Text("Gen:%3d", runner.gen());
-                ImGui::SameLine();
-                ImGui::Checkbox("Calculate density", &cal_rate);
-                if (cal_rate) {
-                    ImGui::SameLine();
-                    int count = runner.tile().count();
-                    ImGui::Text("(%f)", float(count) / runner.tile().area());
-                }
             }
 
             {
