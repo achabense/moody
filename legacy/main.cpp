@@ -100,7 +100,8 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
     static bool as_flip = false; // TODO: for as_flip, use characters other than "0" "1"
     ImGui::Checkbox("As-Flip", &as_flip);
 
-    legacy::ruleT_base rule = old_rule.to_base(as_flip ? legacy::interpret_mode::XOR : legacy::interpret_mode::ABS);
+    legacy::ruleT_base rule =
+        legacy::from_rule(old_rule, as_flip ? legacy::interpret_mode::XOR : legacy::interpret_mode::ABS);
 
     // TODO: How to specify the first "BeginTabItem"?
     // ???ImGuiTabItemFlags_SetSelected
@@ -112,24 +113,17 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
             const auto& groups = part.groups();
 
                 const int k = part.k();
-                auto grule = part.gather_from(rule);
+                auto scans = part.scan(rule);
 
                 ImGui::PushStyleVar(ImGuiStyleVar_::ImGuiStyleVar_ItemSpacing, ImVec2(4, 4));
                 // buttons. TODO: better visual; show group members.
                 for (int j = 0; j < k; j++) {
-                    bool m = true;
-                    for (auto code : groups[j]) {
-                        if (rule[code] != rule[groups[j][0]]) {
-                            m = false;
-                        }
-                    }
-
                     if (j % 8 != 0) {
                         ImGui::SameLine();
                     }
 
                     // TODO: should be able to resolve conflicts...
-                    if (!m) {
+                    if (scans[j] == legacy::scanT::inconsistent) {
                         ImGui::BeginDisabled();
                         // TODO: better visual...
                         ImGui::PushStyleColor(ImGuiCol_::ImGuiCol_Button, ImVec4(0.8, 0, 0, 1));
@@ -145,7 +139,7 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
                     }
                     ImGui::PopStyleVar();
                     ImGui::PopID();
-                    if (!m) {
+                    if (scans[j] == legacy::scanT::inconsistent) {
                         ImGui::EndDisabled();
                         ImGui::PopStyleColor();
                     }
@@ -161,7 +155,7 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
                             ImGui::Image(icons.texture(), ImVec2(3 * zoom, 3 * zoom), ImVec2(0, code * (1.0f / 512)),
                                          ImVec2(1, (code + 1) * (1.0f / 512)), ImVec4(1, 1, 1, 1),
                                          ImVec4(0.5, 0.5, 0.5, 1));
-                            if (!m) {
+                            if (scans[j] == legacy::scanT::inconsistent) {
                                 ImGui::SameLine();
                                 ImGui::AlignTextToFramePadding();
                                 ImGui::TextUnformatted(rule[code] ? ":1" : ":0");
@@ -171,7 +165,8 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
                     }
                     ImGui::SameLine();
                     ImGui::AlignTextToFramePadding();
-                    ImGui::TextUnformatted(m ? (grule[j] ? ":1" : ":0") : ":x"); // TODO: how to remove the spacing?
+                    static const char* strs[]{":x", ":0", ":1"};
+                    ImGui::TextUnformatted(strs[scans[j]]);
                 }
                 ImGui::PopStyleVar();
 
@@ -479,7 +474,7 @@ int main(int argc, char** argv) {
             ImGui::SeparatorText("Tile");
             {
                 ImGui::AlignTextToFramePadding();
-                ImGui::Text("Gen:%3d", runner.gen());
+                ImGui::Text("Gen:%d", runner.gen());
             }
 
             {

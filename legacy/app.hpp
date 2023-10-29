@@ -8,25 +8,16 @@
 #include "serialize.hpp"
 #include "tile.hpp"
 
-// TODO: partition traits... e.g. can ABS make sense, or can FLIP make sense...
 // TODO: partial rule (e.g. collect from tile; the rest is generated from another generator...)
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 // TODO: allow resizing the grid.
 // TODO: rule editor... (based on mini-window, click the pixel to set...)..
 // TODO: where to add gol?
-// TODO: add pace.
 // TODO: (important) small window...
 
 // TODO: notify on quit...
 // TODO!!!!!support more run-mode...
-// TODO: restart should...
-// TODO: run_extra..
 // TODO: some settings should leave states in paused state...
-// TODO: rnd-mode for tile...(stable vs arbitrary...)
 // TODO: right click to enable/disable miniwindow...
-// TODO: fine-grained rule edition...
 // TODO: file container. easy ways to add fav...
 
 // TODO: really?
@@ -112,7 +103,7 @@ public:
         legacy::ruleT_base grule{}; // TODO: is it safe not to do value init?
         random_fill(grule.data(), grule.data() + max_density(), density, m_rand);
         legacy::ruleT_base rule = current_partition().dispatch_from(grule);
-        return legacy::ruleT(rule, interpret_as);
+        return legacy::to_rule(rule, interpret_as);
     }
 };
 

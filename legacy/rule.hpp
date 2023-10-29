@@ -50,6 +50,7 @@ namespace legacy {
         return code;
     }
 
+    // TODO: reword...
     // Unambiguously refer to the map from env-code to the new state.
     // TODO: reconsider inheritance-based approach...
     // TODO: should allow implicit conversion?
@@ -60,7 +61,6 @@ namespace legacy {
     // TODO: is it suitable to declare a namespace-enum for this?
     enum interpret_mode : int { ABS = false, XOR = true };
 
-    // TODO: make from_base, to_base, global functions?
     struct ruleT : public array<bool, 512> {
         using array_base = array<bool, 512>;
 
@@ -101,8 +101,7 @@ namespace legacy {
         }
     };
 
-    using ruleT_base = ruleT::array_base;
-
+    // "Convay's Game of Life" rule.
     inline ruleT game_of_life() {
         // b3 s23
         ruleT rule{};
@@ -118,6 +117,14 @@ namespace legacy {
             }
         }
         return rule;
+    }
+
+    using ruleT_base = ruleT::array_base;
+    ruleT_base from_rule(const ruleT& rule, interpret_mode interp) {
+        return rule.to_base(interp);
+    }
+    ruleT to_rule(const ruleT_base& rule_data, interpret_mode interp) {
+        return ruleT(rule_data, interp);
     }
 
 } // namespace legacy

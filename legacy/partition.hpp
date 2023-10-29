@@ -7,6 +7,15 @@
 
 // higher-order(???) ...TODO...
 namespace legacy {
+    // TODO: rename...
+    enum scanT : int {
+        inconsistent,
+        all_0,
+        all_1,
+    };
+    using scanlistT = array<scanT, 512>; // TODO: enable restricting...
+    // TODO: the main challenge is to provide user-interface...
+
     // TODO: better variable names...
     class partitionT {
     public:
@@ -91,16 +100,23 @@ namespace legacy {
             return m_k;
         }
 
-        // TODO: rename variable...
-        // TODO: must be member function?
-        ruleT_base gather_from(const ruleT_base& rule) const {
-            ruleT_base grule{};
+        scanlistT scan(const ruleT_base& rule) const {
+            scanlistT result{}; // TODO: unknown?
             for (int j = 0; j < k(); ++j) {
-                grule[j] = rule[m_groups[j][0]];
+                const auto& group = m_groups[j];
+                bool first = rule[group[0]];
+                result[j] = first ? all_1 : all_0;
+                for (auto code : group) {
+                    if (rule[code] != first) {
+                        result[j] = inconsistent;
+                        break;
+                    }
+                }
             }
-            return grule;
+            return result;
         }
 
+        // TODO: the arg type is problematic.
         ruleT_base dispatch_from(const ruleT_base& grule) const {
             ruleT_base rule;
             for (int code = 0; code < 512; ++code) {
