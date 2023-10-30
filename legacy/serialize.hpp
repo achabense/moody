@@ -86,17 +86,6 @@ namespace legacy {
             return rule;
         }
 
-        explicit compressT(const string& str) : bits{} {
-            assert(std::regex_match(str, rulestr_regex()));
-            for (int w = 0; w < 64; ++w) {
-                uint8_t low = _impl_details::from_hex(str[w * 2]);
-                uint8_t high = _impl_details::from_hex(str[w * 2 + 1]);
-                bits[w] = low | high << 4;
-            }
-        }
-
-        // TODO: support "operator string()" when needed...
-
         friend bool operator==(const compressT& l, const compressT& r) {
             return l.bits == r.bits;
         }

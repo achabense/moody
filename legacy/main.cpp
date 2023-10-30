@@ -23,6 +23,7 @@
 #include "app.hpp"
 #include "image.hpp"
 #include "rule_traits.hpp"
+#include "serialize2.hpp"
 
 #if !SDL_VERSION_ATLEAST(2, 0, 17)
 #error This backend requires SDL 2.0.17+ because of SDL_RenderGeometry() function
@@ -38,7 +39,7 @@ constexpr int pergen_min = 1, pergen_max = 20;
 int pergen = 1;
 
 // TODO: when is this needed?
-constexpr int start_min = 0, start_max = 100;
+constexpr int start_min = 0, start_max = 1000;
 int start_from = 0;
 
 // TODO: support pace formally...
@@ -72,7 +73,7 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
         return old_rule;
     }
 
-    auto rule_str = to_string(old_rule);               // how to reuse the resource?
+    auto rule_str = to_MAP_str(old_rule);              // how to reuse the resource?
     ImGui::PushTextWrapPos(ImGui::GetFontSize() * 18); // TODO: "fontsize" is height
     ImGui::TextUnformatted("Rule str:");
     // TODO: better visual; use editor::member instead...
@@ -91,6 +92,7 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
     static legacy::partition::extra_specification extr = {};
 
     // TODO: combine with rule_maker's
+    // TODO: use extra_specification_names...
     ImGui::RadioButton("basic", underlying_address(extr), legacy::partition::extra_specification::none);
     ImGui::SameLine();
     ImGui::RadioButton("paired", underlying_address(extr), legacy::partition::paired);
@@ -188,9 +190,10 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
 
 int main(int argc, char** argv) {
     // TODO: should be able to "open" a rulelist file...
+    // legacy::convert_all_files();
 
     // TODO: what's the effect in "/SUBSYSTEM:WINDOWS" release mode?
-    puts("This will be shown only in debug mode");
+    // puts("This will be shown only in debug mode");
 
     // Setup SDL
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0) {
@@ -324,8 +327,8 @@ int main(int argc, char** argv) {
 
         // TODO: remove this when suitable...
         if (show_demo_window) {
-            // ImGui::ShowDemoWindow(&show_demo_window);
-            ImGui::ShowMetricsWindow(&show_demo_window);
+            ImGui::ShowDemoWindow(&show_demo_window);
+            // ImGui::ShowMetricsWindow(&show_demo_window);
         }
 
         if (ImGui::Begin("-v-", nullptr,
@@ -378,7 +381,7 @@ int main(int argc, char** argv) {
                     ImGui::Image(img_texture, ImVec2(region_sz * zoom, region_sz * zoom), uv0, uv1);
 
                     ImGui::TextUnformatted("Rclick to copy to clipboard:"); // TODO: show successful / fail...
-                    auto rule_str = to_string(runner.rule());               // how to reuse the resource?
+                    auto rule_str = to_MAP_str(runner.rule());              // how to reuse the resource?
                     ImGui::TextUnformatted(wrap_rule_string(rule_str).c_str());
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_::ImGuiMouseButton_Right)) {
                         ImGui::SetClipboardText(rule_str.c_str()); // TODO: notify...
@@ -391,14 +394,14 @@ int main(int argc, char** argv) {
                         if (text) {
                             std::string str = text;
                             std::smatch match_result;
-                            if (std::regex_search(str, match_result, legacy::rulestr_regex())) {
+                            if (std::regex_search(str, match_result, legacy::regex_MAP_str())) {
                                 found_str = match_result[0];
                             }
                         }
                         ImGui::TextUnformatted(found_str.empty() ? "(none)" : wrap_rule_string(found_str).c_str());
                         // TODO: redesign copy/paste... especially lclick-paste is problematic...
                         if (ImGui::IsMouseClicked(ImGuiMouseButton_::ImGuiMouseButton_Left) && !found_str.empty()) {
-                            recorder.take(legacy::to_rule(found_str));
+                            recorder.take(legacy::from_MAP_str(found_str));
                         }
                     }
 
@@ -516,10 +519,10 @@ int main(int argc, char** argv) {
                                                             // start_min, start_max...
                 ImGui::SliderInt("Gap Frame [0-20]", &skip_per_frame, skip_min, skip_max, "%d",
                                  ImGuiSliderFlags_NoInput);
-                ImGui::BeginDisabled();
-                ImGui::SliderInt("Start gen [0-100]", &start_from, start_min, start_max, "%d",
+                // ImGui::BeginDisabled();
+                ImGui::SliderInt("Start gen [0-1000]", &start_from, start_min, start_max, "%d",
                                  ImGuiSliderFlags_NoInput);
-                ImGui::EndDisabled();
+                // ImGui::EndDisabled();
             }
         }
         ImGui::End();

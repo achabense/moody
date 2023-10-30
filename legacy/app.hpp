@@ -5,7 +5,7 @@
 
 #include "partition.hpp"
 #include "rule.hpp"
-#include "serialize.hpp"
+#include "serialize2.hpp"
 #include "tile.hpp"
 
 // TODO: partial rule (e.g. collect from tile; the rest is generated from another generator...)
@@ -117,7 +117,7 @@ class rule_runner {
     friend class rule_recorder;
     void reset_rule(const legacy::ruleT& rule) {
         m_rule = rule;
-        restart();
+        restart(); // TODO: optionally start from current state...
     }
 
 public:
@@ -251,14 +251,13 @@ public:
     }
 };
 
-std::vector<legacy::compressT> extract_rules(std::string_view str) {
+std::vector<legacy::compressT> extract_rules(const char* begin, const char* end) {
     std::vector<legacy::compressT> rules;
 
-    const char *begin = str.data(), *end = str.data() + str.size();
-    const auto& regex = legacy::rulestr_regex();
+    const auto& regex = legacy::regex_MAP_str();
     std::cmatch match;
     while (std::regex_search(begin, end, match, regex)) {
-        rules.emplace_back(match[0]);
+        rules.emplace_back(legacy::from_MAP_str(match[0]));
         begin = match.suffix().first;
     }
     return rules;
@@ -280,7 +279,7 @@ std::vector<legacy::compressT> read_rule_from_file(const char* filename) {
             int read = fread(data.data(), 1, size, fp);
             fclose(fp);
             assert(read == size); // TODO: how to deal with this?
-            vec = extract_rules(std::string_view(data.data(), data.size()));
+            vec = extract_rules(data.data(), data.data() + data.size());
         }
     }
     return vec;
@@ -321,3 +320,19 @@ public:
 // export as file...
 // current-record???->which notify which?
 // TODO: empty state?
+
+#if 0
+// TODO: problematic... what to record?
+bool record_rule(const legacy::ruleT& rule, const char* name = "??????.txt") {
+    using namespace legacy;
+    string str = to_MAP_str(rule);
+
+    FILE* fp = fopen(name, "a");
+    if (!fp) {
+        return false;
+    }
+    bool successful = fprintf(fp, "\n%s", to_MAP_str(rule).c_str()) >= 0;
+    fclose(fp);
+    return successful;
+}
+#endif

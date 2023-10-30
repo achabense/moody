@@ -108,22 +108,22 @@ namespace legacy {
         for (int code = 0; code < 512; ++code) {
             auto [q, w, e, a, s, d, z, x, c] = decode(code);
             int count = q + w + e + a + d + z + x + c;
-            if (count == 2) { // 2:s
+            if (count == 2) { // 2:s ~ 0->0, 1->1 ~ equal to "s".
                 rule[code] = s;
-            } else if (count == 3) { // 3:bs
-                rule[code] = true;
+            } else if (count == 3) { // 3:bs ~ 0->1, 1->1 ~ always 1.
+                rule[code] = 1;
             } else {
-                rule[code] = false;
+                rule[code] = 0;
             }
         }
         return rule;
     }
 
     using ruleT_base = ruleT::array_base;
-    ruleT_base from_rule(const ruleT& rule, interpret_mode interp) {
+    inline ruleT_base from_rule(const ruleT& rule, interpret_mode interp) {
         return rule.to_base(interp);
     }
-    ruleT to_rule(const ruleT_base& rule_data, interpret_mode interp) {
+    inline ruleT to_rule(const ruleT_base& rule_data, interpret_mode interp) {
         return ruleT(rule_data, interp);
     }
 

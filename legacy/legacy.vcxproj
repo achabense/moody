@@ -162,6 +162,7 @@
     <ClInclude Include="rule_traits.hpp" />
     <ClInclude Include="serialize.hpp" />
     <ClInclude Include="partition.hpp" />
+    <ClInclude Include="serialize2.hpp" />
     <ClInclude Include="tile.hpp" />
     <ClInclude Include="rule.hpp" />
   </ItemGroup>
@@ -178,6 +179,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />
+    <None Include="README.md" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
