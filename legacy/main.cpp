@@ -110,6 +110,7 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
     // TODO: when will it return false?
     if (ImGui::BeginTabBar("##Type")) {
         for (int i = 0; i < legacy::partition::basic_specification::size; ++i) {
+            // TODO: how to get/set current item?
             if (ImGui::BeginTabItem(legacy::partition::basic_specification_names[i])) {
             const auto& part = legacy::partition::get_partition(legacy::partition::basic_specification(i), extr);
             const auto& groups = part.groups();
@@ -119,7 +120,7 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
 
                 ImGui::PushStyleVar(ImGuiStyleVar_::ImGuiStyleVar_ItemSpacing, ImVec2(4, 4));
                 // buttons. TODO: better visual; show group members.
-                for (int j = 0; j < k; j++) {
+                for (int j = 0; j < k; ++j) {
                     if (j % 8 != 0) {
                         ImGui::SameLine();
                     }
@@ -142,8 +143,8 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
                     ImGui::PopStyleVar();
                     ImGui::PopID();
                     if (scans[j] == legacy::scanT::inconsistent) {
-                        ImGui::EndDisabled();
                         ImGui::PopStyleColor();
+                        ImGui::EndDisabled();
                     }
                     if (ImGui::BeginItemTooltip()) {
                         int x = 0;
@@ -414,8 +415,23 @@ int main(int argc, char** argv) {
                     ImGui::EndTooltip();
                 }
 
-                ImGui::Text("Total:%d At:%d%s", recorder.size(), recorder.pos(),
-                            recorder.pos() + 1 == recorder.size() ? "(last)" : ""); // TODO: random-access...
+                // TODO: again, can size()==0?
+                ImGui::Text("Last:%d At:%d", recorder.size() - 1, recorder.pos());
+
+                static char go_to[20]{};
+                auto filter = [](ImGuiInputTextCallbackData* data) {
+                    return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
+                };
+                if (ImGui::InputTextWithHint(
+                        "##Goto", "GOTO e.g. 2->enter", go_to, 20,
+                        ImGuiInputTextFlags_CallbackCharFilter | ImGuiInputTextFlags_EnterReturnsTrue, filter)) {
+                    int val{};
+                    if (sscanf(go_to, "%d", &val) == 1) {
+                        recorder.set_pos(val);
+                    }
+                    go_to[0] = '\0';
+                    // TODO: how to regain focus?
+                }
             }
 
             ImGui::SeparatorText("Rule generator");

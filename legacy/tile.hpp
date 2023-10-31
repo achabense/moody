@@ -93,11 +93,12 @@ namespace legacy {
 
     private:
         // This could be used to support boundless space.
+        // TODO: whether to set back const?
         const tileT& gather( // clang-format off
             const tileT* q, const tileT* w, const tileT* e,
             const tileT* a, /*    this   */ const tileT* d,
             const tileT* z, const tileT* x, const tileT* c
-        ) const { // clang-format on
+        ) { // clang-format on
             // assert m_shape == *.m_shape.
             int width = m_size.width, height = m_size.height;
 
@@ -119,11 +120,12 @@ namespace legacy {
 
     public:
         // Torus.
-        const tileT& gather() const {
+        const tileT& gather() {
             gather(this, this, this, this, this, this, this, this);
             return *this;
         }
 
+        // TODO: optimize...
         void apply(const ruleT& rule, tileT& dest) const {
             // pre: already gathered ???<TODO>, which is untestable.
             assert(this != &dest);

@@ -66,6 +66,7 @@ namespace legacy {
         return rule;
     }
 
+    // TODO: this should belong to <rule.hpp>.
     class compressT {
         array<uint8_t, 64> bits; // as bitset.
     public:
@@ -86,13 +87,9 @@ namespace legacy {
             return rule;
         }
 
-        friend bool operator==(const compressT& l, const compressT& r) {
-            return l.bits == r.bits;
-        }
+        friend bool operator==(const compressT& l, const compressT& r) = default;
 
-        friend bool operator<(const compressT& l, const compressT& r) {
-            return l.bits < r.bits;
-        }
+        friend bool operator<(const compressT& l, const compressT& r) = default;
 
         size_t hash() const {
             // it's ridiculous there is no std::hash<byte-array>...

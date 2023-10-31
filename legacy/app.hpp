@@ -214,31 +214,34 @@ public:
         }
     }
 
-    // TODO: random-access mode...
     // TODO: current...
 
-    void next() {
-        assert(m_pos + 1 <= m_record.size());
-        if (m_pos + 1 != m_record.size()) {
-            m_runner->reset_rule(legacy::ruleT(m_record[++m_pos]));
+    bool set_pos(int pos) {
+        if (pos >= 0 && pos < size()) {
+            if (pos != m_pos) {
+                m_runner->reset_rule(legacy::ruleT(m_record[m_pos = pos]));
         }
+            return true;
+    }
+        return false;
     }
 
-    void prev() {
-        assert(m_pos != -1); // TODO: needed? enough?
-        if (m_pos > 0) {
-            m_runner->reset_rule(legacy::ruleT(m_record[--m_pos]));
+    bool next() {
+        return set_pos(m_pos + 1);
         }
+
+    bool prev() {
+        return set_pos(m_pos - 1);
     }
 
     // TODO: ctor...maker-ctor as...
 
     // TODO: reconsider m_pos logic...
-
+    // TODO: append looks problematic with m_pos logic...
     void append(const std::vector<legacy::compressT>& vec) {
         m_record.insert(m_record.end(), vec.begin(), vec.end());
         if (!m_record.empty() && m_pos == -1) {
-            m_runner->reset_rule(legacy::ruleT(m_record[m_pos = 0]));
+            m_runner->reset_rule(legacy::ruleT(m_record[m_pos = 0])); // TODO: why = 0?
         }
     }
 
