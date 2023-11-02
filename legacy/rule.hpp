@@ -61,6 +61,7 @@ namespace legacy {
     // TODO: is it suitable to declare a namespace-enum for this?
     enum interpret_mode : int { ABS = false, XOR = true };
 
+    // TODO: is this conceptually a "struct" (with no secret) or a "class"?
     struct ruleT : public array<bool, 512> {
         using array_base = array<bool, 512>;
 
@@ -126,5 +127,4 @@ namespace legacy {
     inline ruleT to_rule(const ruleT_base& rule_data, interpret_mode interp) {
         return ruleT(rule_data, interp);
     }
-
 } // namespace legacy

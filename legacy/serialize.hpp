@@ -91,16 +91,6 @@ namespace legacy {
 
         friend bool operator<(const compressT& l, const compressT& r) = default;
 
-        size_t hash() const {
-            // it's ridiculous there is no std::hash<byte-array>...
-            string as_bytes(bits.begin(), bits.end());
-            return std::hash<string>{}(as_bytes);
-        }
+        // TODO: hashing...
     };
 } // namespace legacy
-
-template <> struct std::hash<legacy::compressT> {
-    size_t operator()(const legacy::compressT& cmpr) const {
-        return cmpr.hash();
-    }
-};

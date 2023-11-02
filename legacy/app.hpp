@@ -164,7 +164,7 @@ public:
         m_tile.swap(m_side);
     }
 
-    rule_runner(legacy::rectT size) : m_tile(size), m_side(size) {}
+    explicit rule_runner(legacy::rectT size) : m_tile(size), m_side(size) {}
 };
 
 // TODO: how to suitably deal with empty state?????
@@ -216,6 +216,7 @@ public:
 
     // TODO: current...
 
+    // TODO: pos>=size() ->size()-1?
     bool set_pos(int pos) {
         if (pos >= 0 && pos < size()) {
             if (pos != m_pos) {

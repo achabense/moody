@@ -11,13 +11,12 @@ namespace legacy {
         bool operator==(const rectT&) const = default;
     };
 
+    // TODO: when is it needed to [return] a tile?
     class tileT {
         rectT m_size; // observable width and height.
         bool* m_data;
 
     public:
-        tileT() = delete;
-
         explicit tileT(rectT size) : m_size(size) {
             assert(m_size.width > 0 && m_size.height > 0);
             m_data = new bool[padded_area()]{/* false... */};
@@ -36,6 +35,7 @@ namespace legacy {
         }
 
         // TODO: support copy when needed...
+        tileT() = delete;
         tileT(const tileT&) = delete;
         tileT& operator=(const tileT&) = delete;
 
@@ -80,6 +80,7 @@ namespace legacy {
         }
 
     public:
+        // TODO: like images, "padded_width" is actually "pitch" of the tile... expose publicly???
         // TODO: return span instead?
         bool* line(int y) {
             assert(y >= 0 && y < height());
@@ -92,9 +93,9 @@ namespace legacy {
         }
 
     private:
-        // This could be used to support boundless space.
+        // TODO: This could be used to support boundless space.
         // TODO: whether to set back const?
-        const tileT& gather( // clang-format off
+        const tileT& _gather( // clang-format off
             const tileT* q, const tileT* w, const tileT* e,
             const tileT* a, /*    this   */ const tileT* d,
             const tileT* z, const tileT* x, const tileT* c
@@ -121,29 +122,41 @@ namespace legacy {
     public:
         // Torus.
         const tileT& gather() {
-            gather(this, this, this, this, this, this, this, this);
+            _gather(this, this, this, this, this, this, this, this);
             return *this;
         }
 
+    private:
+        // TODO: This could be used to support constraint gathering...
         // TODO: optimize...
-        void apply(const ruleT& rule, tileT& dest) const {
+        void _apply(auto /*bool(int)*/ rule_source, tileT& dest) const {
             // pre: already gathered ???<TODO>, which is untestable.
             assert(this != &dest);
             dest.resize(m_size);
 
-            auto _apply = [&rule, width = width()](bool* _dest, const bool* _up, const bool* _sc, const bool* _dw) {
+            const int width = this->width(), height = this->height();
+
+            for (int _y = 1; _y <= height; ++_y) {
+                const bool* _up = _line(_y - 1);
+                const bool* _sc = _line(_y);
+                const bool* _dw = _line(_y + 1);
+
+                bool* _dest = dest._line(_y);
                 for (int _x = 1; _x <= width; ++_x) {
                     // clang-format off
-                    _dest[_x] = rule.map(_up[_x - 1], _up[_x], _up[_x + 1],
+                    _dest[_x] = rule_source(encode(_up[_x - 1], _up[_x], _up[_x + 1],
                                          _sc[_x - 1], _sc[_x], _sc[_x + 1],
-                                         _dw[_x - 1], _dw[_x], _dw[_x + 1]);
+                                                   _dw[_x - 1], _dw[_x], _dw[_x + 1]));
                     // clang-format on
                 }
-            };
-
-            for (int _y = 1; _y <= height(); ++_y) {
-                _apply(dest._line(_y), _line(_y - 1), _line(_y), _line(_y + 1));
             }
+        }
+
+    public:
+        void apply(const ruleT& rule, tileT& dest) const {
+            // ~ supposed to be optimized-out... or, support operator() in rule?
+            auto rule_source = [&rule](int code) { return rule.map(code); };
+            _apply(rule_source, dest);
         }
 
         int count() const {

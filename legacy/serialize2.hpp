@@ -42,7 +42,13 @@ namespace legacy {
         }
     } // namespace _impl_details
 
-    // Convert rule to text format that can be copied into softwares like Golly directly.
+    // TODO: rephrase...
+    // Convert ruleT into text form. Specifically, in "MAP" format, so that the result can be pasted into Golly.
+    // The correctness can be verified by checking the result of `to_MAP_str(game_of_life())`.
+    //
+    // Source: https://golly.sourceforge.io/Help/Algorithms/QuickLife.html
+    // > So, Conway's Life (B3/S23) encoded as a MAP rule is:
+    // > rule = MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA
     inline string to_MAP_str(const ruleT& rule) {
         // MAP rule uses a different coding scheme.
         bool reordered[512]{};
