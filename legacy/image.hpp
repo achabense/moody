@@ -32,9 +32,9 @@ public:
         assert(tile.width() == m_w && tile.height() == m_h);
 
         void* pixels = NULL;
-        int pitch = 0;
-        bool successful = SDL_LockTexture(m_texture, NULL, &pixels, &pitch) == 0;
-        assert(successful && pitch == m_w * sizeof(Uint32));
+        [[maybe_unused]] int pitch = 0;
+        [[maybe_unused]] bool succ = SDL_LockTexture(m_texture, NULL, &pixels, &pitch) == 0;
+        assert(succ && pitch == m_w * sizeof(Uint32));
 
         for (int y = 0; y < m_h; ++y) {
             const bool* line = tile.line(y);

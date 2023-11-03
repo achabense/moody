@@ -23,6 +23,7 @@
 #include "app.hpp"
 #include "image.hpp"
 #include "rule_traits.hpp"
+#include "save.hpp"
 #include "serialize2.hpp"
 
 #if !SDL_VERSION_ATLEAST(2, 0, 17)
@@ -82,6 +83,9 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
 
     if (ImGui::Button("Copy to clipboard")) {
         ImGui::SetClipboardText(rule_str.c_str());
+    }
+    if (ImGui::Button("Save")) {
+        legacy::record_rule(old_rule); // TODO: expreimental... use rule_str instead?
     }
 
     // TODO: are these info useful?
@@ -257,8 +261,6 @@ int main(int argc, char** argv) {
     // Our state
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-    static int frame = 0;
-
     // Main loop
     bool done = false;
     while (!done) {
@@ -338,7 +340,7 @@ int main(int argc, char** argv) {
             ImGui::Checkbox("Rule editor", &show_rule_editor);
             ImGui::SameLine();
             ImGui::Checkbox("Demo window", &show_demo_window);
-            ImGui::Text("(%.1f FPS) Frame:%d\n", io.Framerate, frame++);
+            ImGui::Text("(%.1f FPS) Frame:%d\n", io.Framerate, ImGui::GetFrameCount());
             ImGui::Separator();
 
             // tile:
@@ -559,7 +561,7 @@ int main(int argc, char** argv) {
             runner.run(start_from);
         }
         if (!paused) {
-            if (frame % (skip_per_frame + 1) == 0) {
+            if (ImGui::GetFrameCount() % (skip_per_frame + 1) == 0) {
                 runner.run(pergen);
             }
         }

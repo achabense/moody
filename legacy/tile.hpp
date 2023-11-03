@@ -8,7 +8,7 @@
 namespace legacy {
     struct rectT {
         int width, height;
-        bool operator==(const rectT&) const = default;
+        friend bool operator==(const rectT&, const rectT&) = default;
     };
 
     // TODO: when is it needed to [return] a tile?
@@ -101,13 +101,13 @@ namespace legacy {
             const tileT* z, const tileT* x, const tileT* c
         ) { // clang-format on
             // assert m_shape == *.m_shape.
-            int width = m_size.width, height = m_size.height;
+            const int width = m_size.width, height = m_size.height;
 
-            for (int _x = 1; _x <= width; _x++) {
+            for (int _x = 1; _x <= width; ++_x) {
                 _line(0)[_x] = w->_line(height)[_x];
                 _line(height + 1)[_x] = x->_line(1)[_x];
             }
-            for (int _y = 1; _y <= height; _y++) {
+            for (int _y = 1; _y <= height; ++_y) {
                 _line(_y)[0] = a->_line(_y)[width];
                 _line(_y)[width + 1] = d->_line(_y)[1];
             }
@@ -129,12 +129,13 @@ namespace legacy {
     private:
         // TODO: This could be used to support constraint gathering...
         // TODO: optimize...
+        // TODO: pass by value is not suitable in generic context...
         void _apply(auto /*bool(int)*/ rule_source, tileT& dest) const {
             // pre: already gathered ???<TODO>, which is untestable.
             assert(this != &dest);
             dest.resize(m_size);
 
-            const int width = this->width(), height = this->height();
+            const int width = m_size.width, height = m_size.height;
 
             for (int _y = 1; _y <= height; ++_y) {
                 const bool* _up = _line(_y - 1);
@@ -165,18 +166,6 @@ namespace legacy {
                 count += std::accumulate(line(y), line(y) + width(), 0);
             }
             return count;
-        }
-        bool operator==(const tileT& other) const {
-            if (m_size != other.m_size) {
-                return false;
-            }
-
-            for (int y = 0; y < height(); ++y) {
-                if (!memcmp(line(y), other.line(y), width())) {
-                    return false;
-                }
-            }
-            return true;
         }
     };
 } // namespace legacy

@@ -290,33 +290,6 @@ std::vector<legacy::compressT> read_rule_from_file(const char* filename) {
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
-// in developement...
-
-// TODO: use this instead...
-class tile_runner {
-    legacy::tileT m_tile, m_side;
-    bool initialized = false;
-
-public:
-    tile_runner(legacy::rectT size) : m_tile(size), m_side(size) {}
-
-    void reset(const tile_filler& filler, const legacy::rectT* resize = nullptr) {
-        filler.fill(m_tile, resize);
-        initialized = true;
-    }
-
-    const legacy::tileT& tile() const {
-        assert(initialized);
-        return m_tile;
-    }
-
-    void run(const legacy::ruleT& rule) {
-        assert(initialized);
-        m_tile.gather().apply(rule, m_side);
-        m_tile.swap(m_side);
-    }
-};
-
 // TODO: should allow multiple record.
 // "current_record" ~editor~modify-each...
 // extract a rule and set as ...
@@ -324,19 +297,3 @@ public:
 // export as file...
 // current-record???->which notify which?
 // TODO: empty state?
-
-#if 0
-// TODO: problematic... what to record?
-bool record_rule(const legacy::ruleT& rule, const char* name = "??????.txt") {
-    using namespace legacy;
-    string str = to_MAP_str(rule);
-
-    FILE* fp = fopen(name, "a");
-    if (!fp) {
-        return false;
-    }
-    bool successful = fprintf(fp, "\n%s", to_MAP_str(rule).c_str()) >= 0;
-    fclose(fp);
-    return successful;
-}
-#endif
