@@ -106,7 +106,7 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
     static bool as_flip = false; // TODO: for as_flip, use characters other than "0" "1"
     ImGui::Checkbox("As-Flip", &as_flip);
 
-    legacy::ruleT_base rule =
+    legacy::ruleT_data rule =
         legacy::from_rule(old_rule, as_flip ? legacy::interpret_mode::XOR : legacy::interpret_mode::ABS);
 
     // TODO: How to specify the first "BeginTabItem"?
@@ -184,7 +184,7 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
         ImGui::EndTabBar();
     }
     ImGui::End();
-    return legacy::ruleT(rule, as_flip ? legacy::interpret_mode::XOR : legacy::interpret_mode::ABS);
+    return to_rule(rule, as_flip ? legacy::interpret_mode::XOR : legacy::interpret_mode::ABS);
 }
 
 // TODO: should enable guide-mode (with a switch...)
@@ -525,6 +525,14 @@ int main(int argc, char** argv) {
                 ImGui::SameLine();
                 if (ImGui::Button("Reseed")) {
                     runner.m_filler->disturb();
+                    runner.restart();
+                }
+
+                // TODO: use char event instead?
+                if (ImGui::IsKeyReleased(ImGuiKey_P)) {
+                    paused = !paused;
+                }
+                if (ImGui::IsKeyReleased(ImGuiKey_R)) {
                     runner.restart();
                 }
             }

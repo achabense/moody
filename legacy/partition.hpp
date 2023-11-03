@@ -100,7 +100,7 @@ namespace legacy {
             return m_k;
         }
 
-        scanlistT scan(const ruleT_base& rule) const {
+        scanlistT scan(const ruleT_data& rule) const {
             scanlistT result{}; // TODO: unknown?
             for (int j = 0; j < k(); ++j) {
                 const auto& group = m_groups[j];
@@ -117,8 +117,8 @@ namespace legacy {
         }
 
         // TODO: the arg type is problematic.
-        ruleT_base dispatch_from(const ruleT_base& grule) const {
-            ruleT_base rule;
+        ruleT_data dispatch_from(const ruleT_data& grule) const {
+            ruleT_data rule;
             for (int code = 0; code < 512; ++code) {
                 rule[code] = grule[map(code)];
             }
@@ -126,7 +126,7 @@ namespace legacy {
         }
 
         // TODO: bad name...
-        bool matches(const ruleT_base& rule) const {
+        bool matches(const ruleT_data& rule) const {
             for (int code = 0; code < 512; ++code) {
                 if (rule[code] != rule[head_for(code)]) {
                     return false;

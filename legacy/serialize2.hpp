@@ -1,9 +1,8 @@
 #pragma once
 
-#include <fstream>
+#include <regex>
 
 #include "rule.hpp"
-#include "serialize.hpp"
 
 // TODO: integrate into ...
 namespace legacy {
@@ -102,61 +101,4 @@ namespace legacy {
         }
         return rule;
     }
-
-    // TODO: convert all native strs to MAP format...
-    inline string native_to_MAP_str(const std::string& native_str) {
-        return to_MAP_str(legacy::to_rule(native_str));
-    }
-
-    inline void convert_all_data(const char* source, const char* dest) {
-        using namespace std;
-        FILE* s = fopen(source, "rb");
-        fseek(s, 0, SEEK_END);
-        int size = ftell(s);
-        vector<char> data(size);
-        fseek(s, 0, SEEK_SET);
-        fread(data.data(), 1, size, s);
-        fclose(s);
-        vector<char> converted;
-        auto append = [&converted](const string& str) { converted.insert(converted.end(), str.begin(), str.end()); };
-
-        const char *begin = data.data(), *end = begin + size;
-        std::cmatch m;
-        while (std::regex_search(begin, end, m, rulestr_regex())) {
-            append(m.prefix());
-            append(native_to_MAP_str(m[0]));
-            begin = m.suffix().first;
-        }
-        converted.insert(converted.end(), begin, end);
-
-        FILE* d = fopen(dest, "wb");
-        fwrite(converted.data(), 1, converted.size(), d);
-        fclose(d);
-    }
-
-    inline void convert_all_files() {
-        // 2023/10/30.
-        // test exporting to Golly (export as MAP rule format)...
-        // puts(legacy::convert_to_MAP_str(legacy::game_of_life()).c_str());
-
-        string pos = R"(C:\*redacted*\Desktop\rulelistsx\)";
-        string dest_pos = R"(C:\*redacted*\Desktop\rulelistsx\converted\)";
-        for (char ch = 'a'; ch <= 'f'; ++ch) {
-            string source = pos + "ro4 " + ch + ".txt";
-            string dest = dest_pos + "ro4 " + ch + ".txt";
-            legacy::convert_all_data(source.c_str(), dest.c_str());
-        }
-        for (char ch = '1'; ch <= '7'; ++ch) {
-            string source = pos + "rul" + ch + ".txt";
-            string dest = dest_pos + "rul" + ch + ".txt";
-            legacy::convert_all_data(source.c_str(), dest.c_str());
-        }
-
-        for (char ch = 'a'; ch <= 'j'; ++ch) {
-            string source = pos + "sym " + ch + ".txt";
-            string dest = dest_pos + "sym " + ch + ".txt";
-            legacy::convert_all_data(source.c_str(), dest.c_str());
-        }
-    }
-
 } // namespace legacy

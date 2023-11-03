@@ -27,9 +27,6 @@
     <ClInclude Include="tile.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="serialize.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="imgui_sdl2\imgui_impl_sdl2.h">
       <Filter>imgui_sdl2</Filter>
     </ClInclude>

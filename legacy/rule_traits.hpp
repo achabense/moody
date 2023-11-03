@@ -7,7 +7,7 @@
 namespace legacy {
     // TODO: ud, lr, mdiag, sdiag...
     inline bool spatial_symmetric(const ruleT& rule) {
-        return partition::get_partition_spatial().matches(rule);
+        return partition::get_partition_spatial().matches(rule.map);
     }
 
     inline bool center_agnostic_abs(const ruleT& rule) {

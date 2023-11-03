@@ -100,9 +100,9 @@ public:
     }
 
     legacy::ruleT make() {
-        legacy::ruleT_base grule{}; // TODO: is it safe not to do value init?
+        legacy::ruleT_data grule{}; // TODO: is it safe not to do value init?
         random_fill(grule.data(), grule.data() + max_density(), density, m_rand);
-        legacy::ruleT_base rule = current_partition().dispatch_from(grule);
+        legacy::ruleT_data rule = current_partition().dispatch_from(grule);
         return legacy::to_rule(rule, interpret_as);
     }
 };

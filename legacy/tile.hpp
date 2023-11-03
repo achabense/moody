@@ -128,9 +128,7 @@ namespace legacy {
 
     private:
         // TODO: This could be used to support constraint gathering...
-        // TODO: optimize...
-        // TODO: pass by value is not suitable in generic context...
-        void _apply(auto /*bool(int)*/ rule_source, tileT& dest) const {
+        void _apply(const auto& /*bool(int)*/ rule_source, tileT& dest) const {
             // pre: already gathered ???<TODO>, which is untestable.
             assert(this != &dest);
             dest.resize(m_size);
@@ -155,9 +153,7 @@ namespace legacy {
 
     public:
         void apply(const ruleT& rule, tileT& dest) const {
-            // ~ supposed to be optimized-out... or, support operator() in rule?
-            auto rule_source = [&rule](int code) { return rule.map(code); };
-            _apply(rule_source, dest);
+            _apply(rule, dest);
         }
 
         int count() const {
