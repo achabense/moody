@@ -36,11 +36,10 @@ public:
         [[maybe_unused]] bool succ = SDL_LockTexture(m_texture, NULL, &pixels, &pitch) == 0;
         assert(succ && pitch == m_w * sizeof(Uint32));
 
-        for (int y = 0; y < m_h; ++y) {
-            const bool* line = tile.line(y);
-            for (int x = 0; x < m_w; ++x) {
-                ((Uint32*)pixels)[y * m_w + x] = line[x] ? -1 /* white */ : 0;
-            }
+        // Relying on both image and tile data being consecutive.
+        const bool* data = tile.begin();
+        for (int i = 0; i < tile.area(); ++i) {
+            ((Uint32*)pixels)[i] = data[i] ? -1 /* white */ : 0;
         }
         SDL_UnlockTexture(m_texture);
     }

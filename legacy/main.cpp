@@ -137,7 +137,8 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
                     }
                     ImGui::PushID(j);
                     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
-                    if (ImGui::ImageButton(icons.texture(), ImVec2(3 * 8, 3 * 8),
+                    constexpr int zoom = 7; // TODO: 6? 8?
+                    if (ImGui::ImageButton(icons.texture(), ImVec2(3 * zoom, 3 * zoom),
                                            ImVec2(0, groups[j][0] * (1.0f / 512)),
                                            ImVec2(1, (groups[j][0] + 1) * (1.0f / 512)))) {
                         for (auto code : groups[j]) {
@@ -157,7 +158,6 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
                                 ImGui::SameLine();
                             }
 
-                            constexpr int zoom = 8;
                             // for bordercol...
                             ImGui::Image(icons.texture(), ImVec2(3 * zoom, 3 * zoom), ImVec2(0, code * (1.0f / 512)),
                                          ImVec2(1, (code + 1) * (1.0f / 512)), ImVec4(1, 1, 1, 1),

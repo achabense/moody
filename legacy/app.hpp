@@ -47,16 +47,7 @@ public:
             tile.resize(*resize);
         }
 
-        int width = tile.width(), height = tile.height();
-        int area = width * height;
-        bool* data = new bool[area];
-        random_fill(data, data + area, area * density, std::mt19937_64{m_rand});
-
-        for (int y = 0; y < height; ++y) {
-            memcpy(tile.line(y), data + y * width, width);
-        }
-
-        delete[] data;
+        random_fill(tile.begin(), tile.end(), tile.area() * density, std::mt19937_64{m_rand});
     }
 };
 
@@ -221,15 +212,15 @@ public:
         if (pos >= 0 && pos < size()) {
             if (pos != m_pos) {
                 m_runner->reset_rule(legacy::ruleT(m_record[m_pos = pos]));
-        }
+            }
             return true;
-    }
+        }
         return false;
     }
 
     bool next() {
         return set_pos(m_pos + 1);
-        }
+    }
 
     bool prev() {
         return set_pos(m_pos - 1);

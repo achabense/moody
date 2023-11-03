@@ -12,14 +12,15 @@ namespace legacy {
     };
 
     // TODO: when is it needed to [return] a tile?
+    // TODO: explain layout... reorganize for better readibility...
     class tileT {
         rectT m_size; // observable width and height.
-        bool* m_data;
+        bool* m_data; // layout: [height+2][width]|[height+2][2].
 
     public:
         explicit tileT(rectT size) : m_size(size) {
-            assert(m_size.width > 0 && m_size.height > 0);
-            m_data = new bool[padded_area()]{/* false... */};
+            assert(m_size.width > 1 && m_size.height > 1);
+            m_data = new bool[(m_size.width + 2) * (m_size.height + 2)]{};
         }
 
         // conceptually write-only after this call...
@@ -62,39 +63,54 @@ namespace legacy {
         }
 
     private:
-        // TODO: explain padding
-        int padded_height() const {
-            return height() + 2;
-        }
-        int padded_width() const {
-            return width() + 2;
-        }
-        int padded_area() const {
-            return padded_height() * padded_width();
-        }
-
         // TODO: explain why const
         bool* _line(int _y) const {
-            assert(_y >= 0 && _y < padded_height());
-            return m_data + _y * padded_width();
+            assert(_y >= 0 && _y < m_size.height + 2);
+            return m_data + _y * m_size.width;
         }
 
     public:
-        // TODO: like images, "padded_width" is actually "pitch" of the tile... expose publicly???
-        // TODO: return span instead?
         bool* line(int y) {
-            assert(y >= 0 && y < height());
-            return _line(y + 1) + 1;
+            assert(y >= 0 && y < m_size.height);
+            return _line(y + 1);
         }
 
         const bool* line(int y) const {
-            assert(y >= 0 && y < height());
-            return _line(y + 1) + 1;
+            assert(y >= 0 && y < m_size.height);
+            return _line(y + 1);
+        }
+
+        bool* begin() {
+            return line(0);
+        }
+
+        const bool* begin() const {
+            return line(0);
+        }
+
+        bool* end() {
+            return begin() + area();
+        }
+
+        const bool* end() const {
+            return begin() + area();
         }
 
     private:
+        void _set_lr(int _y, bool l, bool r) {
+            assert(_y >= 0 && _y < m_size.height + 2);
+            bool* lr = m_data + m_size.width * (m_size.height + 2);
+            lr[_y * 2] = l;
+            lr[_y * 2 + 1] = r;
+        }
+
+        std::pair<bool, bool> _get_lr(int _y) const {
+            assert(_y >= 0 && _y < m_size.height + 2);
+            const bool* lr = m_data + m_size.width * (m_size.height + 2);
+            return {lr[_y * 2], lr[_y * 2 + 1]};
+        }
+
         // TODO: This could be used to support boundless space.
-        // TODO: whether to set back const?
         const tileT& _gather( // clang-format off
             const tileT* q, const tileT* w, const tileT* e,
             const tileT* a, /*    this   */ const tileT* d,
@@ -103,20 +119,53 @@ namespace legacy {
             // assert m_shape == *.m_shape.
             const int width = m_size.width, height = m_size.height;
 
-            for (int _x = 1; _x <= width; ++_x) {
-                _line(0)[_x] = w->_line(height)[_x];
-                _line(height + 1)[_x] = x->_line(1)[_x];
-            }
+            memcpy(_line(0), w->_line(height), width * sizeof(bool));
+            memcpy(_line(height + 1), x->_line(1), width * sizeof(bool));
+
+            _set_lr(0, q->_line(height)[width - 1], e->_line(height)[0]);
+            _set_lr(height + 1, z->_line(1)[width - 1], c->_line(1)[0]);
             for (int _y = 1; _y <= height; ++_y) {
-                _line(_y)[0] = a->_line(_y)[width];
-                _line(_y)[width + 1] = d->_line(_y)[1];
+                _set_lr(_y, a->_line(_y)[width - 1], d->_line(_y)[0]);
             }
-            _line(0)[0] = q->_line(height)[width];
-            _line(0)[width + 1] = e->_line(height)[1];
-            _line(height + 1)[0] = z->_line(1)[width];
-            _line(height + 1)[width + 1] = c->_line(1)[1];
 
             return *this;
+        }
+
+        // TODO: This could be used to support constraint gathering...
+        // Relying on width > 1 (which is a reasonable requirement)
+        // I hate this function, it is the payment for consecutive data...
+        void _apply(const auto& rulefn /*bool(int)*/, tileT& dest) const {
+            // pre: already gathered ???<TODO>, which is untestable.
+            assert(this != &dest);
+            dest.resize(m_size);
+
+            const int width = m_size.width, height = m_size.height;
+
+            for (int _y = 1; _y <= height; ++_y) {
+                const auto [_q, _e] = _get_lr(_y - 1);
+                const auto [_a, _d] = _get_lr(_y);
+                const auto [_z, _c] = _get_lr(_y + 1);
+
+                const bool* _up = _line(_y - 1); // _q _up _e
+                const bool* _ct = _line(_y);     // _a _ct _d
+                const bool* _dw = _line(_y + 1); // _z _dw _c
+
+                bool* _dest = dest._line(_y);
+
+                // clang-format off
+                _dest[0] = rulefn(encode(_q, _up[0], _up[1],
+                                         _a, _ct[0], _ct[1],
+                                         _z, _dw[0], _dw[1]));
+                for (int x = 1; x < width - 1; ++x) {
+                    _dest[x] = rulefn(encode(_up[x - 1], _up[x], _up[x + 1],
+                                             _ct[x - 1], _ct[x], _ct[x + 1],
+                                             _dw[x - 1], _dw[x], _dw[x + 1]));
+                }
+                _dest[width - 1] = rulefn(encode(_up[width - 2], _up[width - 1], _e,
+                                                 _ct[width - 2], _ct[width - 1], _d,
+                                                 _dw[width - 2], _dw[width - 1], _c));
+                // clang-format on
+            }
         }
 
     public:
@@ -126,42 +175,12 @@ namespace legacy {
             return *this;
         }
 
-    private:
-        // TODO: This could be used to support constraint gathering...
-        void _apply(const auto& /*bool(int)*/ rule_source, tileT& dest) const {
-            // pre: already gathered ???<TODO>, which is untestable.
-            assert(this != &dest);
-            dest.resize(m_size);
-
-            const int width = m_size.width, height = m_size.height;
-
-            for (int _y = 1; _y <= height; ++_y) {
-                const bool* _up = _line(_y - 1);
-                const bool* _sc = _line(_y);
-                const bool* _dw = _line(_y + 1);
-
-                bool* _dest = dest._line(_y);
-                for (int _x = 1; _x <= width; ++_x) {
-                    // clang-format off
-                    _dest[_x] = rule_source(encode(_up[_x - 1], _up[_x], _up[_x + 1],
-                                         _sc[_x - 1], _sc[_x], _sc[_x + 1],
-                                                   _dw[_x - 1], _dw[_x], _dw[_x + 1]));
-                    // clang-format on
-                }
-            }
-        }
-
-    public:
         void apply(const ruleT& rule, tileT& dest) const {
             _apply(rule, dest);
         }
 
         int count() const {
-            int count = 0;
-            for (int y = 0; y < height(); ++y) {
-                count += std::accumulate(line(y), line(y) + width(), 0);
-            }
-            return count;
+            return std::accumulate(begin(), end(), 0);
         }
     };
 } // namespace legacy
