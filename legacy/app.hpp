@@ -51,53 +51,6 @@ public:
     }
 };
 
-// TODO: support inc,dec, next_perm, prev_perm...
-// ugh, horrible, this seems belong to editor... (as maker seems just a partition generator...)
-// TODO: density is actually for generation, not matching with cursor now...
-// TODO: editor, very hard...
-// TODO: how to support user-defined partition?
-// TODO: what's the relation with analyzer/ editor?
-// TODO: how to interact with recorder automatically?
-class rule_maker {
-    std::mt19937_64 m_rand;
-
-public:
-    // TODO: "density" might not be suitable name...
-    // density ¡Ê [0, max_density()]
-    int density = 0; // TODO: rename. TODO: revert density setting?
-
-    // TODO: aside from filters, the problem is, [what] to support?
-    // TODO: partially symmetric rules?
-
-    // TODO: explain what this is exactly...
-    // TODO: the enum is problematic...
-    legacy::interpret_mode interpret_as = legacy::ABS;
-    // TODO: explain e_mode...
-    static constexpr auto& b_mode_names = legacy::partition::basic_specification_names;
-    static constexpr auto& e_mode_names = legacy::partition::extra_specification_names;
-    // TODO: the naming is horrible...
-    legacy::partition::basic_specification b_mode = legacy::partition::spatial;
-    legacy::partition::extra_specification e_mode = legacy::partition::extra_specification::none;
-
-    explicit rule_maker(uint64_t seed) : m_rand{seed} {
-        density = max_density() * 0.3;
-    }
-
-    const legacy::partitionT& current_partition() const {
-        return legacy::partition::get_partition(b_mode, e_mode);
-    }
-    int max_density() const {
-        return current_partition().k();
-    }
-
-    legacy::ruleT make() {
-        legacy::ruleT_data grule{}; // TODO: is it safe not to do value init?
-        random_fill(grule.data(), grule.data() + max_density(), density, m_rand);
-        legacy::ruleT_data rule = current_partition().dispatch_from(grule);
-        return legacy::to_rule(rule, interpret_as);
-    }
-};
-
 // TODO: support shifting...
 // TODO: !!!! recheck when to "restart"..
 class rule_runner {
@@ -225,8 +178,6 @@ public:
     bool prev() {
         return set_pos(m_pos - 1);
     }
-
-    // TODO: ctor...maker-ctor as...
 
     // TODO: reconsider m_pos logic...
     // TODO: append looks problematic with m_pos logic...
