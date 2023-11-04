@@ -46,8 +46,8 @@ int start_from = 0;
 // TODO: support pace formally...
 // ~paceless, take another thread... (need locks)
 // enum pace_mode { per_frame, per_duration };
-constexpr int skip_min = 0, skip_max = 20;
-int skip_per_frame = 0;
+constexpr int gap_min = 0, gap_max = 20;
+int gap_frame = 0;
 
 bool cal_rate = true;
 bool anti_flick = true; // TODO: make settable...
@@ -103,11 +103,16 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
     ImGui::SameLine();
     ImGui::RadioButton("state", underlying_address(extr), legacy::partition::state);
 
-    static bool as_flip = false; // TODO: for as_flip, use characters other than "0" "1"
-    ImGui::Checkbox("As-Flip", &as_flip);
+    // TODO: same as that in main. combine.
+    static legacy::interpret_mode interpret_as = {};
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted("As");
+    ImGui::SameLine();
+    ImGui::RadioButton("ABS", underlying_address(interpret_as), legacy::ABS);
+    ImGui::SameLine();
+    ImGui::RadioButton("XOR", underlying_address(interpret_as), legacy::XOR);
 
-    legacy::ruleT_data rule =
-        legacy::from_rule(old_rule, as_flip ? legacy::interpret_mode::XOR : legacy::interpret_mode::ABS);
+    legacy::ruleT_data rule = legacy::from_rule(old_rule, interpret_as);
 
     // TODO: How to specify the first "BeginTabItem"?
     // ???ImGuiTabItemFlags_SetSelected
@@ -122,6 +127,23 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
                 const int k = part.k();
                 auto scans = part.scan(rule);
 
+                // TODO: expreimental; not suitable place... should be totally redesigned...
+                if (ImGui::Button("????")) {
+                    std::vector<legacy::compressT> vec;
+                    vec.emplace_back(legacy::to_rule(rule, interpret_as));
+                    for (int j = 0; j < k; ++j) {
+                        legacy::ruleT_data rule_j = rule;
+                        // TODO: whether to flip inconsistent units?
+                        for (int code : groups[j]) {
+                            rule_j[code] = !rule_j[code];
+                        }
+                        vec.emplace_back(legacy::to_rule(rule_j, interpret_as));
+                    }
+                    // TODO: too obscure: rely on vec's first val being the same rule and replace set to it...
+                    recorder.replace(vec); // TODO: ideally shouldn't involve globaL recorder...
+                }
+
+                // TODO:ImGuiStyleVar_ItemSpacing vs FramePadding???
                 ImGui::PushStyleVar(ImGuiStyleVar_::ImGuiStyleVar_ItemSpacing, ImVec2(4, 4));
                 // buttons. TODO: better visual; show group members.
                 for (int j = 0; j < k; ++j) {
@@ -184,7 +206,7 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
         ImGui::EndTabBar();
     }
     ImGui::End();
-    return to_rule(rule, as_flip ? legacy::interpret_mode::XOR : legacy::interpret_mode::ABS);
+    return to_rule(rule, interpret_as);
 }
 
 // TODO: should enable guide-mode (with a switch...)
@@ -494,17 +516,18 @@ int main(int argc, char** argv) {
 
             ImGui::SeparatorText("Tile");
             {
-                ImGui::AlignTextToFramePadding();
                 ImGui::Text("Gen:%d", runner.gen());
-            }
 
-            {
+                // TODO: this is horribly obscure...
                 if (ImGui::SliderFloat("Init density [0-1]", &runner.m_filler->density, 0.0f, 1.0f, "%.3f",
                                        ImGuiSliderFlags_NoInput)) {
                     runner.restart();
                 }
 
                 ImGui::Checkbox("Pause", &paused);
+                if (ImGui::IsKeyPressed(ImGuiKey_P, false)) {
+                    paused = !paused;
+                }
 
                 ImGui::SameLine();
                 ImGui::PushButtonRepeat(true); // accept consecutive clicks... TODO: too fast...
@@ -518,21 +541,12 @@ int main(int argc, char** argv) {
                 ImGui::PopButtonRepeat();
 
                 ImGui::SameLine();
-                if (ImGui::Button("Restart")) {
+                if (ImGui::Button("Restart") || ImGui::IsKeyPressed(ImGuiKey_R, false)) {
                     runner.restart();
-                    // runner.reset_tile();
                 }
                 ImGui::SameLine();
-                if (ImGui::Button("Reseed")) {
+                if (ImGui::Button("Reseed") || ImGui::IsKeyPressed(ImGuiKey_S, false)) {
                     runner.m_filler->disturb();
-                    runner.restart();
-                }
-
-                // TODO: use char event instead?
-                if (ImGui::IsKeyReleased(ImGuiKey_P)) {
-                    paused = !paused;
-                }
-                if (ImGui::IsKeyReleased(ImGuiKey_R)) {
                     runner.restart();
                 }
             }
@@ -540,15 +554,10 @@ int main(int argc, char** argv) {
             {
                 // TODO: toooo ugly...
                 // TODO: (?) currently suitable to restart immediately...
-                ImGui::SliderInt("Per gen [1-20]", &pergen, pergen_min, pergen_max, "%d",
-                                 ImGuiSliderFlags_NoInput); // TODO: use sprintf for pergen_min and pergen_max,
-                                                            // start_min, start_max...
-                ImGui::SliderInt("Gap Frame [0-20]", &skip_per_frame, skip_min, skip_max, "%d",
-                                 ImGuiSliderFlags_NoInput);
-                // ImGui::BeginDisabled();
+                ImGui::SliderInt("Per gen [1-20]", &pergen, pergen_min, pergen_max, "%d", ImGuiSliderFlags_NoInput);
+                ImGui::SliderInt("Gap Frame [0-20]", &gap_frame, gap_min, gap_max, "%d", ImGuiSliderFlags_NoInput);
                 ImGui::SliderInt("Start gen [0-1000]", &start_from, start_min, start_max, "%d",
                                  ImGuiSliderFlags_NoInput);
-                // ImGui::EndDisabled();
             }
         }
         ImGui::End();
@@ -563,13 +572,12 @@ int main(int argc, char** argv) {
                     --pergen;
                 }
             }
-            // TODO: how to restore when switch to new rules?
+            // TODO: (whether and) how to restore when switch to new rules?
         }
-        if (runner.gen() == 0) {
-            runner.run(start_from);
-        }
-        if (!paused) {
-            if (ImGui::GetFrameCount() % (skip_per_frame + 1) == 0) {
+        if (runner.gen() < start_from) {
+            runner.run(start_from - runner.gen());
+        } else if (!paused) {
+            if (ImGui::GetFrameCount() % (gap_frame + 1) == 0) {
                 runner.run(pergen);
             }
         }

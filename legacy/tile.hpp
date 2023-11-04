@@ -11,6 +11,9 @@ namespace legacy {
         friend bool operator==(const rectT&, const rectT&) = default;
     };
 
+    // TODO: add area() for rectT?
+    // TODO: assert int is not two-byte...
+
     // TODO: when is it needed to [return] a tile?
     // TODO: explain layout... reorganize for better readibility...
     class tileT {

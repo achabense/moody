@@ -136,8 +136,8 @@ public:
         for (int i = 0; i < count; ++i) {
             m_tile.gather().apply(m_rule, m_side);
             m_tile.swap(m_side);
+            ++m_gen;
         }
-        m_gen += count;
     }
 
     // TODO: should the filler be shifted too? if so then must be tile-based...
@@ -252,7 +252,10 @@ std::vector<legacy::compressT> extract_rules(const char* begin, const char* end)
     const auto& regex = legacy::regex_MAP_str();
     std::cmatch match;
     while (std::regex_search(begin, end, match, regex)) {
-        rules.emplace_back(legacy::from_MAP_str(match[0]));
+        legacy::compressT rule(legacy::from_MAP_str(match[0]));
+        if (rules.empty() || rules.back() != rule) {
+            rules.push_back(rule);
+        }
         begin = match.suffix().first;
     }
     return rules;
@@ -261,8 +264,6 @@ std::vector<legacy::compressT> extract_rules(const char* begin, const char* end)
 // TODO: refine...
 // TODO: forbid exception...
 std::vector<legacy::compressT> read_rule_from_file(const char* filename) {
-    std::vector<legacy::compressT> vec;
-
     if (FILE* fp = fopen(filename, "rb")) {
         fseek(fp, 0, SEEK_END);
         int size = ftell(fp);
@@ -274,10 +275,10 @@ std::vector<legacy::compressT> read_rule_from_file(const char* filename) {
             int read = fread(data.data(), 1, size, fp);
             fclose(fp);
             assert(read == size); // TODO: how to deal with this?
-            vec = extract_rules(data.data(), data.data() + data.size());
+            return extract_rules(data.data(), data.data() + data.size());
         }
     }
-    return vec;
+    return {};
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////

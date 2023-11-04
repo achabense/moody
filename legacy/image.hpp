@@ -57,19 +57,20 @@ public:
 };
 
 // TODO: looks horrible...
+// TODO: lacks useful interface...
 class code_image {
     SDL_Texture* m_texture;
 
 public:
     code_image(SDL_Renderer* renderer) {
         m_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, width(), height());
-        Uint32 pixels[3 * 3 * 512];
+        Uint32 pixels[512][3][3];
         for (int code = 0; code < 512; ++code) {
             auto [q, w, e, a, s, d, z, x, c] = legacy::decode(code);
             bool fill[3][3] = {{q, w, e}, {a, s, d}, {z, x, c}};
             for (int y = 0; y < 3; ++y) {
                 for (int x = 0; x < 3; ++x) {
-                    pixels[(code * 3 + y) * 3 + x] = fill[y][x] ? -1 : 0;
+                    pixels[code][y][x] = fill[y][x] ? -1 : 0;
                 }
             }
         }
