@@ -160,7 +160,7 @@ public:
 
     // TODO: current...
 
-    // TODO: pos>=size() ->size()-1?
+    // TODO: clamp?
     bool set_pos(int pos) {
         if (pos >= 0 && pos < size()) {
             if (pos != m_pos) {

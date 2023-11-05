@@ -13,7 +13,7 @@ namespace legacy {
 
     // TODO: add area() for rectT?
     // TODO: assert int is not two-byte...
-
+    // TODO: add basic noexcept annotation?
     // TODO: when is it needed to [return] a tile?
     // TODO: explain layout... reorganize for better readibility...
     class tileT {
@@ -38,6 +38,7 @@ namespace legacy {
             delete[] m_data;
         }
 
+        // TODO: should empty state be supported?
         // TODO: support copy when needed...
         tileT() = delete;
         tileT(const tileT&) = delete;

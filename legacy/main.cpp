@@ -65,6 +65,8 @@ template <class Enum> auto* underlying_address(Enum& ptr) {
 // TODO: how to get renderer from backend?
 // TODO: should be a class...
 legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& icons) {
+    // TODO: better visual; use editor::member instead...
+
     assert(show);
     if (!ImGui::Begin("Rule editor", &show,
                       ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse |
@@ -78,12 +80,12 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
                 legacy::spatial_symmetric(old_rule), legacy::state_symmetric(old_rule),
                 legacy::center_agnostic_abs(old_rule), legacy::center_agnostic_xor(old_rule));
 
-    auto rule_str = to_MAP_str(old_rule);              // how to reuse the resource?
-    ImGui::PushTextWrapPos(ImGui::GetFontSize() * 26); // TODO: "fontsize" is height
+    auto rule_str = to_MAP_str(old_rule); // how to reuse the resource?
     ImGui::TextUnformatted("Rule str:");
-    // TODO: better visual; use editor::member instead...
-    ImGui::TextUnformatted(rule_str.c_str());
-    ImGui::PopTextWrapPos();
+    // ImGui::PushTextWrapPos(ImGui::GetFontSize() * 26); // TODO: "fontsize" is height
+    // ImGui::TextUnformatted(rule_str.c_str());
+    // ImGui::PopTextWrapPos();
+    ImGui::TextWrapped(rule_str.c_str());
 
     if (ImGui::Button("Copy to clipboard")) {
         ImGui::SetClipboardText(rule_str.c_str());
@@ -146,6 +148,7 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
         rden = (double)rcount / k;
     }
 
+    // TODO: should be foldable...
     ImGui::SeparatorText("Details");
     {
         const auto& part = legacy::partition::get_partition(base, extr);
@@ -375,7 +378,6 @@ int main(int argc, char** argv) {
         // TODO: remove this when suitable...
         if (show_demo_window) {
             ImGui::ShowDemoWindow(&show_demo_window);
-            // ImGui::ShowMetricsWindow(&show_demo_window);
         }
 
         if (ImGui::Begin("-v-", nullptr,
@@ -406,6 +408,7 @@ int main(int argc, char** argv) {
                 if (ImGui::IsItemHovered() && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
                     // TODO: will not work properly when img_zoom!=1...
                     runner.shift_xy(io.MouseDelta.x, io.MouseDelta.y);
+                    // TODO: how to follow smoothly without closing tip window?
                 } else if (ImGui::BeginItemTooltip()) {
                     auto& io = ImGui::GetIO();
                     // TODO: rewrite logic...
@@ -462,24 +465,25 @@ int main(int argc, char** argv) {
                 }
 
                 // TODO: again, can size()==0?
+                ImGui::AlignTextToFramePadding(); // TODO: +1 is clumsy.
                 ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1);
-                // TODO: double click
-                if (ImGui::SmallButton("Clear")) {
-                }
 
                 static char go_to[20]{};
                 auto filter = [](ImGuiInputTextCallbackData* data) {
                     return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
                 };
+                ImGui::SameLine();
                 if (ImGui::InputTextWithHint(
                         "##Goto", "GOTO e.g. 2->enter", go_to, 20,
                         ImGuiInputTextFlags_CallbackCharFilter | ImGuiInputTextFlags_EnterReturnsTrue, filter)) {
                     int val{};
                     if (sscanf(go_to, "%d", &val) == 1) {
-                        recorder.set_pos(val);
+                        recorder.set_pos(val - 1); // TODO: -1 is clumsy.
                     }
                     go_to[0] = '\0';
-                    // TODO: how to regain focus?
+
+                    // Regain focus:
+                    ImGui::SetKeyboardFocusHere(-1);
                 }
             }
 
@@ -531,7 +535,15 @@ int main(int argc, char** argv) {
         }
         ImGui::End();
 
-        // run tile (TODO: should be here?)
+        // Rendering
+        ImGui::Render();
+        SDL_RenderSetScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
+        SDL_SetRenderDrawColor(renderer, (Uint8)(clear_color.x * 255), (Uint8)(clear_color.y * 255),
+                               (Uint8)(clear_color.z * 255), (Uint8)(clear_color.w * 255));
+        SDL_RenderClear(renderer);
+        ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
+        SDL_RenderPresent(renderer);
+
         if (anti_flick) {
             if (legacy::will_flick(runner.rule()) && pergen % 2) {
                 if (pergen == 1) {
@@ -550,15 +562,6 @@ int main(int argc, char** argv) {
                 runner.run(pergen);
             }
         }
-
-        // Rendering
-        ImGui::Render();
-        SDL_RenderSetScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
-        SDL_SetRenderDrawColor(renderer, (Uint8)(clear_color.x * 255), (Uint8)(clear_color.y * 255),
-                               (Uint8)(clear_color.z * 255), (Uint8)(clear_color.w * 255));
-        SDL_RenderClear(renderer);
-        ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
-        SDL_RenderPresent(renderer);
     }
 
     // Cleanup
