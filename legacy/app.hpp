@@ -1,7 +1,6 @@
 #pragma once
 
 #include <random>
-#include <unordered_map>
 
 #include "partition.hpp"
 #include "rule.hpp"
@@ -160,23 +159,20 @@ public:
 
     // TODO: current...
 
-    // TODO: clamp?
-    bool set_pos(int pos) {
-        if (pos >= 0 && pos < size()) {
+    void set_pos(int pos) {
+        assert(!empty());
+        pos = std::clamp(pos, 0, size() - 1);
             if (pos != m_pos) {
                 m_runner->reset_rule(legacy::ruleT(m_record[m_pos = pos]));
             }
-            return true;
-        }
-        return false;
     }
 
-    bool next() {
-        return set_pos(m_pos + 1);
+    void next() {
+        set_pos(m_pos + 1);
     }
 
-    bool prev() {
-        return set_pos(m_pos - 1);
+    void prev() {
+        set_pos(m_pos - 1);
     }
 
     // TODO: reconsider m_pos logic...

@@ -51,11 +51,6 @@ int gap_frame = 0;
 bool cal_rate = true;
 bool anti_flick = true; // TODO: make settable...
 
-// TODO: looks horrible and inefficient
-std::string wrap_rule_string(const std::string& str) {
-    return str.substr(0, 32) + "\n" + str.substr(32, 16) + "...";
-}
-
 // TODO: awful... need to be avoided...
 template <class Enum> auto* underlying_address(Enum& ptr) {
     return reinterpret_cast<std::underlying_type_t<Enum>*>(std::addressof(ptr));
@@ -336,42 +331,32 @@ int main(int argc, char** argv) {
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
-        ////////////////////////////////////////////////////////////////////////////
-        // TODO: experimental...
-        // TOO clumsy...
-        bool open_popup = false;
-        if (ImGui::BeginMainMenuBar()) {
-            if (ImGui::BeginMenu("Open##1234")) {
-                // if (ImGui::MenuItem("Open##5678", "...")) {}
-                open_popup = true;
-                ImGui::EndMenu();
+        {
+            // TODO: experimental... TOO clumsy
+            bool open_popup = false;
+            if (ImGui::BeginMainMenuBar()) {
+                if (ImGui::BeginMenu("Open##1234")) {
+                    // if (ImGui::MenuItem("Open##5678", "...")) {}
+                    open_popup = true;
+                    ImGui::EndMenu();
+                }
+                ImGui::EndMainMenuBar();
             }
-            ImGui::EndMainMenuBar();
-        }
-        static bool prev_paused = false; // TODO: should be push/pop mode
-        if (open_popup) {
-            prev_paused = paused;
-            paused = true;
-            ImGui::OpenPopup("Open file##0123");
-        }
-        if (ImGui::BeginPopupModal("Open file##0123", NULL, ImGuiWindowFlags_::ImGuiWindowFlags_AlwaysAutoResize)) {
-            static char buf[100]{}; // TODO: static? init contents?
-            if (ImGui::InputTextWithHint("##1223", "File-path", buf, 100, ImGuiInputTextFlags_EnterReturnsTrue)) {
-                recorder.replace(read_rule_from_file(buf));
-                buf[0] = '\0';
-                ImGui::CloseCurrentPopup();
-                paused = prev_paused;
+            static bool prev_paused = false; // TODO: should be push/pop mode
+            if (open_popup) {
+                prev_paused = paused;
+                paused = true;
+                ImGui::OpenPopup("Open file##0123");
             }
-            ImGui::EndPopup();
-        }
-        /////////////////////////////////////////////////////////////////////////
-
-        // TODO: editor works poorly with recorder...
-        // TODO: shouldnt be here...
-        if (show_rule_editor) {
-            auto edited = edit_rule(show_rule_editor, runner.rule(), icons);
-            if (edited != runner.rule()) {
-                recorder.take(edited);
+            if (ImGui::BeginPopupModal("Open file##0123", NULL, ImGuiWindowFlags_::ImGuiWindowFlags_AlwaysAutoResize)) {
+                static char buf[100]{}; // TODO: static? init contents?
+                if (ImGui::InputTextWithHint("##1223", "File-path", buf, 100, ImGuiInputTextFlags_EnterReturnsTrue)) {
+                    recorder.replace(read_rule_from_file(buf));
+                    buf[0] = '\0';
+                    paused = prev_paused;
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndPopup();
             }
         }
 
@@ -395,27 +380,30 @@ int main(int argc, char** argv) {
             {
                 const ImVec2 pos = ImGui::GetCursorScreenPos();
 
-                img.update(runner.tile());
-                SDL_Texture* const img_texture = img.texture();
                 const float img_zoom = 1; // TODO: *2 is too big with (320*240)
                 const ImVec2 img_size = ImVec2(img.width() * img_zoom, img.height() * img_zoom);
 
                 ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
-                ImGui::ImageButton(img_texture, img_size);
+                ImGui::ImageButton(img.texture(), img_size);
                 ImGui::PopStyleVar();
 
-                // TODO: refine dragging logic...
                 if (ImGui::IsItemHovered() && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
                     // TODO: will not work properly when img_zoom!=1...
                     runner.shift_xy(io.MouseDelta.x, io.MouseDelta.y);
-                    // TODO: how to follow smoothly without closing tip window?
-                } else if (ImGui::BeginItemTooltip()) {
-                    auto& io = ImGui::GetIO();
+                }
+
+                // I did a trick here. ImageButton didn't draw eagerly, so it's safe to update the texture later (here).
+                // This is used to provide stable view against dragging.
+                // TODO: is this correct?
+                img.update(runner.tile());
+
+                if (ImGui::BeginItemTooltip()) {
+                    auto& io = ImGui::GetIO(); // const?
                     // TODO: rewrite logic...
                     const float region_sz = 32.0f;
                     float region_x = io.MousePos.x - pos.x - region_sz * 0.5f;
                     float region_y = io.MousePos.y - pos.y - region_sz * 0.5f;
-                    const float zoom = 4.0f; // TODO: should be settable between 4 and 8.
+                    const float zoom = 4.0f; // TODO: should be settable?
                     if (region_x < 0.0f) {
                         region_x = 0.0f;
                     } else if (region_x > img_size.x - region_sz) {
@@ -428,13 +416,12 @@ int main(int argc, char** argv) {
                     }
                     ImVec2 uv0 = ImVec2((region_x) / img_size.x, (region_y) / img_size.y);
                     ImVec2 uv1 = ImVec2((region_x + region_sz) / img_size.x, (region_y + region_sz) / img_size.y);
-                    ImGui::Image(img_texture, ImVec2(region_sz * zoom, region_sz * zoom), uv0, uv1);
+                    ImGui::Image(img.texture(), ImVec2(region_sz * zoom, region_sz * zoom), uv0, uv1);
 
-                    ImGui::TextUnformatted("Rclick to copy to clipboard:"); // TODO: show successful / fail...
-                    auto rule_str = to_MAP_str(runner.rule());              // how to reuse the resource?
-                    ImGui::TextUnformatted(wrap_rule_string(rule_str).c_str());
+                    ImGui::TextUnformatted("Rclick to copy to clipboard.");
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_::ImGuiMouseButton_Right)) {
-                        ImGui::SetClipboardText(rule_str.c_str()); // TODO: notify...
+                        // TODO: add a log window for operations like this.
+                        ImGui::SetClipboardText(to_MAP_str(runner.rule()).c_str());
                     }
                     ImGui::TextUnformatted("Ctrl+Lclick to paste from clipboard:");
                     if (io.KeyCtrl) {
@@ -448,7 +435,8 @@ int main(int argc, char** argv) {
                                 found_str = match_result[0];
                             }
                         }
-                        ImGui::TextUnformatted(found_str.empty() ? "(none)" : wrap_rule_string(found_str).c_str());
+                        ImGui::TextUnformatted(found_str.empty() ? "(none)"
+                                                                 : (found_str.substr(0, 24) + "...").c_str());
                         // TODO: redesign copy/paste... especially lclick-paste is problematic...
                         if (ImGui::IsMouseClicked(ImGuiMouseButton_::ImGuiMouseButton_Left) && !found_str.empty()) {
                             recorder.take(legacy::from_MAP_str(found_str));
@@ -464,7 +452,8 @@ int main(int argc, char** argv) {
                     ImGui::EndTooltip();
                 }
 
-                // TODO: again, can size()==0?
+                // TODO: again, can size()==0? NO, but how to guarantee?
+                // It seems the whole recorder model is problematic...
                 ImGui::AlignTextToFramePadding(); // TODO: +1 is clumsy.
                 ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1);
 
@@ -531,9 +520,27 @@ int main(int argc, char** argv) {
                 ImGui::SliderInt("Gap Frame [0-20]", &gap_frame, gap_min, gap_max, "%d", ImGuiSliderFlags_NoInput);
                 ImGui::SliderInt("Start gen [0-1000]", &start_from, start_min, start_max, "%d",
                                  ImGuiSliderFlags_NoInput);
+
+                if (ImGui::IsKeyPressed(ImGuiKey_1, true)) {
+                    gap_frame = std::max(gap_min, gap_frame - 1);
+                }
+
+                if (ImGui::IsKeyPressed(ImGuiKey_2, true)) {
+                    gap_frame = std::min(gap_max, gap_frame + 1);
+                }
             }
         }
         ImGui::End();
+
+        // TODO: editor works poorly with recorder...
+        // TODO: probably shouldn't be here, but have to temporarily to avoid gen starting from 0 even if start_from is
+        // setted, as `take` resets the gen too eagerly...
+        if (show_rule_editor) {
+            auto edited = edit_rule(show_rule_editor, runner.rule(), icons);
+            if (edited != runner.rule()) {
+                recorder.take(edited); // TODO: rule resetting should always be outside of rendering...
+            }
+        }
 
         // Rendering
         ImGui::Render();
@@ -558,6 +565,7 @@ int main(int argc, char** argv) {
         if (runner.gen() < start_from) {
             runner.run(start_from - runner.gen());
         } else if (!paused) {
+            // TODO: is GetFrameCount unchanged since last call in tile window?
             if (ImGui::GetFrameCount() % (gap_frame + 1) == 0) {
                 runner.run(pergen);
             }
