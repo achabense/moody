@@ -20,6 +20,7 @@ namespace legacy {
         int hour;  // [0,23]
         int min;   // [0,59]
         int sec;   // [0,59]
+        int ms;
 
         static timeT now() {
             using namespace std::chrono;
@@ -34,7 +35,8 @@ namespace legacy {
             int hour = hms.hours().count();
             int min = hms.minutes().count();
             int sec = hms.seconds().count();
-            return timeT{year, month, day, hour, min, sec};
+            int ms = hms.subseconds().count();
+            return timeT{year, month, day, hour, min, sec, ms};
         }
     };
 
@@ -51,13 +53,8 @@ namespace legacy {
         snprintf(str, 100, "%d_%d_%d.txt", time.year, time.month, time.day); // TODO: can fail?
         return str;
     }
-    inline string make_str(const timeT& time) {
-        char str[100];
-        snprintf(str, 100, "%d/%d/%d %d:%d:%d", time.year, time.month, time.day, time.hour, time.min,
-                 time.sec); // TODO: can fail?
-        return str;
-    }
 
+    // TODO: should be redesigned...
     inline void record_rule(const ruleT& rule) {
         static std::optional<ruleT> last{std::nullopt};
         if (last == rule) {
@@ -71,7 +68,11 @@ namespace legacy {
 
         std::ofstream append(m_folder / filename_from(time), std::ios::app);
         if (append) {
-            append << "# time: " << make_str(time);
+            char str[100];
+            snprintf(str, 100, "%d-%d-%d %02d:%02d:%02d", time.year, time.month, time.day, time.hour, time.min,
+                     time.sec);
+
+            append << "# time: " << str;
             append << "; rule-hash: " << std::hash<string>{}(to_MAP_str(rule))
                    << "\n";                     // TODO: bad; should provide a way to show consecutive diff though...
             append << to_MAP_str(rule) << "\n"; // and what?
@@ -79,7 +80,4 @@ namespace legacy {
             // TODO: what to do?
         }
     }
-
-    // TODO:...
-
 } // namespace legacy

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <deque>
+#include <format>
 #include <random>
 
 #include "partition.hpp"
@@ -57,10 +59,35 @@ class rule_runner {
     legacy::tileT m_tile, m_side;
     int m_gen = 0;
 
+    // TODO: this turns out to be a mess...
     friend class rule_recorder;
     void reset_rule(const legacy::ruleT& rule) {
         m_rule = rule;
         restart(); // TODO: optionally start from current state...
+    }
+
+    // TODO: experimental... maybe not suitable for rule_runner.
+    // The logic looks very fragile... reliance is a mess...
+    // TODO: recheck logic...
+    int init_shift_x = 0, init_shift_y = 0;
+
+    void do_shift_xy(int dx, int dy) {
+        const int width = m_tile.width(), height = m_tile.height();
+
+        dx = ((-dx % width) + width) % width;
+        dy = ((-dy % height) + height) % height;
+        if (dx == 0 && dy == 0) {
+            return;
+        }
+
+        m_side.resize(m_tile.size());
+        for (int y = 0; y < height; ++y) {
+            bool* source = m_tile.line((y + dy) % height);
+            bool* dest = m_side.line(y);
+            std::copy_n(source, width, dest);
+            std::rotate(dest, dest + dx, dest + width);
+        }
+        m_tile.swap(m_side);
     }
 
 public:
@@ -80,8 +107,9 @@ public:
     }
 
     void restart() {
-        m_filler->fill(m_tile);
         m_gen = 0;
+        m_filler->fill(m_tile);
+        do_shift_xy(init_shift_x, init_shift_y);
     }
 
     void run(int count) {
@@ -92,19 +120,10 @@ public:
         }
     }
 
-    // TODO: should the filler be shifted too? if so then must be tile-based...
-    // TODO: recheck logic...
     void shift_xy(int dx, int dy) {
-        dx = ((-dx % m_tile.width()) + m_tile.width()) % m_tile.width();
-        dy = ((-dy % m_tile.height()) + m_tile.height()) % m_tile.height();
-        for (int y = 0; y < m_tile.height(); ++y) {
-            bool* source = m_tile.line((y + dy) % m_tile.height());
-            bool* dest = m_side.line(y);
-            std::copy_n(source, m_tile.width(), dest);
-            std::rotate(dest, dest + dx, dest + m_tile.width());
-        }
-
-        m_tile.swap(m_side);
+        init_shift_x += dx;
+        init_shift_y += dy; // TODO: wrap eagerly...
+        do_shift_xy(dx, dy);
     }
 
     explicit rule_runner(legacy::rectT size) : m_tile(size), m_side(size) {}
@@ -162,9 +181,9 @@ public:
     void set_pos(int pos) {
         assert(!empty());
         pos = std::clamp(pos, 0, size() - 1);
-            if (pos != m_pos) {
-                m_runner->reset_rule(legacy::ruleT(m_record[m_pos = pos]));
-            }
+        if (pos != m_pos) {
+            m_runner->reset_rule(legacy::ruleT(m_record[m_pos = pos]));
+        }
     }
 
     void next() {
@@ -236,3 +255,65 @@ std::vector<legacy::compressT> read_rule_from_file(const char* filename) {
 // export as file...
 // current-record???->which notify which?
 // TODO: empty state?
+
+#include "save.hpp"
+#include <imgui.h>
+
+// Likely to be the only singleton...
+class logger {
+    // TODO: maybe timestamp-and-inheritance-based...
+    std::deque<std::string> m_strs{};
+    int m_max;
+    int i = 0;
+
+public:
+    // TODO: m_max should be constrainted...
+    explicit logger(int max_size = 20) : m_max(max_size) {}
+
+    // Also serve as error handler; must succeed.
+    template <class... T> // TODO: clang-format setting is problematic here...
+    void log(std::format_string<const T&...> fmt, const T&... args) noexcept {
+        auto now = legacy::timeT::now();
+        // TODO: the format should be refined...
+        char str[100];
+        snprintf(str, 100, "%d-%d %02d:%02d:%02d [%d] ", now.month, now.day, now.hour, now.min, now.sec, i++);
+
+        m_strs.push_back(str + std::format(fmt, args...));
+        if (m_strs.size() > m_max) {
+            m_strs.pop_front();
+        }
+    }
+
+    // TODO: layout is terrible...
+    void window(const char* id_str, bool* p_open = nullptr) {
+        if (ImGui::Begin(id_str, p_open)) {
+            int n_max = m_max;
+            ImGui::PushItemWidth(200);
+            if (ImGui::SliderInt("Max record [20,50]", &n_max, 20, 50)) {
+                m_max = n_max;
+                while (m_strs.size() > m_max) {
+                    m_strs.pop_front();
+                }
+            }
+            ImGui::PopItemWidth();
+
+            ImGui::SameLine();
+            if (ImGui::Button("Clear")) {
+                m_strs.clear();
+            }
+
+            ImGui::Separator();
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+            ImGuiListClipper clipper;
+            clipper.Begin(m_strs.size());
+            while (clipper.Step()) {
+                for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i) {
+                    ImGui::TextUnformatted(m_strs[i].c_str());
+                }
+            }
+            clipper.End();
+            ImGui::PopStyleVar();
+        }
+        ImGui::End();
+    }
+};

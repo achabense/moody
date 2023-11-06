@@ -30,27 +30,6 @@
 #error This backend requires SDL 2.0.17+ because of SDL_RenderGeometry() function
 #endif
 
-tile_filler filler(/* seed= */ 0);
-rule_runner runner({.width = 320, .height = 240});
-rule_recorder recorder;
-
-// TODO: how to generalize this?
-constexpr int pergen_min = 1, pergen_max = 20;
-int pergen = 1;
-
-// TODO: when is this needed?
-constexpr int start_min = 0, start_max = 1000;
-int start_from = 0;
-
-// TODO: support pace formally...
-// ~paceless, take another thread... (need locks)
-// enum pace_mode { per_frame, per_duration };
-constexpr int gap_min = 0, gap_max = 20;
-int gap_frame = 0;
-
-bool cal_rate = true;
-bool anti_flick = true; // TODO: make settable...
-
 // TODO: awful... need to be avoided...
 template <class Enum> auto* underlying_address(Enum& ptr) {
     return reinterpret_cast<std::underlying_type_t<Enum>*>(std::addressof(ptr));
@@ -59,7 +38,7 @@ template <class Enum> auto* underlying_address(Enum& ptr) {
 // TODO: clumsy...
 // TODO: how to get renderer from backend?
 // TODO: should be a class...
-legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& icons) {
+legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& icons, rule_recorder& recorder) {
     // TODO: better visual; use editor::member instead...
 
     assert(show);
@@ -71,9 +50,9 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
     }
 
     // TODO: are these info useful?
-    ImGui::Text("Spatial_symmtric:%d\tState_symmetric:%d\nABS_agnostic:%d\tXOR_agnostic:%d",
-                legacy::spatial_symmetric(old_rule), legacy::state_symmetric(old_rule),
-                legacy::center_agnostic_abs(old_rule), legacy::center_agnostic_xor(old_rule));
+    // ImGui::Text("Spatial_symmtric:%d\tState_symmetric:%d\nABS_agnostic:%d\tXOR_agnostic:%d",
+    //             legacy::spatial_symmetric(old_rule), legacy::state_symmetric(old_rule),
+    //             legacy::center_agnostic_abs(old_rule), legacy::center_agnostic_xor(old_rule));
 
     auto rule_str = to_MAP_str(old_rule); // how to reuse the resource?
     ImGui::TextUnformatted("Rule str:");
@@ -167,7 +146,7 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
                 }
             }
             // TODO: too obscure: rely on vec's first val being the same rule and replace set to it...
-            recorder.replace(vec); // TODO: ideally shouldn't involve globaL recorder...
+            recorder.replace(vec); // TODO: awkward...
         }
 
         // TODO:ImGuiStyleVar_ItemSpacing vs FramePadding???
@@ -199,6 +178,7 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
                 ImGui::PopStyleColor();
                 ImGui::EndDisabled();
             }
+            // TODO: ImGuiStyleVar_ItemSpacing ~ ImVec2(4, 4) is too tight when !inconsistent
             if (ImGui::BeginItemTooltip()) {
                 int x = 0;
                 for (int code : groups[j]) {
@@ -207,6 +187,7 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
                     }
 
                     // for bordercol...
+                    // TODO: use the same bordercol as button's?
                     ImGui::Image(icons.texture(), ImVec2(3 * zoom, 3 * zoom), ImVec2(0, code * (1.0f / 512)),
                                  ImVec2(1, (code + 1) * (1.0f / 512)), ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
                     if (scans[j] == legacy::scanT::inconsistent) {
@@ -229,6 +210,28 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
     return to_rule(rule, interp);
 }
 
+// TODO: logger is very low-level thing. should not define "logs" here; and should be renamed...
+logger logs;
+
+tile_filler filler(/* seed= */ 0);
+rule_runner runner({.width = 320, .height = 240});
+rule_recorder recorder;
+
+// TODO: how to generalize this?
+constexpr int pergen_min = 1, pergen_max = 20;
+int pergen = 1;
+
+constexpr int start_min = 0, start_max = 1000;
+int start_from = 0;
+
+// TODO: support pace formally...
+// ~paceless, take another thread... (need locks)
+// enum pace_mode { per_frame, per_duration };
+constexpr int gap_min = 0, gap_max = 20;
+int gap_frame = 0;
+
+bool anti_flick = true; // TODO: make settable...
+
 // TODO: should enable guide-mode (with a switch...)
 // TODO: imgui_widgets_extension; see TextDisabled for details...
 // TODO: changes upon the same rule should be grouped together... how? (editor++)...
@@ -236,6 +239,8 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
 // TODO: how to capture certain patterns? (editor++)...
 
 int main(int argc, char** argv) {
+    logs.log("Entered main");
+
     // TODO: should be able to "open" a rulelist file...
     // legacy::convert_all_files();
 
@@ -266,7 +271,7 @@ int main(int argc, char** argv) {
     // init:
     runner.m_filler = &filler;
     recorder.m_runner = &runner;
-    // TODO: is this correct design?
+    // TODO: is this correct design? NO...
 
     // TODO: is this acceptable?
     // recorder.take(maker.make());
@@ -285,6 +290,7 @@ int main(int argc, char** argv) {
     bool paused = false;
     bool show_rule_editor = true;
     bool show_demo_window = false; // TODO: remove this in the future...
+    bool show_log_window = true;
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -350,6 +356,7 @@ int main(int argc, char** argv) {
             }
             if (ImGui::BeginPopupModal("Open file##0123", NULL, ImGuiWindowFlags_::ImGuiWindowFlags_AlwaysAutoResize)) {
                 static char buf[100]{}; // TODO: static? init contents?
+                ImGui::SetKeyboardFocusHere();
                 if (ImGui::InputTextWithHint("##1223", "File-path", buf, 100, ImGuiInputTextFlags_EnterReturnsTrue)) {
                     recorder.replace(read_rule_from_file(buf));
                     buf[0] = '\0';
@@ -364,6 +371,9 @@ int main(int argc, char** argv) {
         if (show_demo_window) {
             ImGui::ShowDemoWindow(&show_demo_window);
         }
+        if (show_log_window) {
+            logs.window("Events", &show_log_window);
+        }
 
         if (ImGui::Begin("-v-", nullptr,
                          ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse |
@@ -371,6 +381,9 @@ int main(int argc, char** argv) {
             ImGui::Checkbox("Rule editor", &show_rule_editor);
             ImGui::SameLine();
             ImGui::Checkbox("Demo window", &show_demo_window);
+            ImGui::SameLine();
+            ImGui::Checkbox("Log window", &show_log_window);
+
             ImGui::Text("(%.1f FPS) Frame:%d\n", io.Framerate, ImGui::GetFrameCount());
             ImGui::Separator();
 
@@ -422,6 +435,10 @@ int main(int argc, char** argv) {
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_::ImGuiMouseButton_Right)) {
                         // TODO: add a log window for operations like this.
                         ImGui::SetClipboardText(to_MAP_str(runner.rule()).c_str());
+                        logs.log("Copied rule with hash {}",
+                                 0xffff & (std::hash<std::string>{}(to_MAP_str(runner.rule()))));
+                        // TODO: should refine msg.
+                        // TODO: should be shared with editor's.
                     }
                     ImGui::TextUnformatted("Ctrl+Lclick to paste from clipboard:");
                     if (io.KeyCtrl) {
@@ -440,6 +457,7 @@ int main(int argc, char** argv) {
                         // TODO: redesign copy/paste... especially lclick-paste is problematic...
                         if (ImGui::IsMouseClicked(ImGuiMouseButton_::ImGuiMouseButton_Left) && !found_str.empty()) {
                             recorder.take(legacy::from_MAP_str(found_str));
+                            logs.log("Pasted rule with hash {}", 0xffff & (std::hash<std::string>{}(found_str)));
                         }
                     }
 
@@ -536,7 +554,7 @@ int main(int argc, char** argv) {
         // TODO: probably shouldn't be here, but have to temporarily to avoid gen starting from 0 even if start_from is
         // setted, as `take` resets the gen too eagerly...
         if (show_rule_editor) {
-            auto edited = edit_rule(show_rule_editor, runner.rule(), icons);
+            auto edited = edit_rule(show_rule_editor, runner.rule(), icons, recorder);
             if (edited != runner.rule()) {
                 recorder.take(edited); // TODO: rule resetting should always be outside of rendering...
             }
@@ -584,26 +602,72 @@ int main(int argc, char** argv) {
     return 0;
 }
 
-// TODO: or instead, adding
-// TODO: interop with partition...
-struct ruleT_constraints {
-    enum state : char { _0, _1, _u };
-    std::array<state, 512> data;
+namespace legacy {
+    // TODO: interop with partition...
+    // TODO: rename...
+    // Doesn't allow flip mode.
+    struct ruleT_constraints {
+        // TODO: it's easy to define an invalid state, but how to adapt with partition?
+        enum state : char { _0, _1, unknown };
+        std::array<state, 512> data;
+        // known-count???
 
-    void set(int code, bool s) {
-        // TODO: what if cannot ?
-        data[code] = state{s};
+        ruleT_constraints() {
+            reset();
+        }
+
+        void set(int code, bool s) {
+            // TODO: explain decision against invalid situ
+            if (data[code] == unknown) {
+                data[code] = state{s};
+            }
+        }
+
+        void reset() {
+            data.fill(unknown);
+        }
+
+        auto bind(const legacy::ruleT& rule) {
+            // TODO: is this const?
+            return [this, rule](int code) /*const*/ {
+                set(code, rule[code]);
+                return rule[code];
+            };
+        }
+    };
+
+    // TODO: how to consume???
+} // namespace legacy
+
+////////////////////////////////////////////////////////////////////////////////
+// TODO: whether to accept <imgui.h> as base header?
+
+namespace legacy {
+    void run_and_swap(tileT& major, tileT& helper, const ruleT& rule) {
+        assert(&major != &helper);
+        major.gather().apply(rule, helper);
+        major.swap(helper);
     }
 
-    void reset() {
-        data.fill(_u);
+    void shift_xy(tileT& major, tileT& helper, int dx, int dy) {
+        const int width = major.width(), height = major.height();
+
+        dx = ((-dx % width) + width) % width;
+        dy = ((-dy % height) + height) % height;
+        if (dx == 0 && dy == 0) {
+            return;
+        }
+
+        helper.resize(major.size());
+        for (int y = 0; y < height; ++y) {
+            bool* source = major.line((y + dy) % height);
+            bool* dest = major.line(y);
+            std::copy_n(source, width, dest);
+            std::rotate(dest, dest + dx, dest + width);
+        }
+        major.swap(helper);
     }
 
-    auto bind(const legacy::ruleT& rule) {
-        // TODO: is this const?
-        return [this, rule](int code) {
-            set(code, rule[code]);
-            return rule[code];
-        };
-    }
-};
+} // namespace legacy
+
+////////////////////////////////////////////////////////////////////////////////
