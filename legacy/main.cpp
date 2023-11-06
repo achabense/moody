@@ -38,72 +38,67 @@ template <class Enum> auto* underlying_address(Enum& ptr) {
 // TODO: clumsy...
 // TODO: how to get renderer from backend?
 // TODO: should be a class...
-legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& icons, rule_recorder& recorder) {
-    // TODO: better visual; use editor::member instead...
-
+legacy::ruleT edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule_recorder& recorder) {
     assert(show);
     if (!ImGui::Begin("Rule editor", &show,
                       ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse |
                           ImGuiWindowFlags_::ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::End();
-        return old_rule;
+        return to_edit;
     }
 
     // TODO: are these info useful?
     // ImGui::Text("Spatial_symmtric:%d\tState_symmetric:%d\nABS_agnostic:%d\tXOR_agnostic:%d",
-    //             legacy::spatial_symmetric(old_rule), legacy::state_symmetric(old_rule),
-    //             legacy::center_agnostic_abs(old_rule), legacy::center_agnostic_xor(old_rule));
+    //             legacy::spatial_symmetric(to_edit), legacy::state_symmetric(to_edit),
+    //             legacy::center_agnostic_abs(to_edit), legacy::center_agnostic_xor(to_edit));
 
-    auto rule_str = to_MAP_str(old_rule); // how to reuse the resource?
-    ImGui::TextUnformatted("Rule str:");
-    // ImGui::PushTextWrapPos(ImGui::GetFontSize() * 26); // TODO: "fontsize" is height
-    // ImGui::TextUnformatted(rule_str.c_str());
-    // ImGui::PopTextWrapPos();
-    ImGui::TextWrapped(rule_str.c_str());
+    ImGui::SeparatorText("Rule str");
+    {
+        auto rule_str = to_MAP_str(to_edit);
+        ImGui::TextWrapped(rule_str.c_str());
 
-    if (ImGui::Button("Copy to clipboard")) {
-        ImGui::SetClipboardText(rule_str.c_str());
+        if (ImGui::Button("Copy to clipboard")) {
+            ImGui::SetClipboardText(rule_str.c_str());
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Save to file")) {
+            legacy::record_rule(to_edit); // TODO: wasteful...
+        }
     }
-    ImGui::SameLine();
-    if (ImGui::Button("Save to file")) {
-        legacy::record_rule(old_rule); // TODO: expreimental... use rule_str instead?
-    }
-
-    ImGui::SeparatorText("???");
 
     static legacy::partition::basic_specification base = {};
-    ImGui::Combo("##MainMode", underlying_address(base), legacy::partition::basic_specification_names,
-                 std::size(legacy::partition::basic_specification_names));
-
     static legacy::partition::extra_specification extr = {};
-
-    // TODO: use extra_specification_names...
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted("Extr");
-    ImGui::SameLine();
-    ImGui::RadioButton("basic", underlying_address(extr), legacy::partition::extra_specification::none);
-    ImGui::SameLine();
-    ImGui::RadioButton("paired", underlying_address(extr), legacy::partition::paired);
-    ImGui::SameLine();
-    // TODO: explain...
-    ImGui::RadioButton("state", underlying_address(extr), legacy::partition::state);
-
-    // TODO: same as that in main. combine.
     static legacy::interpret_mode interp = {};
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted("Interp"); // TODO: suitable name...
-    ImGui::SameLine();
-    ImGui::RadioButton("ABS", underlying_address(interp), legacy::ABS);
-    ImGui::SameLine();
-    ImGui::RadioButton("XOR", underlying_address(interp), legacy::XOR);
 
-    legacy::ruleT_data rule = legacy::from_rule(old_rule, interp);
-
+    ImGui::SeparatorText("Settings");
     {
-        static std::mt19937_64 rand(time(0));
+        ImGui::Combo("##MainMode", underlying_address(base), legacy::partition::basic_specification_names,
+                     std::size(legacy::partition::basic_specification_names));
 
-        const int k = legacy::partition::get_partition(base, extr).k();
+        // TODO: use extra_specification_names...
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted("Extr");
+        ImGui::SameLine();
+        ImGui::RadioButton("basic", underlying_address(extr), legacy::partition::extra_specification::none);
+        ImGui::SameLine();
+        ImGui::RadioButton("paired", underlying_address(extr), legacy::partition::paired);
+        ImGui::SameLine();
+        // TODO: explain...
+        ImGui::RadioButton("state", underlying_address(extr), legacy::partition::state);
 
+        // TODO: same as that in main. combine.
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted("Interp"); // TODO: suitable name...
+        ImGui::SameLine();
+        ImGui::RadioButton("ABS", underlying_address(interp), legacy::ABS);
+        ImGui::SameLine();
+        ImGui::RadioButton("XOR", underlying_address(interp), legacy::XOR);
+    }
+
+    const auto& part = legacy::partition::get_partition(base, extr);
+    const int k = part.k();
+    legacy::ruleT_data rule = legacy::from_rule(to_edit, interp);
+    {
         // TODO: rden is for stability against base/extr change, but is too dirty...
         // AND NOT PRECISE...
         static double rden = 0.3;
@@ -115,6 +110,7 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
 
         ImGui::SameLine();
         if (ImGui::Button("Randomize")) {
+            static std::mt19937_64 rand(time(0));
             legacy::ruleT_data grule{};
             random_fill(grule.data(), grule.data() + k, rcount, rand);
             rule = legacy::partition::get_partition(base, extr).dispatch_from(grule);
@@ -122,13 +118,10 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
         rden = (double)rcount / k;
     }
 
-    // TODO: should be foldable...
-    ImGui::SeparatorText("Details");
+    // TODO: should be foldable; should be able to set max height...
+    ImGui::SeparatorText("Rule details");
     {
-        const auto& part = legacy::partition::get_partition(base, extr);
         const auto& groups = part.groups();
-
-        const int k = part.k();
         auto scans = part.scan(rule);
 
         // TODO: expreimental; not suitable place... should be totally redesigned...
@@ -149,36 +142,55 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
             recorder.replace(vec); // TODO: awkward...
         }
 
-        // TODO:ImGuiStyleVar_ItemSpacing vs FramePadding???
         ImGui::PushStyleVar(ImGuiStyleVar_::ImGuiStyleVar_ItemSpacing, ImVec2(4, 4));
-        // TODO: foldable; maxheight
         for (int j = 0; j < k; ++j) {
-            if (j % 9 != 0) {
+            if (j % 8 != 0) {
                 ImGui::SameLine();
             }
 
-            // TODO: should be able to resolve conflicts...
-            if (scans[j] == legacy::scanT::inconsistent) {
-                ImGui::BeginDisabled();
-                // TODO: better visual...
-                ImGui::PushStyleColor(ImGuiCol_::ImGuiCol_Button, ImVec4(0.8, 0, 0, 1));
+            const bool inconsistent = scans[j] == legacy::scanT::inconsistent;
+
+            if (inconsistent) {
+                // TODO: document this behavior... (keyctrl->resolve conflicts)
+                if (!ImGui::GetIO().KeyCtrl) {
+                    ImGui::BeginDisabled();
+                }
+                // TODO: this looks super dumb...
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6, 0, 0, 1));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8, 0, 0, 1));
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.9, 0, 0, 1));
             }
-            ImGui::PushID(j);
-            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
-            constexpr int zoom = 7; // TODO: 6? 8?
-            if (ImGui::ImageButton(icons.texture(), ImVec2(3 * zoom, 3 * zoom), ImVec2(0, groups[j][0] * (1.0f / 512)),
-                                   ImVec2(1, (groups[j][0] + 1) * (1.0f / 512)))) {
-                for (auto code : groups[j]) {
-                    rule[code] = !rule[code];
+
+            const ImVec2 icon_size(3 * 7, 3 * 7); // zoom = 7.
+            {
+                ImGui::PushID(j);
+                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
+                if (ImGui::ImageButton(icons.texture(), icon_size, ImVec2(0, groups[j][0] * (1.0f / 512)),
+                                       ImVec2(1, (groups[j][0] + 1) * (1.0f / 512)))) {
+                    // TODO: simplify logic...
+                    if (inconsistent) {
+                        bool b = !rule[groups[j][0]];
+                        for (int code : groups[j]) {
+                            rule[code] = b;
+                        }
+                        scans[j] = b ? legacy::scanT::all_1 : legacy::scanT::all_0;
+                    } else {
+                        for (int code : groups[j]) {
+                            rule[code] = !rule[code];
+                        }
+                    }
+                }
+                ImGui::PopStyleVar();
+                ImGui::PopID();
+            }
+
+            if (inconsistent) {
+                ImGui::PopStyleColor(3);
+                if (!ImGui::GetIO().KeyCtrl) {
+                    ImGui::EndDisabled();
                 }
             }
-            ImGui::PopStyleVar();
-            ImGui::PopID();
-            if (scans[j] == legacy::scanT::inconsistent) {
-                ImGui::PopStyleColor();
-                ImGui::EndDisabled();
-            }
-            // TODO: ImGuiStyleVar_ItemSpacing ~ ImVec2(4, 4) is too tight when !inconsistent
+
             if (ImGui::BeginItemTooltip()) {
                 int x = 0;
                 for (int code : groups[j]) {
@@ -186,21 +198,19 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& old_rule, code_image& i
                         ImGui::SameLine();
                     }
 
-                    // for bordercol...
                     // TODO: use the same bordercol as button's?
-                    ImGui::Image(icons.texture(), ImVec2(3 * zoom, 3 * zoom), ImVec2(0, code * (1.0f / 512)),
+                    ImGui::Image(icons.texture(), icon_size, ImVec2(0, code * (1.0f / 512)),
                                  ImVec2(1, (code + 1) * (1.0f / 512)), ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
-                    if (scans[j] == legacy::scanT::inconsistent) {
-                        ImGui::SameLine();
-                        ImGui::AlignTextToFramePadding();
-                        ImGui::TextUnformatted(rule[code] ? ":1" : ":0");
-                    }
+                    ImGui::SameLine();
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::TextUnformatted(rule[code] ? ":1" : ":0");
                 }
                 ImGui::EndTooltip();
             }
+
             ImGui::SameLine();
             ImGui::AlignTextToFramePadding();
-            static const char* strs[]{":x", ":0", ":1"};
+            static const char* const strs[]{":x", ":0", ":1"};
             ImGui::TextUnformatted(strs[scans[j]]);
         }
         ImGui::PopStyleVar();
@@ -392,22 +402,18 @@ int main(int argc, char** argv) {
                         float(runner.tile().count()) / runner.tile().area());
             {
                 const ImVec2 pos = ImGui::GetCursorScreenPos();
-
-                const float img_zoom = 1; // TODO: *2 is too big with (320*240)
-                const ImVec2 img_size = ImVec2(img.width() * img_zoom, img.height() * img_zoom);
+                const ImVec2 img_size = ImVec2(img.width(), img.height()); // TODO: support zooming?
 
                 ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
                 ImGui::ImageButton(img.texture(), img_size);
                 ImGui::PopStyleVar();
 
+                // I did a trick here. ImageButton didn't draw eagerly, so it's safe to update the texture after
+                // ImageButton(). This is used to provide stable view against dragging.
+                // TODO: is this correct?
                 if (ImGui::IsItemHovered() && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
-                    // TODO: will not work properly when img_zoom!=1...
                     runner.shift_xy(io.MouseDelta.x, io.MouseDelta.y);
                 }
-
-                // I did a trick here. ImageButton didn't draw eagerly, so it's safe to update the texture later (here).
-                // This is used to provide stable view against dragging.
-                // TODO: is this correct?
                 img.update(runner.tile());
 
                 if (ImGui::BeginItemTooltip()) {
@@ -416,24 +422,16 @@ int main(int argc, char** argv) {
                     const float region_sz = 32.0f;
                     float region_x = io.MousePos.x - pos.x - region_sz * 0.5f;
                     float region_y = io.MousePos.y - pos.y - region_sz * 0.5f;
+                    region_x = std::clamp(region_x, 0.0f, img_size.x - region_sz);
+                    region_y = std::clamp(region_y, 0.0f, img_size.y - region_sz);
+
+                    const ImVec2 uv0 = ImVec2((region_x) / img_size.x, (region_y) / img_size.y);
+                    const ImVec2 uv1 = ImVec2((region_x + region_sz) / img_size.x, (region_y + region_sz) / img_size.y);
                     const float zoom = 4.0f; // TODO: should be settable?
-                    if (region_x < 0.0f) {
-                        region_x = 0.0f;
-                    } else if (region_x > img_size.x - region_sz) {
-                        region_x = img_size.x - region_sz;
-                    }
-                    if (region_y < 0.0f) {
-                        region_y = 0.0f;
-                    } else if (region_y > img_size.y - region_sz) {
-                        region_y = img_size.y - region_sz;
-                    }
-                    ImVec2 uv0 = ImVec2((region_x) / img_size.x, (region_y) / img_size.y);
-                    ImVec2 uv1 = ImVec2((region_x + region_sz) / img_size.x, (region_y + region_sz) / img_size.y);
                     ImGui::Image(img.texture(), ImVec2(region_sz * zoom, region_sz * zoom), uv0, uv1);
 
                     ImGui::TextUnformatted("Rclick to copy to clipboard.");
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_::ImGuiMouseButton_Right)) {
-                        // TODO: add a log window for operations like this.
                         ImGui::SetClipboardText(to_MAP_str(runner.rule()).c_str());
                         logs.log("Copied rule with hash {}",
                                  0xffff & (std::hash<std::string>{}(to_MAP_str(runner.rule()))));
