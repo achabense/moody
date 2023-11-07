@@ -209,9 +209,6 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& ic
     return to_rule(rule, interp);
 }
 
-// TODO: logger is very low-level thing. should not define "logs" here; and should be renamed...
-logger logs;
-
 tile_filler filler(/* seed= */ 0);
 rule_runner runner({.width = 320, .height = 240});
 rule_recorder recorder;
@@ -234,7 +231,7 @@ bool anti_flick = true; // TODO: make settable...
 // TODO: how to capture certain patterns? (editor++)...
 
 int main(int argc, char** argv) {
-    logs.log("Entered main");
+    logger::log("Entered main");
 
     // TODO: what's the effect in "/SUBSYSTEM:WINDOWS" release mode?
     // puts("This will be shown only in debug mode");
@@ -262,13 +259,12 @@ int main(int argc, char** argv) {
 
     // init:
     // TODO: must be non-empty; "init" method...
-    recorder.take(legacy::game_of_life()); // first rule...
+    // recorder.take(legacy::game_of_life()); // first rule -> ctor
     if (argc == 2) {
         // TODO: add err logger
         recorder.replace(read_rule_from_file(argv[1]));
     }
 
-    assert(!recorder.empty());
     runner.set_rule(recorder.current());
     runner.restart(filler);
 
@@ -367,7 +363,7 @@ int main(int argc, char** argv) {
             ImGui::ShowDemoWindow(&show_demo_window);
         }
         if (show_log_window) {
-            logs.window("Events", &show_log_window);
+            logger::window("Events", &show_log_window);
         }
         // TODO: editor works still poorly with recorder...
         if (show_rule_editor) {
@@ -423,7 +419,7 @@ int main(int argc, char** argv) {
                     ImGui::TextUnformatted("Rclick to copy to clipboard.");
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_::ImGuiMouseButton_Right)) {
                         ImGui::SetClipboardText(to_MAP_str(runner.rule()).c_str());
-                        logs.log("Copied rule with hash {}",
+                        logger::log("Copied rule with hash {}",
                                  0xffff & (std::hash<std::string>{}(to_MAP_str(runner.rule()))));
                         // TODO: should refine msg.
                         // TODO: should be shared with editor's.
@@ -445,7 +441,7 @@ int main(int argc, char** argv) {
                         // TODO: redesign copy/paste... especially lclick-paste is problematic...
                         if (ImGui::IsMouseClicked(ImGuiMouseButton_::ImGuiMouseButton_Left) && !found_str.empty()) {
                             recorder.take(legacy::from_MAP_str(found_str));
-                            logs.log("Pasted rule with hash {}", 0xffff & (std::hash<std::string>{}(found_str)));
+                            logger::log("Pasted rule with hash {}", 0xffff & (std::hash<std::string>{}(found_str)));
                         }
                     }
 

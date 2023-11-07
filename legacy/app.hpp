@@ -84,6 +84,8 @@ class rule_runner {
     }
 
 public:
+    explicit rule_runner(legacy::rectT size) : m_tile(size), m_side(size) {}
+
     const legacy::ruleT& rule() const {
         return m_rule;
     }
@@ -124,50 +126,44 @@ public:
         init_shift_y += dy; // TODO: wrap eagerly...
         do_shift_xy(dx, dy);
     }
-
-    explicit rule_runner(legacy::rectT size) : m_tile(size), m_side(size) {}
 };
 
-// TODO: how to suitably deal with empty state?????
-// TODO: support file...
-// TODO: more obvious ways to record important rules...
+// Never empty.
 class rule_recorder {
     std::vector<legacy::compressT> m_record;
-    // std::unordered_map<legacy::compress, int> m_map;
-
-    int m_pos = -1; // always<=size()-1.// TODO: how to make m_pos always valid?
+    int m_pos;
 
 public:
-    bool empty() const {
-        return m_record.empty();
+    rule_recorder() {
+        m_record.emplace_back(legacy::game_of_life());
+        m_pos = 0;
     }
 
     int size() const {
         return m_record.size();
     }
 
+    // [0, size() - 1]
     int pos() const {
         return m_pos;
     }
 
     // TODO: look for better names...
-    // TODO: reconsider what should be done when already exists...
-    // TODO: next/prev work still poorly with generator, editor etc...
+    // TODO: reconsider what should be done when already exists in the whole vec...
+    // TODO: next/prev work still poorly with editor...
     void take(const legacy::ruleT& rule) {
         legacy::compressT cmpr(rule);
-        if (m_record.empty() || cmpr != m_record[m_pos]) {
+        if (cmpr != m_record[m_pos]) {
             m_record.push_back(cmpr);
             m_pos = m_record.size() - 1;
         }
     }
 
     legacy::ruleT current() const {
-        assert(!empty());
         return legacy::ruleT(m_record[m_pos]);
     }
 
     void set_pos(int pos) {
-        assert(!empty());
         m_pos = std::clamp(pos, 0, size() - 1);
     }
 
@@ -180,12 +176,8 @@ public:
     }
 
     // TODO: reconsider m_pos logic...
-    // TODO: append looks problematic with m_pos logic...
     void append(const std::vector<legacy::compressT>& vec) {
         m_record.insert(m_record.end(), vec.begin(), vec.end());
-        if (!m_record.empty() && m_pos == -1) {
-            m_pos = 0;
-        }
     }
 
     void replace(std::vector<legacy::compressT> vec) {
@@ -246,22 +238,21 @@ std::vector<legacy::compressT> read_rule_from_file(const char* filename) {
 
 // Likely to be the only singleton...
 class logger {
-    // TODO: maybe timestamp-and-inheritance-based...
-    std::deque<std::string> m_strs{};
-    int m_max;
-    int i = 0;
+    // TODO: maybe better if data(inheritance)-based?
+    static inline std::deque<std::string> m_strs{};
 
 public:
-    // TODO: m_max should be constrainted...
-    explicit logger(int max_size = 20) : m_max(max_size) {}
+    logger() = delete;
 
     // Also serve as error handler; must succeed.
     template <class... T> // TODO: clang-format setting is problematic here...
-    void log(std::format_string<const T&...> fmt, const T&... args) noexcept {
+    static void log(std::format_string<const T&...> fmt, const T&... args) noexcept {
+        static constexpr int m_max = 40;
+        static int ith = 0;
         auto now = legacy::timeT::now();
         // TODO: the format should be refined...
         char str[100];
-        snprintf(str, 100, "%d-%d %02d:%02d:%02d [%d] ", now.month, now.day, now.hour, now.min, now.sec, i++);
+        snprintf(str, 100, "%d-%d %02d:%02d:%02d [%d] ", now.month, now.day, now.hour, now.min, now.sec, ith++);
 
         m_strs.push_back(str + std::format(fmt, args...));
         if (m_strs.size() > m_max) {
@@ -270,34 +261,41 @@ public:
     }
 
     // TODO: layout is terrible...
-    void window(const char* id_str, bool* p_open = nullptr) {
+    static void window(const char* id_str, bool* p_open = nullptr) {
         if (ImGui::Begin(id_str, p_open)) {
-            int n_max = m_max;
-            ImGui::PushItemWidth(200);
-            if (ImGui::SliderInt("Max record [20,50]", &n_max, 20, 50)) {
-                m_max = n_max;
-                while (m_strs.size() > m_max) {
-                    m_strs.pop_front();
-                }
-            }
-            ImGui::PopItemWidth();
-
-            ImGui::SameLine();
             if (ImGui::Button("Clear")) {
                 m_strs.clear();
             }
-
+            ImGui::SameLine();
+            bool to_bottom = ImGui::Button("Bottom");
             ImGui::Separator();
+
+            ImGui::BeginChild("");
+#if 1
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
             ImGuiListClipper clipper;
             clipper.Begin(m_strs.size());
+            // TODO: problematic...
             while (clipper.Step()) {
+                // TODO: safe?
                 for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i) {
                     ImGui::TextUnformatted(m_strs[i].c_str());
                 }
             }
             clipper.End();
             ImGui::PopStyleVar();
+#else
+            std::string str;
+            for (const auto& s : m_strs) {
+                str += s;
+                str += '\n';
+            }
+            ImGui::TextWrapped(str.c_str());
+#endif
+            if (to_bottom || ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) {
+                ImGui::SetScrollHereY(1.0f);
+            }
+            ImGui::EndChild();
         }
         ImGui::End();
     }
