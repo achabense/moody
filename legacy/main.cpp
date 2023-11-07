@@ -148,48 +148,37 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& ic
                 ImGui::SameLine();
             }
 
+            const ImVec2 icon_size(3 * 7, 3 * 7); // zoom = 7.
             const bool inconsistent = scans[j] == legacy::scanT::inconsistent;
 
+            ImGui::PushID(j);
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
             if (inconsistent) {
-                // TODO: document this behavior... (keyctrl->resolve conflicts)
-                if (!ImGui::GetIO().KeyCtrl) {
-                    ImGui::BeginDisabled();
-                }
                 // TODO: this looks super dumb...
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6, 0, 0, 1));
                 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8, 0, 0, 1));
                 ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.9, 0, 0, 1));
             }
-
-            const ImVec2 icon_size(3 * 7, 3 * 7); // zoom = 7.
-            {
-                ImGui::PushID(j);
-                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
                 if (ImGui::ImageButton(icons.texture(), icon_size, ImVec2(0, groups[j][0] * (1.0f / 512)),
                                        ImVec2(1, (groups[j][0] + 1) * (1.0f / 512)))) {
-                    // TODO: simplify logic...
-                    if (inconsistent) {
-                        bool b = !rule[groups[j][0]];
+                // TODO: document this behavior... (keyctrl->resolve conflicts)
+                if (ImGui::GetIO().KeyCtrl) {
+                    const bool b = !rule[groups[j][0]];
                         for (int code : groups[j]) {
                             rule[code] = b;
                         }
-                        scans[j] = b ? legacy::scanT::all_1 : legacy::scanT::all_0;
                     } else {
                         for (int code : groups[j]) {
                             rule[code] = !rule[code];
                         }
                     }
+                // TODO: TextUnformatted(strs[scans[j]]) may yield false result at this frame, but is negligible...
                 }
-                ImGui::PopStyleVar();
-                ImGui::PopID();
-            }
-
             if (inconsistent) {
                 ImGui::PopStyleColor(3);
-                if (!ImGui::GetIO().KeyCtrl) {
-                    ImGui::EndDisabled();
                 }
-            }
+            ImGui::PopStyleVar();
+            ImGui::PopID();
 
             if (ImGui::BeginItemTooltip()) {
                 int x = 0;
@@ -211,7 +200,7 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& ic
             ImGui::SameLine();
             ImGui::AlignTextToFramePadding();
             static const char* const strs[]{":x", ":0", ":1"};
-            ImGui::TextUnformatted(strs[scans[j]]);
+            ImGui::TextUnformatted(strs[scans[j]]); // TODO: is ":x" useless?
         }
         ImGui::PopStyleVar();
     }
@@ -227,16 +216,12 @@ tile_filler filler(/* seed= */ 0);
 rule_runner runner({.width = 320, .height = 240});
 rule_recorder recorder;
 
-// TODO: how to generalize this?
 constexpr int pergen_min = 1, pergen_max = 20;
 int pergen = 1;
 
 constexpr int start_min = 0, start_max = 1000;
 int start_from = 0;
 
-// TODO: support pace formally...
-// ~paceless, take another thread... (need locks)
-// enum pace_mode { per_frame, per_duration };
 constexpr int gap_min = 0, gap_max = 20;
 int gap_frame = 0;
 
@@ -250,9 +235,6 @@ bool anti_flick = true; // TODO: make settable...
 
 int main(int argc, char** argv) {
     logs.log("Entered main");
-
-    // TODO: should be able to "open" a rulelist file...
-    // legacy::convert_all_files();
 
     // TODO: what's the effect in "/SUBSYSTEM:WINDOWS" release mode?
     // puts("This will be shown only in debug mode");
