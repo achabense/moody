@@ -159,24 +159,24 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& ic
                 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8, 0, 0, 1));
                 ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.9, 0, 0, 1));
             }
-                if (ImGui::ImageButton(icons.texture(), icon_size, ImVec2(0, groups[j][0] * (1.0f / 512)),
-                                       ImVec2(1, (groups[j][0] + 1) * (1.0f / 512)))) {
+            if (ImGui::ImageButton(icons.texture(), icon_size, ImVec2(0, groups[j][0] * (1.0f / 512)),
+                                   ImVec2(1, (groups[j][0] + 1) * (1.0f / 512)))) {
                 // TODO: document this behavior... (keyctrl->resolve conflicts)
                 if (ImGui::GetIO().KeyCtrl) {
                     const bool b = !rule[groups[j][0]];
-                        for (int code : groups[j]) {
-                            rule[code] = b;
-                        }
-                    } else {
-                        for (int code : groups[j]) {
-                            rule[code] = !rule[code];
-                        }
+                    for (int code : groups[j]) {
+                        rule[code] = b;
                     }
-                // TODO: TextUnformatted(strs[scans[j]]) may yield false result at this frame, but is negligible...
+                } else {
+                    for (int code : groups[j]) {
+                        rule[code] = !rule[code];
+                    }
                 }
+                // TODO: TextUnformatted(strs[scans[j]]) may yield false result at this frame, but is negligible...
+            }
             if (inconsistent) {
                 ImGui::PopStyleColor(3);
-                }
+            }
             ImGui::PopStyleVar();
             ImGui::PopID();
 
@@ -261,19 +261,16 @@ int main(int argc, char** argv) {
     }
 
     // init:
-    runner.m_filler = &filler;
-    recorder.m_runner = &runner;
-    // TODO: is this correct design? NO...
-
-    // TODO: is this acceptable?
-    // recorder.take(maker.make());
-
     // TODO: must be non-empty; "init" method...
     recorder.take(legacy::game_of_life()); // first rule...
     if (argc == 2) {
         // TODO: add err logger
         recorder.replace(read_rule_from_file(argv[1]));
     }
+
+    assert(!recorder.empty());
+    runner.set_rule(recorder.current());
+    runner.restart(filler);
 
     // TODO: raii works terribly with C-style cleanup... can texture be destroyed after renderer?
     tile_image img(renderer, runner.tile()); // TODO: ...
@@ -329,6 +326,12 @@ int main(int argc, char** argv) {
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
+        // Frame state:
+        // TODO: applying following logic; cosider refining it.
+        // recorder is modified during display, but will synchronize with runner's before next frame.
+        assert(runner.rule() == recorder.current());
+        bool should_restart = false;
+
         {
             // TODO: experimental... TOO clumsy
             bool open_popup = false;
@@ -365,6 +368,11 @@ int main(int argc, char** argv) {
         }
         if (show_log_window) {
             logs.window("Events", &show_log_window);
+        }
+        // TODO: editor works still poorly with recorder...
+        if (show_rule_editor) {
+            auto edited = edit_rule(show_rule_editor, runner.rule(), icons, recorder);
+            recorder.take(edited);
         }
 
         if (ImGui::Begin("-v-", nullptr,
@@ -454,6 +462,8 @@ int main(int argc, char** argv) {
                 // It seems the whole recorder model is problematic...
                 ImGui::AlignTextToFramePadding(); // TODO: +1 is clumsy.
                 ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1);
+                // TODO: pos may not reflect runner's real pos, as recorder can be modified on the way... may not
+                // matters
 
                 static char go_to[20]{};
                 auto filter = [](ImGuiInputTextCallbackData* data) {
@@ -479,9 +489,9 @@ int main(int argc, char** argv) {
                 ImGui::Text("Gen:%d", runner.gen());
 
                 // TODO: this is horribly obscure...
-                if (ImGui::SliderFloat("Init density [0-1]", &runner.m_filler->density, 0.0f, 1.0f, "%.3f",
+                if (ImGui::SliderFloat("Init density [0-1]", &filler.density, 0.0f, 1.0f, "%.3f",
                                        ImGuiSliderFlags_NoInput)) {
-                    runner.restart();
+                    should_restart = true;
                 }
 
                 ImGui::Checkbox("Pause", &paused);
@@ -501,13 +511,15 @@ int main(int argc, char** argv) {
                 ImGui::PopButtonRepeat();
 
                 ImGui::SameLine();
+                // TODO: conflicts with text input. should have scope.
                 if (ImGui::Button("Restart") || ImGui::IsKeyPressed(ImGuiKey_R, false)) {
-                    runner.restart();
+                    should_restart = true;
                 }
                 ImGui::SameLine();
+                // TODO: conflicts with text input. should have scope.
                 if (ImGui::Button("Reseed") || ImGui::IsKeyPressed(ImGuiKey_S, false)) {
-                    runner.m_filler->disturb();
-                    runner.restart();
+                    filler.disturb();
+                    should_restart = true;
                 }
             }
 
@@ -519,26 +531,16 @@ int main(int argc, char** argv) {
                 ImGui::SliderInt("Start gen [0-1000]", &start_from, start_min, start_max, "%d",
                                  ImGuiSliderFlags_NoInput);
 
+                // TODO: conflicts with text input. should have scope.
                 if (ImGui::IsKeyPressed(ImGuiKey_1, true)) {
                     gap_frame = std::max(gap_min, gap_frame - 1);
                 }
-
                 if (ImGui::IsKeyPressed(ImGuiKey_2, true)) {
                     gap_frame = std::min(gap_max, gap_frame + 1);
                 }
             }
         }
         ImGui::End();
-
-        // TODO: editor works poorly with recorder...
-        // TODO: probably shouldn't be here, but have to temporarily to avoid gen starting from 0 even if start_from is
-        // setted, as `take` resets the gen too eagerly...
-        if (show_rule_editor) {
-            auto edited = edit_rule(show_rule_editor, runner.rule(), icons, recorder);
-            if (edited != runner.rule()) {
-                recorder.take(edited); // TODO: rule resetting should always be outside of rendering...
-            }
-        }
 
         // Rendering
         ImGui::Render();
@@ -549,6 +551,8 @@ int main(int argc, char** argv) {
         ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
         SDL_RenderPresent(renderer);
 
+        // Synchronize with recorder:
+        should_restart |= runner.set_rule(recorder.current()); // is || (instead of | here) app-logically safe?
         if (anti_flick) {
             if (legacy::will_flick(runner.rule()) && pergen % 2) {
                 if (pergen == 1) {
@@ -559,6 +563,9 @@ int main(int argc, char** argv) {
                 }
             }
             // TODO: (whether and) how to restore when switch to new rules?
+        }
+        if (should_restart) {
+            runner.restart(filler);
         }
         if (runner.gen() < start_from) {
             runner.run(start_from - runner.gen());

@@ -59,13 +59,6 @@ class rule_runner {
     legacy::tileT m_tile, m_side;
     int m_gen = 0;
 
-    // TODO: this turns out to be a mess...
-    friend class rule_recorder;
-    void reset_rule(const legacy::ruleT& rule) {
-        m_rule = rule;
-        restart(); // TODO: optionally start from current state...
-    }
-
     // TODO: experimental... maybe not suitable for rule_runner.
     // The logic looks very fragile... reliance is a mess...
     // TODO: recheck logic...
@@ -91,9 +84,6 @@ class rule_runner {
     }
 
 public:
-    // TODO: clarify ownership...
-    tile_filler* m_filler = nullptr; // source.
-
     const legacy::ruleT& rule() const {
         return m_rule;
     }
@@ -106,10 +96,19 @@ public:
         return m_gen;
     }
 
-    void restart() {
+    void restart(const tile_filler& filler) {
         m_gen = 0;
-        m_filler->fill(m_tile);
+        filler.fill(m_tile);
         do_shift_xy(init_shift_x, init_shift_y);
+    }
+
+    // TODO: clumspy
+    bool set_rule(const legacy::ruleT& rule) {
+        if (m_rule != rule) {
+            m_rule = rule;
+            return true;
+        }
+        return false;
     }
 
     void run(int count) {
@@ -138,20 +137,7 @@ class rule_recorder {
 
     int m_pos = -1; // always<=size()-1.// TODO: how to make m_pos always valid?
 
-    void invariants() const {
-        if (!m_record.empty()) {
-            assert(m_pos >= 0);
-        }
-        assert(m_pos >= 0 && m_pos < m_record.size());
-    }
-
 public:
-    // TODO: init_state is problematic...
-    // TODO: can this be null?
-    // TODO: nullability? ownership?
-    rule_runner* m_runner = nullptr; // notify. // TODO: shared_ptr?
-    // TODO: analyzer... (notify...)
-
     bool empty() const {
         return m_record.empty();
     }
@@ -168,22 +154,21 @@ public:
     // TODO: reconsider what should be done when already exists...
     // TODO: next/prev work still poorly with generator, editor etc...
     void take(const legacy::ruleT& rule) {
-        // TODO: requiring syntronized...
-        if (m_record.empty() || m_runner->rule() != rule) {
-            m_record.emplace_back(rule);
+        legacy::compressT cmpr(rule);
+        if (m_record.empty() || cmpr != m_record[m_pos]) {
+            m_record.push_back(cmpr);
             m_pos = m_record.size() - 1;
-            m_runner->reset_rule(rule);
         }
     }
 
-    // TODO: current...
+    legacy::ruleT current() const {
+        assert(!empty());
+        return legacy::ruleT(m_record[m_pos]);
+    }
 
     void set_pos(int pos) {
         assert(!empty());
-        pos = std::clamp(pos, 0, size() - 1);
-        if (pos != m_pos) {
-            m_runner->reset_rule(legacy::ruleT(m_record[m_pos = pos]));
-        }
+        m_pos = std::clamp(pos, 0, size() - 1);
     }
 
     void next() {
@@ -199,14 +184,14 @@ public:
     void append(const std::vector<legacy::compressT>& vec) {
         m_record.insert(m_record.end(), vec.begin(), vec.end());
         if (!m_record.empty() && m_pos == -1) {
-            m_runner->reset_rule(legacy::ruleT(m_record[m_pos = 0])); // TODO: why = 0?
+            m_pos = 0;
         }
     }
 
     void replace(std::vector<legacy::compressT> vec) {
         if (!vec.empty()) {
             m_record.swap(vec);
-            m_runner->reset_rule(legacy::ruleT(m_record[m_pos = 0]));
+            m_pos = 0;
         }
         // else???
     }
