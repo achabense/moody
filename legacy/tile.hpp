@@ -6,13 +6,14 @@
 #include "rule.hpp"
 
 namespace legacy {
+    static_assert(INT_MAX >= INT32_MAX);
+
     struct rectT {
         int width, height;
         friend bool operator==(const rectT&, const rectT&) = default;
     };
 
     // TODO: add area() for rectT?
-    // TODO: assert int is not two-byte...
     // TODO: add basic noexcept annotation?
     // TODO: when is it needed to [return] a tile?
     // TODO: explain layout... reorganize for better readibility...

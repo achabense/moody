@@ -36,6 +36,20 @@ auto* underlying_address(Enum& ptr) {
     return reinterpret_cast<std::underlying_type_t<Enum>*>(std::addressof(ptr));
 }
 
+// TODO: move into a header...
+struct [[nodiscard]] imgui_itemtooltip {
+    const bool opened; // TODO: proper name?
+    imgui_itemtooltip() : opened(ImGui::BeginItemTooltip()) {}
+    ~imgui_itemtooltip() {
+        if (opened) {
+            ImGui::EndTooltip();
+        }
+    }
+    explicit operator bool() const {
+        return opened;
+    }
+};
+
 // TODO: clumsy...
 // TODO: how to get renderer from backend?
 // TODO: should be a class...
@@ -181,7 +195,7 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& ic
             ImGui::PopStyleVar();
             ImGui::PopID();
 
-            if (ImGui::BeginItemTooltip()) {
+            if (imgui_itemtooltip tooltip; tooltip) {
                 int x = 0;
                 for (int code : groups[j]) {
                     if (x++ % 8 != 0) {
@@ -195,7 +209,6 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& ic
                     ImGui::AlignTextToFramePadding();
                     ImGui::TextUnformatted(rule[code] ? ":1" : ":0");
                 }
-                ImGui::EndTooltip();
             }
 
             ImGui::SameLine();
@@ -214,18 +227,6 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& ic
 // TODO: logic cleanup; must be raii... as exceptions can happen...
 // TODO: add input...
 // TODO: undo operation...
-
-struct [[nodiscard]] imgui_window {
-    const bool visible;
-    imgui_window(const char* name, bool* p_open = {}, ImGuiWindowFlags flags = {})
-        : visible(ImGui::Begin(name, p_open, flags)) {}
-    ~imgui_window() {
-        ImGui::End();
-    }
-    explicit operator bool() const {
-        return visible;
-    }
-};
 
 [[nodiscard]] std::optional<std::vector<legacy::compressT>> file_nav(const char* id_str, bool* p_open = nullptr) {
     using namespace std;
@@ -318,10 +319,8 @@ constexpr bool bytes_equal(const T& t, const U& u) noexcept {
     if constexpr (sizeof(t) != sizeof(u)) {
         return false;
     } else {
-        // TODO: one-liner?
-        auto lbytes = std::bit_cast<std::array<std::byte, sizeof(t)>>(t);
-        auto rbytes = std::bit_cast<std::array<std::byte, sizeof(u)>>(u);
-        return lbytes == rbytes;
+        using A = std::array<std::byte, sizeof(t)>;
+        return std::bit_cast<A>(t) == std::bit_cast<A>(u);
     }
 }
 
@@ -329,9 +328,6 @@ static_assert(bytes_equal("中文", u8"中文"));
 
 int main(int argc, char** argv) {
     logger::log("Entered main");
-
-    // TODO: what's the effect in "/SUBSYSTEM:WINDOWS" release mode?
-    // puts("This will be shown only in debug mode");
 
     // Setup SDL
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0) {
@@ -354,8 +350,24 @@ int main(int argc, char** argv) {
         return 0;
     }
 
+    // Setup Dear ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
+
+    // Setup Dear ImGui style
+    ImGui::StyleColorsDark();
+
+    // Setup Platform/Renderer backends
+    ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
+    ImGui_ImplSDLRenderer2_Init(renderer);
+
+    // Our state
+    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
     // init:
-    // TODO: must be non-empty; "init" method...
     // recorder.take(legacy::game_of_life()); // first rule -> ctor
     if (argc == 2) {
         // TODO: add err logger
@@ -373,23 +385,6 @@ int main(int argc, char** argv) {
     bool show_rule_editor = true;
     bool show_demo_window = false; // TODO: remove this in the future...
     bool show_log_window = true;
-
-    // Setup Dear ImGui context
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
-    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
-    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
-
-    // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
-
-    // Setup Platform/Renderer backends
-    ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
-    ImGui_ImplSDLRenderer2_Init(renderer);
-
-    // Our state
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     // Main loop
     bool done = false;
@@ -439,6 +434,7 @@ int main(int argc, char** argv) {
         }
         {
             // TODO: temporarily have to be here; works poorly with `recorder.take(edited);` logic...
+            // TODO: as popup instead?
             auto result = file_nav("File Nav");
             if (result) {
                 if (!result->empty()) {
@@ -450,9 +446,8 @@ int main(int argc, char** argv) {
             }
         }
 
-        if (ImGui::Begin("-v-", nullptr,
-                         ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse |
-                             ImGuiWindowFlags_::ImGuiWindowFlags_AlwaysAutoResize)) {
+        if (imgui_window window("-v-", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize);
+            window) {
             ImGui::Checkbox("Rule editor", &show_rule_editor);
             ImGui::SameLine();
             ImGui::Checkbox("Demo window", &show_demo_window);
@@ -481,7 +476,7 @@ int main(int argc, char** argv) {
                 }
                 img.update(runner.tile());
 
-                if (ImGui::BeginItemTooltip()) {
+                if (imgui_itemtooltip tooltip; tooltip) {
                     auto& io = ImGui::GetIO(); // const?
                     // TODO: rewrite logic...
                     const float region_sz = 32.0f;
@@ -529,8 +524,6 @@ int main(int argc, char** argv) {
                     } else if (io.MouseWheel > 0) { // scroll up
                         recorder.prev();
                     }
-
-                    ImGui::EndTooltip();
                 }
 
                 // TODO: again, can size()==0? NO, but how to guarantee?
@@ -615,7 +608,6 @@ int main(int argc, char** argv) {
                 }
             }
         }
-        ImGui::End();
 
         // Rendering
         ImGui::Render();
@@ -651,6 +643,8 @@ int main(int argc, char** argv) {
             }
         }
     }
+
+    // TODO: should destroy img and icons here... (depending on where they defined now)
 
     // Cleanup
     ImGui_ImplSDLRenderer2_Shutdown();

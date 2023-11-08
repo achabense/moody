@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include <unordered_map>
+
 #include "rule.hpp"
 #include "tile.hpp"
 
@@ -18,11 +20,16 @@ namespace legacy {
 
             tileT tile;
         };
+        struct posT {
+            uint32_t x, y;
+            friend bool operator==(const posT&, const posT&) = default;
+            // Using the same type as hasher for convenience:
+            size_t operator()(const posT& pos) const {
+                return std::hash<uint64_t>{}((uint64_t(pos.x) << 32) | pos.y);
+            }
+        };
 
         rectT tile_size;
-
-        tileT void_tile;
-        tileT shared;
 
         static constexpr int min_width = 20, min_height = 20;
         // TODO: max_x?
@@ -38,11 +45,36 @@ namespace legacy {
             return size;
         }
 
+        std::unordered_map<posT, space_tile, posT> m_space;
+        tileT void_tile;
+        tileT shared;
+        int m_gen;
+
         // TODO: the size should be shared...
 
         void set_background(tileT& back) const {}
 
         void load(int x, int y, tileT& tile) const {}
+
+        void run(const ruleT& rule) {
+            // Step 0: ...
+            // TODO: utilize speed of light for less frequent updates...
+            // ...
+            // Step 1: ...
+            void_tile.gather();
+            for (auto& [p, tile] : m_space) {
+                tile.tile.gather(/*...*/);
+            }
+            // Step 2: ...
+            void_tile.apply(rule, shared);
+            void_tile.swap(shared);
+            for (auto& [p, tile] : m_space) {
+                tile.tile.apply(rule, shared);
+                tile.tile.swap(shared);
+            }
+            // ...
+            ++m_gen;
+        }
     };
 
 } // namespace legacy

@@ -160,7 +160,7 @@ public:
     }
 
     legacy::ruleT current() const {
-        return legacy::ruleT(m_record[m_pos]);
+        return static_cast<legacy::ruleT>(m_record[m_pos]);
     }
 
     void set_pos(int pos) {
@@ -236,6 +236,18 @@ std::vector<legacy::compressT> read_rule_from_file(const char* filename) {
 #include "save.hpp"
 #include <imgui.h>
 
+struct [[nodiscard]] imgui_window {
+    const bool visible;
+    imgui_window(const char* name, bool* p_open = {}, ImGuiWindowFlags flags = {})
+        : visible(ImGui::Begin(name, p_open, flags)) {}
+    ~imgui_window() {
+        ImGui::End(); // Unconditional.
+    }
+    explicit operator bool() const {
+        return visible;
+    }
+};
+
 // Likely to be the only singleton...
 class logger {
     // TODO: maybe better if data(inheritance)-based?
@@ -262,7 +274,7 @@ public:
 
     // TODO: layout is terrible...
     static void window(const char* id_str, bool* p_open = nullptr) {
-        if (ImGui::Begin(id_str, p_open)) {
+        if (imgui_window window(id_str, p_open); window) {
             if (ImGui::Button("Clear")) {
                 m_strs.clear();
             }
@@ -297,6 +309,5 @@ public:
             }
             ImGui::EndChild();
         }
-        ImGui::End();
     }
 };

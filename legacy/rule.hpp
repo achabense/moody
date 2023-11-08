@@ -11,7 +11,6 @@ namespace legacy {
     using std::string;
     using std::vector;
 
-    // TOOD: reconsider using bool[3][3]?
     // clang-format off
     // The environment around "s".
     struct envT {
@@ -50,6 +49,7 @@ namespace legacy {
         return code;
     }
 
+    // TODO: rephrase...
     // Unambiguously refer to the map from env-code to the new state.
     struct ruleT {
         using data_type = array<bool, 512>;
