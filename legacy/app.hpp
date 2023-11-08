@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <deque>
 #include <format>
@@ -37,7 +37,7 @@ class tile_filler {
 public:
     explicit tile_filler(uint64_t seed) : m_rand{seed} {}
 
-    float density = 0.5; // ¡Ê [0.0f, 1.0f]
+    float density = 0.5; // âˆˆ [0.0f, 1.0f]
 
     void disturb() {
         // Enough to make totally different result:
@@ -271,7 +271,7 @@ public:
             ImGui::Separator();
 
             ImGui::BeginChild("");
-#if 1
+#if 0
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
             ImGuiListClipper clipper;
             clipper.Begin(m_strs.size());

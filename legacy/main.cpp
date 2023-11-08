@@ -1,4 +1,4 @@
-// Dear ImGui: standalone example application for SDL2 + SDL_Renderer
+﻿// Dear ImGui: standalone example application for SDL2 + SDL_Renderer
 // (SDL is a cross-platform general purpose library for handling windows, inputs, OpenGL/Vulkan/Metal graphics context
 // creation, etc.)
 
@@ -209,6 +209,85 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& ic
     return to_rule(rule, interp);
 }
 
+// TODO: is "record" a returnable type?
+// TODO: logic cleanup; must be raii... as exceptions can happen...
+// TODO: add input...
+// TODO: undo operation...
+
+struct [[nodiscard]] imgui_window {
+    const bool visible;
+    imgui_window(const char* name, bool* p_open = {}, ImGuiWindowFlags flags = {})
+        : visible(ImGui::Begin(name, p_open, flags)) {}
+    ~imgui_window() {
+        ImGui::End();
+    }
+    explicit operator bool() const {
+        return visible;
+    }
+};
+
+[[nodiscard]] std::optional<std::vector<legacy::compressT>> file_nav(const char* id_str, bool* p_open = nullptr) {
+    using namespace std;
+    using namespace std::filesystem;
+
+    // static path pos = current_path();
+    static path pos = R"(C:\*redacted*\Desktop\rulelists_new)";
+
+    optional<path> try_open = nullopt;
+
+    if (imgui_window window(id_str, p_open); window) {
+        try {
+            ImGui::TextUnformatted((const char*)pos.u8string().c_str());
+
+            ImGui::Separator();
+            // TODO: how to switch driver on windows? (enough to enable text input...)
+            if (ImGui::MenuItem("Program current path")) {
+                pos = current_path(); // TODO: what if invalid?
+            }
+            path par = pos.parent_path();
+            if (ImGui::MenuItem("..", "dir", nullptr, par != pos && is_directory(par))) {
+                pos = par;
+            }
+            ImGui::Separator();
+
+            // TODO: what if too many entries?
+            int entries = 0;
+            for (const auto& entry : directory_iterator(pos)) {
+                auto str = entry.path().filename().u8string(); // TODO: is showing filename-only a good idea?
+                // TODO: should ".txt" be needed? or should this be just be a default regex filter?
+                bool txt = entry.is_regular_file() && entry.path().extension() == ".txt";
+                bool dir = entry.is_directory();
+                if (txt || dir) {
+                    ++entries;
+                    if (ImGui::MenuItem((const char*)str.c_str(), dir ? "dir" : "")) {
+                        if (txt) {
+                            // TODO: want double click; how?
+                            try_open = entry.path();
+                        } else if (dir) {
+                            pos = entry.path();
+                            break;
+                        }
+                    }
+                }
+            }
+            if (entries == 0) {
+                // TODO: better msg...
+                ImGui::MenuItem("None##None", nullptr, nullptr, false);
+            }
+        } catch (const exception& what) {
+            logger::log("Exception: {}", what.what()); // TODO: a lot of messy fs exceptions (access, encoding)...
+            pos = pos.parent_path();                   // TODO: maybe fail again?
+        }
+    }
+
+    if (try_open) {
+        logger::log("Tried to open {}", try_open->filename().string());
+        return read_rule_from_file(try_open->string().c_str());
+    } else {
+        return nullopt;
+    }
+}
+
 tile_filler filler(/* seed= */ 0);
 rule_runner runner({.width = 320, .height = 240});
 rule_recorder recorder;
@@ -229,6 +308,21 @@ bool anti_flick = true; // TODO: make settable...
 // TODO: changes upon the same rule should be grouped together... how? (editor++)...
 // TODO: support seeding...(how to save?) some patterns are located in certain seed states...
 // TODO: how to capture certain patterns? (editor++)...
+
+// TODO: move the check elsewhere.
+// C/C++ - command line - /utf-8
+// and save file as utf8-encoding...
+template <class T, class U> constexpr bool bytes_equal(const T& t, const U& u) noexcept {
+    if constexpr (sizeof(t) != sizeof(u)) {
+        return false;
+    } else {
+        auto lbytes = std::bit_cast<std::array<std::byte, sizeof(t)>>(t);
+        auto rbytes = std::bit_cast<std::array<std::byte, sizeof(u)>>(u);
+        return lbytes == rbytes;
+    }
+}
+
+static_assert(bytes_equal("中文", u8"中文"));
 
 int main(int argc, char** argv) {
     logger::log("Entered main");
@@ -328,36 +422,6 @@ int main(int argc, char** argv) {
         assert(runner.rule() == recorder.current());
         bool should_restart = false;
 
-        {
-            // TODO: experimental... TOO clumsy
-            bool open_popup = false;
-            if (ImGui::BeginMainMenuBar()) {
-                if (ImGui::BeginMenu("Open##1234")) {
-                    // if (ImGui::MenuItem("Open##5678", "...")) {}
-                    open_popup = true;
-                    ImGui::EndMenu();
-                }
-                ImGui::EndMainMenuBar();
-            }
-            static bool prev_paused = false; // TODO: should be push/pop mode
-            if (open_popup) {
-                prev_paused = paused;
-                paused = true;
-                ImGui::OpenPopup("Open file##0123");
-            }
-            if (ImGui::BeginPopupModal("Open file##0123", NULL, ImGuiWindowFlags_::ImGuiWindowFlags_AlwaysAutoResize)) {
-                static char buf[100]{}; // TODO: static? init contents?
-                ImGui::SetKeyboardFocusHere();
-                if (ImGui::InputTextWithHint("##1223", "File-path", buf, 100, ImGuiInputTextFlags_EnterReturnsTrue)) {
-                    recorder.replace(read_rule_from_file(buf));
-                    buf[0] = '\0';
-                    paused = prev_paused;
-                    ImGui::CloseCurrentPopup();
-                }
-                ImGui::EndPopup();
-            }
-        }
-
         // TODO: remove this when suitable...
         if (show_demo_window) {
             ImGui::ShowDemoWindow(&show_demo_window);
@@ -369,6 +433,18 @@ int main(int argc, char** argv) {
         if (show_rule_editor) {
             auto edited = edit_rule(show_rule_editor, runner.rule(), icons, recorder);
             recorder.take(edited);
+        }
+        {
+            // TODO: temporarily have to be here; works poorly with `recorder.take(edited);` logic...
+            auto result = file_nav("File Nav");
+            if (result) {
+                if (!result->empty()) {
+                    logger::log("Found {} rules", result->size());
+                    recorder.replace(std::move(*result));
+                } else {
+                    logger::log("Found nothing");
+                }
+            }
         }
 
         if (ImGui::Begin("-v-", nullptr,
@@ -420,7 +496,7 @@ int main(int argc, char** argv) {
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_::ImGuiMouseButton_Right)) {
                         ImGui::SetClipboardText(to_MAP_str(runner.rule()).c_str());
                         logger::log("Copied rule with hash {}",
-                                 0xffff & (std::hash<std::string>{}(to_MAP_str(runner.rule()))));
+                                    0xffff & (std::hash<std::string>{}(to_MAP_str(runner.rule()))));
                         // TODO: should refine msg.
                         // TODO: should be shared with editor's.
                     }
