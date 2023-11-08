@@ -1,7 +1,7 @@
 #pragma once
 
-#include "rule.hpp"
 #include "partition.hpp"
+#include "rule.hpp"
 
 // TODO: rule generator and rule analyser/editor...
 namespace legacy {

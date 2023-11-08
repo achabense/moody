@@ -245,7 +245,7 @@ public:
     logger() = delete;
 
     // Also serve as error handler; must succeed.
-    template <class... T> // TODO: clang-format setting is problematic here...
+    template <class... T>
     static void log(std::format_string<const T&...> fmt, const T&... args) noexcept {
         static constexpr int m_max = 40;
         static int ith = 0;

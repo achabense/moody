@@ -31,7 +31,8 @@
 #endif
 
 // TODO: awful... need to be avoided...
-template <class Enum> auto* underlying_address(Enum& ptr) {
+template <class Enum>
+auto* underlying_address(Enum& ptr) {
     return reinterpret_cast<std::underlying_type_t<Enum>*>(std::addressof(ptr));
 }
 
@@ -312,10 +313,12 @@ bool anti_flick = true; // TODO: make settable...
 // TODO: move the check elsewhere.
 // C/C++ - command line - /utf-8
 // and save file as utf8-encoding...
-template <class T, class U> constexpr bool bytes_equal(const T& t, const U& u) noexcept {
+template <class T, class U>
+constexpr bool bytes_equal(const T& t, const U& u) noexcept {
     if constexpr (sizeof(t) != sizeof(u)) {
         return false;
     } else {
+        // TODO: one-liner?
         auto lbytes = std::bit_cast<std::array<std::byte, sizeof(t)>>(t);
         auto rbytes = std::bit_cast<std::array<std::byte, sizeof(u)>>(u);
         return lbytes == rbytes;
