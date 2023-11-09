@@ -11,13 +11,10 @@
 
 // TODO: partial rule (e.g. collect from tile; the rest is generated from another generator...)
 // TODO: allow resizing the grid.
-// TODO: rule editor... (based on mini-window, click the pixel to set...)..
-// TODO: where to add gol?
 // TODO: (important) small window...
 
 // TODO: notify on quit...
-// TODO!!!!!support more run-mode...
-// TODO: some settings should leave states in paused state...
+// TODO: support more run-mode...
 // TODO: right click to enable/disable miniwindow...
 // TODO: file container. easy ways to add fav...
 
@@ -291,7 +288,7 @@ public:
             bool to_bottom = ImGui::Button("Bottom");
             ImGui::Separator();
 
-            ImGui::BeginChild("");
+            ImGui::BeginChild("Child");
 #if 0
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
             ImGuiListClipper clipper;

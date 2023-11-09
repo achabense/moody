@@ -150,6 +150,17 @@ namespace legacy {
 
         friend bool operator<(const compressT& l, const compressT& r) = default;
 
-        // TODO: hashing...
+        size_t hash() const {
+            // ~ not ub.
+            const char* data = reinterpret_cast<const char*>(bits.data());
+            return std::hash<std::string_view>{}(std::string_view(data, 64));
+        }
     };
 } // namespace legacy
+
+template <>
+struct std::hash<legacy::compressT> {
+    size_t operator()(const legacy::compressT& cmpr) const {
+        return cmpr.hash();
+    }
+};

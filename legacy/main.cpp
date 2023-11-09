@@ -54,174 +54,175 @@ struct [[nodiscard]] imgui_itemtooltip {
 // TODO: clumsy...
 // TODO: how to get renderer from backend?
 // TODO: should be a class...
-legacy::ruleT edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule_recorder& recorder) {
-    assert(show);
-    if (!ImGui::Begin("Rule editor", &show,
-                      ImGuiWindowFlags_::ImGuiWindowFlags_NoCollapse |
-                          ImGuiWindowFlags_::ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::End();
-        return to_edit;
-    }
+void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule_recorder& recorder) {
+    if (imgui_window window("Rule editor", &show, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize);
+        window) {
+        // TODO: are these info useful?
+        // ImGui::Text("Spatial_symmtric:%d\tState_symmetric:%d\nABS_agnostic:%d\tXOR_agnostic:%d",
+        //             legacy::spatial_symmetric(to_edit), legacy::state_symmetric(to_edit),
+        //             legacy::center_agnostic_abs(to_edit), legacy::center_agnostic_xor(to_edit));
 
-    // TODO: are these info useful?
-    // ImGui::Text("Spatial_symmtric:%d\tState_symmetric:%d\nABS_agnostic:%d\tXOR_agnostic:%d",
-    //             legacy::spatial_symmetric(to_edit), legacy::state_symmetric(to_edit),
-    //             legacy::center_agnostic_abs(to_edit), legacy::center_agnostic_xor(to_edit));
+        ImGui::SeparatorText("Rule str");
+        {
+            auto rule_str = to_MAP_str(to_edit);
+            ImGui::TextWrapped(rule_str.c_str());
 
-    ImGui::SeparatorText("Rule str");
-    {
-        auto rule_str = to_MAP_str(to_edit);
-        ImGui::TextWrapped(rule_str.c_str());
-
-        if (ImGui::Button("Copy to clipboard")) {
-            ImGui::SetClipboardText(rule_str.c_str());
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Save to file")) {
-            legacy::record_rule(to_edit); // TODO: wasteful...
-        }
-    }
-
-    static legacy::partition::basic_specification base = {};
-    static legacy::partition::extra_specification extr = {};
-    static legacy::interpret_mode interp = {};
-
-    ImGui::SeparatorText("Settings");
-    {
-        ImGui::Combo("##MainMode", underlying_address(base), legacy::partition::basic_specification_names,
-                     std::size(legacy::partition::basic_specification_names));
-
-        // TODO: use extra_specification_names...
-        ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted("Extr");
-        ImGui::SameLine();
-        ImGui::RadioButton("basic", underlying_address(extr), legacy::partition::extra_specification::none);
-        ImGui::SameLine();
-        ImGui::RadioButton("paired", underlying_address(extr), legacy::partition::paired);
-        ImGui::SameLine();
-        // TODO: explain...
-        ImGui::RadioButton("state", underlying_address(extr), legacy::partition::state);
-
-        // TODO: same as that in main. combine.
-        ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted("Interp"); // TODO: suitable name...
-        ImGui::SameLine();
-        ImGui::RadioButton("ABS", underlying_address(interp), legacy::ABS);
-        ImGui::SameLine();
-        ImGui::RadioButton("XOR", underlying_address(interp), legacy::XOR);
-    }
-
-    const auto& part = legacy::partition::get_partition(base, extr);
-    const int k = part.k();
-    legacy::ruleT_data rule = legacy::from_rule(to_edit, interp);
-    {
-        // TODO: rden is for stability against base/extr change, but is too dirty...
-        // AND NOT PRECISE...
-        static double rden = 0.3;
-        static int rcount = rden * k;
-        rcount = rden * k;
-
-        ImGui::Text("Groups: %d", k);
-        ImGui::SliderInt("##Active", &rcount, 0, k, "%d", ImGuiSliderFlags_NoInput);
-
-        ImGui::SameLine();
-        if (ImGui::Button("Randomize")) {
-            static std::mt19937_64 rand(time(0));
-            legacy::ruleT_data grule{};
-            random_fill(grule.data(), grule.data() + k, rcount, rand);
-            rule = legacy::partition::get_partition(base, extr).dispatch_from(grule);
-        }
-        rden = (double)rcount / k;
-    }
-
-    // TODO: should be foldable; should be able to set max height...
-    ImGui::SeparatorText("Rule details");
-    {
-        const auto& groups = part.groups();
-        auto scans = part.scan(rule);
-
-        // TODO: expreimental; not suitable place... should be totally redesigned...
-        if (ImGui::Button("....")) {
-            std::vector<legacy::compressT> vec;
-            vec.emplace_back(legacy::to_rule(rule, interp));
-            for (int j = 0; j < k; ++j) {
-                // TODO: whether to flip inconsistent units?
-                if (scans[j] != legacy::scanT::inconsistent) {
-                    legacy::ruleT_data rule_j = rule;
-                    for (int code : groups[j]) {
-                        rule_j[code] = !rule_j[code];
-                    }
-                    vec.emplace_back(legacy::to_rule(rule_j, interp));
-                }
+            if (ImGui::Button("Copy to clipboard")) {
+                ImGui::SetClipboardText(rule_str.c_str());
             }
-            // TODO: too obscure: rely on vec's first val being the same rule and replace set to it...
-            recorder.replace(vec); // TODO: awkward...
+            ImGui::SameLine();
+            if (ImGui::Button("Save to file")) {
+                legacy::record_rule(to_edit); // TODO: wasteful...
+            }
         }
 
-        ImGui::PushStyleVar(ImGuiStyleVar_::ImGuiStyleVar_ItemSpacing, ImVec2(4, 4));
-        for (int j = 0; j < k; ++j) {
-            if (j % 8 != 0) {
-                ImGui::SameLine();
-            }
+        static legacy::partition::basic_specification base = {};
+        static legacy::partition::extra_specification extr = {};
+        static legacy::interpret_mode interp = {};
 
-            const ImVec2 icon_size(3 * 7, 3 * 7); // zoom = 7.
-            const bool inconsistent = scans[j] == legacy::scanT::inconsistent;
+        ImGui::SeparatorText("Settings");
+        {
+            ImGui::Combo("##MainMode", underlying_address(base), legacy::partition::basic_specification_names,
+                         std::size(legacy::partition::basic_specification_names));
 
-            ImGui::PushID(j);
-            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
-            if (inconsistent) {
-                // TODO: this looks super dumb...
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6, 0, 0, 1));
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8, 0, 0, 1));
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.9, 0, 0, 1));
-            }
-            if (ImGui::ImageButton(icons.texture(), icon_size, ImVec2(0, groups[j][0] * (1.0f / 512)),
-                                   ImVec2(1, (groups[j][0] + 1) * (1.0f / 512)))) {
-                // TODO: document this behavior... (keyctrl->resolve conflicts)
-                if (ImGui::GetIO().KeyCtrl) {
-                    const bool b = !rule[groups[j][0]];
-                    for (int code : groups[j]) {
-                        rule[code] = b;
-                    }
-                } else {
-                    for (int code : groups[j]) {
-                        rule[code] = !rule[code];
-                    }
-                }
-                // TODO: TextUnformatted(strs[scans[j]]) may yield false result at this frame, but is negligible...
-            }
-            if (inconsistent) {
-                ImGui::PopStyleColor(3);
-            }
-            ImGui::PopStyleVar();
-            ImGui::PopID();
+            // TODO: use extra_specification_names...
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted("Extr");
+            ImGui::SameLine();
+            ImGui::RadioButton("basic", underlying_address(extr), legacy::partition::extra_specification::none);
+            ImGui::SameLine();
+            ImGui::RadioButton("paired", underlying_address(extr), legacy::partition::paired);
+            ImGui::SameLine();
+            // TODO: explain...
+            ImGui::RadioButton("state", underlying_address(extr), legacy::partition::state);
 
-            if (imgui_itemtooltip tooltip; tooltip) {
-                int x = 0;
-                for (int code : groups[j]) {
-                    if (x++ % 8 != 0) {
-                        ImGui::SameLine();
-                    }
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted("Interp"); // TODO: suitable name...
+            ImGui::SameLine();
+            ImGui::RadioButton("ABS", underlying_address(interp), legacy::ABS);
+            ImGui::SameLine();
+            ImGui::RadioButton("XOR", underlying_address(interp), legacy::XOR);
 
-                    // TODO: use the same bordercol as button's?
-                    ImGui::Image(icons.texture(), icon_size, ImVec2(0, code * (1.0f / 512)),
-                                 ImVec2(1, (code + 1) * (1.0f / 512)), ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
-                    ImGui::SameLine();
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::TextUnformatted(rule[code] ? ":1" : ":0");
-                }
+            // TODO: still awkward...
+            ImGui::Text("State symmetry: %d", (int)legacy::state_symmetric(to_edit));
+            ImGui::SameLine();
+            if (ImGui::SmallButton("details")) {
+                extr = legacy::partition::extra_specification::state;
+                interp = legacy::interpret_mode::XOR;
             }
+        }
+
+        const auto& part = legacy::partition::get_partition(base, extr);
+        const int k = part.k();
+        legacy::ruleT_data rule = legacy::from_rule(to_edit, interp);
+        {
+            // TODO: rden is for stability against base/extr change, but is too dirty...
+            // AND NOT PRECISE...
+            static double rden = 0.3;
+            static int rcount = rden * k;
+            rcount = rden * k;
+
+            ImGui::Text("Groups: %d", k);
+            ImGui::SliderInt("##Active", &rcount, 0, k, "%d", ImGuiSliderFlags_NoInput);
 
             ImGui::SameLine();
-            ImGui::AlignTextToFramePadding();
-            static const char* const strs[]{":x", ":0", ":1"};
-            ImGui::TextUnformatted(strs[scans[j]]); // TODO: is ":x" useless?
+            if (ImGui::Button("Randomize")) {
+                static std::mt19937_64 rand(time(0));
+                legacy::ruleT_data grule{};
+                random_fill(grule.data(), grule.data() + k, rcount, rand);
+                rule = legacy::partition::get_partition(base, extr).dispatch_from(grule);
+            }
+            rden = (double)rcount / k;
         }
-        ImGui::PopStyleVar();
-    }
 
-    ImGui::End();
-    return to_rule(rule, interp);
+        // TODO: should be foldable; should be able to set max height...
+        ImGui::SeparatorText("Rule details");
+        {
+            const auto& groups = part.groups();
+            auto scans = part.scan(rule);
+
+            // TODO: expreimental; not suitable place... should be totally redesigned...
+            if (ImGui::Button("....")) {
+                std::vector<legacy::compressT> vec;
+                vec.emplace_back(legacy::to_rule(rule, interp));
+                for (int j = 0; j < k; ++j) {
+                    // TODO: whether to flip inconsistent units?
+                    if (scans[j] != legacy::scanT::inconsistent) {
+                        legacy::ruleT_data rule_j = rule;
+                        for (int code : groups[j]) {
+                            rule_j[code] = !rule_j[code];
+                        }
+                        vec.emplace_back(legacy::to_rule(rule_j, interp));
+                    }
+                }
+                recorder.replace(vec); // TODO: awkward...
+            }
+
+            ImGui::PushStyleVar(ImGuiStyleVar_::ImGuiStyleVar_ItemSpacing, ImVec2(4, 4));
+            for (int j = 0; j < k; ++j) {
+                if (j % 8 != 0) {
+                    ImGui::SameLine();
+                }
+
+                const ImVec2 icon_size(3 * 7, 3 * 7); // zoom = 7.
+                const bool inconsistent = scans[j] == legacy::scanT::inconsistent;
+
+                ImGui::PushID(j);
+                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
+                if (inconsistent) {
+                    // TODO: this looks super dumb...
+                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6, 0, 0, 1));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8, 0, 0, 1));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.9, 0, 0, 1));
+                }
+                if (ImGui::ImageButton(icons.texture(), icon_size, ImVec2(0, groups[j][0] * (1.0f / 512)),
+                                       ImVec2(1, (groups[j][0] + 1) * (1.0f / 512)))) {
+                    // TODO: document this behavior... (keyctrl->resolve conflicts)
+                    if (ImGui::GetIO().KeyCtrl) {
+                        const bool b = !rule[groups[j][0]];
+                        for (int code : groups[j]) {
+                            rule[code] = b;
+                        }
+                    } else {
+                        for (int code : groups[j]) {
+                            rule[code] = !rule[code];
+                        }
+                    }
+
+                    recorder.take(legacy::to_rule(rule, interp));
+                    // TODO: TextUnformatted(strs[scans[j]]) may yield false result at this frame, but is negligible...
+                }
+                if (inconsistent) {
+                    ImGui::PopStyleColor(3);
+                }
+                ImGui::PopStyleVar();
+                ImGui::PopID();
+
+                if (imgui_itemtooltip tooltip; tooltip) {
+                    int x = 0;
+                    for (int code : groups[j]) {
+                        if (x++ % 8 != 0) {
+                            ImGui::SameLine();
+                        }
+
+                        // TODO: use the same bordercol as button's?
+                        ImGui::Image(icons.texture(), icon_size, ImVec2(0, code * (1.0f / 512)),
+                                     ImVec2(1, (code + 1) * (1.0f / 512)), ImVec4(1, 1, 1, 1),
+                                     ImVec4(0.5, 0.5, 0.5, 1));
+                        ImGui::SameLine();
+                        ImGui::AlignTextToFramePadding();
+                        ImGui::TextUnformatted(rule[code] ? ":1" : ":0");
+                    }
+                }
+
+                ImGui::SameLine();
+                ImGui::AlignTextToFramePadding();
+                static const char* const strs[]{":x", ":0", ":1"};
+                ImGui::TextUnformatted(strs[scans[j]]); // TODO: is ":x" useless?
+            }
+            ImGui::PopStyleVar();
+        }
+    }
 }
 
 // TODO: is "record" a returnable type?
@@ -431,8 +432,7 @@ int main(int argc, char** argv) {
         }
         // TODO: editor works still poorly with recorder...
         if (show_rule_editor) {
-            auto edited = edit_rule(show_rule_editor, runner.rule(), icons, recorder);
-            recorder.take(edited);
+            edit_rule(show_rule_editor, runner.rule(), icons, recorder);
         }
         {
             // TODO: temporarily have to be here; works poorly with `recorder.take(edited);` logic...
@@ -516,7 +516,7 @@ int main(int argc, char** argv) {
                         ImGui::TextUnformatted(found_str.empty() ? "(none)"
                                                                  : (found_str.substr(0, 24) + "...").c_str());
                         // TODO: redesign copy/paste... especially lclick-paste is problematic...
-                        if (ImGui::IsMouseClicked(ImGuiMouseButton_::ImGuiMouseButton_Left) && !found_str.empty()) {
+                        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !found_str.empty()) {
                             recorder.take(legacy::from_MAP_str(found_str));
                             logger::log("Pasted rule with hash {}", 0xffff & (std::hash<std::string>{}(found_str)));
                         }
@@ -527,6 +527,7 @@ int main(int argc, char** argv) {
                     } else if (io.MouseWheel > 0) { // scroll up
                         recorder.prev();
                     }
+                    // TODO: recorder actions should ideally be centralized...
                 }
 
                 // TODO: again, can size()==0? NO, but how to guarantee?
@@ -537,7 +538,7 @@ int main(int argc, char** argv) {
                 // matters
 
                 static char go_to[20]{};
-                auto filter = [](ImGuiInputTextCallbackData* data) {
+                const auto filter = [](ImGuiInputTextCallbackData* data) {
                     return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
                 };
                 ImGui::SameLine();
@@ -573,7 +574,7 @@ int main(int argc, char** argv) {
                 ImGui::SameLine();
                 ImGui::PushButtonRepeat(true); // accept consecutive clicks... TODO: too fast...
                 if (ImGui::Button("+1")) {
-                    runner.run(1);
+                    runner.run(1); // TODO: should run be called here?
                 }
                 ImGui::SameLine();
                 if (ImGui::Button("+p")) {
