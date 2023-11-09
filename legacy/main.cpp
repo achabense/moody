@@ -32,11 +32,12 @@
 
 // TODO: awful... need to be avoided...
 template <class Enum>
-auto* underlying_address(Enum& ptr) {
-    return reinterpret_cast<std::underlying_type_t<Enum>*>(std::addressof(ptr));
+auto underlying_address(Enum& e) {
+    return reinterpret_cast<std::underlying_type_t<Enum>*>(std::addressof(e));
 }
 
 // TODO: move into a header...
+// TODO: forbid copying...
 struct [[nodiscard]] imgui_itemtooltip {
     const bool opened; // TODO: proper name?
     imgui_itemtooltip() : opened(ImGui::BeginItemTooltip()) {}
@@ -227,7 +228,7 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& ic
 // TODO: logic cleanup; must be raii... as exceptions can happen...
 // TODO: add input...
 // TODO: undo operation...
-
+// TODO: class-ify?
 [[nodiscard]] std::optional<std::vector<legacy::compressT>> file_nav(const char* id_str, bool* p_open = nullptr) {
     using namespace std;
     using namespace std::filesystem;
@@ -253,6 +254,7 @@ legacy::ruleT edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& ic
             ImGui::Separator();
 
             // TODO: what if too many entries?
+            // TODO: move into child window; scope-guard required...
             int entries = 0;
             for (const auto& entry : directory_iterator(pos)) {
                 auto str = entry.path().filename().u8string(); // TODO: is showing filename-only a good idea?
@@ -436,6 +438,7 @@ int main(int argc, char** argv) {
             // TODO: temporarily have to be here; works poorly with `recorder.take(edited);` logic...
             // TODO: as popup instead?
             auto result = file_nav("File Nav");
+            // TODO: move logging to read_rule_from_file?
             if (result) {
                 if (!result->empty()) {
                     logger::log("Found {} rules", result->size());

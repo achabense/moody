@@ -204,22 +204,28 @@ std::vector<legacy::compressT> extract_rules(const char* begin, const char* end)
     return rules;
 }
 
-// TODO: refine...
-// TODO: forbid exception...
-std::vector<legacy::compressT> read_rule_from_file(const char* filename) {
-    if (FILE* fp = fopen(filename, "rb")) {
-        fseek(fp, 0, SEEK_END);
+// It's unfortunate that `expected` is not in C++20...
+std::optional<std::vector<char>> load_binary(const char* filename, int max_size) {
+    std::unique_ptr<FILE, decltype(+fclose)> file(fopen(filename, "rb"), fclose);
+    if (file) {
+        FILE* fp = file.get();
+        fseek(fp, 0, SEEK_END); // <-- what if fails?
         int size = ftell(fp);
-        if (size > 1000000) {
-            fclose(fp);
-        } else {
+        if (size < max_size) {
+            fseek(fp, 0, SEEK_SET); // <-- what if fails?
             std::vector<char> data(size);
-            fseek(fp, 0, SEEK_SET);
-            int read = fread(data.data(), 1, size, fp);
-            fclose(fp);
-            assert(read == size); // TODO: how to deal with this?
-            return extract_rules(data.data(), data.data() + data.size());
+            fread(data.data(), 1, size, fp); // what if fails?
+            return data;
         }
+    }
+    return {};
+}
+
+// TODO: also optional?
+std::vector<legacy::compressT> read_rule_from_file(const char* filename) {
+    auto result = load_binary(filename, 1'000'000);
+    if (result) {
+        return extract_rules(result->data(), result->data() + result->size());
     }
     return {};
 }
@@ -236,9 +242,10 @@ std::vector<legacy::compressT> read_rule_from_file(const char* filename) {
 #include "save.hpp"
 #include <imgui.h>
 
+// TODO: forbid copying...
 struct [[nodiscard]] imgui_window {
     const bool visible;
-    imgui_window(const char* name, bool* p_open = {}, ImGuiWindowFlags flags = {})
+    explicit imgui_window(const char* name, bool* p_open = {}, ImGuiWindowFlags flags = {})
         : visible(ImGui::Begin(name, p_open, flags)) {}
     ~imgui_window() {
         ImGui::End(); // Unconditional.
@@ -247,11 +254,15 @@ struct [[nodiscard]] imgui_window {
         return visible;
     }
 };
+// TODO: imgui_childwindow???
 
 // Likely to be the only singleton...
 class logger {
     // TODO: maybe better if data(inheritance)-based?
     static inline std::deque<std::string> m_strs{};
+    static constexpr int m_max = 40;
+    // ~ "ith" must not be a static in log(), as it's a template...
+    static inline int ith = 0;
 
 public:
     logger() = delete;
@@ -259,8 +270,6 @@ public:
     // Also serve as error handler; must succeed.
     template <class... T>
     static void log(std::format_string<const T&...> fmt, const T&... args) noexcept {
-        static constexpr int m_max = 40;
-        static int ith = 0;
         auto now = legacy::timeT::now();
         // TODO: the format should be refined...
         char str[100];
