@@ -189,7 +189,6 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
                         }
                     }
 
-                    recorder.take(legacy::to_rule(rule, interp));
                     // TODO: TextUnformatted(strs[scans[j]]) may yield false result at this frame, but is negligible...
                 }
                 if (inconsistent) {
@@ -222,6 +221,7 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
             }
             ImGui::PopStyleVar();
         }
+        recorder.take(legacy::to_rule(rule, interp));
     }
 }
 
