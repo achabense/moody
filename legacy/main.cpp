@@ -52,8 +52,8 @@ struct [[nodiscard]] imgui_itemtooltip {
 };
 
 // TODO: clumsy...
-// TODO: how to get renderer from backend?
-// TODO: should be a class...
+// TODO: should be a class... how to decouple? ...
+// TODO: for "paired", support 4-step modification (_,S,B,BS)... add new color?
 void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule_recorder& recorder) {
     if (imgui_window window("Rule editor", &show, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize);
         window) {
@@ -78,7 +78,7 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
 
         static legacy::partition::basic_specification base = {};
         static legacy::partition::extra_specification extr = {};
-        static legacy::interpret_mode interp = {};
+        static legacy::interT inter = {};
 
         ImGui::SeparatorText("Settings");
         {
@@ -96,66 +96,79 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
             // TODO: explain...
             ImGui::RadioButton("state", underlying_address(extr), legacy::partition::state);
 
+            ImGui::Text("Groups: %d", legacy::partition::get_partition(base, extr).k()); // TODO: use variable "part"?
+            ImGui::Separator();
+
             ImGui::AlignTextToFramePadding();
             ImGui::TextUnformatted("Interp"); // TODO: suitable name...
             ImGui::SameLine();
-            ImGui::RadioButton("ABS", underlying_address(interp), legacy::ABS);
+            ImGui::RadioButton("Val", underlying_address(inter.tag), inter.Value);
             ImGui::SameLine();
-            ImGui::RadioButton("XOR", underlying_address(interp), legacy::XOR);
-
+            ImGui::RadioButton("Flp", underlying_address(inter.tag), inter.Flip);
+            ImGui::SameLine();
+            ImGui::RadioButton("Dif", underlying_address(inter.tag), inter.Diff);
+            if (inter.tag == inter.Diff) {
+                ImGui::SameLine();
+                if (ImGui::Button("Take current")) {
+                    inter.custom = to_edit;
+                }
+                ImGui::TextWrapped(to_MAP_str(inter.custom).c_str());
+            }
             // TODO: still awkward...
             ImGui::Text("State symmetry: %d", (int)legacy::state_symmetric(to_edit));
             ImGui::SameLine();
             if (ImGui::SmallButton("details")) {
                 extr = legacy::partition::extra_specification::state;
-                interp = legacy::interpret_mode::XOR;
+                inter.tag = inter.Flip;
             }
         }
 
         const auto& part = legacy::partition::get_partition(base, extr);
         const int k = part.k();
-        legacy::ruleT_data rule = legacy::from_rule(to_edit, interp);
-        {
-            // TODO: rden is for stability against base/extr change, but is too dirty...
-            // AND NOT PRECISE...
-            static double rden = 0.3;
-            static int rcount = rden * k;
-            rcount = rden * k;
-
-            ImGui::Text("Groups: %d", k);
-            ImGui::SliderInt("##Active", &rcount, 0, k, "%d", ImGuiSliderFlags_NoInput);
-
-            ImGui::SameLine();
-            if (ImGui::Button("Randomize")) {
-                static std::mt19937_64 rand(time(0));
-                legacy::ruleT_data grule{};
-                random_fill(grule.data(), grule.data() + k, rcount, rand);
-                rule = legacy::partition::get_partition(base, extr).dispatch_from(grule);
-            }
-            rden = (double)rcount / k;
-        }
+        legacy::ruleT_data rule = inter.from_rule(to_edit);
 
         // TODO: should be foldable; should be able to set max height...
         ImGui::SeparatorText("Rule details");
         {
+            {
+                // TODO: rden is for stability against base/extr change, but is too dirty...
+                // AND NOT PRECISE...
+                static double rden = 0.3;
+                static int rcount = rden * k;
+                rcount = rden * k;
+
+                ImGui::SliderInt("##Active", &rcount, 0, k, "%d", ImGuiSliderFlags_NoInput);
+
+                ImGui::SameLine();
+                if (ImGui::Button("Randomize")) {
+                    static std::mt19937_64 rand(time(0));
+                    legacy::ruleT_data grule{};
+                    random_fill(grule.data(), grule.data() + k, rcount, rand);
+                    rule = legacy::partition::get_partition(base, extr).dispatch_from(grule);
+                }
+                rden = (double)rcount / k;
+            }
             const auto& groups = part.groups();
             auto scans = part.scan(rule);
-
-            // TODO: expreimental; not suitable place... should be totally redesigned...
-            if (ImGui::Button("....")) {
-                std::vector<legacy::compressT> vec;
-                vec.emplace_back(legacy::to_rule(rule, interp));
-                for (int j = 0; j < k; ++j) {
-                    // TODO: whether to flip inconsistent units?
-                    if (scans[j] != legacy::scanT::inconsistent) {
-                        legacy::ruleT_data rule_j = rule;
-                        for (int code : groups[j]) {
-                            rule_j[code] = !rule_j[code];
+            {
+                // TODO: expreimental; not suitable place... should be totally redesigned...
+                ImGui::SameLine();
+                if (ImGui::Button("????")) {
+                    std::vector<legacy::compressT> vec;
+                    vec.emplace_back(inter.to_rule(rule));
+                    for (int j = 0; j < k; ++j) {
+                        // TODO: whether to flip inconsistent units?
+                        if (scans[j] != legacy::scanT::inconsistent) {
+                            legacy::ruleT_data rule_j = rule;
+                            for (int code : groups[j]) {
+                                rule_j[code] = !rule_j[code];
+                            }
+                            vec.emplace_back(inter.to_rule(rule_j));
                         }
-                        vec.emplace_back(legacy::to_rule(rule_j, interp));
                     }
+                    recorder.replace(vec); // TODO: awkward...
+                    // TODO: relying on final take() having no effect...
                 }
-                recorder.replace(vec); // TODO: awkward...
             }
 
             ImGui::PushStyleVar(ImGuiStyleVar_::ImGuiStyleVar_ItemSpacing, ImVec2(4, 4));
@@ -221,7 +234,7 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
             }
             ImGui::PopStyleVar();
         }
-        recorder.take(legacy::to_rule(rule, interp));
+        recorder.take(inter.to_rule(rule));
     }
 }
 
@@ -480,7 +493,6 @@ int main(int argc, char** argv) {
                 img.update(runner.tile());
 
                 if (imgui_itemtooltip tooltip; tooltip) {
-                    auto& io = ImGui::GetIO(); // const?
                     // TODO: rewrite logic...
                     const float region_sz = 32.0f;
                     float region_x = io.MousePos.x - pos.x - region_sz * 0.5f;
@@ -661,43 +673,6 @@ int main(int argc, char** argv) {
 
     return 0;
 }
-
-namespace legacy {
-    // TODO: interop with partition...
-    // TODO: rename...
-    // Doesn't allow flip mode.
-    struct ruleT_constraints {
-        // TODO: it's easy to define an invalid state, but how to adapt with partition?
-        enum state : char { _0, _1, unknown };
-        std::array<state, 512> data;
-        // known-count???
-
-        ruleT_constraints() {
-            reset();
-        }
-
-        void set(int code, bool s) {
-            // TODO: explain decision against invalid situ
-            if (data[code] == unknown) {
-                data[code] = state{s};
-            }
-        }
-
-        void reset() {
-            data.fill(unknown);
-        }
-
-        auto bind(const legacy::ruleT& rule) {
-            // TODO: is this const?
-            return [this, rule](int code) /*const*/ {
-                set(code, rule[code]);
-                return rule[code];
-            };
-        }
-    };
-
-    // TODO: how to consume???
-} // namespace legacy
 
 ////////////////////////////////////////////////////////////////////////////////
 // TODO: whether to accept <imgui.h> as base header?

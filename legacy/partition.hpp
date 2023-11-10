@@ -272,3 +272,84 @@ namespace legacy {
     } // namespace partition
 
 } // namespace legacy
+
+namespace legacy {
+    // TODO: whether to allow flip mode?
+    struct modelT {
+        // TODO: it's easy to define an invalid state, but how to adapt with partition?
+        enum state : char { _0, _1, unknown };
+        std::array<state, 512> data;
+
+        modelT() {
+            reset();
+        }
+
+        void set(int code, bool s) {
+            // TODO: explain decision against invalid situ
+            if (data[code] == unknown) {
+                data[code] = state{s};
+            }
+        }
+
+        void reset() {
+            data.fill(unknown);
+        }
+
+        auto bind(const legacy::ruleT& rule) {
+            // TODO: is this const?
+            return [this, rule](int code) /*const*/ {
+                set(code, rule[code]);
+                return rule[code];
+            };
+        }
+    };
+
+    inline vector<modelT::state> filter(const modelT& m, const partitionT& p) {
+        using enum modelT::state;
+
+        vector<modelT::state> grouped(p.k(), modelT::unknown);
+
+        for (int j = 0; j < p.k(); ++j) {
+            bool has_0 = false;
+            bool has_1 = false;
+            for (int code : p.groups()[j]) {
+                if (m.data[code] == _0) {
+                    has_0 = true;
+                } else if (m.data[code] == _1) {
+                    has_1 = true;
+                }
+            }
+            if (has_0 && has_1) {
+                // TODO: What to do?
+            }
+            if (has_0) {
+                grouped[j] = _0;
+            } else if (has_1) {
+                grouped[j] = _1;
+            }
+        }
+        return grouped;
+    }
+
+    ruleT make_rule(const modelT& m, const partitionT& p, auto&& rand) {
+        // step 1:
+        using enum modelT::state;
+
+        vector<modelT::state> grouped = filter(m, p);
+
+        // step 2:
+        // TODO: doesn't make sense...
+        for (auto& s : grouped) {
+            if (s == unknown) {
+                s = (rand() & 0b111) == 1 ? _1 : _0;
+            }
+        }
+
+        // step 3: dispatch...
+        ruleT rule{};
+        for (int code = 0; code < 512; ++code) {
+            rule[code] = grouped[p.map(code)] == _0 ? 0 : 1;
+        }
+        return rule;
+    }
+} // namespace legacy

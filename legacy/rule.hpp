@@ -18,7 +18,7 @@ namespace legacy {
         bool a, s, d;
         bool z, x, c;
 
-        int encode() const {
+        constexpr int encode() const {
             // ~ bool is implicitly promoted to int.
             int code = (q << 0) | (w << 1) | (e << 2) |
                        (a << 3) | (s << 4) | (d << 5) |
@@ -29,7 +29,7 @@ namespace legacy {
     };
     // clang-format on
 
-    inline envT decode(int code) {
+    constexpr envT decode(int code) {
         assert(code >= 0 && code < 512);
         bool q = (code >> 0) & 1, w = (code >> 1) & 1, e = (code >> 2) & 1;
         bool a = (code >> 3) & 1, s = (code >> 4) & 1, d = (code >> 5) & 1;
@@ -38,17 +38,18 @@ namespace legacy {
     }
 
     // Equivalent to decode(code).s.
-    inline bool decode_s(int code) {
+    constexpr bool decode_s(int code) {
         return (code >> 4) & 1;
     }
 
     // Equivalent to envT(...).encode().
-    inline int encode(bool q, bool w, bool e, bool a, bool s, bool d, bool z, bool x, bool c) {
+    constexpr int encode(bool q, bool w, bool e, bool a, bool s, bool d, bool z, bool x, bool c) {
         int code = (q << 0) | (w << 1) | (e << 2) | (a << 3) | (s << 4) | (d << 5) | (z << 6) | (x << 7) | (c << 8);
         assert(code >= 0 && code < 512);
         return code;
     }
 
+    // TODO: constexpr?
     // TODO: rephrase...
     // Unambiguously refer to the map from env-code to the new state.
     struct ruleT {
@@ -101,34 +102,6 @@ namespace legacy {
 
     using ruleT_data = ruleT::data_type;
 
-    // TODO: explain...
-    inline ruleT_data to_flip(const ruleT& rule) {
-        ruleT_data flip{};
-        for (int code = 0; code < 512; ++code) {
-            flip[code] = rule[code] == decode_s(code) ? false : true;
-        }
-        return flip;
-    }
-
-    inline ruleT from_flip(const ruleT_data& flip) {
-        ruleT rule{};
-        for (int code = 0; code < 512; ++code) {
-            bool s = decode_s(code);
-            rule[code] = flip[code] ? !s : s;
-        }
-        return rule;
-    }
-
-    // TODO: is it suitable to declare a namespace-enum for this?
-    enum interpret_mode : int { ABS = false, XOR = true };
-
-    inline ruleT_data from_rule(const ruleT& rule, interpret_mode interp) {
-        return interp == ABS ? rule.map : to_flip(rule);
-    }
-    inline ruleT to_rule(const ruleT_data& rule_data, interpret_mode interp) {
-        return interp == ABS ? ruleT{rule_data} : from_flip(rule_data);
-    }
-
     class compressT {
         array<uint8_t, 64> bits; // as bitset.
     public:
@@ -164,3 +137,55 @@ struct std::hash<legacy::compressT> {
         return cmpr.hash();
     }
 };
+
+namespace legacy {
+    // TODO: explain...
+    // TODO: refine... better names; consistently use Abc naming convention?
+    struct interT {
+        enum tagE { Value, Flip, Diff };
+        tagE tag = Value;
+        ruleT custom{};
+
+        const ruleT& get_base() const {
+            static constexpr ruleT zero{};
+            static constexpr ruleT identity = []() {
+                ruleT id{};
+                for (int code = 0; code < 512; ++code) {
+                    id.map[code] = decode_s(code);
+                }
+                return id;
+            }();
+
+            switch (tag) {
+            case Value:
+                return zero;
+            case Flip:
+                return identity;
+            case Diff:
+                return custom;
+            default:
+                assert(false);
+            }
+        }
+
+        // actually XOR...
+        ruleT_data from_rule(const ruleT& rule) const {
+            const ruleT& base = get_base();
+            ruleT_data diff{};
+            for (int code = 0; code < 512; ++code) {
+                diff[code] = rule[code] == base[code] ? 0 : 1;
+            }
+            return diff;
+        }
+
+        ruleT to_rule(const ruleT_data& diff) const {
+            const ruleT& base = get_base();
+            ruleT rule{};
+            for (int code = 0; code < 512; ++code) {
+                rule[code] = diff[code] ? !base[code] : base[code];
+            }
+            return rule;
+        }
+    };
+
+} // namespace legacy
