@@ -102,6 +102,7 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
             ImGui::AlignTextToFramePadding();
             ImGui::TextUnformatted("Interp"); // TODO: suitable name...
             ImGui::SameLine();
+            // TODO: might be better named "direct"
             ImGui::RadioButton("Val", underlying_address(inter.tag), inter.Value);
             ImGui::SameLine();
             ImGui::RadioButton("Flp", underlying_address(inter.tag), inter.Flip);
@@ -114,7 +115,7 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
                 }
                 ImGui::TextWrapped(to_MAP_str(inter.custom).c_str());
             }
-            // TODO: still awkward...
+            // TODO: how to keep state-symmetry in Diff mode?
             ImGui::Text("State symmetry: %d", (int)legacy::state_symmetric(to_edit));
             ImGui::SameLine();
             if (ImGui::SmallButton("details")) {
@@ -238,6 +239,22 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
     }
 }
 
+#if 0
+// I have no idea whether I should use things like this...
+const std::filesystem::path& get_pref_path() {
+    static const std::filesystem::path pref = []() {
+        std::unique_ptr<char, decltype(+SDL_free)> p(SDL_GetPrefPath("wtf", "wtfapp"), SDL_free);
+        if (!p) {
+            logger::log("{}", SDL_GetError());
+            throw 0; // TODO: what if !p?
+        }
+        // TODO: p must be utf-8; on the other way, what encoding does fs::path assume?
+        return std::filesystem::path(p.get());
+    }();
+    return pref;
+}
+#endif
+
 // TODO: is "record" a returnable type?
 // TODO: logic cleanup; must be raii... as exceptions can happen...
 // TODO: add input...
@@ -249,6 +266,7 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
 
     // static path pos = current_path();
     static path pos = R"(C:\*redacted*\Desktop\rulelists_new)";
+    // static path pos = get_pref_path();
 
     optional<path> try_open = nullopt;
 

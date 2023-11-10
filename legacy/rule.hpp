@@ -100,6 +100,7 @@ namespace legacy {
         return rule;
     }
 
+    // TODO: still here?
     using ruleT_data = ruleT::data_type;
 
     class compressT {
