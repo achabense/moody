@@ -132,12 +132,10 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
         ImGui::SeparatorText("Rule details");
         {
             {
-                // TODO: rden is for stability against base/extr change, but is too dirty...
-                // TODO: some values are not accessible... e.g. 31
-                // AND NOT PRECISE...
-                static double rden = 0.3;
-                static int rcount = rden * k;
-                rcount = rden * k;
+                // TODO: unstable between base/extr switchs; ratio-based approach is on-trivial though... (double has
+                // inaccessible values)
+                static int rcount = 0.3 * k;
+                rcount = std::clamp(rcount, 0, k);
 
                 ImGui::SliderInt("##Active", &rcount, 0, k, "%d", ImGuiSliderFlags_NoInput);
                 ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 0)); // TODO: it this spacing suitable?
@@ -161,7 +159,6 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
                     random_fill(grule.data(), grule.data() + k, rcount, rand);
                     rule = legacy::partition::get_partition(base, extr).dispatch_from(grule);
                 }
-                rden = (double)rcount / k;
             }
             const auto& groups = part.groups();
             auto scans = part.scan(rule);
@@ -173,7 +170,7 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
                     vec.emplace_back(inter.to_rule(rule));
                     for (int j = 0; j < k; ++j) {
                         // TODO: whether to flip inconsistent units?
-                        if (scans[j] != legacy::scanT::inconsistent) {
+                        if (scans[j] != scans.Inconsistent) {
                             legacy::ruleT_data rule_j = rule;
                             for (int code : groups[j]) {
                                 rule_j[code] = !rule_j[code];
@@ -186,6 +183,9 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
                 }
             }
 
+            ImGui::Text("[1:%d] [0:%d] [x:%d]", scans.count(scans.All_1), scans.count(scans.All_0),
+                        scans.count(scans.Inconsistent));
+
             ImGui::PushStyleVar(ImGuiStyleVar_::ImGuiStyleVar_ItemSpacing, ImVec2(4, 4));
             for (int j = 0; j < k; ++j) {
                 if (j % 8 != 0) {
@@ -193,7 +193,7 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
                 }
 
                 const ImVec2 icon_size(3 * 7, 3 * 7); // zoom = 7.
-                const bool inconsistent = scans[j] == legacy::scanT::inconsistent;
+                const bool inconsistent = scans[j] == scans.Inconsistent;
 
                 ImGui::PushID(j);
                 ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));

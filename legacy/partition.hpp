@@ -7,13 +7,6 @@
 
 // higher-order(???) ...TODO...
 namespace legacy {
-    // TODO: rename...
-    enum scanT : int {
-        inconsistent,
-        all_0,
-        all_1,
-    };
-    using scanlistT = array<scanT, 512>; // TODO: enable restricting...
     // TODO: the main challenge is to provide user-interface...
 
     // TODO: better variable names...
@@ -100,15 +93,54 @@ namespace legacy {
             return m_k;
         }
 
+        class scanlistT {
+        public:
+            // TODO: better names.
+            enum scanE : int {
+                Inconsistent,
+                All_0,
+                All_1,
+            };
+
+        private:
+            std::array<scanE, 512> m_data; // TODO: vector?
+            int m_k;
+
+        public:
+            explicit scanlistT(int k) : m_data{}, m_k(k) {}
+
+            auto begin() const {
+                return m_data.cbegin();
+            }
+
+            auto end() const {
+                return m_data.cbegin() + m_k;
+            }
+
+            int k() const {
+                return m_k;
+            }
+            scanE& operator[](int j) {
+                return m_data[j];
+            }
+            const scanE& operator[](int j) const {
+                return m_data[j];
+            }
+            // TODO: cache, or count in ctor (need redesign)?
+            int count(scanE s) const {
+                return std::count(begin(), end(), s);
+            }
+        };
+
         scanlistT scan(const ruleT_data& rule) const {
-            scanlistT result{}; // TODO: unknown?
+            scanlistT result(k());
             for (int j = 0; j < k(); ++j) {
                 const auto& group = m_groups[j];
                 bool first = rule[group[0]];
-                result[j] = first ? all_1 : all_0;
+                result[j] = first ? result.All_1 : result.All_0;
                 for (auto code : group) {
                     if (rule[code] != first) {
-                        result[j] = inconsistent;
+                        result[j] = result.Inconsistent;
                         break;
                     }
                 }
