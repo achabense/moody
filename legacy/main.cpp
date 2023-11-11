@@ -30,6 +30,16 @@
 #error This backend requires SDL 2.0.17+ because of SDL_RenderGeometry() function
 #endif
 
+// TODO: apply in several other places...
+template <class F>
+struct [[nodiscard]] scope_guard {
+    F f;
+    scope_guard(F&& f) : f(std::move(f)) {}
+    ~scope_guard() { f(); }
+    scope_guard(const scope_guard&) = delete;
+    scope_guard& operator=(const scope_guard&) = delete;
+};
+
 // TODO: awful... need to be avoided...
 template <class Enum>
 auto underlying_address(Enum& e) {
@@ -281,7 +291,6 @@ const std::filesystem::path& get_pref_path() {
 #endif
 
 // TODO: is "record" a returnable type?
-// TODO: logic cleanup; must be raii... as exceptions can happen...
 // TODO: add input...
 // TODO: undo operation...
 // TODO: class-ify?
@@ -390,8 +399,6 @@ constexpr char8_t bbbbb[]{u8"中文"};
 static_assert(bytes_equal(aaaaa, bbbbb));
 
 int main(int argc, char** argv) {
-    logger::log("Entered main");
-
     // Setup SDL
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0) {
         printf("Error: %s\n", SDL_GetError());
@@ -427,11 +434,19 @@ int main(int argc, char** argv) {
     ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
     ImGui_ImplSDLRenderer2_Init(renderer);
 
-    // Our state
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    scope_guard cleanup([=] {
+        ImGui_ImplSDLRenderer2_Shutdown();
+        ImGui_ImplSDL2_Shutdown();
+        ImGui::DestroyContext();
 
-    // init:
-    // recorder.take(legacy::game_of_life()); // first rule -> ctor
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+    });
+
+    // Program logic:
+    logger::log("Entered main");
+
     if (argc == 2) {
         // TODO: add err logger
         recorder.replace(read_rule_from_file(argv[1]));
@@ -440,7 +455,6 @@ int main(int argc, char** argv) {
     runner.set_rule(recorder.current());
     runner.restart(filler);
 
-    // TODO: raii works terribly with C-style cleanup... can texture be destroyed after renderer?
     tile_image img(renderer, runner.tile()); // TODO: ...
     code_image icons(renderer);              // TODO: how to get "renderer" from backend?
 
@@ -700,8 +714,9 @@ int main(int argc, char** argv) {
         // Rendering
         ImGui::Render();
         SDL_RenderSetScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
-        SDL_SetRenderDrawColor(renderer, (Uint8)(clear_color.x * 255), (Uint8)(clear_color.y * 255),
-                               (Uint8)(clear_color.z * 255), (Uint8)(clear_color.w * 255));
+        // ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+        // SDL_SetRenderDrawColor(renderer, (Uint8)(clear_color.x * 255), (Uint8)(clear_color.y * 255),
+        //                        (Uint8)(clear_color.z * 255), (Uint8)(clear_color.w * 255));
         SDL_RenderClear(renderer);
         ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
         SDL_RenderPresent(renderer);
@@ -720,17 +735,6 @@ int main(int argc, char** argv) {
             }
         }
     }
-
-    // TODO: should destroy img and icons here... (depending on where they defined now)
-
-    // Cleanup
-    ImGui_ImplSDLRenderer2_Shutdown();
-    ImGui_ImplSDL2_Shutdown();
-    ImGui::DestroyContext();
-
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-    SDL_Quit();
 
     return 0;
 }

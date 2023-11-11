@@ -11,7 +11,6 @@
 
 // TODO: partial rule (e.g. collect from tile; the rest is generated from another generator...)
 // TODO: allow resizing the grid.
-// TODO: (important) small window...
 
 // TODO: notify on quit...
 // TODO: support more run-mode...
@@ -93,7 +92,7 @@ public:
         do_shift_xy(init_shift_x, init_shift_y);
     }
 
-    // TODO: clumspy
+    // TODO: clumsy
     bool set_rule(const legacy::ruleT& rule) {
         if (m_rule != rule) {
             m_rule = rule;
