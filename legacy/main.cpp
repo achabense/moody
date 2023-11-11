@@ -133,12 +133,26 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
         {
             {
                 // TODO: rden is for stability against base/extr change, but is too dirty...
+                // TODO: some values are not accessible... e.g. 31
                 // AND NOT PRECISE...
                 static double rden = 0.3;
                 static int rcount = rden * k;
                 rcount = rden * k;
 
                 ImGui::SliderInt("##Active", &rcount, 0, k, "%d", ImGuiSliderFlags_NoInput);
+                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 0)); // TODO: it this spacing suitable?
+                ImGui::PushButtonRepeat(true);
+                const float r = ImGui::GetFrameHeight();
+                ImGui::SameLine();
+                if (ImGui::Button("-", ImVec2(r, r))) {
+                    rcount = std::max(0, rcount - 1);
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("+", ImVec2(r, r))) {
+                    rcount = std::min(k, rcount + 1);
+                }
+                ImGui::PopButtonRepeat();
+                ImGui::PopStyleVar();
 
                 ImGui::SameLine();
                 if (ImGui::Button("Randomize")) {
@@ -491,7 +505,6 @@ int main(int argc, char** argv) {
             ImGui::Text("(%.1f FPS) Frame:%d\n", io.Framerate, ImGui::GetFrameCount());
             ImGui::Separator();
 
-            // tile:
             ImGui::Text("Width:%d,Height:%d,Density:%f", runner.tile().width(), runner.tile().height(),
                         float(runner.tile().count()) / runner.tile().area());
             {
@@ -504,7 +517,7 @@ int main(int argc, char** argv) {
 
                 // I did a trick here. ImageButton didn't draw eagerly, so it's safe to update the texture after
                 // ImageButton(). This is used to provide stable view against dragging.
-                // TODO: is this correct?
+                // TODO: is this a good design?
                 if (ImGui::IsItemHovered() && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
                     runner.shift_xy(io.MouseDelta.x, io.MouseDelta.y);
                 }
@@ -634,11 +647,18 @@ int main(int argc, char** argv) {
                                  ImGuiSliderFlags_NoInput);
 
                 // TODO: conflicts with text input. should have scope.
+                // TODO: which(_1, _2) should be used for gap_frame+=1?
                 if (ImGui::IsKeyPressed(ImGuiKey_1, true)) {
                     gap_frame = std::max(gap_min, gap_frame - 1);
                 }
                 if (ImGui::IsKeyPressed(ImGuiKey_2, true)) {
                     gap_frame = std::min(gap_max, gap_frame + 1);
+                }
+                if (ImGui::IsKeyPressed(ImGuiKey_3, true)) {
+                    pergen = std::max(pergen_min, pergen - 1);
+                }
+                if (ImGui::IsKeyPressed(ImGuiKey_4, true)) {
+                    pergen = std::min(pergen_max, pergen + 1);
                 }
             }
         }

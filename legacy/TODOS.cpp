@@ -14,4 +14,7 @@
 
 // Whether to support boundless space? It cannot be too useful without copy/paste...
 // Whether to support customized partition? It can get out of control too easily...
-// Whether to consider using imgui's "docking" branch?
+// Consider using imgui's "docking" branch?
+// Relax dependency to C++17?
+// Is it really a good idea to use bool type?
+// Are there UBs in the program?
