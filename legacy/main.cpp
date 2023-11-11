@@ -165,7 +165,7 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
             {
                 // TODO: expreimental; not suitable place... should be totally redesigned...
                 ImGui::SameLine();
-                if (ImGui::Button("????")) {
+                if (ImGui::Button("???")) {
                     std::vector<legacy::compressT> vec;
                     vec.emplace_back(inter.to_rule(rule));
                     for (int j = 0; j < k; ++j) {
@@ -352,7 +352,7 @@ int start_from = 0;
 constexpr int gap_min = 0, gap_max = 20;
 int gap_frame = 0;
 
-bool anti_flick = true; // TODO: make settable...
+bool anti_flick = true; // TODO: add explanation
 
 // TODO: should enable guide-mode (with a switch...)
 // TODO: imgui_widgets_extension; see TextDisabled for details...
@@ -434,6 +434,21 @@ int main(int argc, char** argv) {
     bool show_rule_editor = true;
     bool show_demo_window = false; // TODO: remove this in the future...
     bool show_log_window = true;
+    bool show_nav_window = true;
+
+    auto actual_pergen = [](int pergen) {
+        if (anti_flick) {
+            if (legacy::will_flick(runner.rule()) && pergen % 2) {
+                if (pergen == 1) {
+                    ++pergen;
+                } else {
+                    assert(pergen >= 2);
+                    --pergen;
+                }
+            }
+        }
+        return pergen;
+    };
 
     // Main loop
     bool done = false;
@@ -469,10 +484,11 @@ int main(int argc, char** argv) {
         assert(runner.rule() == recorder.current());
         bool should_restart = false;
 
-        // TODO: remove this when suitable...
+        // TODO: remove this when all done...
         if (show_demo_window) {
             ImGui::ShowDemoWindow(&show_demo_window);
         }
+
         if (show_log_window) {
             logger::window("Events", &show_log_window);
         }
@@ -480,10 +496,10 @@ int main(int argc, char** argv) {
         if (show_rule_editor) {
             edit_rule(show_rule_editor, runner.rule(), icons, recorder);
         }
-        {
+        if (show_nav_window) {
             // TODO: temporarily have to be here; works poorly with `recorder.take(edited);` logic...
             // TODO: as popup instead?
-            auto result = file_nav("File Nav");
+            auto result = file_nav("File Nav", &show_nav_window);
             // TODO: move logging to read_rule_from_file?
             if (result) {
                 if (!result->empty()) {
@@ -497,11 +513,13 @@ int main(int argc, char** argv) {
 
         if (imgui_window window("-v-", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize);
             window) {
+            ImGui::Checkbox("Log window", &show_log_window);
+            ImGui::SameLine();
             ImGui::Checkbox("Rule editor", &show_rule_editor);
             ImGui::SameLine();
+            ImGui::Checkbox("Nav window", &show_nav_window);
+
             ImGui::Checkbox("Demo window", &show_demo_window);
-            ImGui::SameLine();
-            ImGui::Checkbox("Log window", &show_log_window);
 
             ImGui::Text("(%.1f FPS) Frame:%d\n", io.Framerate, ImGui::GetFrameCount());
             ImGui::Separator();
@@ -545,24 +563,20 @@ int main(int argc, char** argv) {
                         // TODO: should refine msg.
                         // TODO: should be shared with editor's.
                     }
-                    ImGui::TextUnformatted("Ctrl+Lclick to paste from clipboard:");
-                    if (io.KeyCtrl) {
-                        std::string found_str;
+                    ImGui::TextUnformatted("Ctrl+Lclick to paste from clipboard.");
+                    if (io.KeyCtrl && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
                         const char* text = ImGui::GetClipboardText();
                         // TODO: can text return nullptr?
                         if (text) {
-                            std::string str = text;
-                            std::smatch match_result;
-                            if (std::regex_search(str, match_result, legacy::regex_MAP_str())) {
-                                found_str = match_result[0];
+                            auto rules = extract_rules(text, text + strlen(text));
+                            if (!rules.empty()) {
+                                int size = recorder.size();
+                                recorder.append(rules); // TODO: requires non-trivial append logic.
+                                recorder.set_pos(size);
+                                logger::log("Got {} rules from clipboard", rules.size());
+                            } else {
+                                logger::log("X_X");
                             }
-                        }
-                        ImGui::TextUnformatted(found_str.empty() ? "(none)"
-                                                                 : (found_str.substr(0, 24) + "...").c_str());
-                        // TODO: redesign copy/paste... especially lclick-paste is problematic...
-                        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !found_str.empty()) {
-                            recorder.take(legacy::from_MAP_str(found_str));
-                            logger::log("Pasted rule with hash {}", 0xffff & (std::hash<std::string>{}(found_str)));
                         }
                     }
 
@@ -622,7 +636,7 @@ int main(int argc, char** argv) {
                 }
                 ImGui::SameLine();
                 if (ImGui::Button("+p")) {
-                    runner.run(pergen); // TODO: should combine...
+                    runner.run(actual_pergen(pergen)); // TODO: should combine...
                 }
                 ImGui::PopButtonRepeat();
 
@@ -643,6 +657,11 @@ int main(int argc, char** argv) {
                 // TODO: toooo ugly...
                 // TODO: (?) currently suitable to restart immediately...
                 ImGui::SliderInt("Per gen [1-20]", &pergen, pergen_min, pergen_max, "%d", ImGuiSliderFlags_NoInput);
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("(Actual: %d)", actual_pergen(pergen));
+                ImGui::SameLine();
+                ImGui::Checkbox("anti-flick", &anti_flick);
+
                 ImGui::SliderInt("Gap Frame [0-20]", &gap_frame, gap_min, gap_max, "%d", ImGuiSliderFlags_NoInput);
                 ImGui::SliderInt("Start gen [0-1000]", &start_from, start_min, start_max, "%d",
                                  ImGuiSliderFlags_NoInput);
@@ -661,6 +680,13 @@ int main(int argc, char** argv) {
                 if (ImGui::IsKeyPressed(ImGuiKey_4, true)) {
                     pergen = std::min(pergen_max, pergen + 1);
                 }
+                if (ImGui::IsKeyPressed(ImGuiKey_Space, true)) {
+                    if (!paused) {
+                        paused = true;
+                    } else {
+                        runner.run(actual_pergen(pergen)); // ?run(1)
+                    }
+                }
             }
         }
 
@@ -675,17 +701,6 @@ int main(int argc, char** argv) {
 
         // Synchronize with recorder:
         should_restart |= runner.set_rule(recorder.current()); // is || (instead of | here) app-logically safe?
-        if (anti_flick) {
-            if (legacy::will_flick(runner.rule()) && pergen % 2) {
-                if (pergen == 1) {
-                    ++pergen;
-                } else {
-                    assert(pergen >= 2);
-                    --pergen;
-                }
-            }
-            // TODO: (whether and) how to restore when switch to new rules?
-        }
         if (should_restart) {
             runner.restart(filler);
         }
@@ -694,7 +709,7 @@ int main(int argc, char** argv) {
         } else if (!paused) {
             // TODO: is GetFrameCount unchanged since last call in tile window?
             if (ImGui::GetFrameCount() % (gap_frame + 1) == 0) {
-                runner.run(pergen);
+                runner.run(actual_pergen(pergen));
             }
         }
     }
