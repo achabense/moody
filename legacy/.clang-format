@@ -3,7 +3,8 @@
 BasedOnStyle:  LLVM
 
 ColumnLimit:     120
-AllowShortFunctionsOnASingleLine: Empty
+# Only suitable for simple logics (getters etc).
+AllowShortFunctionsOnASingleLine: Inline
 AlwaysBreakTemplateDeclarations: Yes
 
 IndentWidth:     4

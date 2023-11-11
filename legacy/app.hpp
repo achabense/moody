@@ -83,17 +83,9 @@ class rule_runner {
 public:
     explicit rule_runner(legacy::rectT size) : m_tile(size), m_side(size) {}
 
-    const legacy::ruleT& rule() const {
-        return m_rule;
-    }
-
-    const legacy::tileT& tile() const {
-        return m_tile;
-    }
-
-    int gen() const {
-        return m_gen;
-    }
+    const legacy::ruleT& rule() const { return m_rule; }
+    const legacy::tileT& tile() const { return m_tile; }
+    int gen() const { return m_gen; }
 
     void restart(const tile_filler& filler) {
         m_gen = 0;
@@ -136,14 +128,10 @@ public:
         m_pos = 0;
     }
 
-    int size() const {
-        return m_record.size();
-    }
+    int size() const { return m_record.size(); }
 
     // [0, size() - 1]
-    int pos() const {
-        return m_pos;
-    }
+    int pos() const { return m_pos; }
 
     // TODO: look for better names...
     // TODO: reconsider what should be done when already exists in the whole vec...
@@ -156,24 +144,18 @@ public:
         }
     }
 
-    legacy::ruleT current() const {
+    legacy::ruleT current() const { //
         return static_cast<legacy::ruleT>(m_record[m_pos]);
     }
 
-    void set_pos(int pos) {
+    void set_pos(int pos) { //
         m_pos = std::clamp(pos, 0, size() - 1);
     }
-
-    void next() {
-        set_pos(m_pos + 1);
-    }
-
-    void prev() {
-        set_pos(m_pos - 1);
-    }
+    void next() { set_pos(m_pos + 1); }
+    void prev() { set_pos(m_pos - 1); }
 
     // TODO: reconsider m_pos logic...
-    void append(const std::vector<legacy::compressT>& vec) {
+    void append(const std::vector<legacy::compressT>& vec) { //
         m_record.insert(m_record.end(), vec.begin(), vec.end());
     }
 
@@ -247,9 +229,7 @@ struct [[nodiscard]] imgui_window {
     ~imgui_window() {
         ImGui::End(); // Unconditional.
     }
-    explicit operator bool() const {
-        return visible;
-    }
+    explicit operator bool() const { return visible; }
 };
 // TODO: imgui_childwindow???
 

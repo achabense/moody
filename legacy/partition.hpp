@@ -79,19 +79,17 @@ namespace legacy {
             assert(code >= 0 && code < 512);
             return m_map[code];
         }
-        const vector<vector<int>>& groups() const {
+        const vector<vector<int>>& groups() const { //
             return m_groups;
         }
-        const vector<int>& group_for(int code) const {
+        const vector<int>& group_for(int code) const { //
             return m_groups[map(code)];
         }
-        int head_for(int code) const {
+        int head_for(int code) const { //
             return m_groups[map(code)][0];
         }
 
-        int k() const {
-            return m_k;
-        }
+        int k() const { return m_k; }
 
         class scanlistT {
         public:
@@ -109,25 +107,16 @@ namespace legacy {
         public:
             explicit scanlistT(int k) : m_data{}, m_k(k) {}
 
-            auto begin() const {
-                return m_data.cbegin();
-            }
+            auto begin() const { return m_data.cbegin(); }
+            auto end() const { return m_data.cbegin() + m_k; }
 
-            auto end() const {
-                return m_data.cbegin() + m_k;
-            }
+            int k() const { return m_k; }
 
-            int k() const {
-                return m_k;
-            }
-            scanE& operator[](int j) {
-                return m_data[j];
-            }
-            const scanE& operator[](int j) const {
-                return m_data[j];
-            }
+            scanE& operator[](int j) { return m_data[j]; }
+            const scanE& operator[](int j) const { return m_data[j]; }
+
             // TODO: cache, or count in ctor (need redesign)?
-            int count(scanE s) const {
+            int count(scanE s) const { //
                 return std::count(begin(), end(), s);
             }
         };
@@ -312,9 +301,7 @@ namespace legacy {
         enum state : char { _0, _1, unknown };
         std::array<state, 512> data;
 
-        modelT() {
-            reset();
-        }
+        modelT() { reset(); }
 
         void set(int code, bool s) {
             // TODO: explain decision against invalid situ
@@ -323,9 +310,7 @@ namespace legacy {
             }
         }
 
-        void reset() {
-            data.fill(unknown);
-        }
+        void reset() { data.fill(unknown); }
 
         auto bind(const legacy::ruleT& rule) {
             // TODO: is this const?

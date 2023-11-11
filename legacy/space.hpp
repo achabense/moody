@@ -24,7 +24,7 @@ namespace legacy {
             uint32_t x, y;
             friend bool operator==(const posT&, const posT&) = default;
             // Using the same type as hasher for convenience:
-            size_t operator()(const posT& pos) const {
+            size_t operator()(const posT& pos) const { //
                 return std::hash<uint64_t>{}((uint64_t(pos.x) << 32) | pos.y);
             }
         };

@@ -35,9 +35,7 @@ namespace legacy {
             }
         }
 
-        ~tileT() {
-            delete[] m_data;
-        }
+        ~tileT() { delete[] m_data; }
 
         // TODO: should empty state be supported?
         // TODO: support copy when needed...
@@ -51,21 +49,11 @@ namespace legacy {
         }
 
     public:
-        rectT size() const {
-            return m_size;
-        }
+        rectT size() const { return m_size; }
 
-        int width() const {
-            return m_size.width;
-        }
-
-        int height() const {
-            return m_size.height;
-        }
-
-        int area() const {
-            return m_size.width * m_size.height;
-        }
+        int width() const { return m_size.width; }
+        int height() const { return m_size.height; }
+        int area() const { return m_size.width * m_size.height; }
 
     private:
         // TODO: explain why const
@@ -79,27 +67,16 @@ namespace legacy {
             assert(y >= 0 && y < m_size.height);
             return _line(y + 1);
         }
-
         const bool* line(int y) const {
             assert(y >= 0 && y < m_size.height);
             return _line(y + 1);
         }
 
-        bool* begin() {
-            return line(0);
-        }
+        bool* begin() { return line(0); }
+        const bool* begin() const { return line(0); }
 
-        const bool* begin() const {
-            return line(0);
-        }
-
-        bool* end() {
-            return begin() + area();
-        }
-
-        const bool* end() const {
-            return begin() + area();
-        }
+        bool* end() { return begin() + area(); }
+        const bool* end() const { return begin() + area(); }
 
     private:
         void _set_lr(int _y, bool l, bool r) {
@@ -180,11 +157,11 @@ namespace legacy {
             return *this;
         }
 
-        void apply(const ruleT& rule, tileT& dest) const {
+        void apply(const ruleT& rule, tileT& dest) const { //
             _apply(rule, dest);
         }
 
-        int count() const {
+        int count() const { //
             return std::accumulate(begin(), end(), 0);
         }
     };

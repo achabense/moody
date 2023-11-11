@@ -44,16 +44,10 @@ public:
         SDL_UnlockTexture(m_texture);
     }
 
-    int width() const {
-        return m_w;
-    }
-    int height() const {
-        return m_h;
-    }
+    int width() const { return m_w; }
+    int height() const { return m_h; }
 
-    SDL_Texture* texture() {
-        return m_texture;
-    }
+    SDL_Texture* texture() { return m_texture; }
 };
 
 // TODO: looks horrible...
@@ -83,15 +77,8 @@ public:
         SDL_DestroyTexture(m_texture);
     }
 
-    static int width() {
-        return 3;
-    }
+    static int width() { return 3; }
+    static int height() { return 3 * 512; }
 
-    static int height() {
-        return 3 * 512;
-    }
-
-    SDL_Texture* texture() {
-        return m_texture;
-    }
+    SDL_Texture* texture() { return m_texture; }
 };

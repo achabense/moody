@@ -63,23 +63,16 @@ namespace legacy {
             assert(code >= 0 && code < 512);
             return map[code];
         }
-
-        bool operator()(const envT& env) const {
+        bool operator()(const envT& env) const { //
             return map[env.encode()];
         }
-
-        bool operator()(bool q, bool w, bool e, bool a, bool s, bool d, bool z, bool x, bool c) const {
+        bool operator()(bool q, bool w, bool e, bool a, bool s, bool d, bool z, bool x, bool c) const { //
             return map[encode(q, w, e, a, s, d, z, x, c)];
         }
 
         // Conceptually only for data access.
-        const bool& operator[](int at) const {
-            return map[at];
-        }
-
-        bool& operator[](int at) {
-            return map[at];
-        }
+        const bool& operator[](int at) const { return map[at]; }
+        bool& operator[](int at) { return map[at]; }
 
         friend bool operator==(const ruleT&, const ruleT&) = default;
     };
@@ -136,7 +129,7 @@ namespace legacy {
 
 template <>
 struct std::hash<legacy::compressT> {
-    size_t operator()(const legacy::compressT& cmpr) const {
+    size_t operator()(const legacy::compressT& cmpr) const { //
         return cmpr.hash();
     }
 };

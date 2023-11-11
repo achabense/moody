@@ -46,9 +46,7 @@ struct [[nodiscard]] imgui_itemtooltip {
             ImGui::EndTooltip();
         }
     }
-    explicit operator bool() const {
-        return opened;
-    }
+    explicit operator bool() const { return opened; }
 };
 
 // TODO: clumsy...
