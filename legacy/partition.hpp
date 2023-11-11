@@ -60,7 +60,8 @@ namespace legacy {
                 }
             }
             // TODO: temporary; should be dealt with by get_partition...
-            bool paired = m_map[0] == m_map[16]; // TODO: not used; should recheck
+            bool paired =
+                m_map[0] == m_map[16]; // TODO: not used; should recheck (this part should be totally redesigned)
             bool state = m_map[0] == m_map[511];
             if (!state) {
                 for (codeT code = 0; code < 512; ++code) {
@@ -173,17 +174,22 @@ namespace legacy {
     namespace partition {
         // TODO: none/orthogonal/diagonal are too noisy; only support when configured...
         enum basic_specification : int {
-            // none = 0,
-            // orthogonal,
-            // diagonal,
+            none = 0,
+            orthogonal,
+            diagonal,
             spatial,
             ro45,
             spatial_ro45,
             permutation,
             size
         };
-        static constexpr const char* basic_specification_names[]{/*"none",    "orthogonal",   "diagonal",   */
-                                                                 "spatial", "ro45", "spatial_ro45", "permutation"};
+        static constexpr const char* basic_specification_names[]{"(deprecated) none",       //
+                                                                 "(deprecated) orthogonal", //
+                                                                 "(deprecated) diagonal",   //
+                                                                 "spatial",
+                                                                 "ro45",
+                                                                 "spatial_ro45",
+                                                                 "permutation"};
         inline namespace s {
             // TODO: currently in a new namespace to avoid enumerator clash...
             enum extra_specification : int { none = 0, paired, state, size };
@@ -260,11 +266,9 @@ namespace legacy {
 #undef mapto
 
             static const std::initializer_list<mapperP> args[basic_specification::size]{
-                /*
                 {},                                                     // none.
                 {upside_down, leftside_right},                          // orthogonal
                 {main_diag, side_diag},                                 // diagonal
-                */
                 {upside_down, leftside_right, main_diag /*side_diag*/}, // spatial
                 {rotate_45},                                            // ro45
                 {upside_down, leftside_right, main_diag, rotate_45},    // spatial_ro45

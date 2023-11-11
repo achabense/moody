@@ -9,6 +9,7 @@
 //     Need to check:
 //     https://github.com/ocornut/imgui/blob/master/docs/FONTS.md
 // How to build? (Especially, the project should be accessible in linux systems...)
+// What is the typical way to include imgui source files in the project?
 
 // What license should this project use?
 
@@ -18,3 +19,7 @@
 // Relax dependency to C++17? (X there are already a lot of dependencies...)
 // Is it really a good idea to use bool type?
 // Are there UBs in the program?
+
+// Refine logs
+// Improve layout
+// Support tile clipping?

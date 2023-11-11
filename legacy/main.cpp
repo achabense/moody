@@ -76,7 +76,7 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
             }
         }
 
-        static legacy::partition::basic_specification base = {};
+        static legacy::partition::basic_specification base = legacy::partition::basic_specification::spatial;
         static legacy::partition::extra_specification extr = {};
         static legacy::interT inter = {};
 
@@ -186,17 +186,24 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
             ImGui::Text("[1:%d] [0:%d] [x:%d]", scans.count(scans.All_1), scans.count(scans.All_0),
                         scans.count(scans.Inconsistent));
 
-            ImGui::PushStyleVar(ImGuiStyleVar_::ImGuiStyleVar_ItemSpacing, ImVec2(4, 4));
+            const ImVec2 icon_size(3 * 7, 3 * 7); // zoom = 7.
+            const int perline = 8;
+            const int lines = 7;
+            const float child_height = lines * (21 /*r*/ + 4 /*padding.y*2*/) + (lines - 1) * 4 /*spacing.y*/;
+            // ImGui::Separator();
+            ImGui::BeginChild("Details", ImVec2(390, child_height)); // TODO: how to resize automatically
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 4));
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
             for (int j = 0; j < k; ++j) {
-                if (j % 8 != 0) {
+                if (j % perline != 0) {
                     ImGui::SameLine();
                 }
-
-                const ImVec2 icon_size(3 * 7, 3 * 7); // zoom = 7.
+                if (j != 0 && j % (perline * lines) == 0) {
+                    ImGui::Separator(); // TODO: refine...
+                }
                 const bool inconsistent = scans[j] == scans.Inconsistent;
 
                 ImGui::PushID(j);
-                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
                 if (inconsistent) {
                     // TODO: this looks super dumb...
                     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6, 0, 0, 1));
@@ -222,7 +229,6 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
                 if (inconsistent) {
                     ImGui::PopStyleColor(3);
                 }
-                ImGui::PopStyleVar();
                 ImGui::PopID();
 
                 if (imgui_itemtooltip tooltip; tooltip) {
@@ -248,12 +254,16 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
                 static const char* const strs[]{":x", ":0", ":1"};
                 ImGui::TextUnformatted(strs[scans[j]]); // TODO: is ":x" useless?
             }
-            ImGui::PopStyleVar();
+            ImGui::PopStyleVar(2);
+            ImGui::EndChild();
         }
         recorder.take(inter.to_rule(rule));
     }
 }
 
+// TODO: Should be a part runtime [dependency] - allowed to create folders in the exe path. (SDL_GetBasePath(), instead
+// of PrefPath)
+// TODO: btw, how to deal with imgui config?
 #if 0
 // I have no idea whether I should use things like this...
 const std::filesystem::path& get_pref_path() {
@@ -441,15 +451,8 @@ int main(int argc, char** argv) {
     bool show_nav_window = true;
 
     auto actual_pergen = [](int pergen) {
-        if (anti_flick) {
-            if (legacy::will_flick(runner.rule()) && pergen % 2) {
-                if (pergen == 1) {
-                    ++pergen;
-                } else {
-                    assert(pergen >= 2);
-                    --pergen;
-                }
-            }
+        if (anti_flick && legacy::will_flick(runner.rule()) && pergen % 2) {
+            return pergen + 1;
         }
         return pergen;
     };
@@ -541,7 +544,7 @@ int main(int argc, char** argv) {
                 // I did a trick here. ImageButton didn't draw eagerly, so it's safe to update the texture after
                 // ImageButton(). This is used to provide stable view against dragging.
                 // TODO: is this a good design?
-                if (ImGui::IsItemHovered() && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+                if (ImGui::IsItemHovered() && ImGui::IsItemActive()) {
                     runner.shift_xy(io.MouseDelta.x, io.MouseDelta.y);
                 }
                 img.update(runner.tile());
@@ -660,9 +663,9 @@ int main(int argc, char** argv) {
             {
                 // TODO: toooo ugly...
                 // TODO: (?) currently suitable to restart immediately...
-                ImGui::SliderInt("Per gen [1-20]", &pergen, pergen_min, pergen_max, "%d", ImGuiSliderFlags_NoInput);
+                ImGui::SliderInt("Pergen [1-20]", &pergen, pergen_min, pergen_max, "%d", ImGuiSliderFlags_NoInput);
                 ImGui::AlignTextToFramePadding();
-                ImGui::Text("(Actual: %d)", actual_pergen(pergen));
+                ImGui::Text("(Actual pergen: %d)", actual_pergen(pergen));
                 ImGui::SameLine();
                 ImGui::Checkbox("anti-flick", &anti_flick);
 
@@ -672,10 +675,10 @@ int main(int argc, char** argv) {
 
                 // TODO: conflicts with text input. should have scope.
                 // TODO: which(_1, _2) should be used for gap_frame+=1?
-                if (ImGui::IsKeyPressed(ImGuiKey_1, true)) {
+                if (ImGui::IsKeyPressed(ImGuiKey_2, true)) {
                     gap_frame = std::max(gap_min, gap_frame - 1);
                 }
-                if (ImGui::IsKeyPressed(ImGuiKey_2, true)) {
+                if (ImGui::IsKeyPressed(ImGuiKey_1, true)) {
                     gap_frame = std::min(gap_max, gap_frame + 1);
                 }
                 if (ImGui::IsKeyPressed(ImGuiKey_3, true)) {
