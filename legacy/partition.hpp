@@ -60,7 +60,7 @@ namespace legacy {
                 }
             }
             // TODO: temporary; should be dealt with by get_partition...
-            bool paired = m_map[0] == m_map[16];
+            bool paired = m_map[0] == m_map[16]; // TODO: not used; should recheck
             bool state = m_map[0] == m_map[511];
             if (!state) {
                 for (codeT code = 0; code < 512; ++code) {
@@ -185,7 +185,7 @@ namespace legacy {
         static constexpr const char* basic_specification_names[]{/*"none",    "orthogonal",   "diagonal",   */
                                                                  "spatial", "ro45", "spatial_ro45", "permutation"};
         inline namespace s {
-            // TODO: currently in a new namespace to avoid enumrator clash...
+            // TODO: currently in a new namespace to avoid enumerator clash...
             enum extra_specification : int { none = 0, paired, state, size };
         } // namespace s
 
@@ -199,6 +199,7 @@ namespace legacy {
                 part.fill(-1);
 
                 auto equiv = [&](codeT code, int color, auto& equiv) -> void {
+                    assert(color != -1);
                     if (part[code] != -1) {
                         assert(part[code] == color);
                         return;
@@ -297,7 +298,7 @@ namespace legacy {
 
 } // namespace legacy
 
-// TODO: in developement...
+// TODO: in development...
 namespace legacy {
     // TODO: whether to allow flip mode?
     struct modelT {
@@ -369,7 +370,7 @@ namespace legacy {
         // step 3: dispatch...
         ruleT rule{};
         for (codeT code = 0; code < 512; ++code) {
-            rule[code] = grouped[p.map(code)] == _0 ? 0 : 1;
+            rule.map[code] = grouped[p.map(code)] == _0 ? 0 : 1;
         }
         return rule;
     }

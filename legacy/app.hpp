@@ -221,6 +221,13 @@ std::vector<legacy::compressT> read_rule_from_file(const char* filename) {
 #include "save.hpp"
 #include <imgui.h>
 
+// Unlike ImGui::TextWrapped, doesn't take fmt str...
+inline void imgui_strwrapped(std::string_view str) {
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextUnformatted(str.data(), str.data() + str.size());
+    ImGui::PopTextWrapPos();
+}
+
 // TODO: forbid copying...
 struct [[nodiscard]] imgui_window {
     const bool visible;
@@ -288,7 +295,8 @@ public:
                 str += s;
                 str += '\n';
             }
-            ImGui::TextWrapped(str.c_str());
+            imgui_strwrapped(str);
+
 #endif
             if (to_bottom || ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) {
                 ImGui::SetScrollHereY(1.0f);

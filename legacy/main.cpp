@@ -58,14 +58,14 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
     if (imgui_window window("Rule editor", &show, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize);
         window) {
         // TODO: are these info useful?
-        // ImGui::Text("Spatial_symmtric:%d\tState_symmetric:%d\nABS_agnostic:%d\tXOR_agnostic:%d",
+        // ImGui::Text("Spatial_symmetric:%d\tState_symmetric:%d\nABS_agnostic:%d\tXOR_agnostic:%d",
         //             legacy::spatial_symmetric(to_edit), legacy::state_symmetric(to_edit),
         //             legacy::center_agnostic_abs(to_edit), legacy::center_agnostic_xor(to_edit));
 
         ImGui::SeparatorText("Rule str");
         {
             auto rule_str = to_MAP_str(to_edit);
-            ImGui::TextWrapped(rule_str.c_str());
+            imgui_strwrapped(rule_str);
 
             if (ImGui::Button("Copy to clipboard")) {
                 ImGui::SetClipboardText(rule_str.c_str());
@@ -113,7 +113,7 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
                 if (ImGui::Button("Take current")) {
                     inter.custom = to_edit;
                 }
-                ImGui::TextWrapped(to_MAP_str(inter.custom).c_str());
+                imgui_strwrapped(to_MAP_str(inter.custom));
             }
             // TODO: how to keep state-symmetry in Diff mode?
             ImGui::Text("State symmetry: %d", (int)legacy::state_symmetric(to_edit));
@@ -163,7 +163,7 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
             const auto& groups = part.groups();
             auto scans = part.scan(rule);
             {
-                // TODO: expreimental; not suitable place... should be totally redesigned...
+                // TODO: experimental; not suitable place... should be totally redesigned...
                 ImGui::SameLine();
                 if (ImGui::Button("???")) {
                     std::vector<legacy::compressT> vec;
@@ -373,7 +373,11 @@ constexpr bool bytes_equal(const T& t, const U& u) noexcept {
     }
 }
 
-static_assert(bytes_equal("中文", u8"中文"));
+// "aaaaa" and "bbbbb" are workarounds for a compiler bug in clang...
+// https://github.com/llvm/llvm-project/issues/63686
+constexpr char aaaaa[]{"中文"};
+constexpr char8_t bbbbb[]{u8"中文"};
+static_assert(bytes_equal(aaaaa, bbbbb));
 
 int main(int argc, char** argv) {
     logger::log("Entered main");
@@ -479,7 +483,7 @@ int main(int argc, char** argv) {
         ImGui::NewFrame();
 
         // Frame state:
-        // TODO: applying following logic; cosider refining it.
+        // TODO: applying following logic; consider refining it.
         // recorder is modified during display, but will synchronize with runner's before next frame.
         assert(runner.rule() == recorder.current());
         bool should_restart = false;
@@ -604,7 +608,7 @@ int main(int argc, char** argv) {
                         "##Goto", "GOTO e.g. 2->enter", go_to, 20,
                         ImGuiInputTextFlags_CallbackCharFilter | ImGuiInputTextFlags_EnterReturnsTrue, filter)) {
                     int val{};
-                    if (sscanf(go_to, "%d", &val) == 1) {
+                    if (std::from_chars(go_to, go_to + strlen(go_to), val).ec == std::errc{}) {
                         recorder.set_pos(val - 1); // TODO: -1 is clumsy.
                     }
                     go_to[0] = '\0';

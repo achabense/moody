@@ -112,8 +112,7 @@ namespace legacy {
         }
 
         friend bool operator==(const compressT& l, const compressT& r) = default;
-
-        friend bool operator<(const compressT& l, const compressT& r) = default;
+        friend std::strong_ordering operator<=>(const compressT& l, const compressT& r) = default;
 
         size_t hash() const {
             // ~ not ub.
