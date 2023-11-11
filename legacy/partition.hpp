@@ -9,6 +9,7 @@
 namespace legacy {
     // TODO: the main challenge is to provide user-interface...
 
+    // TODO: using gcodeT (or other names) = int;
     // TODO: better variable names...
     class partitionT {
     public:
@@ -17,10 +18,10 @@ namespace legacy {
     private:
         array_base m_map;
         int m_k;
-        vector<vector<int>> m_groups;
+        vector<vector<codeT>> m_groups;
 
         // TODO: remove in the future...
-        void invariants() {
+        void assert_invariants() {
             assert(map(0) == 0);
             int max_sofar = 0; // part[0].
             for (auto gcode : m_map) {
@@ -51,8 +52,9 @@ namespace legacy {
 
             // regulated.
             m_k = regulate.next;
+            assert_invariants();
             m_groups.resize(m_k);
-            for (int code = 0; code < 512; ++code) {
+            for (codeT code = 0; code < 512; ++code) {
                 if (!decode_s(code)) {
                     m_groups[m_map[code]].push_back(code);
                 }
@@ -61,13 +63,13 @@ namespace legacy {
             bool paired = m_map[0] == m_map[16];
             bool state = m_map[0] == m_map[511];
             if (!state) {
-                for (int code = 0; code < 512; ++code) {
+                for (codeT code = 0; code < 512; ++code) {
                     if (decode_s(code)) {
                         m_groups[m_map[code]].push_back(code);
                     }
                 }
             } else {
-                for (int code = 511; code >= 0; --code) {
+                for (codeT code = 511; code >= 0; --code) {
                     if (decode_s(code)) {
                         m_groups[m_map[code]].push_back(code);
                     }
@@ -75,17 +77,17 @@ namespace legacy {
             }
         }
 
-        int map(int code) const {
+        int map(codeT code) const {
             assert(code >= 0 && code < 512);
             return m_map[code];
         }
-        const vector<vector<int>>& groups() const { //
+        const vector<vector<codeT>>& groups() const { //
             return m_groups;
         }
-        const vector<int>& group_for(int code) const { //
+        const vector<codeT>& group_for(codeT code) const { //
             return m_groups[map(code)];
         }
-        int head_for(int code) const { //
+        codeT head_for(codeT code) const { //
             return m_groups[map(code)][0];
         }
 
@@ -127,7 +129,7 @@ namespace legacy {
                 const auto& group = m_groups[j];
                 bool first = rule[group[0]];
                 result[j] = first ? result.All_1 : result.All_0;
-                for (auto code : group) {
+                for (codeT code : group) {
                     if (rule[code] != first) {
                         result[j] = result.Inconsistent;
                         break;
@@ -140,7 +142,7 @@ namespace legacy {
         // TODO: the arg type is problematic.
         ruleT_data dispatch_from(const ruleT_data& grule) const {
             ruleT_data rule;
-            for (int code = 0; code < 512; ++code) {
+            for (codeT code = 0; code < 512; ++code) {
                 rule[code] = grule[map(code)];
             }
             return rule;
@@ -148,7 +150,7 @@ namespace legacy {
 
         // TODO: bad name...
         bool matches(const ruleT_data& rule) const {
-            for (int code = 0; code < 512; ++code) {
+            for (codeT code = 0; code < 512; ++code) {
                 if (rule[code] != rule[head_for(code)]) {
                     return false;
                 }
@@ -158,7 +160,7 @@ namespace legacy {
 
         bool subdivides(const partitionT& part) const {
             for (const auto& group : m_groups) {
-                for (auto code : group) {
+                for (codeT code : group) {
                     if (part.m_map[code] != part.m_map[group[0]]) {
                         return false;
                     }
@@ -190,13 +192,13 @@ namespace legacy {
         static constexpr const char* extra_specification_names[]{"basic", "paired", "state"};
 
         inline const partitionT& get_partition(basic_specification basic, extra_specification extr) {
-            using mapperP = int (*)(int);
+            using mapperP = codeT (*)(codeT);
 
             constexpr auto make_partition = [](const vector<mapperP>& mappers) -> partitionT {
                 partitionT::array_base part;
                 part.fill(-1);
 
-                auto equiv = [&](int code, int color, auto& equiv) -> void {
+                auto equiv = [&](codeT code, int color, auto& equiv) -> void {
                     if (part[code] != -1) {
                         assert(part[code] == color);
                         return;
@@ -208,7 +210,7 @@ namespace legacy {
                 };
 
                 int color = 0;
-                for (int code = 0; code < 512; code++) {
+                for (codeT code = 0; code < 512; code++) {
                     if (part[code] == -1) {
                         equiv(code, color++, equiv);
                     }
@@ -216,8 +218,9 @@ namespace legacy {
                 return part;
             };
 
+            // TODO: very strange format...
 #define mapto(...)                                                                                                     \
-    +[](int code) {                                                                                                    \
+    +[](codeT code) {                                                                                                  \
         auto [q, w, e, a, s, d, z, x, c] = decode(code);                                                               \
         return encode(__VA_ARGS__);                                                                                    \
     }
@@ -294,6 +297,7 @@ namespace legacy {
 
 } // namespace legacy
 
+// TODO: in developement...
 namespace legacy {
     // TODO: whether to allow flip mode?
     struct modelT {
@@ -303,10 +307,10 @@ namespace legacy {
 
         modelT() { reset(); }
 
-        void set(int code, bool s) {
+        void set(codeT code, bool b) {
             // TODO: explain decision against invalid situ
             if (data[code] == unknown) {
-                data[code] = state{s};
+                data[code] = state{b};
             }
         }
 
@@ -314,9 +318,9 @@ namespace legacy {
 
         auto bind(const legacy::ruleT& rule) {
             // TODO: is this const?
-            return [this, rule](int code) /*const*/ {
-                set(code, rule[code]);
-                return rule[code];
+            return [this, rule](codeT code) /*const*/ {
+                set(code, rule(code));
+                return rule(code);
             };
         }
     };
@@ -329,7 +333,7 @@ namespace legacy {
         for (int j = 0; j < p.k(); ++j) {
             bool has_0 = false;
             bool has_1 = false;
-            for (int code : p.groups()[j]) {
+            for (codeT code : p.groups()[j]) {
                 if (m.data[code] == _0) {
                     has_0 = true;
                 } else if (m.data[code] == _1) {
@@ -364,7 +368,7 @@ namespace legacy {
 
         // step 3: dispatch...
         ruleT rule{};
-        for (int code = 0; code < 512; ++code) {
+        for (codeT code = 0; code < 512; ++code) {
             rule[code] = grouped[p.map(code)] == _0 ? 0 : 1;
         }
         return rule;

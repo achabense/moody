@@ -53,6 +53,8 @@ struct [[nodiscard]] imgui_itemtooltip {
 // TODO: should be a class... how to decouple? ...
 // TODO: for "paired", support 4-step modification (_,S,B,BS)... add new color?
 void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule_recorder& recorder) {
+    using legacy::codeT;
+
     if (imgui_window window("Rule editor", &show, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize);
         window) {
         // TODO: are these info useful?
@@ -170,7 +172,7 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
                         // TODO: whether to flip inconsistent units?
                         if (scans[j] != scans.Inconsistent) {
                             legacy::ruleT_data rule_j = rule;
-                            for (int code : groups[j]) {
+                            for (codeT code : groups[j]) {
                                 rule_j[code] = !rule_j[code];
                             }
                             vec.emplace_back(inter.to_rule(rule_j));
@@ -206,11 +208,11 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
                     // TODO: document this behavior... (keyctrl->resolve conflicts)
                     if (ImGui::GetIO().KeyCtrl) {
                         const bool b = !rule[groups[j][0]];
-                        for (int code : groups[j]) {
+                        for (codeT code : groups[j]) {
                             rule[code] = b;
                         }
                     } else {
-                        for (int code : groups[j]) {
+                        for (codeT code : groups[j]) {
                             rule[code] = !rule[code];
                         }
                     }
@@ -225,12 +227,13 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
 
                 if (imgui_itemtooltip tooltip; tooltip) {
                     int x = 0;
-                    for (int code : groups[j]) {
+                    for (codeT code : groups[j]) {
                         if (x++ % 8 != 0) {
                             ImGui::SameLine();
                         }
 
                         // TODO: use the same bordercol as button's?
+                        // TODO: icons should provide codeT methods...
                         ImGui::Image(icons.texture(), icon_size, ImVec2(0, code * (1.0f / 512)),
                                      ImVec2(1, (code + 1) * (1.0f / 512)), ImVec4(1, 1, 1, 1),
                                      ImVec4(0.5, 0.5, 0.5, 1));

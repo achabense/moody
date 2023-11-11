@@ -116,7 +116,7 @@ namespace legacy {
         // TODO: This could be used to support constraint gathering...
         // Relying on width > 1 (which is a reasonable requirement)
         // I hate this function, it is the payment for consecutive data...
-        void _apply(const auto& rulefn /*bool(int)*/, tileT& dest) const {
+        void _apply(const auto& rulefn /*bool(codeT)*/, tileT& dest) const {
             // pre: already gathered ???<TODO>, which is untestable.
             assert(this != &dest);
             dest.resize(m_size);

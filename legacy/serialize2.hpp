@@ -51,18 +51,18 @@ namespace legacy {
     inline string to_MAP_str(const ruleT& rule) {
         // MAP rule uses a different coding scheme.
         bool reordered[512]{};
-        for (int code = 0; code < 512; ++code) {
+        for (codeT code = 0; code < 512; ++code) {
             auto [q, w, e, a, s, d, z, x, c] = decode(code);
-            reordered[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1] = rule[code];
+            reordered[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1] = rule(code);
         }
         auto get = [&reordered](int i) { return i < 512 ? reordered[i] : 0; };
         string str = "MAP";
-        int p = 0;
-        while (p < 512) {
-            uint8_t b6 = (get(p + 5) << 0) | (get(p + 4) << 1) | (get(p + 3) << 2) | (get(p + 2) << 3) |
-                         (get(p + 1) << 4) | (get(p + 0) << 5);
+        int i = 0;
+        while (i < 512) {
+            uint8_t b6 = (get(i + 5) << 0) | (get(i + 4) << 1) | (get(i + 3) << 2) | (get(i + 2) << 3) |
+                         (get(i + 1) << 4) | (get(i + 0) << 5);
             str += _impl_details::to_base64(b6);
-            p += 6;
+            i += 6;
         }
         return str;
     }
@@ -83,21 +83,21 @@ namespace legacy {
         };
 
         int chp = 3; // skip "MAP"
-        int at = 0;
-        while (at < 512) {
+        int i = 0;
+        while (i < 512) {
             uint8_t b6 = _impl_details::from_base64(map_str[chp++]);
-            put(at + 5, (b6 >> 0) & 1);
-            put(at + 4, (b6 >> 1) & 1);
-            put(at + 3, (b6 >> 2) & 1);
-            put(at + 2, (b6 >> 3) & 1);
-            put(at + 1, (b6 >> 4) & 1);
-            put(at + 0, (b6 >> 5) & 1);
-            at += 6;
+            put(i + 5, (b6 >> 0) & 1);
+            put(i + 4, (b6 >> 1) & 1);
+            put(i + 3, (b6 >> 2) & 1);
+            put(i + 2, (b6 >> 3) & 1);
+            put(i + 1, (b6 >> 4) & 1);
+            put(i + 0, (b6 >> 5) & 1);
+            i += 6;
         }
         ruleT rule{};
-        for (int code = 0; code < 512; ++code) {
+        for (codeT code = 0; code < 512; ++code) {
             auto [q, w, e, a, s, d, z, x, c] = decode(code);
-            rule[code] = reordered[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1];
+            rule.map[code] = reordered[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1];
         }
         return rule;
     }

@@ -59,7 +59,7 @@ public:
     code_image(SDL_Renderer* renderer) {
         m_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, width(), height());
         Uint32 pixels[512][3][3];
-        for (int code = 0; code < 512; ++code) {
+        for (legacy::codeT code = 0; code < 512; ++code) {
             auto [q, w, e, a, s, d, z, x, c] = legacy::decode(code);
             bool fill[3][3] = {{q, w, e}, {a, s, d}, {z, x, c}};
             for (int y = 0; y < 3; ++y) {

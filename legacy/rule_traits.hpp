@@ -10,10 +10,11 @@ namespace legacy {
         return partition::get_partition_spatial().matches(rule.map);
     }
 
+    // TODO: code_ns etc should be supported in rule.hpp.
     inline bool center_agnostic_abs(const ruleT& rule) {
-        for (int code = 0; code < 512; ++code) {
-            int code_ns = code ^ (1 << 4); // s->!s
-            if (rule[code] != rule[code_ns]) {
+        for (codeT code = 0; code < 512; ++code) {
+            codeT code_ns = code ^ (1 << 4); // s->!s
+            if (rule(code) != rule(code_ns)) {
                 return false;
             }
         }
@@ -21,9 +22,9 @@ namespace legacy {
     }
 
     inline bool center_agnostic_xor(const ruleT& rule) {
-        for (int code = 0; code < 512; ++code) {
-            int code_ns = code ^ (1 << 4); // s->!s
-            if ((decode_s(code) == rule[code]) != (decode_s(code_ns) == rule[code_ns])) {
+        for (codeT code = 0; code < 512; ++code) {
+            codeT code_ns = code ^ (1 << 4); // s->!s
+            if ((decode_s(code) == rule(code)) != (decode_s(code_ns) == rule(code_ns))) {
                 return false;
             }
         }
@@ -31,9 +32,9 @@ namespace legacy {
     }
 
     inline bool state_symmetric(const ruleT& rule) {
-        for (int code = 0; code < 512; ++code) {
-            int code_n = (~code) & 511;
-            if ((decode_s(code) == rule[code]) != (decode_s(code_n) == rule[code_n])) {
+        for (codeT code = 0; code < 512; ++code) {
+            codeT code_n = (~code) & 511;
+            if ((decode_s(code) == rule(code)) != (decode_s(code_n) == rule(code_n))) {
                 return false;
             }
         }
@@ -41,7 +42,7 @@ namespace legacy {
     }
 
     inline bool will_flick(const ruleT& rule) {
-        return rule[0] == 1 && rule[511] == 0; // TODO: more robust encoding?
+        return rule(0) == 1 && rule(511) == 0; // TODO: more robust encoding?
     }
 
     // TODO: how to incoporate this fact in the program?
