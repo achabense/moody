@@ -11,18 +11,16 @@
 // TODO: should not update when paused...
 class tile_image {
     int m_w, m_h;
-
     SDL_Texture* m_texture; // owning.
 
 public:
     tile_image(SDL_Renderer* renderer, const legacy::tileT& tile) : m_w(tile.width()), m_h(tile.height()) {
         m_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STREAMING, m_w, m_h);
+        assert(m_texture);
         update(tile);
     }
 
-    ~tile_image() {
-        SDL_DestroyTexture(m_texture);
-    }
+    ~tile_image() { SDL_DestroyTexture(m_texture); }
 
     tile_image(const tile_image&) = delete;
     tile_image& operator=(const tile_image&) = delete;
@@ -57,6 +55,7 @@ class code_image {
 public:
     code_image(SDL_Renderer* renderer) {
         m_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, width(), height());
+        assert(m_texture);
         Uint32 pixels[512][3][3];
         for (legacy::codeT code = 0; code < 512; ++code) {
             auto [q, w, e, a, s, d, z, x, c] = legacy::decode(code);
@@ -71,10 +70,10 @@ public:
         SDL_UpdateTexture(m_texture, NULL, pixels, width() * sizeof(Uint32));
     }
 
-    ~code_image() {
-        // TODO: do the renderer need to be living at this point?
-        SDL_DestroyTexture(m_texture);
-    }
+    ~code_image() { SDL_DestroyTexture(m_texture); }
+
+    code_image(const code_image&) = delete;
+    code_image& operator=(const code_image&) = delete;
 
     static int width() { return 3; }
     static int height() { return 3 * 512; }

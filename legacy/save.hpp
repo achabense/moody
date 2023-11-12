@@ -72,9 +72,7 @@ namespace legacy {
             snprintf(str, 100, "%d-%d-%d %02d:%02d:%02d", time.year, time.month, time.day, time.hour, time.min,
                      time.sec);
 
-            // TODO: bad; should provide a way to show consecutive diff though...
-            append << "# " << str << " rule-hash: " << std::hash<string>{}(to_MAP_str(rule)) << "\n";
-            append << to_MAP_str(rule) << "\n"; // and what?
+            append << "# " << str << "\n" << to_MAP_str(rule) << "\n"; // and what?
         } else {
             // TODO: what to do?
         }

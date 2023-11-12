@@ -17,8 +17,7 @@
 // TODO: right click to enable/disable miniwindow...
 // TODO: file container. easy ways to add fav...
 
-// TODO: really?
-/* implicitly inline */ void random_fill(bool* begin, bool* end, int count, auto&& rand) {
+void random_fill(bool* begin, bool* end, int count, auto&& rand) {
     int dist = end - begin;
     assert(dist > 0);
     std::fill(begin, end, false);

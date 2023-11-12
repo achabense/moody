@@ -65,8 +65,7 @@ struct [[nodiscard]] imgui_itemtooltip {
 void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule_recorder& recorder) {
     using legacy::codeT;
 
-    if (imgui_window window("Rule editor", &show, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize);
-        window) {
+    if (imgui_window window("Rule editor", &show, ImGuiWindowFlags_AlwaysAutoResize); window) {
         // TODO: are these info useful?
         // ImGui::Text("Spatial_symmetric:%d\tState_symmetric:%d\nABS_agnostic:%d\tXOR_agnostic:%d",
         //             legacy::spatial_symmetric(to_edit), legacy::state_symmetric(to_edit),
@@ -358,21 +357,6 @@ const std::filesystem::path& get_pref_path() {
     }
 }
 
-tile_filler filler(/* seed= */ 0);
-rule_runner runner({.width = 320, .height = 240});
-rule_recorder recorder;
-
-constexpr int pergen_min = 1, pergen_max = 20;
-int pergen = 1;
-
-constexpr int start_min = 0, start_max = 1000;
-int start_from = 0;
-
-constexpr int gap_min = 0, gap_max = 20;
-int gap_frame = 0;
-
-bool anti_flick = true; // TODO: add explanation
-
 // TODO: should enable guide-mode (with a switch...)
 // TODO: imgui_widgets_extension; see TextDisabled for details...
 // TODO: changes upon the same rule should be grouped together... how? (editor++)...
@@ -428,6 +412,7 @@ int main(int argc, char** argv) {
     ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
     ImGui_ImplSDLRenderer2_Init(renderer);
 
+    // TODO: regulate lambda capturing...
     scope_guard cleanup([=] {
         ImGui_ImplSDLRenderer2_Shutdown();
         ImGui_ImplSDL2_Shutdown();
@@ -448,6 +433,21 @@ int main(int argc, char** argv) {
 
     logger::log("Entered main");
 
+    tile_filler filler(/* seed= */ 0);
+    rule_runner runner({.width = 320, .height = 240});
+    rule_recorder recorder;
+
+    constexpr int pergen_min = 1, pergen_max = 20;
+    int pergen = 1;
+
+    constexpr int start_min = 0, start_max = 1000;
+    int start_from = 0;
+
+    constexpr int gap_min = 0, gap_max = 20;
+    int gap_frame = 0;
+
+    bool anti_flick = true; // TODO: add explanation
+
     if (argc == 2) {
         // TODO: add err logger
         recorder.replace(read_rule_from_file(argv[1]));
@@ -465,7 +465,7 @@ int main(int argc, char** argv) {
     bool show_log_window = true;
     bool show_nav_window = true;
 
-    auto actual_pergen = [](int pergen) {
+    auto actual_pergen = [&](int pergen) {
         if (anti_flick && legacy::will_flick(runner.rule()) && pergen % 2) {
             return pergen + 1;
         }
@@ -618,6 +618,7 @@ int main(int argc, char** argv) {
                         }
                     }
 
+                    // TODO: should this be guarded by io.want...?
                     if (io.MouseWheel < 0) { // scroll down
                         recorder.next();
                     } else if (io.MouseWheel > 0) { // scroll up
