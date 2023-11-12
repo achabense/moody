@@ -423,12 +423,6 @@ int main(int argc, char** argv) {
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
-    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
-    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
-
-    // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
 
     // Setup Platform/Renderer backends
     ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
@@ -445,6 +439,13 @@ int main(int argc, char** argv) {
     });
 
     // Program logic:
+    ImGuiIO& io = ImGui::GetIO();
+    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
+
+    // Setup Dear ImGui style
+    ImGui::StyleColorsDark();
+
     logger::log("Entered main");
 
     if (argc == 2) {
@@ -455,8 +456,8 @@ int main(int argc, char** argv) {
     runner.set_rule(recorder.current());
     runner.restart(filler);
 
-    tile_image img(renderer, runner.tile()); // TODO: ...
-    code_image icons(renderer);              // TODO: how to get "renderer" from backend?
+    tile_image img(renderer, runner.tile());
+    code_image icons(renderer);
 
     bool paused = false;
     bool show_rule_editor = true;
@@ -469,6 +470,10 @@ int main(int argc, char** argv) {
             return pergen + 1;
         }
         return pergen;
+    };
+
+    auto imgui_keypressed = [&io](ImGuiKey key, bool repeat) {
+        return !io.WantCaptureKeyboard && ImGui::IsKeyPressed(key, repeat);
     };
 
     // Main loop
@@ -498,6 +503,18 @@ int main(int argc, char** argv) {
         ImGui_ImplSDLRenderer2_NewFrame();
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
+
+        scope_guard endframe([renderer, &io]() {
+            // Rendering
+            ImGui::Render();
+            SDL_RenderSetScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
+            // ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+            // SDL_SetRenderDrawColor(renderer, (Uint8)(clear_color.x * 255), (Uint8)(clear_color.y * 255),
+            //                        (Uint8)(clear_color.z * 255), (Uint8)(clear_color.w * 255));
+            SDL_RenderClear(renderer);
+            ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
+            SDL_RenderPresent(renderer);
+        });
 
         // Frame state:
         // TODO: applying following logic; consider refining it.
@@ -573,7 +590,7 @@ int main(int argc, char** argv) {
 
                     const ImVec2 uv0 = ImVec2((region_x) / img_size.x, (region_y) / img_size.y);
                     const ImVec2 uv1 = ImVec2((region_x + region_sz) / img_size.x, (region_y + region_sz) / img_size.y);
-                    const float zoom = 4.0f; // TODO: should be settable?
+                    const float zoom = 4.0f; // TODO: should be settable? 5.0f?
                     ImGui::Image(img.texture(), ImVec2(region_sz * zoom, region_sz * zoom), uv0, uv1);
 
                     ImGui::TextUnformatted("Rclick to copy to clipboard.");
@@ -609,12 +626,12 @@ int main(int argc, char** argv) {
                     // TODO: recorder actions should ideally be centralized...
                 }
 
-                // TODO: again, can size()==0? NO, but how to guarantee?
                 // It seems the whole recorder model is problematic...
                 ImGui::AlignTextToFramePadding(); // TODO: +1 is clumsy.
                 ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1);
                 // TODO: pos may not reflect runner's real pos, as recorder can be modified on the way... may not
                 // matters
+                // TODO: should runner.run() logic happen outside of frame?
 
                 static char go_to[20]{};
                 const auto filter = [](ImGuiInputTextCallbackData* data) {
@@ -646,7 +663,7 @@ int main(int argc, char** argv) {
                 }
 
                 ImGui::Checkbox("Pause", &paused);
-                if (ImGui::IsKeyPressed(ImGuiKey_P, false)) {
+                if (imgui_keypressed(ImGuiKey_P, false)) {
                     paused = !paused;
                 }
 
@@ -662,13 +679,11 @@ int main(int argc, char** argv) {
                 ImGui::PopButtonRepeat();
 
                 ImGui::SameLine();
-                // TODO: conflicts with text input. should have scope.
-                if (ImGui::Button("Restart") || ImGui::IsKeyPressed(ImGuiKey_R, false)) {
+                if (ImGui::Button("Restart") || imgui_keypressed(ImGuiKey_R, false)) {
                     should_restart = true;
                 }
                 ImGui::SameLine();
-                // TODO: conflicts with text input. should have scope.
-                if (ImGui::Button("Reseed") || ImGui::IsKeyPressed(ImGuiKey_S, false)) {
+                if (ImGui::Button("Reseed") || imgui_keypressed(ImGuiKey_S, false)) {
                     filler.disturb();
                     should_restart = true;
                 }
@@ -676,7 +691,6 @@ int main(int argc, char** argv) {
 
             {
                 // TODO: toooo ugly...
-                // TODO: (?) currently suitable to restart immediately...
                 ImGui::SliderInt("Pergen [1-20]", &pergen, pergen_min, pergen_max, "%d", ImGuiSliderFlags_NoInput);
                 ImGui::AlignTextToFramePadding();
                 ImGui::Text("(Actual pergen: %d)", actual_pergen(pergen));
@@ -687,21 +701,20 @@ int main(int argc, char** argv) {
                 ImGui::SliderInt("Start gen [0-1000]", &start_from, start_min, start_max, "%d",
                                  ImGuiSliderFlags_NoInput);
 
-                // TODO: conflicts with text input. should have scope.
                 // TODO: which(_1, _2) should be used for gap_frame+=1?
-                if (ImGui::IsKeyPressed(ImGuiKey_2, true)) {
+                if (imgui_keypressed(ImGuiKey_1, true)) {
                     gap_frame = std::max(gap_min, gap_frame - 1);
                 }
-                if (ImGui::IsKeyPressed(ImGuiKey_1, true)) {
+                if (imgui_keypressed(ImGuiKey_2, true)) {
                     gap_frame = std::min(gap_max, gap_frame + 1);
                 }
-                if (ImGui::IsKeyPressed(ImGuiKey_3, true)) {
+                if (imgui_keypressed(ImGuiKey_3, true)) {
                     pergen = std::max(pergen_min, pergen - 1);
                 }
-                if (ImGui::IsKeyPressed(ImGuiKey_4, true)) {
+                if (imgui_keypressed(ImGuiKey_4, true)) {
                     pergen = std::min(pergen_max, pergen + 1);
                 }
-                if (ImGui::IsKeyPressed(ImGuiKey_Space, true)) {
+                if (imgui_keypressed(ImGuiKey_Space, true)) {
                     if (!paused) {
                         paused = true;
                     } else {
@@ -711,25 +724,16 @@ int main(int argc, char** argv) {
             }
         }
 
-        // Rendering
-        ImGui::Render();
-        SDL_RenderSetScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
-        // ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-        // SDL_SetRenderDrawColor(renderer, (Uint8)(clear_color.x * 255), (Uint8)(clear_color.y * 255),
-        //                        (Uint8)(clear_color.z * 255), (Uint8)(clear_color.w * 255));
-        SDL_RenderClear(renderer);
-        ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
-        SDL_RenderPresent(renderer);
-
         // Synchronize with recorder:
-        should_restart |= runner.set_rule(recorder.current()); // is || (instead of | here) app-logically safe?
+        if (runner.set_rule(recorder.current())) {
+            should_restart = true;
+        }
         if (should_restart) {
             runner.restart(filler);
         }
         if (runner.gen() < start_from) {
             runner.run(start_from - runner.gen());
         } else if (!paused) {
-            // TODO: is GetFrameCount unchanged since last call in tile window?
             if (ImGui::GetFrameCount() % (gap_frame + 1) == 0) {
                 runner.run(actual_pergen(pergen));
             }

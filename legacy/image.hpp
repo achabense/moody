@@ -21,7 +21,6 @@ public:
     }
 
     ~tile_image() {
-        // TODO: this is (horribly) happening after renderer being destroyed...
         SDL_DestroyTexture(m_texture);
     }
 
