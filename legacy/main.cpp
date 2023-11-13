@@ -76,12 +76,28 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
             auto rule_str = to_MAP_str(to_edit);
             imgui_strwrapped(rule_str);
 
+            // TODO: refine msg...
             if (ImGui::Button("Copy to clipboard")) {
                 ImGui::SetClipboardText(rule_str.c_str());
+                logger::log("Copied");
             }
             ImGui::SameLine();
             if (ImGui::Button("Save to file")) {
                 legacy::record_rule(to_edit); // TODO: wasteful...
+                logger::log("Saved");         // TODO: redesign record_rule...
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Paste from clipboard")) {
+                // TODO: can text return nullptr?
+                if (const char* text = ImGui::GetClipboardText()) {
+                    auto rules = extract_rules(text, text + strlen(text));
+                    if (!rules.empty()) {
+                        int size = recorder.size();
+                        recorder.append(rules); // TODO: requires non-trivial append logic.
+                        recorder.set_pos(size);
+                        logger::log("Pasted {}", rules.size());
+                    }
+                }
             }
         }
 
@@ -277,7 +293,7 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
 // I have no idea whether I should use things like this...
 const std::filesystem::path& get_pref_path() {
     static const std::filesystem::path pref = []() {
-        std::unique_ptr<char, decltype(+SDL_free)> p(SDL_GetPrefPath("wtf", "wtfapp"), SDL_free);
+        const std::unique_ptr<char[], decltype(+SDL_free)> p(SDL_GetPrefPath("wtf", "wtfapp"), SDL_free);
         if (!p) {
             logger::log("{}", SDL_GetError());
             throw 0; // TODO: what if !p?
@@ -305,45 +321,62 @@ const std::filesystem::path& get_pref_path() {
 
     if (imgui_window window(id_str, p_open); window) {
         try {
+            // TODO: support filter...
             ImGui::TextUnformatted((const char*)pos.u8string().c_str());
-
             ImGui::Separator();
             // TODO: how to switch driver on windows? (enough to enable text input...)
-            if (ImGui::MenuItem("Program current path")) {
+            if (ImGui::MenuItem("-> Exe path")) {
+                // TODO: is char[] correct? (is both correct?)
+                // The correctness of "pos = base.get()" relies on default coding being utf-8 (asserted; TODO: list all
+                // utf8 dependencies)
+                const std::unique_ptr<char[], decltype(+SDL_free)> base(SDL_GetBasePath(), SDL_free);
+                if (base) {
+                    pos = base.get();
+                }
+                // TODO: what if this fails?
+            }
+            if (ImGui::MenuItem("-> Cur path")) {
                 pos = current_path(); // TODO: what if invalid?
             }
+            // TODO: the correctness is doubtful here...
             path par = pos.parent_path();
-            if (ImGui::MenuItem("..", "dir", nullptr, par != pos && is_directory(par))) {
+            if (ImGui::MenuItem("-> ..", nullptr, nullptr, par != pos && is_directory(par))) {
                 pos = par;
             }
             ImGui::Separator();
 
-            // TODO: what if too many entries?
-            // TODO: move into child window; scope-guard required...
-            int entries = 0;
-            for (const auto& entry : directory_iterator(pos)) {
-                auto str = entry.path().filename().u8string(); // TODO: is showing filename-only a good idea?
-                // TODO: should ".txt" be needed? or should this be just be a default regex filter?
-                bool txt = entry.is_regular_file() && entry.path().extension() == ".txt";
-                bool dir = entry.is_directory();
-                if (txt || dir) {
-                    ++entries;
-                    if (ImGui::MenuItem((const char*)str.c_str(), dir ? "dir" : "")) {
-                        if (txt) {
-                            // TODO: want double click; how?
-                            try_open = entry.path();
-                        } else if (dir) {
-                            pos = entry.path();
-                            break;
+            // TODO: add childwindow class? (currently not defined as the param is complex...)
+            scope_guard endchild(+ImGui::EndChild);
+            if (ImGui::BeginChild("Child")) {
+                // TODO: what if too many entries?
+                // TODO: move into child window; scope-guard required...
+                int entries = 0;
+                for (const auto& entry : directory_iterator(pos)) {
+                    auto str = entry.path().filename().u8string(); // TODO: is showing filename-only a good idea?
+                    // TODO: should ".txt" be needed? or should this be just be a default regex filter?
+                    bool txt = entry.is_regular_file() && entry.path().extension() == ".txt";
+                    bool dir = entry.is_directory();
+                    if (txt || dir) {
+                        ++entries;
+                        if (ImGui::MenuItem((const char*)str.c_str(), dir ? "dir" : "")) {
+                            if (txt) {
+                                // TODO: want double click; how?
+                                try_open = entry.path();
+                            } else if (dir) {
+                                pos = entry.path();
+                                break;
+                            }
                         }
                     }
                 }
-            }
-            if (entries == 0) {
-                // TODO: better msg...
-                ImGui::MenuItem("None##None", nullptr, nullptr, false);
+                if (entries == 0) {
+                    // TODO: better msg...
+                    ImGui::MenuItem("None##None", nullptr, nullptr, false);
+                }
             }
         } catch (const exception& what) {
+            // TODO: as logger can be folded, better show the message in this window...
+            // TODO: let every window have its own logger?
             logger::log("Exception: {}", what.what()); // TODO: a lot of messy fs exceptions (access, encoding)...
             pos = pos.parent_path();                   // TODO: maybe fail again?
         }
@@ -389,6 +422,7 @@ int main(int argc, char** argv) {
         return -1;
     }
 
+    // IME: "Input Method Editor"
     // From 2.0.18: Enable native IME.
 #ifdef SDL_HINT_IME_SHOW_UI
     SDL_SetHint(SDL_HINT_IME_SHOW_UI, "1");
@@ -398,6 +432,7 @@ int main(int argc, char** argv) {
     SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     SDL_Window* window = SDL_CreateWindow("Dear ImGui SDL2+SDL_Renderer example", SDL_WINDOWPOS_CENTERED,
                                           SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
+    // TODO: should be able to control framerate (should not rely on VSYNC rate)
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
     if (renderer == nullptr) {
         SDL_Log("Error creating SDL_Renderer!");
@@ -477,6 +512,7 @@ int main(int argc, char** argv) {
     };
 
     // Main loop
+    // TODO: cannot break eagerly?
     bool done = false;
     while (!done) {
         // Poll and handle events (inputs, window resize, etc.)
@@ -569,31 +605,36 @@ int main(int argc, char** argv) {
                 const ImVec2 img_size = ImVec2(img.width(), img.height()); // TODO: support zooming?
 
                 ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
+                img.update(runner.tile());
                 ImGui::ImageButton(img.texture(), img_size);
                 ImGui::PopStyleVar();
 
-                // I did a trick here. ImageButton didn't draw eagerly, so it's safe to update the texture after
-                // ImageButton(). This is used to provide stable view against dragging.
-                // TODO: is this a good design?
-                if (ImGui::IsItemHovered() && ImGui::IsItemActive()) {
-                    runner.shift_xy(io.MouseDelta.x, io.MouseDelta.y);
-                }
-                img.update(runner.tile());
+                static bool spaused = false;
 
-                if (imgui_itemtooltip tooltip; tooltip) {
-                    // TODO: rewrite logic...
+                if (ImGui::IsItemActivated()) {
+                    spaused = paused;
+                    paused = true;
+                }
+                if (ImGui::IsItemDeactivated()) {
+                    paused = spaused;
+                }
+                if (ImGui::IsItemHovered() && ImGui::IsItemActive()) {
+                    if (io.MouseDelta.x != 0 || io.MouseDelta.y != 0) {
+                        runner.shift_xy(io.MouseDelta.x, io.MouseDelta.y);
+                        // img.update(runner.tile()); // will not affect much... TODO: remove...
+                    }
+                } else if (imgui_itemtooltip tooltip; tooltip) {
+                    assert(ImGui::IsMousePosValid());
                     const float region_sz = 32.0f;
-                    float region_x = io.MousePos.x - pos.x - region_sz * 0.5f;
-                    float region_y = io.MousePos.y - pos.y - region_sz * 0.5f;
-                    region_x = std::clamp(region_x, 0.0f, img_size.x - region_sz);
-                    region_y = std::clamp(region_y, 0.0f, img_size.y - region_sz);
+                    float region_x = std::clamp(io.MousePos.x - pos.x - region_sz * 0.5f, 0.0f, img_size.x - region_sz);
+                    float region_y = std::clamp(io.MousePos.y - pos.y - region_sz * 0.5f, 0.0f, img_size.y - region_sz);
 
                     const ImVec2 uv0 = ImVec2((region_x) / img_size.x, (region_y) / img_size.y);
                     const ImVec2 uv1 = ImVec2((region_x + region_sz) / img_size.x, (region_y + region_sz) / img_size.y);
                     const float zoom = 4.0f; // TODO: should be settable? 5.0f?
                     ImGui::Image(img.texture(), ImVec2(region_sz * zoom, region_sz * zoom), uv0, uv1);
 
-                    ImGui::TextUnformatted("Rclick to copy to clipboard.");
+                    ImGui::TextUnformatted("Rclick to copy."); // TODO: remove in the future.
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_::ImGuiMouseButton_Right)) {
                         ImGui::SetClipboardText(to_MAP_str(runner.rule()).c_str());
                         logger::log("Copied rule with hash {}",
@@ -601,24 +642,7 @@ int main(int argc, char** argv) {
                         // TODO: should refine msg.
                         // TODO: should be shared with editor's.
                     }
-                    ImGui::TextUnformatted("Ctrl+Lclick to paste from clipboard.");
-                    if (io.KeyCtrl && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-                        const char* text = ImGui::GetClipboardText();
-                        // TODO: can text return nullptr?
-                        if (text) {
-                            auto rules = extract_rules(text, text + strlen(text));
-                            if (!rules.empty()) {
-                                int size = recorder.size();
-                                recorder.append(rules); // TODO: requires non-trivial append logic.
-                                recorder.set_pos(size);
-                                logger::log("Got {} rules from clipboard", rules.size());
-                            } else {
-                                logger::log("X_X");
-                            }
-                        }
-                    }
 
-                    // TODO: should this be guarded by io.want...?
                     if (io.MouseWheel < 0) { // scroll down
                         recorder.next();
                     } else if (io.MouseWheel > 0) { // scroll up

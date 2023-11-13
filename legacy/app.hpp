@@ -183,7 +183,7 @@ std::vector<legacy::compressT> extract_rules(const char* begin, const char* end)
 
 // It's unfortunate that `expected` is not in C++20...
 std::optional<std::vector<char>> load_binary(const char* filename, int max_size) {
-    std::unique_ptr<FILE, decltype(+fclose)> file(fopen(filename, "rb"), fclose);
+    const std::unique_ptr<FILE, decltype(+fclose)> file(fopen(filename, "rb"), fclose);
     if (file) {
         FILE* fp = file.get();
         fseek(fp, 0, SEEK_END); // <-- what if fails?
