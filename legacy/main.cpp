@@ -64,8 +64,6 @@ struct [[nodiscard]] imgui_itemtooltip {
 // TODO: for "paired", support 4-step modification (_,S,B,BS)... add new color?
 void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, code_image& icons,
                rule_recorder& recorder) {
-    using legacy::codeT;
-
     if (imgui_window window(id_str, p_open, ImGuiWindowFlags_AlwaysAutoResize); window) {
         // TODO: are these info useful?
         // ImGui::Text("Spatial_symmetric:%d\tState_symmetric:%d\nABS_agnostic:%d\tXOR_agnostic:%d",
@@ -158,6 +156,7 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
         // TODO: should be foldable; should be able to set max height...
         ImGui::SeparatorText("Rule details");
         {
+            using legacy::codeT;
             {
                 // TODO: unstable between base/extr switchs; ratio-based approach is on-trivial though... (double has
                 // inaccessible values)
@@ -286,24 +285,8 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
     }
 }
 
-// TODO: Should be a part runtime [dependency] - allowed to create folders in the exe path. (SDL_GetBasePath(), instead
-// of PrefPath)
-// TODO: btw, how to deal with imgui config?
-#if 0
-// I have no idea whether I should use things like this...
-const std::filesystem::path& get_pref_path() {
-    static const std::filesystem::path pref = []() {
-        const std::unique_ptr<char[], decltype(+SDL_free)> p(SDL_GetPrefPath("wtf", "wtfapp"), SDL_free);
-        if (!p) {
-            logger::log("{}", SDL_GetError());
-            throw 0; // TODO: what if !p?
-        }
-        // TODO: p must be utf-8; on the other way, what encoding does fs::path assume?
-        return std::filesystem::path(p.get());
-    }();
-    return pref;
-}
-#endif
+// TODO: the program should be allowed to create folders in the exe path.(SDL_GetBasePath(), instead of PrefPath)
+// this is a part runtime [dependency]. (btw, where to put imgui config?)
 
 // TODO: is "record" a returnable type?
 // TODO: add input...
@@ -322,9 +305,9 @@ const std::filesystem::path& get_pref_path() {
             // TODO: support filter...
             ImGui::TextUnformatted((const char*)pos.u8string().c_str());
             ImGui::Separator();
+            // TODO: add text input.
             // TODO: how to switch driver on windows? (enough to enable text input...)
             if (ImGui::MenuItem("-> Exe path")) {
-                // TODO: is char[] correct? (is both correct?)
                 // The correctness of "pos = base.get()" relies on default coding being utf-8 (asserted; TODO: list all
                 // utf8 dependencies)
                 const std::unique_ptr<char[], decltype(+SDL_free)> base(SDL_GetBasePath(), SDL_free);
@@ -337,9 +320,8 @@ const std::filesystem::path& get_pref_path() {
                 pos = current_path(); // TODO: what if invalid?
             }
             // TODO: the correctness is doubtful here...
-            path par = pos.parent_path();
-            if (ImGui::MenuItem("-> ..", nullptr, nullptr, par != pos && is_directory(par))) {
-                pos = par;
+            if (path par = pos.parent_path(); ImGui::MenuItem("-> ..", nullptr, nullptr, par != pos)) {
+                pos = par; // swap?
             }
             ImGui::Separator();
 
@@ -350,17 +332,22 @@ const std::filesystem::path& get_pref_path() {
                 // TODO: move into child window; scope-guard required...
                 int entries = 0;
                 for (const auto& entry : directory_iterator(pos)) {
-                    auto str = entry.path().filename().u8string(); // TODO: is showing filename-only a good idea?
                     // TODO: should ".txt" be needed? or should this be just be a default regex filter?
-                    bool txt = entry.is_regular_file() && entry.path().extension() == ".txt";
-                    bool dir = entry.is_directory();
+                    // TODO: how to compare file extension without creating a real string?
+                    const bool txt = entry.is_regular_file() && entry.path().extension() == ".txt";
+                    const bool dir = entry.is_directory();
                     if (txt || dir) {
                         ++entries;
+                        // TODO: is only showing filename a good idea?
+                        const auto str = entry.path().filename().u8string();
                         if (ImGui::MenuItem((const char*)str.c_str(), dir ? "dir" : "")) {
                             if (txt) {
                                 // TODO: want double click; how?
                                 // TODO: always use u8string?
                                 logger::log("Tried to open {}", entry.path().filename().string());
+                                // TODO: is string() encoding-safe for fopen()?
+                                // to-check:
+                                // https://stackoverflow.com/questions/396567/is-there-a-standard-way-to-do-an-fopen-with-a-unicode-string-file-path
                                 auto result = read_rule_from_file(entry.path().string().c_str());
                                 if (!result.empty()) {
                                     logger::append(" ~ found {} rules", result.size());
@@ -382,21 +369,25 @@ const std::filesystem::path& get_pref_path() {
             }
         } catch (const exception& what) {
             // TODO: as logger can be folded, better show the message in this window...
+            // (this is really an exception that should be posed to users...)
             // TODO: let every window have its own logger?
             // TODO: what's the encoding of exception.what()?
             logger::log("Exception: {}", what.what()); // TODO: a lot of messy fs exceptions (access, encoding)...
-            pos = pos.parent_path();                   // TODO: maybe fail again?
+            pos = pos.parent_path();
+            // TODO: this won't fail easily, but may cause exception loop in the following frames.
+            // better: if exception happens after a path change, restore. otherwise, should become "broken" state.
         }
     }
 }
 
 // TODO: should enable guide-mode (with a switch...)
-// TODO: imgui_widgets_extension; see TextDisabled for details...
 // TODO: changes upon the same rule should be grouped together... how? (editor++)...
-// TODO: support seeding...(how to save?) some patterns are located in certain seed states...
+// TODO: whether to support seed-saving? some patterns are located in certain seed states...
+// (maybe a lot less useful than pattern saving)
 // TODO: how to capture certain patterns? (editor++)...
 
 // TODO: move the check elsewhere.
+// TODO: "bytes_equal" is not needed elsewhere, remove it.
 // C/C++ - command line - /utf-8
 // and save file as utf8-encoding...
 template <class T, class U>
@@ -626,7 +617,7 @@ int main(int argc, char** argv) {
                     ImGui::Image(img.texture(), ImVec2(region_sz * zoom, region_sz * zoom), uv0, uv1);
 
                     ImGui::TextUnformatted("Rclick to copy."); // TODO: remove in the future.
-                    if (ImGui::IsMouseClicked(ImGuiMouseButton_::ImGuiMouseButton_Right)) {
+                    if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
                         ImGui::SetClipboardText(to_MAP_str(runner.rule()).c_str());
                         logger::log("Copied rule with hash {}",
                                     0xffff & (std::hash<std::string>{}(to_MAP_str(runner.rule()))));
@@ -639,7 +630,7 @@ int main(int argc, char** argv) {
                     } else if (io.MouseWheel > 0) { // scroll up
                         recorder.prev();
                     }
-                    // TODO: recorder actions should ideally be centralized...
+                    // TODO: reconsider whether/where to support next/prev actions
                 }
 
                 // It seems the whole recorder model is problematic...
@@ -647,7 +638,6 @@ int main(int argc, char** argv) {
                 ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1);
                 // TODO: pos may not reflect runner's real pos, as recorder can be modified on the way... may not
                 // matters
-                // TODO: should runner.run() logic happen outside of frame?
 
                 static char go_to[20]{};
                 const auto filter = [](ImGuiInputTextCallbackData* data) {
@@ -741,6 +731,7 @@ int main(int argc, char** argv) {
         }
 
         // Synchronize with recorder:
+        // TODO: should this be put before begin-frame?
         if (runner.set_rule(recorder.current())) {
             should_restart = true;
         }
