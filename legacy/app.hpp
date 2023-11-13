@@ -116,6 +116,7 @@ public:
 };
 
 // Never empty.
+// TODO: should be able to tell different sources...
 class rule_recorder {
     std::vector<legacy::compressT> m_record;
     int m_pos;
@@ -263,8 +264,15 @@ public:
         }
     }
 
+    // TODO: better name...
+    template <class... T>
+    static void append(std::format_string<const T&...> fmt, const T&... args) noexcept {
+        assert(!m_strs.empty());
+        m_strs.back() += std::format(fmt, args...);
+    }
+
     // TODO: layout is terrible...
-    static void window(const char* id_str, bool* p_open = nullptr) {
+    static void window(const char* id_str, bool* p_open) {
         if (imgui_window window(id_str, p_open); window) {
             if (ImGui::Button("Clear")) {
                 m_strs.clear();

@@ -62,16 +62,17 @@ struct [[nodiscard]] imgui_itemtooltip {
 // TODO: clumsy...
 // TODO: should be a class... how to decouple? ...
 // TODO: for "paired", support 4-step modification (_,S,B,BS)... add new color?
-void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule_recorder& recorder) {
+void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, code_image& icons,
+               rule_recorder& recorder) {
     using legacy::codeT;
 
-    if (imgui_window window("Rule editor", &show, ImGuiWindowFlags_AlwaysAutoResize); window) {
+    if (imgui_window window(id_str, p_open, ImGuiWindowFlags_AlwaysAutoResize); window) {
         // TODO: are these info useful?
         // ImGui::Text("Spatial_symmetric:%d\tState_symmetric:%d\nABS_agnostic:%d\tXOR_agnostic:%d",
         //             legacy::spatial_symmetric(to_edit), legacy::state_symmetric(to_edit),
         //             legacy::center_agnostic_abs(to_edit), legacy::center_agnostic_xor(to_edit));
 
-        ImGui::SeparatorText("Rule str");
+        ImGui::TextUnformatted("Current rule:");
         {
             auto rule_str = to_MAP_str(to_edit);
             imgui_strwrapped(rule_str);
@@ -231,7 +232,6 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
 
                 ImGui::PushID(j);
                 if (inconsistent) {
-                    // TODO: this looks super dumb...
                     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6, 0, 0, 1));
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8, 0, 0, 1));
                     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.9, 0, 0, 1));
@@ -259,7 +259,7 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
 
                 if (imgui_itemtooltip tooltip; tooltip) {
                     for (int x = 0; codeT code : groups[j]) {
-                        if (x++ % 8 != 0) {
+                        if (x++ % perline != 0) { // TODO: sharing the same perline (not necessary)
                             ImGui::SameLine();
                         }
 
@@ -308,16 +308,14 @@ const std::filesystem::path& get_pref_path() {
 // TODO: is "record" a returnable type?
 // TODO: add input...
 // TODO: undo operation...
-// TODO: class-ify?
-[[nodiscard]] std::optional<std::vector<legacy::compressT>> file_nav(const char* id_str, bool* p_open = nullptr) {
+// TODO: should be a class?
+[[nodiscard]] void file_nav(const char* id_str, bool* p_open, rule_recorder& recorder) {
     using namespace std;
     using namespace std::filesystem;
 
     // static path pos = current_path();
     static path pos = R"(C:\*redacted*\Desktop\rulelists_new)";
     // static path pos = get_pref_path();
-
-    optional<path> try_open = nullopt;
 
     if (imgui_window window(id_str, p_open); window) {
         try {
@@ -361,7 +359,15 @@ const std::filesystem::path& get_pref_path() {
                         if (ImGui::MenuItem((const char*)str.c_str(), dir ? "dir" : "")) {
                             if (txt) {
                                 // TODO: want double click; how?
-                                try_open = entry.path();
+                                // TODO: always use u8string?
+                                logger::log("Tried to open {}", entry.path().filename().string());
+                                auto result = read_rule_from_file(entry.path().string().c_str());
+                                if (!result.empty()) {
+                                    logger::append(" ~ found {} rules", result.size());
+                                    recorder.replace(std::move(result));
+                                } else {
+                                    logger::append(" ~ found nothing");
+                                }
                             } else if (dir) {
                                 pos = entry.path();
                                 break;
@@ -377,16 +383,10 @@ const std::filesystem::path& get_pref_path() {
         } catch (const exception& what) {
             // TODO: as logger can be folded, better show the message in this window...
             // TODO: let every window have its own logger?
+            // TODO: what's the encoding of exception.what()?
             logger::log("Exception: {}", what.what()); // TODO: a lot of messy fs exceptions (access, encoding)...
             pos = pos.parent_path();                   // TODO: maybe fail again?
         }
-    }
-
-    if (try_open) {
-        logger::log("Tried to open {}", try_open->filename().string());
-        return read_rule_from_file(try_open->string().c_str());
-    } else {
-        return nullopt;
     }
 }
 
@@ -507,6 +507,7 @@ int main(int argc, char** argv) {
         return pergen;
     };
 
+    // TODO: should be a plain function.
     auto imgui_keypressed = [&io](ImGuiKey key, bool repeat) {
         return !io.WantCaptureKeyboard && ImGui::IsKeyPressed(key, repeat);
     };
@@ -568,21 +569,10 @@ int main(int argc, char** argv) {
         }
         // TODO: editor works still poorly with recorder...
         if (show_rule_editor) {
-            edit_rule(show_rule_editor, runner.rule(), icons, recorder);
+            edit_rule("Rule editor", &show_rule_editor, runner.rule(), icons, recorder);
         }
         if (show_nav_window) {
-            // TODO: temporarily have to be here; works poorly with `recorder.take(edited);` logic...
-            // TODO: as popup instead?
-            auto result = file_nav("File Nav", &show_nav_window);
-            // TODO: move logging to read_rule_from_file?
-            if (result) {
-                if (!result->empty()) {
-                    logger::log("Found {} rules", result->size());
-                    recorder.replace(std::move(*result));
-                } else {
-                    logger::log("Found nothing");
-                }
-            }
+            file_nav("File Nav", &show_nav_window, recorder);
         }
 
         if (imgui_window window("-v-", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize);
@@ -696,6 +686,7 @@ int main(int argc, char** argv) {
                 ImGui::PushButtonRepeat(true); // accept consecutive clicks... TODO: too fast...
                 if (ImGui::Button("+1")) {
                     runner.run(1); // TODO: should run be called here?
+                    // TODO: should have visible (text) effect even when not paused...
                 }
                 ImGui::SameLine();
                 if (ImGui::Button("+p")) {
