@@ -468,7 +468,7 @@ int main(int argc, char** argv) {
 
     logger::log("Entered main");
 
-    tile_filler filler(/* seed= */ 0);
+    tile_filler filler{.seed = 0, .density = 0.5};
     rule_runner runner({.width = 320, .height = 240});
     rule_recorder recorder;
 
@@ -508,8 +508,9 @@ int main(int argc, char** argv) {
     };
 
     // TODO: should be a plain function.
-    auto imgui_keypressed = [&io](ImGuiKey key, bool repeat) {
-        return !io.WantCaptureKeyboard && ImGui::IsKeyPressed(key, repeat);
+    // TODO: use GetIO() or io ref?
+    auto imgui_keypressed = [](ImGuiKey key, bool repeat) {
+        return ImGui::GetIO().WantCaptureKeyboard && ImGui::IsKeyPressed(key, repeat);
     };
 
     // Main loop
@@ -671,7 +672,6 @@ int main(int argc, char** argv) {
             {
                 ImGui::Text("Gen:%d", runner.gen());
 
-                // TODO: this is horribly obscure...
                 if (ImGui::SliderFloat("Init density [0-1]", &filler.density, 0.0f, 1.0f, "%.3f",
                                        ImGuiSliderFlags_NoInput)) {
                     should_restart = true;
@@ -683,14 +683,14 @@ int main(int argc, char** argv) {
                 }
 
                 ImGui::SameLine();
-                ImGui::PushButtonRepeat(true); // accept consecutive clicks... TODO: too fast...
+                ImGui::PushButtonRepeat(true);
                 if (ImGui::Button("+1")) {
                     runner.run(1); // TODO: should run be called here?
                     // TODO: should have visible (text) effect even when not paused...
                 }
                 ImGui::SameLine();
                 if (ImGui::Button("+p")) {
-                    runner.run(actual_pergen(pergen)); // TODO: should combine...
+                    runner.run(actual_pergen(pergen));
                 }
                 ImGui::PopButtonRepeat();
 
@@ -700,7 +700,7 @@ int main(int argc, char** argv) {
                 }
                 ImGui::SameLine();
                 if (ImGui::Button("Reseed") || imgui_keypressed(ImGuiKey_S, false)) {
-                    filler.disturb();
+                    ++filler.seed;
                     should_restart = true;
                 }
             }

@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+// TODO: the utilities provided by "app.hpp" appears unsystematic, and generally too weak.
+
 #include <deque>
 #include <format>
 #include <random>
@@ -12,42 +14,30 @@
 // TODO: partial rule (e.g. collect from tile; the rest is generated from another generator...)
 // TODO: allow resizing the grid.
 
-// TODO: notify on quit...
-// TODO: support more run-mode...
-// TODO: right click to enable/disable miniwindow...
-// TODO: file container. easy ways to add fav...
+// TODO: notify on quit... (? there seems no such need.)
+// TODO: support more run-mode... (? related: when will the current run-mode cause problems?)
+// TODO: right click to enable/disable miniwindow... (? should miniwindow be redesigned)
 
 void random_fill(bool* begin, bool* end, int count, auto&& rand) {
-    int dist = end - begin;
-    assert(dist > 0);
     std::fill(begin, end, false);
-    std::fill(begin, begin + std::clamp(count, 0, dist), true);
+    std::fill(begin, begin + std::clamp(count, 0, int(end - begin)), true);
     std::shuffle(begin, end, rand);
 }
 
-// TODO: seed-only? (for easier reproduction...)
-class tile_filler {
-    std::mt19937_64 m_rand;
+// TODO: rename...
+struct tile_filler {
+    uint64_t seed; // arbitrary value
+    float density; // ∈ [0.0f, 1.0f]
 
-public:
-    explicit tile_filler(uint64_t seed) : m_rand{seed} {}
-
-    float density = 0.5; // ∈ [0.0f, 1.0f]
-
-    void disturb() {
-        // Enough to make totally different result:
-        (void)m_rand();
-    }
     void fill(legacy::tileT& tile, const legacy::rectT* resize = nullptr) const {
         if (resize) {
             tile.resize(*resize);
         }
 
-        random_fill(tile.begin(), tile.end(), tile.area() * density, std::mt19937_64{m_rand});
+        random_fill(tile.begin(), tile.end(), tile.area() * density, std::mt19937_64{seed});
     }
 };
 
-// TODO: support shifting...
 // TODO: !!!! recheck when to "restart"..
 class rule_runner {
     legacy::ruleT m_rule{};
