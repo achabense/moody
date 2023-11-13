@@ -116,6 +116,7 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
             ImGui::SameLine();
             ImGui::RadioButton("basic", underlying_address(extr), legacy::partition::extra_specification::none);
             ImGui::SameLine();
+            // TODO: support 4-state modification when paired...
             ImGui::RadioButton("paired", underlying_address(extr), legacy::partition::paired);
             ImGui::SameLine();
             // TODO: explain...
@@ -257,8 +258,7 @@ void edit_rule(bool& show, const legacy::ruleT& to_edit, code_image& icons, rule
                 ImGui::PopID();
 
                 if (imgui_itemtooltip tooltip; tooltip) {
-                    int x = 0;
-                    for (codeT code : groups[j]) {
+                    for (int x = 0; codeT code : groups[j]) {
                         if (x++ % 8 != 0) {
                             ImGui::SameLine();
                         }

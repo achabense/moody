@@ -226,10 +226,10 @@ namespace legacy {
             };
 
             // TODO: very strange format...
-#define mapto(...)                                                                                                     \
-    +[](codeT code) {                                                                                                  \
-        auto [q, w, e, a, s, d, z, x, c] = decode(code);                                                               \
-        return encode(__VA_ARGS__);                                                                                    \
+#define mapto(...)                                       \
+    +[](codeT code) {                                    \
+        auto [q, w, e, a, s, d, z, x, c] = decode(code); \
+        return encode(__VA_ARGS__);                      \
     }
             // z x c
             // a s d

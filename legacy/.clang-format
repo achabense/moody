@@ -7,6 +7,8 @@ ColumnLimit:     120
 AllowShortFunctionsOnASingleLine: Inline
 AlwaysBreakTemplateDeclarations: Yes
 
+AlignEscapedNewlines: Left
+
 IndentWidth:     4
 InsertBraces:    true
 InsertNewlineAtEOF: true
