@@ -156,7 +156,6 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
         // TODO: should be foldable; should be able to set max height...
         ImGui::SeparatorText("Rule details");
         {
-            using legacy::codeT;
             {
                 // TODO: unstable between base/extr switchs; ratio-based approach is on-trivial though... (double has
                 // inaccessible values)
@@ -164,7 +163,7 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                 rcount = std::clamp(rcount, 0, k);
 
                 ImGui::SliderInt("##Active", &rcount, 0, k, "%d", ImGuiSliderFlags_NoInput);
-                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 0)); // TODO: it this spacing suitable?
+                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 0));
                 ImGui::PushButtonRepeat(true);
                 const float r = ImGui::GetFrameHeight();
                 ImGui::SameLine();
@@ -186,6 +185,7 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                     rule = legacy::partition::get_partition(base, extr).dispatch_from(grule);
                 }
             }
+            using legacy::codeT;
             const auto& groups = part.groups();
             auto scans = part.scan(rule);
             {
@@ -216,70 +216,71 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
             const int perline = 8;
             const int lines = 7;
             const float child_height = lines * (21 /*r*/ + 4 /*padding.y*2*/) + (lines - 1) * 4 /*spacing.y*/;
-            // ImGui::Separator();
-            ImGui::BeginChild("Details", ImVec2(390, child_height)); // TODO: how to resize automatically
-            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 4));
-            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
-            for (int j = 0; j < k; ++j) {
-                if (j % perline != 0) {
-                    ImGui::SameLine();
-                }
-                if (j != 0 && j % (perline * lines) == 0) {
-                    ImGui::Separator(); // TODO: refine...
-                }
-                const bool inconsistent = scans[j] == scans.Inconsistent;
-
-                ImGui::PushID(j);
-                if (inconsistent) {
-                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6, 0, 0, 1));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8, 0, 0, 1));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.9, 0, 0, 1));
-                }
-                if (ImGui::ImageButton(icons.texture(), icon_size, ImVec2(0, groups[j][0] * (1.0f / 512)),
-                                       ImVec2(1, (groups[j][0] + 1) * (1.0f / 512)))) {
-                    // TODO: document this behavior... (keyctrl->resolve conflicts)
-                    if (ImGui::GetIO().KeyCtrl) {
-                        const bool b = !rule[groups[j][0]];
-                        for (codeT code : groups[j]) {
-                            rule[code] = b;
-                        }
-                    } else {
-                        for (codeT code : groups[j]) {
-                            rule[code] = !rule[code];
-                        }
-                    }
-
-                    // TODO: TextUnformatted(strs[scans[j]]) may yield false result at this frame, but is negligible...
-                }
-                if (inconsistent) {
-                    ImGui::PopStyleColor(3);
-                }
-                ImGui::PopID();
-
-                if (imgui_itemtooltip tooltip; tooltip) {
-                    for (int x = 0; codeT code : groups[j]) {
-                        if (x++ % perline != 0) { // TODO: sharing the same perline (not necessary)
-                            ImGui::SameLine();
-                        }
-
-                        // TODO: use the same bordercol as button's?
-                        // TODO: icons should provide codeT methods...
-                        ImGui::Image(icons.texture(), icon_size, ImVec2(0, code * (1.0f / 512)),
-                                     ImVec2(1, (code + 1) * (1.0f / 512)), ImVec4(1, 1, 1, 1),
-                                     ImVec4(0.5, 0.5, 0.5, 1));
+            // TOOD: this should always return true...
+            if (imgui_childwindow child("Details", ImVec2(390, child_height)); child) {
+                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 4));
+                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
+                for (int j = 0; j < k; ++j) {
+                    if (j % perline != 0) {
                         ImGui::SameLine();
-                        ImGui::AlignTextToFramePadding();
-                        ImGui::TextUnformatted(rule[code] ? ":1" : ":0");
                     }
-                }
+                    if (j != 0 && j % (perline * lines) == 0) {
+                        ImGui::Separator(); // TODO: refine...
+                    }
+                    const bool inconsistent = scans[j] == scans.Inconsistent;
 
-                ImGui::SameLine();
-                ImGui::AlignTextToFramePadding();
-                static const char* const strs[]{":x", ":0", ":1"};
-                ImGui::TextUnformatted(strs[scans[j]]); // TODO: is ":x" useless?
+                    ImGui::PushID(j);
+                    if (inconsistent) {
+                        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6, 0, 0, 1));
+                        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8, 0, 0, 1));
+                        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.9, 0, 0, 1));
+                    }
+                    if (ImGui::ImageButton(icons.texture(), icon_size, ImVec2(0, groups[j][0] * (1.0f / 512)),
+                                           ImVec2(1, (groups[j][0] + 1) * (1.0f / 512)))) {
+                        // TODO: document this behavior... (keyctrl->resolve conflicts)
+                        if (ImGui::GetIO().KeyCtrl) {
+                            const bool b = !rule[groups[j][0]];
+                            for (codeT code : groups[j]) {
+                                rule[code] = b;
+                            }
+                        } else {
+                            for (codeT code : groups[j]) {
+                                rule[code] = !rule[code];
+                            }
+                        }
+
+                        // TODO: TextUnformatted(strs[scans[j]]) may yield false result at this frame, but is
+                        // negligible...
+                    }
+                    if (inconsistent) {
+                        ImGui::PopStyleColor(3);
+                    }
+                    ImGui::PopID();
+
+                    if (imgui_itemtooltip tooltip; tooltip) {
+                        for (int x = 0; codeT code : groups[j]) {
+                            if (x++ % perline != 0) { // TODO: sharing the same perline (not necessary)
+                                ImGui::SameLine();
+                            }
+
+                            // TODO: use the same bordercol as button's?
+                            // TODO: icons should provide codeT methods...
+                            ImGui::Image(icons.texture(), icon_size, ImVec2(0, code * (1.0f / 512)),
+                                         ImVec2(1, (code + 1) * (1.0f / 512)), ImVec4(1, 1, 1, 1),
+                                         ImVec4(0.5, 0.5, 0.5, 1));
+                            ImGui::SameLine();
+                            ImGui::AlignTextToFramePadding();
+                            ImGui::TextUnformatted(rule[code] ? ":1" : ":0");
+                        }
+                    }
+
+                    ImGui::SameLine();
+                    ImGui::AlignTextToFramePadding();
+                    static const char* const strs[]{":x", ":0", ":1"};
+                    ImGui::TextUnformatted(strs[scans[j]]); // TODO: is ":x" useless?
+                }
+                ImGui::PopStyleVar(2);
             }
-            ImGui::PopStyleVar(2);
-            ImGui::EndChild();
         }
         recorder.take(inter.to_rule(rule));
     }
@@ -325,9 +326,7 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
             }
             ImGui::Separator();
 
-            // TODO: add childwindow class? (currently not defined as the param is complex...)
-            scope_guard endchild(+ImGui::EndChild);
-            if (ImGui::BeginChild("Child")) {
+            if (imgui_childwindow child("child"); child) {
                 // TODO: what if too many entries?
                 // TODO: move into child window; scope-guard required...
                 int entries = 0;
@@ -346,8 +345,7 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                                 // TODO: always use u8string?
                                 logger::log("Tried to open {}", entry.path().filename().string());
                                 // TODO: is string() encoding-safe for fopen()?
-                                // to-check:
-                                // https://stackoverflow.com/questions/396567/is-there-a-standard-way-to-do-an-fopen-with-a-unicode-string-file-path
+                                // TODO: use ifstream(path()) instead?
                                 auto result = read_rule_from_file(entry.path().string().c_str());
                                 if (!result.empty()) {
                                     logger::append(" ~ found {} rules", result.size());

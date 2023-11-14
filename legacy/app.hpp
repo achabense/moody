@@ -172,7 +172,6 @@ std::vector<legacy::compressT> extract_rules(const char* begin, const char* end)
     return rules;
 }
 
-// It's unfortunate that `expected` is not in C++20...
 std::optional<std::vector<char>> load_binary(const char* filename, int max_size) {
     const std::unique_ptr<FILE, decltype(+fclose)> file(fopen(filename, "rb"), fclose);
     if (file) {
@@ -189,7 +188,7 @@ std::optional<std::vector<char>> load_binary(const char* filename, int max_size)
     return {};
 }
 
-// TODO: also optional?
+// TODO: redesign return types... also optional?
 std::vector<legacy::compressT> read_rule_from_file(const char* filename) {
     auto result = load_binary(filename, 1'000'000);
     if (result) {
@@ -199,18 +198,12 @@ std::vector<legacy::compressT> read_rule_from_file(const char* filename) {
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
-// TODO: should allow multiple record.
-// "current_record" ~editor~modify-each...
-// extract a rule and set as ...
-// open file... merge multiple file into ...
-// export as file...
-// current-record???->which notify which?
-// TODO: empty state?
 
 #include "save.hpp"
 #include <imgui.h>
 
 // Unlike ImGui::TextWrapped, doesn't take fmt str...
+// TODO: the name is awful...
 inline void imgui_strwrapped(std::string_view str) {
     ImGui::PushTextWrapPos(0.0f);
     ImGui::TextUnformatted(str.data(), str.data() + str.size());
@@ -227,7 +220,16 @@ struct [[nodiscard]] imgui_window {
     }
     explicit operator bool() const { return visible; }
 };
-// TODO: imgui_childwindow???
+
+struct [[nodiscard]] imgui_childwindow {
+    const bool visible;
+    explicit imgui_childwindow(const char* name, const ImVec2& size = {}, ImGuiWindowFlags flags = {})
+        : visible(ImGui::BeginChild(name, size, false, flags)) {}
+    ~imgui_childwindow() {
+        ImGui::EndChild(); // Unconditional.
+    }
+    explicit operator bool() const { return visible; }
+};
 
 // Likely to be the only singleton...
 class logger {
@@ -271,7 +273,7 @@ public:
             bool to_bottom = ImGui::Button("Bottom");
             ImGui::Separator();
 
-            ImGui::BeginChild("Child");
+            if (imgui_childwindow child("Child"); child) {
 #if 0
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
             ImGuiListClipper clipper;
@@ -286,18 +288,17 @@ public:
             clipper.End();
             ImGui::PopStyleVar();
 #else
-            std::string str;
-            for (const auto& s : m_strs) {
-                str += s;
-                str += '\n';
-            }
-            imgui_strwrapped(str);
-
+                std::string str;
+                for (const auto& s : m_strs) {
+                    str += s;
+                    str += '\n';
+                }
+                imgui_strwrapped(str);
 #endif
-            if (to_bottom || ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) {
-                ImGui::SetScrollHereY(1.0f);
+                if (to_bottom || ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) {
+                    ImGui::SetScrollHereY(1.0f);
+                }
             }
-            ImGui::EndChild();
         }
     }
 };
