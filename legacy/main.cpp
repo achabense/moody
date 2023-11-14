@@ -46,19 +46,6 @@ auto underlying_address(Enum& e) {
     return reinterpret_cast<std::underlying_type_t<Enum>*>(std::addressof(e));
 }
 
-// TODO: move into a header...
-// TODO: forbid copying...
-struct [[nodiscard]] imgui_itemtooltip {
-    const bool opened; // TODO: proper name?
-    imgui_itemtooltip() : opened(ImGui::BeginItemTooltip()) {}
-    ~imgui_itemtooltip() {
-        if (opened) {
-            ImGui::EndTooltip();
-        }
-    }
-    explicit operator bool() const { return opened; }
-};
-
 // TODO: clumsy...
 // TODO: should be a class... how to decouple? ...
 // TODO: for "paired", support 4-step modification (_,S,B,BS)... add new color?
@@ -579,12 +566,11 @@ int main(int argc, char** argv) {
                 const ImVec2 img_size = ImVec2(img.width(), img.height()); // TODO: support zooming?
 
                 ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
-                img.update(runner.tile());
+                // img.update(runner.tile());
                 ImGui::ImageButton(img.texture(), img_size);
                 ImGui::PopStyleVar();
 
                 static bool spaused = false;
-
                 if (ImGui::IsItemActivated()) {
                     spaused = paused;
                     paused = true;
@@ -592,35 +578,44 @@ int main(int argc, char** argv) {
                 if (ImGui::IsItemDeactivated()) {
                     paused = spaused;
                 }
-                if (ImGui::IsItemHovered() && ImGui::IsItemActive()) {
-                    if (io.MouseDelta.x != 0 || io.MouseDelta.y != 0) {
-                        runner.shift(io.MouseDelta.x, io.MouseDelta.y);
-                        // img.update(runner.tile()); // will not affect much... TODO: remove...
+                if (ImGui::IsItemHovered()) {
+                    if (ImGui::IsItemActive()) {
+                        if (io.MouseDelta.x != 0 || io.MouseDelta.y != 0) {
+                            runner.shift(io.MouseDelta.x, io.MouseDelta.y);
+                        }
+                    } else {
+                        if (io.MouseWheel < 0) { // scroll down
+                            recorder.next();
+                        } else if (io.MouseWheel > 0) { // scroll up
+                            recorder.prev();
+                        }
+                        // TODO: reconsider whether/where to support next/prev actions
                     }
-                } else if (imgui_itemtooltip tooltip; tooltip) {
-                    assert(ImGui::IsMousePosValid());
-                    const float region_sz = 32.0f;
-                    float region_x = std::clamp(io.MousePos.x - pos.x - region_sz * 0.5f, 0.0f, img_size.x - region_sz);
-                    float region_y = std::clamp(io.MousePos.y - pos.y - region_sz * 0.5f, 0.0f, img_size.y - region_sz);
-
-                    const ImVec2 uv0 = ImVec2((region_x) / img_size.x, (region_y) / img_size.y);
-                    const ImVec2 uv1 = ImVec2((region_x + region_sz) / img_size.x, (region_y + region_sz) / img_size.y);
-                    const float zoom = 4.0f; // TODO: should be settable? 5.0f?
-                    ImGui::Image(img.texture(), ImVec2(region_sz * zoom, region_sz * zoom), uv0, uv1);
-
+                    static bool show_zoom = true; // TODO: should be here?
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
                         // TODO: should be more useful...
-                        // TODO: open/ close miniwindow instead?
-                        paused = !paused;
+                        show_zoom = !show_zoom;
                     }
+                    if (imgui_itemtooltip tooltip(show_zoom); tooltip) {
+                        assert(ImGui::IsMousePosValid());
+                        const float region_sz = 32.0f;
+                        float region_x =
+                            std::clamp(io.MousePos.x - pos.x - region_sz * 0.5f, 0.0f, img_size.x - region_sz);
+                        float region_y =
+                            std::clamp(io.MousePos.y - pos.y - region_sz * 0.5f, 0.0f, img_size.y - region_sz);
 
-                    if (io.MouseWheel < 0) { // scroll down
-                        recorder.next();
-                    } else if (io.MouseWheel > 0) { // scroll up
-                        recorder.prev();
+                        const ImVec2 uv0 = ImVec2((region_x) / img_size.x, (region_y) / img_size.y);
+                        const ImVec2 uv1 =
+                            ImVec2((region_x + region_sz) / img_size.x, (region_y + region_sz) / img_size.y);
+                        const float zoom = 4.0f; // TODO: should be settable? 5.0f?
+                        ImGui::Image(img.texture(), ImVec2(region_sz * zoom, region_sz * zoom), uv0, uv1);
                     }
-                    // TODO: reconsider whether/where to support next/prev actions
                 }
+
+                // TODO: reconsider this design...
+                // put off to here, for "runner.shift(io.MouseDelta.x, io.MouseDelta.y);".
+                // works fine as texture() (pointer) is unchanged by update, and the rendering happens very later...
+                img.update(runner.tile());
 
                 // It seems the whole recorder model is problematic...
                 ImGui::AlignTextToFramePadding(); // TODO: +1 is clumsy.

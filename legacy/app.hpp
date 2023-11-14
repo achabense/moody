@@ -257,6 +257,19 @@ struct [[nodiscard]] imgui_childwindow {
     explicit operator bool() const { return visible; }
 };
 
+// TODO: should imgui_childwindow/... support "enabled feature"?
+// TODO: forbid copying...
+struct [[nodiscard]] imgui_itemtooltip {
+    const bool opened; // TODO: proper name?
+    imgui_itemtooltip(bool enabled = true) : opened(enabled && ImGui::BeginItemTooltip()) {}
+    ~imgui_itemtooltip() {
+        if (opened) {
+            ImGui::EndTooltip();
+        }
+    }
+    explicit operator bool() const { return opened; }
+};
+
 // Likely to be the only singleton...
 class logger {
     // TODO: maybe better if data(inheritance)-based?
