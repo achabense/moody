@@ -28,32 +28,46 @@ void random_fill(bool* begin, bool* end, int count, auto&& rand) {
 struct tile_filler {
     uint64_t seed; // arbitrary value
     float density; // ∈ [0.0f, 1.0f]
-
-    void fill(legacy::tileT& tile, const legacy::rectT* resize = nullptr) const {
-        if (resize) {
-            tile.resize(*resize);
-        }
-
-        random_fill(tile.begin(), tile.end(), tile.area() * density, std::mt19937_64{seed});
-    }
 };
 
-// TODO: !!!! recheck when to "restart"..
-class rule_runner {
-    legacy::ruleT m_rule{};
+// TODO: better name...
+inline int round_clip(int v, int r) {
+    assert(r > 0);
+    return ((v % r) + r) % r;
+}
+
+// TODO: better name...
+class torus {
     legacy::tileT m_tile, m_side;
-    int m_gen = 0;
 
-    // TODO: experimental... maybe not suitable for rule_runner.
-    // The logic looks very fragile... reliance is a mess...
+public:
+    explicit torus(legacy::rectT size) : m_tile(size), m_side(size) {}
+
+    const legacy::tileT& tile() const { return m_tile; }
+
+    // TODO: is passing by optional acceptible?
+    // by value or by cref? (also in tileT)
+    void fill(tile_filler filler, std::optional<legacy::rectT> resize = {}) {
+        if (resize) {
+            m_tile.resize(*resize);
+        }
+
+        const auto seed = filler.seed;
+        const auto density = filler.density;
+        random_fill(m_tile.begin(), m_tile.end(), m_tile.area() * density, std::mt19937_64{seed});
+    }
+
+    void run(const legacy::ruleT& rule) {
+        m_tile.gather().apply(rule, m_side);
+        m_tile.swap(m_side);
+    }
+
     // TODO: recheck logic...
-    int init_shift_x = 0, init_shift_y = 0;
-
-    void do_shift_xy(int dx, int dy) {
+    void shift(int dx, int dy) {
         const int width = m_tile.width(), height = m_tile.height();
 
-        dx = ((-dx % width) + width) % width;
-        dy = ((-dy % height) + height) % height;
+        dx = round_clip(-dx, width);
+        dy = round_clip(-dy, height);
         if (dx == 0 && dy == 0) {
             return;
         }
@@ -67,18 +81,26 @@ class rule_runner {
         }
         m_tile.swap(m_side);
     }
+};
+
+class rule_runner {
+    legacy::ruleT m_rule{};
+    torus m_tile;
+    int m_gen = 0;
+
+    int init_shift_x = 0, init_shift_y = 0;
 
 public:
-    explicit rule_runner(legacy::rectT size) : m_tile(size), m_side(size) {}
+    explicit rule_runner(legacy::rectT size) : m_tile(size) {}
 
     const legacy::ruleT& rule() const { return m_rule; }
-    const legacy::tileT& tile() const { return m_tile; }
+    const legacy::tileT& tile() const { return m_tile.tile(); }
     int gen() const { return m_gen; }
 
-    void restart(const tile_filler& filler) {
+    void restart(tile_filler filler, std::optional<legacy::rectT> resize = {}) {
+        m_tile.fill(filler, resize);
+        m_tile.shift(init_shift_x, init_shift_y);
         m_gen = 0;
-        filler.fill(m_tile);
-        do_shift_xy(init_shift_x, init_shift_y);
     }
 
     // TODO: clumsy
@@ -92,16 +114,15 @@ public:
 
     void run(int count) {
         for (int i = 0; i < count; ++i) {
-            m_tile.gather().apply(m_rule, m_side);
-            m_tile.swap(m_side);
+            m_tile.run(m_rule);
             ++m_gen;
         }
     }
 
-    void shift_xy(int dx, int dy) {
-        init_shift_x += dx;
-        init_shift_y += dy; // TODO: wrap eagerly...
-        do_shift_xy(dx, dy);
+    void shift(int dx, int dy) {
+        m_tile.shift(dx, dy);
+        init_shift_x = round_clip(init_shift_x + dx, tile().width());
+        init_shift_y = round_clip(init_shift_x + dy, tile().height());
     }
 };
 
@@ -198,6 +219,7 @@ std::vector<legacy::compressT> read_rule_from_file(const char* filename) {
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
+// TODO: whether to accept <imgui.h> as base header?
 
 #include "save.hpp"
 #include <imgui.h>
@@ -209,6 +231,10 @@ inline void imgui_strwrapped(std::string_view str) {
     ImGui::TextUnformatted(str.data(), str.data() + str.size());
     ImGui::PopTextWrapPos();
 }
+
+inline bool imgui_keypressed(ImGuiKey key, bool repeat) {
+    return !ImGui::GetIO().WantCaptureKeyboard && ImGui::IsKeyPressed(key, repeat);
+};
 
 // TODO: forbid copying...
 struct [[nodiscard]] imgui_window {

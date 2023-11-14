@@ -496,12 +496,6 @@ int main(int argc, char** argv) {
         return pergen;
     };
 
-    // TODO: should be a plain function.
-    // TODO: use GetIO() or io ref?
-    auto imgui_keypressed = [](ImGuiKey key, bool repeat) {
-        return ImGui::GetIO().WantCaptureKeyboard && ImGui::IsKeyPressed(key, repeat);
-    };
-
     // Main loop
     // TODO: cannot break eagerly?
     bool done = false;
@@ -600,7 +594,7 @@ int main(int argc, char** argv) {
                 }
                 if (ImGui::IsItemHovered() && ImGui::IsItemActive()) {
                     if (io.MouseDelta.x != 0 || io.MouseDelta.y != 0) {
-                        runner.shift_xy(io.MouseDelta.x, io.MouseDelta.y);
+                        runner.shift(io.MouseDelta.x, io.MouseDelta.y);
                         // img.update(runner.tile()); // will not affect much... TODO: remove...
                     }
                 } else if (imgui_itemtooltip tooltip; tooltip) {
@@ -614,13 +608,10 @@ int main(int argc, char** argv) {
                     const float zoom = 4.0f; // TODO: should be settable? 5.0f?
                     ImGui::Image(img.texture(), ImVec2(region_sz * zoom, region_sz * zoom), uv0, uv1);
 
-                    ImGui::TextUnformatted("Rclick to copy."); // TODO: remove in the future.
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-                        ImGui::SetClipboardText(to_MAP_str(runner.rule()).c_str());
-                        logger::log("Copied rule with hash {}",
-                                    0xffff & (std::hash<std::string>{}(to_MAP_str(runner.rule()))));
-                        // TODO: should refine msg.
-                        // TODO: should be shared with editor's.
+                        // TODO: should be more useful...
+                        // TODO: open/ close miniwindow instead?
+                        paused = !paused;
                     }
 
                     if (io.MouseWheel < 0) { // scroll down
@@ -747,36 +738,3 @@ int main(int argc, char** argv) {
 
     return 0;
 }
-
-////////////////////////////////////////////////////////////////////////////////
-// TODO: whether to accept <imgui.h> as base header?
-
-namespace legacy {
-    void run_and_swap(tileT& major, tileT& helper, const ruleT& rule) {
-        assert(&major != &helper);
-        major.gather().apply(rule, helper);
-        major.swap(helper);
-    }
-
-    void shift_xy(tileT& major, tileT& helper, int dx, int dy) {
-        const int width = major.width(), height = major.height();
-
-        dx = ((-dx % width) + width) % width;
-        dy = ((-dy % height) + height) % height;
-        if (dx == 0 && dy == 0) {
-            return;
-        }
-
-        helper.resize(major.size());
-        for (int y = 0; y < height; ++y) {
-            bool* source = major.line((y + dy) % height);
-            bool* dest = major.line(y);
-            std::copy_n(source, width, dest);
-            std::rotate(dest, dest + dx, dest + width);
-        }
-        major.swap(helper);
-    }
-
-} // namespace legacy
-
-////////////////////////////////////////////////////////////////////////////////

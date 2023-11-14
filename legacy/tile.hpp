@@ -152,6 +152,7 @@ namespace legacy {
 
     public:
         // Torus.
+        // TODO: remove this?
         const tileT& gather() {
             _gather(this, this, this, this, this, this, this, this);
             return *this;
