@@ -169,7 +169,7 @@ public:
         m_record.insert(m_record.end(), vec.begin(), vec.end());
     }
 
-    void replace(std::vector<legacy::compressT> vec) {
+    void replace(std::vector<legacy::compressT>&& vec) {
         if (!vec.empty()) {
             m_record.swap(vec);
             m_pos = 0;

@@ -124,6 +124,13 @@ namespace legacy {
             }
         };
 
+        // TODO: refine partitionT methods...
+        static void flip(const vector<codeT>& group, ruleT_data& rule) {
+            for (codeT code : group) {
+                rule[code] = !rule[code];
+            }
+        }
+
         scanlistT scan(const ruleT_data& rule) const {
             scanlistT result(k());
             for (int j = 0; j < k(); ++j) {

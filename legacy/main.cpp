@@ -112,7 +112,7 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
             ImGui::Separator();
 
             ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted("Interp"); // TODO: suitable name...
+            ImGui::TextUnformatted("Inter"); // TODO: suitable name...
             ImGui::SameLine();
             // TODO: might be better named "direct"
             ImGui::RadioButton("Val", underlying_address(inter.tag), inter.Value);
@@ -169,33 +169,25 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                     static std::mt19937_64 rand(time(0));
                     legacy::ruleT_data grule{};
                     random_fill(grule.data(), grule.data() + k, rcount, rand);
-                    rule = legacy::partition::get_partition(base, extr).dispatch_from(grule);
+                    rule = part.dispatch_from(grule);
                 }
-            }
-            using legacy::codeT;
-            const auto& groups = part.groups();
-            auto scans = part.scan(rule);
-            {
+
                 // TODO: experimental; not suitable place... should be totally redesigned...
-                ImGui::SameLine();
-                if (ImGui::Button("???")) {
+                // Flip each group; the result is [actually] independent of inter.
+                if (ImGui::Button("Flip each group")) {
                     std::vector<legacy::compressT> vec;
                     vec.emplace_back(inter.to_rule(rule));
-                    for (int j = 0; j < k; ++j) {
-                        // TODO: whether to flip inconsistent units?
-                        if (scans[j] != scans.Inconsistent) {
-                            legacy::ruleT_data rule_j = rule;
-                            for (codeT code : groups[j]) {
-                                rule_j[code] = !rule_j[code];
-                            }
-                            vec.emplace_back(inter.to_rule(rule_j));
-                        }
+                    for (const auto& group : part.groups()) {
+                        legacy::ruleT_data r = rule;
+                        part.flip(group, r);
+                        vec.emplace_back(inter.to_rule(r));
                     }
-                    recorder.replace(vec); // TODO: awkward...
-                    // TODO: relying on final take() having no effect...
+                    recorder.replace(std::move(vec));
+                    // TODO: awkward... relying on final take() having no effect...
                 }
             }
 
+            const auto scans = part.scan(rule);
             ImGui::Text("[1:%d] [0:%d] [x:%d]", scans.count(scans.All_1), scans.count(scans.All_0),
                         scans.count(scans.Inconsistent));
 
@@ -205,6 +197,8 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
             const float child_height = lines * (21 /*r*/ + 4 /*padding.y*2*/) + (lines - 1) * 4 /*spacing.y*/;
             // TOOD: this should always return true...
             if (imgui_childwindow child("Details", ImVec2(390, child_height)); child) {
+                using legacy::codeT;
+
                 ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 4));
                 ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
                 for (int j = 0; j < k; ++j) {
@@ -215,6 +209,7 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                         ImGui::Separator(); // TODO: refine...
                     }
                     const bool inconsistent = scans[j] == scans.Inconsistent;
+                    const auto& group = part.groups()[j];
 
                     ImGui::PushID(j);
                     if (inconsistent) {
@@ -222,18 +217,16 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8, 0, 0, 1));
                         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.9, 0, 0, 1));
                     }
-                    if (ImGui::ImageButton(icons.texture(), icon_size, ImVec2(0, groups[j][0] * (1.0f / 512)),
-                                           ImVec2(1, (groups[j][0] + 1) * (1.0f / 512)))) {
+                    if (ImGui::ImageButton(icons.texture(), icon_size, ImVec2(0, group[0] * (1.0f / 512)),
+                                           ImVec2(1, (group[0] + 1) * (1.0f / 512)))) {
                         // TODO: document this behavior... (keyctrl->resolve conflicts)
                         if (ImGui::GetIO().KeyCtrl) {
-                            const bool b = !rule[groups[j][0]];
-                            for (codeT code : groups[j]) {
+                            const bool b = !rule[group[0]];
+                            for (codeT code : group) {
                                 rule[code] = b;
                             }
                         } else {
-                            for (codeT code : groups[j]) {
-                                rule[code] = !rule[code];
-                            }
+                            part.flip(group, rule);
                         }
 
                         // TODO: TextUnformatted(strs[scans[j]]) may yield false result at this frame, but is
@@ -245,7 +238,7 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                     ImGui::PopID();
 
                     if (imgui_itemtooltip tooltip; tooltip) {
-                        for (int x = 0; codeT code : groups[j]) {
+                        for (int x = 0; codeT code : group) {
                             if (x++ % perline != 0) { // TODO: sharing the same perline (not necessary)
                                 ImGui::SameLine();
                             }
@@ -682,10 +675,14 @@ int main(int argc, char** argv) {
             {
                 // TODO: toooo ugly...
                 ImGui::SliderInt("Pergen [1-20]", &pergen, pergen_min, pergen_max, "%d", ImGuiSliderFlags_NoInput);
-                ImGui::AlignTextToFramePadding();
-                ImGui::Text("(Actual pergen: %d)", actual_pergen(pergen));
-                ImGui::SameLine();
-                ImGui::Checkbox("anti-flick", &anti_flick);
+                // TODO: conditional or not?
+                if (legacy::will_flick(runner.rule())) {
+                    ImGui::AlignTextToFramePadding();
+                    // TODO: actual_pergen implicitly uses runner.rule()...
+                    ImGui::Text("(Actual pergen: %d)", actual_pergen(pergen));
+                    ImGui::SameLine();
+                    ImGui::Checkbox("anti-flick", &anti_flick);
+                }
 
                 ImGui::SliderInt("Gap Frame [0-20]", &gap_frame, gap_min, gap_max, "%d", ImGuiSliderFlags_NoInput);
                 ImGui::SliderInt("Start gen [0-1000]", &start_from, start_min, start_max, "%d",
@@ -709,6 +706,8 @@ int main(int argc, char** argv) {
                         paused = true;
                     } else {
                         runner.run(actual_pergen(pergen)); // ?run(1)
+                        // TODO: whether to take place after set_rule?
+                        // TODO: whether to update image this frame?
                     }
                 }
             }
