@@ -5,10 +5,7 @@
 
 #include "rule.hpp"
 
-// higher-order(???) ...TODO...
 namespace legacy {
-    // TODO: the main challenge is to provide user-interface...
-
     // TODO: using gcodeT (or other names) = int;
     // TODO: better variable names...
     class partitionT {
@@ -20,39 +17,24 @@ namespace legacy {
         int m_k;
         vector<vector<codeT>> m_groups;
 
-        // TODO: remove in the future...
-        void assert_invariants() {
-            assert(map(0) == 0);
-            int max_sofar = 0; // part[0].
-            for (auto gcode : m_map) {
-                if (gcode > max_sofar) {
-                    assert(gcode == max_sofar + 1);
-                    max_sofar = gcode;
+        static int regulate(array_base& data) {
+            std::map<int, int> mapper;
+            int next = 0;
+            for (auto& gcode : data) {
+                if (!mapper.contains(gcode)) {
+                    mapper[gcode] = next++;
                 }
+                gcode = mapper[gcode];
             }
-            assert(max_sofar + 1 == m_k);
+            assert(next == mapper.size());
+            return next;
         }
 
     public:
         /* implicit */ partitionT(const array_base& part) : m_map{part} {
-            struct {
-                std::map<int, int> mapper;
-                int next = 0;
-                int operator()(int c) {
-                    if (!mapper.contains(c)) {
-                        mapper[c] = next++;
-                    }
-                    return mapper[c];
-                }
-            } regulate;
-
-            for (auto& gcode : m_map) {
-                gcode = regulate(gcode);
-            }
+            m_k = regulate(m_map);
 
             // regulated.
-            m_k = regulate.next;
-            assert_invariants();
             m_groups.resize(m_k);
             for (codeT code = 0; code < 512; ++code) {
                 if (!decode_s(code)) {
@@ -85,14 +67,22 @@ namespace legacy {
         const vector<vector<codeT>>& groups() const { //
             return m_groups;
         }
+        // TODO: too fragile unless codeT is strong-typed (impractical)
         const vector<codeT>& group_for(codeT code) const { //
             return m_groups[map(code)];
         }
         codeT head_for(codeT code) const { //
-            return m_groups[map(code)][0];
+            return group_for(code)[0];
         }
 
         int k() const { return m_k; }
+
+        // TODO: refine partitionT methods...
+        static void flip(const vector<codeT>& group, ruleT_data& rule) {
+            for (codeT code : group) {
+                rule[code] = !rule[code];
+            }
+        }
 
         class scanlistT {
         public:
@@ -123,13 +113,6 @@ namespace legacy {
                 return std::count(begin(), end(), s);
             }
         };
-
-        // TODO: refine partitionT methods...
-        static void flip(const vector<codeT>& group, ruleT_data& rule) {
-            for (codeT code : group) {
-                rule[code] = !rule[code];
-            }
-        }
 
         scanlistT scan(const ruleT_data& rule) const {
             scanlistT result(k());
@@ -233,7 +216,7 @@ namespace legacy {
             };
 
             // TODO: very strange format...
-#define mapto(...)                                       \
+#define MAPTO(...)                                       \
     +[](codeT code) {                                    \
         auto [q, w, e, a, s, d, z, x, c] = decode(code); \
         return encode(__VA_ARGS__);                      \
@@ -241,39 +224,39 @@ namespace legacy {
             // z x c
             // a s d
             // q w e
-            constexpr mapperP upside_down = mapto(z, x, c, a, s, d, q, w, e);
+            constexpr mapperP upside_down = MAPTO(z, x, c, a, s, d, q, w, e);
             // e w q
             // d s a
             // c x z
-            constexpr mapperP leftside_right = mapto(e, w, q, d, s, a, c, x, z);
+            constexpr mapperP leftside_right = MAPTO(e, w, q, d, s, a, c, x, z);
             // q a z
             // w s x
             // e d c
-            constexpr mapperP main_diag = mapto(q, a, z, w, s, x, e, d, c);
+            constexpr mapperP main_diag = MAPTO(q, a, z, w, s, x, e, d, c);
             // c d e
             // x s w
             // z a q
-            constexpr mapperP side_diag = mapto(c, d, e, x, s, w, z, a, q);
+            constexpr mapperP side_diag = MAPTO(c, d, e, x, s, w, z, a, q);
             // w e d
             // q s c
             // a z x
-            constexpr mapperP rotate_45 = mapto(w, e, d, q, s, c, a, z, x);
+            constexpr mapperP rotate_45 = MAPTO(w, e, d, q, s, c, a, z, x);
             // q w e
             // a !s d
             // z x c
-            constexpr mapperP s_flipped = mapto(q, w, e, a, !s, d, z, x, c);
+            constexpr mapperP s_flipped = MAPTO(q, w, e, a, !s, d, z, x, c);
             // !q !w !e
             // !a !s !d
             // !z !x !c
-            constexpr mapperP all_flipped = mapto(!q, !w, !e, !a, !s, !d, !z, !x, !c);
+            constexpr mapperP all_flipped = MAPTO(!q, !w, !e, !a, !s, !d, !z, !x, !c);
             // w q e
             // a s d
             // z x c
-            constexpr mapperP perm_specific = mapto(w, q, e, a, s, d, z, x, c);
-#undef mapto
+            constexpr mapperP perm_specific = MAPTO(w, q, e, a, s, d, z, x, c);
+#undef MAPTO
 
             static const std::initializer_list<mapperP> args[basic_specification::size]{
-                {},                                                     // none.
+                {},                                                     // none
                 {upside_down, leftside_right},                          // orthogonal
                 {main_diag, side_diag},                                 // diagonal
                 {upside_down, leftside_right, main_diag /*side_diag*/}, // spatial
