@@ -172,6 +172,7 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                 ImGui::SameLine();
                 if (ImGui::Button("Randomize")) {
                     static std::mt19937_64 rand(time(0));
+                    // TODO: looks bad.
                     legacy::ruleT_data grule{};
                     random_fill(grule.data(), grule.data() + k, rcount, rand);
                     rule = part.dispatch_from(grule);
@@ -216,13 +217,14 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                     const bool inconsistent = scans[j] == scans.Inconsistent;
                     const auto& group = part.groups()[j];
 
-                    ImGui::PushID(j);
                     if (inconsistent) {
                         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6, 0, 0, 1));
                         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8, 0, 0, 1));
                         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.9, 0, 0, 1));
                     }
-                    if (ImGui::ImageButton(icons.texture(), icon_size, ImVec2(0, group[0] * (1.0f / 512)),
+                    // TODO: "to_string(j).c_str()" looks extremely ugly.
+                    if (ImGui::ImageButton(std::to_string(j).c_str(), icons.texture(), icon_size,
+                                           ImVec2(0, group[0] * (1.0f / 512)),
                                            ImVec2(1, (group[0] + 1) * (1.0f / 512)))) {
                         // TODO: document this behavior... (keyctrl->resolve conflicts)
                         if (ImGui::GetIO().KeyCtrl) {
@@ -240,7 +242,6 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                     if (inconsistent) {
                         ImGui::PopStyleColor(3);
                     }
-                    ImGui::PopID();
 
                     if (imgui_itemtooltip tooltip; tooltip) {
                         for (int x = 0; codeT code : group) {
@@ -458,7 +459,6 @@ int main(int argc, char** argv) {
     bool anti_flick = true; // TODO: add explanation
 
     if (argc == 2) {
-        // TODO: add err logger
         recorder.replace(read_rule_from_file(argv[1]));
     }
 
@@ -499,6 +499,7 @@ int main(int argc, char** argv) {
             if (event.type == SDL_QUIT) {
                 done = true;
             }
+            // TODO: this apprears not needed:
             if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE &&
                 event.window.windowID == SDL_GetWindowID(window)) {
                 done = true;
@@ -563,9 +564,10 @@ int main(int argc, char** argv) {
                 const ImVec2 pos = ImGui::GetCursorScreenPos();
                 const ImVec2 img_size = ImVec2(img.width(), img.height()); // TODO: support zooming?
 
-                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
+                const ImVec2 padding(2, 2);
+                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, padding);
                 // img.update(runner.tile());
-                ImGui::ImageButton(img.texture(), img_size);
+                ImGui::ImageButton("##Tile", img.texture(), img_size);
                 ImGui::PopStyleVar();
 
                 static bool spaused = false;
@@ -591,16 +593,16 @@ int main(int argc, char** argv) {
                     }
                     static bool show_zoom = true; // TODO: should be here?
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-                        // TODO: should be more useful...
+                        // TODO: how to support other operations?
                         show_zoom = !show_zoom;
                     }
                     if (imgui_itemtooltip tooltip(show_zoom); tooltip) {
                         assert(ImGui::IsMousePosValid());
                         const float region_sz = 32.0f;
-                        float region_x =
-                            std::clamp(io.MousePos.x - pos.x - region_sz * 0.5f, 0.0f, img_size.x - region_sz);
-                        float region_y =
-                            std::clamp(io.MousePos.y - pos.y - region_sz * 0.5f, 0.0f, img_size.y - region_sz);
+                        float region_x = std::clamp(io.MousePos.x - (pos.x + padding.x) - region_sz * 0.5f, 0.0f,
+                                                    img_size.x - region_sz);
+                        float region_y = std::clamp(io.MousePos.y - (pos.y + padding.y) - region_sz * 0.5f, 0.0f,
+                                                    img_size.y - region_sz);
 
                         const ImVec2 uv0 = ImVec2((region_x) / img_size.x, (region_y) / img_size.y);
                         const ImVec2 uv1 =
@@ -693,7 +695,7 @@ int main(int argc, char** argv) {
                 ImGui::SliderInt("Start gen [0-1000]", &start_from, start_min, start_max, "%d",
                                  ImGuiSliderFlags_NoInput);
 
-                // TODO: which(_1, _2) should be used for gap_frame+=1?
+                // TODO: redesign keyboard ctrl...
                 if (imgui_keypressed(ImGuiKey_1, true)) {
                     gap_frame = std::max(gap_min, gap_frame - 1);
                 }

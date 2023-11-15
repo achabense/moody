@@ -41,7 +41,7 @@ namespace legacy {
                     m_groups[m_map[code]].push_back(code);
                 }
             }
-            // TODO: temporary; should be dealt with by get_partition...
+            // TODO: temporary; should be dealt with by getp...
             bool paired =
                 m_map[0] == m_map[16]; // TODO: not used; should recheck (this part should be totally redesigned)
             bool state = m_map[0] == m_map[511];

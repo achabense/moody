@@ -16,7 +16,6 @@
 
 // TODO: notify on quit... (? there seems no such need.)
 // TODO: support more run-mode... (? related: when will the current run-mode cause problems?)
-// TODO: right click to enable/disable miniwindow... (? should miniwindow be redesigned)
 
 void random_fill(bool* begin, bool* end, int count, auto&& rand) {
     std::fill(begin, end, false);
@@ -210,6 +209,7 @@ std::optional<std::vector<char>> load_binary(const char* filename, int max_size)
 }
 
 // TODO: redesign return types... also optional?
+// TODO: add error log.
 std::vector<legacy::compressT> read_rule_from_file(const char* filename) {
     auto result = load_binary(filename, 1'000'000);
     if (result) {
