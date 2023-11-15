@@ -3,11 +3,12 @@
 #include "partition.hpp"
 #include "rule.hpp"
 
+// TODO: merge into partition.hpp.
 // TODO: rule generator and rule analyser/editor...
 namespace legacy {
     // TODO: ud, lr, mdiag, sdiag...
     inline bool spatial_symmetric(const ruleT& rule) {
-        return partition::get_partition_spatial().matches(rule.map);
+        return partitionT::get_spatial().matches(rule.map);
     }
 
     // TODO: code_ns etc should be supported in rule.hpp.

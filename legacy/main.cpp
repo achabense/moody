@@ -87,28 +87,33 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
             }
         }
 
-        static legacy::partition::basic_specification base = legacy::partition::basic_specification::spatial;
-        static legacy::partition::extra_specification extr = {};
+        using legacy::partitionT;
+
+        static partitionT::basespecE base = partitionT::Spatial;
+        static partitionT::extrspecE extr = partitionT::None_;
         static legacy::interT inter = {};
 
         ImGui::SeparatorText("Settings");
         {
-            ImGui::Combo("##MainMode", underlying_address(base), legacy::partition::basic_specification_names,
-                         std::size(legacy::partition::basic_specification_names));
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted("Base");
+            ImGui::SameLine();
+            ImGui::Combo("##MainMode", underlying_address(base), partitionT::basespecE_names,
+                         partitionT::basespecE_size);
 
             // TODO: use extra_specification_names...
             ImGui::AlignTextToFramePadding();
             ImGui::TextUnformatted("Extr");
             ImGui::SameLine();
-            ImGui::RadioButton("basic", underlying_address(extr), legacy::partition::extra_specification::none);
+            ImGui::RadioButton("none", underlying_address(extr), partitionT::None_);
             ImGui::SameLine();
             // TODO: support 4-state modification when paired...
-            ImGui::RadioButton("paired", underlying_address(extr), legacy::partition::paired);
+            ImGui::RadioButton("paired", underlying_address(extr), partitionT::Paired);
             ImGui::SameLine();
             // TODO: explain...
-            ImGui::RadioButton("state", underlying_address(extr), legacy::partition::state);
+            ImGui::RadioButton("state", underlying_address(extr), partitionT::State);
 
-            ImGui::Text("Groups: %d", legacy::partition::get_partition(base, extr).k()); // TODO: use variable "part"?
+            ImGui::Text("Groups: %d", partitionT::getp(base, extr).k()); // TODO: use variable "part"?
             ImGui::Separator();
 
             ImGui::AlignTextToFramePadding();
@@ -131,12 +136,12 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
             ImGui::Text("State symmetry: %d", (int)legacy::state_symmetric(to_edit));
             ImGui::SameLine();
             if (ImGui::SmallButton("details")) {
-                extr = legacy::partition::extra_specification::state;
+                extr = partitionT::State;
                 inter.tag = inter.Flip;
             }
         }
 
-        const auto& part = legacy::partition::get_partition(base, extr);
+        const auto& part = partitionT::getp(base, extr);
         const int k = part.k();
         legacy::ruleT_data rule = inter.from_rule(to_edit);
 

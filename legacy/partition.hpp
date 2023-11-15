@@ -159,35 +159,35 @@ namespace legacy {
             }
             return true;
         }
-    };
 
-    namespace partition {
-        // TODO: none/orthogonal/diagonal are too noisy; only support when configured...
-        enum basic_specification : int {
-            none = 0,
-            orthogonal,
-            diagonal,
-            spatial,
-            ro45,
-            spatial_ro45,
-            permutation,
-            size
+        enum basespecE : int { //
+            None = 0,
+            Orthogonal,
+            Diagonal,
+            Spatial,
+            Ro45,
+            Spatial_ro45,
+            Permutation,
+            basespecE_size
         };
-        static constexpr const char* basic_specification_names[]{"(deprecated) none",       //
-                                                                 "(deprecated) orthogonal", //
-                                                                 "(deprecated) diagonal",   //
-                                                                 "spatial",
-                                                                 "ro45",
-                                                                 "spatial_ro45",
-                                                                 "permutation"};
-        inline namespace s {
-            // TODO: currently in a new namespace to avoid enumerator clash...
-            enum extra_specification : int { none = 0, paired, state, size };
-        } // namespace s
+        static constexpr const char* basespecE_names[]{"(deprecated) none",       //
+                                                       "(deprecated) orthogonal", //
+                                                       "(deprecated) diagonal",   //
+                                                       "spatial",
+                                                       "ro45",
+                                                       "spatial_ro45",
+                                                       "permutation"};
 
-        static constexpr const char* extra_specification_names[]{"basic", "paired", "state"};
+        // TODO: explain...
+        enum extrspecE : int { //
+            None_ = 0,         // Are there logical reasons why C++ doesn't allow "None" here?
+            Paired,
+            State,
+            extrspecE_size
+        };
+        static constexpr const char* extrspecE_names[]{"none", "paired", "state"};
 
-        inline const partitionT& get_partition(basic_specification basic, extra_specification extr) {
+        static const partitionT& getp(basespecE basic, extrspecE extr) {
             using mapperP = codeT (*)(codeT);
 
             constexpr auto make_partition = [](const vector<mapperP>& mappers) -> partitionT {
@@ -255,7 +255,7 @@ namespace legacy {
             constexpr mapperP perm_specific = MAPTO(w, q, e, a, s, d, z, x, c);
 #undef MAPTO
 
-            static const std::initializer_list<mapperP> args[basic_specification::size]{
+            static const std::initializer_list<mapperP> args[basespecE_size]{
                 {},                                                     // none
                 {upside_down, leftside_right},                          // orthogonal
                 {main_diag, side_diag},                                 // diagonal
@@ -264,17 +264,17 @@ namespace legacy {
                 {upside_down, leftside_right, main_diag, rotate_45},    // spatial_ro45
                 {rotate_45, perm_specific}                              // permutation
             };
-            static std::optional<partitionT> parts[basic_specification::size][extra_specification::size];
+            static std::optional<partitionT> parts[basespecE_size][extrspecE_size];
             // apparently not thread-safe... TODO: should be thread safe or not?
             if (!parts[basic][extr]) {
                 vector<mapperP> arg = args[basic];
                 switch (extr) {
-                case extra_specification::none:
+                case extrspecE::None_:
                     break;
-                case extra_specification::paired:
+                case extrspecE::Paired:
                     arg.push_back(s_flipped);
                     break;
-                case extra_specification::state:
+                case extrspecE::State:
                     arg.push_back(all_flipped);
                     break;
                 default:
@@ -285,11 +285,9 @@ namespace legacy {
             return *parts[basic][extr];
         }
 
-        inline const partitionT& get_partition_spatial() {
-            return get_partition(basic_specification::spatial, extra_specification::none);
-        }
-    } // namespace partition
-
+        // TODO: better name...
+        static const partitionT& get_spatial() { return getp(Spatial, extrspecE::None_); }
+    };
 } // namespace legacy
 
 // TODO: in development...
