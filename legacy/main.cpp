@@ -441,6 +441,10 @@ int main(int argc, char** argv) {
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
 
+    // TODO: ... works but blurry, and how to apply in project?
+    // const char* fnpath = R"(C:\*redacted*\Desktop\Deng.ttf)";
+    // io.Fonts->AddFontFromFileTTF(fnpath, 13, nullptr, io.Fonts->GetGlyphRangesChineseFull());
+
     logger::log("Entered main");
 
     tile_filler filler{.seed = 0, .density = 0.5};

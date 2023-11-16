@@ -89,7 +89,7 @@ namespace legacy {
             // TODO: better names.
             enum scanE : int {
                 Inconsistent,
-                All_0,
+                All_0, // TODO: A0, A1?
                 All_1,
             };
 
@@ -295,19 +295,19 @@ namespace legacy {
     // TODO: whether to allow flip mode?
     struct modelT {
         // TODO: it's easy to define an invalid state, but how to adapt with partition?
-        enum state : char { _0, _1, unknown };
-        std::array<state, 512> data;
+        enum stateE : char { S0, S1, Unknown };
+        std::array<stateE, 512> data;
 
         modelT() { reset(); }
 
         void set(codeT code, bool b) {
             // TODO: explain decision against invalid situ
-            if (data[code] == unknown) {
-                data[code] = state{b};
+            if (data[code] == Unknown) {
+                data[code] = stateE{b};
             }
         }
 
-        void reset() { data.fill(unknown); }
+        void reset() { data.fill(Unknown); }
 
         auto bind(const legacy::ruleT& rule) {
             // TODO: is this const?
@@ -318,28 +318,12 @@ namespace legacy {
         }
     };
 
-    inline vector<modelT::state> filter(const modelT& m, const partitionT& p) {
-        using enum modelT::state;
-
-        vector<modelT::state> grouped(p.k(), modelT::unknown);
-
-        for (int j = 0; j < p.k(); ++j) {
-            bool has_0 = false;
-            bool has_1 = false;
-            for (codeT code : p.groups()[j]) {
-                if (m.data[code] == _0) {
-                    has_0 = true;
-                } else if (m.data[code] == _1) {
-                    has_1 = true;
-                }
-            }
-            if (has_0 && has_1) {
-                // TODO: What to do?
-            }
-            if (has_0) {
-                grouped[j] = _0;
-            } else if (has_1) {
-                grouped[j] = _1;
+    inline vector<modelT::stateE> filter(const modelT& m, const partitionT& p) {
+        vector<modelT::stateE> grouped(p.k(), modelT::Unknown);
+        for (codeT code = 0; code < 512; ++code) {
+            if (m.data[code] != modelT::Unknown) {
+                grouped[p.map(code)] = m.data[code];
+                // TODO: what if conflict?
             }
         }
         return grouped;
@@ -347,22 +331,20 @@ namespace legacy {
 
     ruleT make_rule(const modelT& m, const partitionT& p, auto&& rand) {
         // step 1:
-        using enum modelT::state;
-
-        vector<modelT::state> grouped = filter(m, p);
+        vector<modelT::stateE> grouped = filter(m, p);
 
         // step 2:
         // TODO: doesn't make sense...
         for (auto& s : grouped) {
-            if (s == unknown) {
-                s = (rand() & 0b111) == 1 ? _1 : _0;
+            if (s == modelT::Unknown) {
+                s = (rand() & 0b111) == 1 ? modelT::S1 : modelT::S0;
             }
         }
 
         // step 3: dispatch...
         ruleT rule{};
         for (codeT code = 0; code < 512; ++code) {
-            rule.map[code] = grouped[p.map(code)] == _0 ? 0 : 1;
+            rule.map[code] = grouped[p.map(code)] == modelT::S0 ? 0 : 1;
         }
         return rule;
     }
