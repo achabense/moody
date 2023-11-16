@@ -46,17 +46,32 @@ auto underlying_address(Enum& e) {
     return reinterpret_cast<std::underlying_type_t<Enum>*>(std::addressof(e));
 }
 
+// TODO: move the check elsewhere.
+// TODO: "bytes_equal" is not needed elsewhere, remove it.
+// C/C++ - command line - /utf-8
+// and save file as utf8-encoding...
+template <class T, class U>
+constexpr bool bytes_equal(const T& t, const U& u) noexcept {
+    if constexpr (sizeof(t) != sizeof(u)) {
+        return false;
+    } else {
+        using A = std::array<std::byte, sizeof(t)>;
+        return std::bit_cast<A>(t) == std::bit_cast<A>(u);
+    }
+}
+
+// "aaaaa" and "bbbbb" are workarounds for a compiler bug in clang...
+// https://github.com/llvm/llvm-project/issues/63686
+constexpr char aaaaa[]{"中文"};
+constexpr char8_t bbbbb[]{u8"中文"};
+static_assert(bytes_equal(aaaaa, bbbbb));
+
 // TODO: clumsy...
 // TODO: should be a class... how to decouple? ...
 // TODO: for "paired", support 4-step modification (_,S,B,BS)... add new color?
 void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, code_image& icons,
                rule_recorder& recorder) {
     if (imgui_window window(id_str, p_open, ImGuiWindowFlags_AlwaysAutoResize); window) {
-        // TODO: are these info useful?
-        // ImGui::Text("Spatial_symmetric:%d\tState_symmetric:%d\nABS_agnostic:%d\tXOR_agnostic:%d",
-        //             legacy::spatial_symmetric(to_edit), legacy::state_symmetric(to_edit),
-        //             legacy::center_agnostic_abs(to_edit), legacy::center_agnostic_xor(to_edit));
-
         ImGui::TextUnformatted("Current rule:");
         {
             auto rule_str = to_MAP_str(to_edit);
@@ -68,12 +83,7 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                 logger::log("Copied");
             }
             ImGui::SameLine();
-            if (ImGui::Button("Save to file")) {
-                legacy::record_rule(to_edit); // TODO: wasteful...
-                logger::log("Saved");         // TODO: redesign record_rule...
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Paste from clipboard")) {
+            if (ImGui::Button("Paste")) {
                 // TODO: can text return nullptr?
                 if (const char* text = ImGui::GetClipboardText()) {
                     auto rules = extract_rules(text, text + strlen(text));
@@ -84,6 +94,11 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                         logger::log("Pasted {}", rules.size());
                     }
                 }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Save to file")) {
+                legacy::record_rule(to_edit); // TODO: wasteful...
+                logger::log("Saved");         // TODO: redesign record_rule...
             }
         }
 
@@ -176,6 +191,7 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                     legacy::ruleT_data grule{};
                     random_fill(grule.data(), grule.data() + k, rcount, rand);
                     rule = part.dispatch_from(grule);
+                    recorder.take(inter.to_rule(rule));
                 }
 
                 // TODO: experimental; not suitable place... should be totally redesigned...
@@ -236,6 +252,8 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                             part.flip(group, rule);
                         }
 
+                        recorder.take(inter.to_rule(rule));
+
                         // TODO: TextUnformatted(strs[scans[j]]) may yield false result at this frame, but is
                         // negligible...
                     }
@@ -268,7 +286,6 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                 ImGui::PopStyleVar(2);
             }
         }
-        recorder.take(inter.to_rule(rule));
     }
 }
 
@@ -370,26 +387,6 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
 // (maybe a lot less useful than pattern saving)
 // TODO: how to capture certain patterns? (editor++)...
 
-// TODO: move the check elsewhere.
-// TODO: "bytes_equal" is not needed elsewhere, remove it.
-// C/C++ - command line - /utf-8
-// and save file as utf8-encoding...
-template <class T, class U>
-constexpr bool bytes_equal(const T& t, const U& u) noexcept {
-    if constexpr (sizeof(t) != sizeof(u)) {
-        return false;
-    } else {
-        using A = std::array<std::byte, sizeof(t)>;
-        return std::bit_cast<A>(t) == std::bit_cast<A>(u);
-    }
-}
-
-// "aaaaa" and "bbbbb" are workarounds for a compiler bug in clang...
-// https://github.com/llvm/llvm-project/issues/63686
-constexpr char aaaaa[]{"中文"};
-constexpr char8_t bbbbb[]{u8"中文"};
-static_assert(bytes_equal(aaaaa, bbbbb));
-
 int main(int argc, char** argv) {
     // Setup SDL
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0) {
@@ -451,6 +448,7 @@ int main(int argc, char** argv) {
     rule_runner runner({.width = 320, .height = 240});
     rule_recorder recorder;
 
+    // TODO: combine to tile_runner...
     constexpr int pergen_min = 1, pergen_max = 20;
     int pergen = 1;
 
@@ -537,11 +535,9 @@ int main(int argc, char** argv) {
         if (show_demo_window) {
             ImGui::ShowDemoWindow(&show_demo_window);
         }
-
         if (show_log_window) {
             logger::window("Events", &show_log_window);
         }
-        // TODO: editor works still poorly with recorder...
         if (show_rule_editor) {
             edit_rule("Rule editor", &show_rule_editor, runner.rule(), icons, recorder);
         }
@@ -656,9 +652,6 @@ int main(int argc, char** argv) {
                 }
 
                 ImGui::Checkbox("Pause", &paused);
-                if (imgui_keypressed(ImGuiKey_P, false)) {
-                    paused = !paused;
-                }
 
                 ImGui::SameLine();
                 ImGui::PushButtonRepeat(true);
@@ -720,6 +713,9 @@ int main(int argc, char** argv) {
                         // TODO: whether to take place after set_rule?
                         // TODO: whether to update image this frame?
                     }
+                }
+                if (imgui_keypressed(ImGuiKey_M, false)) {
+                    paused = !paused;
                 }
             }
         }
