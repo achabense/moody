@@ -205,7 +205,6 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                         vec.emplace_back(inter.to_rule(r));
                     }
                     recorder.replace(std::move(vec));
-                    // TODO: awkward... relying on final take() having no effect...
                 }
             }
 
@@ -444,13 +443,27 @@ int main(int argc, char** argv) {
 
     logger::log("Entered main");
 
+    rule_recorder recorder;
+    if (argc == 2) {
+        recorder.replace(read_rule_from_file(argv[1]));
+    }
+
     tile_filler filler{.seed = 0, .density = 0.5};
     rule_runner runner({.width = 320, .height = 240});
-    rule_recorder recorder;
+    runner.restart(filler);
+
+    legacy::ruleT rule = recorder.current();
 
     // TODO: combine to tile_runner...
     constexpr int pergen_min = 1, pergen_max = 20;
     int pergen = 1;
+    bool anti_flick = true; // TODO: add explanation
+    auto actual_pergen = [&]() {
+        if (anti_flick && legacy::will_flick(rule) && pergen % 2) {
+            return pergen + 1;
+        }
+        return pergen;
+    };
 
     constexpr int start_min = 0, start_max = 1000;
     int start_from = 0;
@@ -458,32 +471,33 @@ int main(int argc, char** argv) {
     constexpr int gap_min = 0, gap_max = 20;
     int gap_frame = 0;
 
-    bool anti_flick = true; // TODO: add explanation
-
-    if (argc == 2) {
-        recorder.replace(read_rule_from_file(argv[1]));
-    }
-
-    runner.set_rule(recorder.current());
-    runner.restart(filler);
-
-    tile_image img(renderer, runner.tile());
-    code_image icons(renderer);
-
     bool paused = false;
+
+    auto run = [&](bool restart) {
+        if (rule != recorder.current()) {
+            rule = recorder.current();
+            restart = true;
+        }
+        if (restart) {
+            runner.restart(filler);
+        }
+        if (runner.gen() < start_from) {
+            runner.run(rule, start_from - runner.gen());
+        } else if (!paused) {
+            if (ImGui::GetFrameCount() % (gap_frame + 1) == 0) {
+                runner.run(rule, actual_pergen());
+            }
+        }
+    };
+
     bool show_rule_editor = true;
     bool show_demo_window = false; // TODO: remove this in the future...
     bool show_log_window = true;
     bool show_nav_window = true;
 
-    auto actual_pergen = [&](int pergen) {
-        if (anti_flick && legacy::will_flick(runner.rule()) && pergen % 2) {
-            return pergen + 1;
-        }
-        return pergen;
-    };
-
     // Main loop
+    tile_image img(renderer, runner.tile());
+    code_image icons(renderer);
     // TODO: cannot break eagerly?
     bool done = false;
     while (!done) {
@@ -539,7 +553,7 @@ int main(int argc, char** argv) {
             logger::window("Events", &show_log_window);
         }
         if (show_rule_editor) {
-            edit_rule("Rule editor", &show_rule_editor, runner.rule(), icons, recorder);
+            edit_rule("Rule editor", &show_rule_editor, rule, icons, recorder);
         }
         if (show_nav_window) {
             file_nav("File Nav", &show_nav_window, recorder);
@@ -656,12 +670,12 @@ int main(int argc, char** argv) {
                 ImGui::SameLine();
                 ImGui::PushButtonRepeat(true);
                 if (ImGui::Button("+1")) {
-                    runner.run(1); // TODO: should run be called here?
+                    runner.run(rule, 1); // TODO: should run be called here?
                     // TODO: should have visible (text) effect even when not paused...
                 }
                 ImGui::SameLine();
                 if (ImGui::Button("+p")) {
-                    runner.run(actual_pergen(pergen));
+                    runner.run(rule, actual_pergen());
                 }
                 ImGui::PopButtonRepeat();
 
@@ -679,14 +693,11 @@ int main(int argc, char** argv) {
             {
                 // TODO: toooo ugly...
                 ImGui::SliderInt("Pergen [1-20]", &pergen, pergen_min, pergen_max, "%d", ImGuiSliderFlags_NoInput);
-                // TODO: conditional or not?
-                if (legacy::will_flick(runner.rule())) {
-                    ImGui::AlignTextToFramePadding();
-                    // TODO: actual_pergen implicitly uses runner.rule()...
-                    ImGui::Text("(Actual pergen: %d)", actual_pergen(pergen));
-                    ImGui::SameLine();
-                    ImGui::Checkbox("anti-flick", &anti_flick);
-                }
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("(Actual pergen: %d)", actual_pergen());
+                ImGui::SameLine();
+                ImGui::Checkbox("anti-flick", &anti_flick);
 
                 ImGui::SliderInt("Gap Frame [0-20]", &gap_frame, gap_min, gap_max, "%d", ImGuiSliderFlags_NoInput);
                 ImGui::SliderInt("Start gen [0-1000]", &start_from, start_min, start_max, "%d",
@@ -709,7 +720,7 @@ int main(int argc, char** argv) {
                     if (!paused) {
                         paused = true;
                     } else {
-                        runner.run(actual_pergen(pergen)); // ?run(1)
+                        runner.run(rule, actual_pergen()); // ?run(1)
                         // TODO: whether to take place after set_rule?
                         // TODO: whether to update image this frame?
                     }
@@ -720,21 +731,8 @@ int main(int argc, char** argv) {
             }
         }
 
-        // Synchronize with recorder:
         // TODO: should this be put before begin-frame?
-        if (runner.set_rule(recorder.current())) {
-            should_restart = true;
-        }
-        if (should_restart) {
-            runner.restart(filler);
-        }
-        if (runner.gen() < start_from) {
-            runner.run(start_from - runner.gen());
-        } else if (!paused) {
-            if (ImGui::GetFrameCount() % (gap_frame + 1) == 0) {
-                runner.run(actual_pergen(pergen));
-            }
-        }
+        run(should_restart);
     }
 
     return 0;

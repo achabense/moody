@@ -83,7 +83,6 @@ public:
 };
 
 class rule_runner {
-    legacy::ruleT m_rule{};
     torus m_tile;
     int m_gen = 0;
 
@@ -92,7 +91,6 @@ class rule_runner {
 public:
     explicit rule_runner(legacy::rectT size) : m_tile(size) {}
 
-    const legacy::ruleT& rule() const { return m_rule; }
     const legacy::tileT& tile() const { return m_tile.tile(); }
     int gen() const { return m_gen; }
 
@@ -102,18 +100,9 @@ public:
         m_gen = 0;
     }
 
-    // TODO: clumsy
-    bool set_rule(const legacy::ruleT& rule) {
-        if (m_rule != rule) {
-            m_rule = rule;
-            return true;
-        }
-        return false;
-    }
-
-    void run(int count) {
+    void run(const legacy::ruleT& rule, int count) {
         for (int i = 0; i < count; ++i) {
-            m_tile.run(m_rule);
+            m_tile.run(rule);
             ++m_gen;
         }
     }
@@ -153,7 +142,8 @@ public:
         }
     }
 
-    legacy::ruleT current() const { //
+    legacy::ruleT current() const {
+        assert(m_pos >= 0 && m_pos < size());
         return static_cast<legacy::ruleT>(m_record[m_pos]);
     }
 
