@@ -8,7 +8,6 @@
 
 #include "partition.hpp"
 #include "rule.hpp"
-#include "serialize2.hpp"
 #include "tile.hpp"
 
 // TODO: partial rule (e.g. collect from tile; the rest is generated from another generator...)

@@ -54,9 +54,6 @@
     <ClInclude Include="imgui\imconfig.h">
       <Filter>imgui</Filter>
     </ClInclude>
-    <ClInclude Include="serialize2.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="save.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
