@@ -54,12 +54,6 @@
     <ClInclude Include="imgui\imconfig.h">
       <Filter>imgui</Filter>
     </ClInclude>
-    <ClInclude Include="save.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="space.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">

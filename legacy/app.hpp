@@ -210,7 +210,9 @@ std::vector<legacy::compressT> read_rule_from_file(const char* filename) {
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 // TODO: whether to accept <imgui.h> as base header?
 
-#include "save.hpp"
+#include <chrono>
+#include <filesystem>
+
 #include <imgui.h>
 
 // Unlike ImGui::TextWrapped, doesn't take fmt str...
@@ -259,6 +261,33 @@ struct [[nodiscard]] imgui_itemtooltip {
     explicit operator bool() const { return opened; }
 };
 
+struct timeT {
+    int year;
+    int month; // [1,12]
+    int day;   // [1,31]
+    int hour;  // [0,23]
+    int min;   // [0,59]
+    int sec;   // [0,59]
+    int ms;
+
+    static timeT now() {
+        using namespace std::chrono;
+        auto now = current_zone()->to_local(system_clock::now());
+
+        year_month_day ymd(floor<days>(now));
+        int year = ymd.year().operator int();
+        int month = ymd.month().operator unsigned int();
+        int day = ymd.day().operator unsigned int();
+
+        hh_mm_ss hms(floor<milliseconds>(now - floor<days>(now)));
+        int hour = hms.hours().count();
+        int min = hms.minutes().count();
+        int sec = hms.seconds().count();
+        int ms = hms.subseconds().count();
+        return timeT{year, month, day, hour, min, sec, ms};
+    }
+};
+
 // Likely to be the only singleton...
 class logger {
     // TODO: maybe better if data(inheritance)-based?
@@ -273,7 +302,7 @@ public:
     // Also serve as error handler; must succeed.
     template <class... T>
     static void log(std::format_string<const T&...> fmt, const T&... args) noexcept {
-        auto now = legacy::timeT::now();
+        auto now = timeT::now();
         // TODO: the format should be refined...
         char str[100];
         snprintf(str, 100, "%d-%d %02d:%02d:%02d [%d] ", now.month, now.day, now.hour, now.min, now.sec, ith++);

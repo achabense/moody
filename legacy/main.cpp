@@ -23,7 +23,6 @@
 #include "app.hpp"
 #include "image.hpp"
 #include "rule_traits.hpp"
-#include "save.hpp"
 
 #if !SDL_VERSION_ATLEAST(2, 0, 17)
 #error This backend requires SDL 2.0.17+ because of SDL_RenderGeometry() function
@@ -94,11 +93,11 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                     }
                 }
             }
-            ImGui::SameLine();
-            if (ImGui::Button("Save to file")) {
-                legacy::record_rule(to_edit); // TODO: wasteful...
-                logger::log("Saved");         // TODO: redesign record_rule...
-            }
+            // TODO: re-implement
+            // ImGui::SameLine();
+            // if (ImGui::Button("Save to file")) {
+            //     logger::log("Saved");
+            // }
         }
 
         using legacy::partitionT;
