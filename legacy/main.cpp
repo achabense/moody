@@ -95,13 +95,13 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                         pst = 15;
                     }
                 }
-                    }
+            }
 
             if (cpy > 0) {
                 --cpy;
                 ImGui::SameLine();
                 ImGui::TextUnformatted("Copied");
-                }
+            }
             if (pst > 0) {
                 --pst;
                 ImGui::SameLine();
@@ -300,6 +300,114 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
     }
 }
 
+// TODO: refine...
+struct file_navT {
+    using path = std::filesystem::path;
+
+    static path exe_path() {
+        // The correctness of "pos = base.get()" relies on default coding being utf-8 (asserted; TODO: list all
+        // utf8 dependencies)
+        const std::unique_ptr<char[], decltype(+SDL_free)> p(SDL_GetBasePath(), SDL_free);
+        assert(p); // TODO: what if this fails? what if exe path is invalid?
+        return p.get();
+    }
+
+    path pos;
+    struct entry {
+        std::filesystem::directory_entry entry;
+        std::filesystem::file_status status; // entry.status(). unusually expensive call.
+    };
+    std::vector<entry> list;
+    bool broken = false;
+    int refresh = 20;
+
+    void refr() noexcept {
+        if (!broken) {
+            if (--refresh <= 0) {
+                set_pos(std::move(pos));
+            }
+        }
+    }
+
+    void set_pos(path&& p) noexcept {
+        broken = true;
+        list.clear();
+        try {
+            if (std::filesystem::exists(p)) {
+                pos = std::filesystem::canonical(p);
+                // TODO: what if too many entries?
+                for (const auto& entry : std::filesystem::directory_iterator(pos)) {
+                    list.emplace_back(entry, entry.status());
+                }
+            }
+        } catch (...) {
+            return;
+        }
+        broken = false;
+        refresh = 20;
+    }
+
+    file_navT(path p = exe_path()) { set_pos(std::move(p)); }
+
+    [[nodiscard]] std::optional<path> show() {
+        using namespace std;
+        using namespace std::filesystem;
+
+        optional<path> sel = nullopt;
+
+        try {
+            // TODO: support filter...
+            // TODO: add text input.
+            ImGui::TextUnformatted((const char*)pos.u8string().c_str());
+            ImGui::Separator();
+            if (ImGui::MenuItem("-> Exe path")) {
+                set_pos(exe_path());
+            }
+            if (ImGui::MenuItem("-> Cur path")) {
+                set_pos(current_path());
+            }
+            // TODO: the correctness is doubtful here...
+            if (path par = pos.parent_path(); ImGui::MenuItem("-> ..", nullptr, nullptr, par != pos)) {
+                set_pos(move(par));
+            }
+            ImGui::Separator();
+
+            if (imgui_childwindow child("child"); child) {
+                if (!broken) {
+                    refr();
+                    for (const auto& [entry, status] : list) {
+                        // TODO: how to compare file extension without creating a real string?
+                        if (is_regular_file(status)) {
+                            const auto str = entry.path().filename().u8string();
+                            if (ImGui::MenuItem((const char*)str.c_str())) {
+                                sel = entry.path();
+                            }
+                        } else if (is_directory(status)) {
+                            const auto str = entry.path().filename().u8string();
+                            if (ImGui::MenuItem((const char*)str.c_str(), "dir")) {
+                                set_pos(path(entry.path()));
+                            }
+                        }
+                    }
+                } else {
+                    ImGui::TextDisabled("Broken"); // TODO: avoid fmt.
+                }
+            }
+        } catch (const exception& what) {
+            broken = true;
+        }
+
+        return sel;
+    }
+
+    [[nodiscard]] std::optional<path> window(const char* id_str, bool* p_open) {
+        if (imgui_window window(id_str, p_open); window) {
+            return show();
+        }
+        return std::nullopt;
+    }
+};
+
 // TODO: the program should be allowed to create folders in the exe path.(SDL_GetBasePath(), instead of PrefPath)
 // this is a part runtime [dependency]. (btw, where to put imgui config?)
 
@@ -307,13 +415,15 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
 // TODO: add input...
 // TODO: undo operation...
 // TODO: should be a class?
-[[nodiscard]] void file_nav(const char* id_str, bool* p_open, rule_recorder& recorder) {
+[[nodiscard]] std::optional<std::filesystem::path> file_nav(const char* id_str, bool* p_open) {
     using namespace std;
     using namespace std::filesystem;
 
     // static path pos = current_path();
     static path pos = R"(C:\*redacted*\Desktop\rulelists_new)";
     // static path pos = get_pref_path();
+
+    optional<path> sel = nullopt;
 
     if (imgui_window window(id_str, p_open); window) {
         try {
@@ -325,7 +435,7 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
             if (ImGui::MenuItem("-> Exe path")) {
                 // The correctness of "pos = base.get()" relies on default coding being utf-8 (asserted; TODO: list all
                 // utf8 dependencies)
-                const std::unique_ptr<char[], decltype(+SDL_free)> base(SDL_GetBasePath(), SDL_free);
+                const unique_ptr<char[], decltype(+SDL_free)> base(SDL_GetBasePath(), SDL_free);
                 if (base) {
                     pos = base.get();
                 }
@@ -336,37 +446,26 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
             }
             // TODO: the correctness is doubtful here...
             if (path par = pos.parent_path(); ImGui::MenuItem("-> ..", nullptr, nullptr, par != pos)) {
-                pos = par; // swap?
+                pos.swap(par);
             }
             ImGui::Separator();
 
             if (imgui_childwindow child("child"); child) {
                 // TODO: what if too many entries?
-                // TODO: move into child window; scope-guard required...
                 int entries = 0;
                 for (const auto& entry : directory_iterator(pos)) {
                     // TODO: should ".txt" be needed? or should this be just be a default regex filter?
                     // TODO: how to compare file extension without creating a real string?
-                    const bool txt = entry.is_regular_file() && entry.path().extension() == ".txt";
-                    const bool dir = entry.is_directory();
+                    const auto status = entry.status(); // more expensive than thought...
+                    const bool txt = is_regular_file(status) && entry.path().extension() == ".txt";
+                    const bool dir = is_directory(status);
                     if (txt || dir) {
                         ++entries;
                         // TODO: is only showing filename a good idea?
                         const auto str = entry.path().filename().u8string();
                         if (ImGui::MenuItem((const char*)str.c_str(), dir ? "dir" : "")) {
                             if (txt) {
-                                // TODO: want double click; how?
-                                // TODO: always use u8string?
-                                logger::log("Tried to open {}", entry.path().filename().string());
-                                // TODO: is string() encoding-safe for fopen()?
-                                // TODO: use ifstream(path()) instead?
-                                auto result = read_rule_from_file(entry.path().string().c_str());
-                                if (!result.empty()) {
-                                    logger::append(" ~ found {} rules", result.size());
-                                    recorder.replace(std::move(result));
-                                } else {
-                                    logger::append(" ~ found nothing");
-                                }
+                                sel = entry.path();
                             } else if (dir) {
                                 pos = entry.path();
                                 break;
@@ -390,6 +489,8 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
             // better: if exception happens after a path change, restore. otherwise, should become "broken" state.
         }
     }
+
+    return sel;
 }
 
 // TODO: should enable guide-mode (with a switch...)
@@ -506,6 +607,7 @@ int main(int argc, char** argv) {
     bool show_demo_window = false; // TODO: remove this in the future...
     bool show_log_window = true;
     bool show_nav_window = true;
+    file_navT nav(R"(C:\*redacted*\Desktop\rulelists_new)");
 
     // Main loop
     tile_image img(renderer, runner.tile());
@@ -568,7 +670,20 @@ int main(int argc, char** argv) {
             edit_rule("Rule editor", &show_rule_editor, rule, icons, recorder);
         }
         if (show_nav_window) {
-            file_nav("File Nav", &show_nav_window, recorder);
+            if (auto sel = nav.window("File Nav", &show_nav_window)) {
+                // TODO: want double click; how?
+                // TODO: always use u8string?
+                logger::log("Tried to open {}", sel->filename().string());
+                // TODO: is string() encoding-safe for fopen()?
+                // TODO: use ifstream(path()) instead?
+                auto result = read_rule_from_file(sel->string().c_str());
+                if (!result.empty()) {
+                    logger::append(" ~ found {} rules", result.size());
+                    recorder.replace(std::move(result));
+                } else {
+                    logger::append(" ~ found nothing");
+                }
+            }
         }
 
         if (imgui_window window("-v-", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize);
