@@ -75,11 +75,13 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
             auto rule_str = to_MAP_str(to_edit);
             imgui_strwrapped(rule_str);
 
-            // TODO: refine msg...
+            static int cpy = 0, pst = 0; // TODO: whatever the form is, should have visible effect.
             if (ImGui::Button("Copy to clipboard")) {
                 ImGui::SetClipboardText(rule_str.c_str());
-                logger::log("Copied");
+                // logger::log("Copied");
+                cpy = 15;
             }
+
             ImGui::SameLine();
             if (ImGui::Button("Paste")) {
                 // TODO: can text return nullptr?
@@ -89,9 +91,21 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                         int size = recorder.size();
                         recorder.append(rules); // TODO: requires non-trivial append logic.
                         recorder.set_pos(size);
-                        logger::log("Pasted {}", rules.size());
+                        // logger::log("Pasted {}", rules.size());
+                        pst = 15;
                     }
                 }
+                    }
+
+            if (cpy > 0) {
+                --cpy;
+                ImGui::SameLine();
+                ImGui::TextUnformatted("Copied");
+                }
+            if (pst > 0) {
+                --pst;
+                ImGui::SameLine();
+                ImGui::TextUnformatted("Pasted");
             }
             // TODO: re-implement
             // ImGui::SameLine();

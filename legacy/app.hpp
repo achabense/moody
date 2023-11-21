@@ -331,27 +331,13 @@ public:
             ImGui::Separator();
 
             if (imgui_childwindow child("Child"); child) {
-#if 0
-            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
-            ImGuiListClipper clipper;
-            clipper.Begin(m_strs.size());
-            // TODO: problematic...
-            while (clipper.Step()) {
-                // TODO: safe?
-                for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i) {
-                    ImGui::TextUnformatted(m_strs[i].c_str());
-                }
-            }
-            clipper.End();
-            ImGui::PopStyleVar();
-#else
+                // TODO: optimize...
                 std::string str;
                 for (const auto& s : m_strs) {
                     str += s;
                     str += '\n';
                 }
                 imgui_strwrapped(str);
-#endif
                 if (to_bottom || ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) {
                     ImGui::SetScrollHereY(1.0f);
                 }
