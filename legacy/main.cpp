@@ -28,6 +28,9 @@
 #error This backend requires SDL 2.0.17+ because of SDL_RenderGeometry() function
 #endif
 
+// Unfortunately, SDL2-renderer backend doesn't support docking features...
+// https://github.com/ocornut/imgui/issues/5835
+
 // TODO: apply in several other places...
 template <class F>
 struct [[nodiscard]] scope_guard {
