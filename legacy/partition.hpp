@@ -36,25 +36,20 @@ namespace legacy {
 
             // regulated.
             m_groups.resize(m_k);
-            for (codeT code = 0; code < 512; ++code) {
-                if (!decode_s(code)) {
-                    m_groups[m_map[code]].push_back(code);
-                }
-            }
+
             // TODO: temporary; should be dealt with by getp...
-            bool paired =
-                m_map[0] == m_map[16]; // TODO: not used; should recheck (this part should be totally redesigned)
-            bool state = m_map[0] == m_map[511];
-            if (!state) {
-                for (codeT code = 0; code < 512; ++code) {
-                    if (decode_s(code)) {
-                        m_groups[m_map[code]].push_back(code);
-                    }
-                }
-            } else {
-                for (codeT code = 511; code >= 0; --code) {
-                    if (decode_s(code)) {
-                        m_groups[m_map[code]].push_back(code);
+            // (this part should be redesigned)
+            for (codeT code = 0; code < 512; ++code) {
+                m_groups[m_map[code]].push_back(code);
+            }
+            const bool paired = m_map[0] == m_map[16];
+            const bool state = m_map[0] == m_map[511];
+            if (paired || state) {
+                for (auto& group : m_groups) {
+                    const auto pred = [f = group[0]](codeT code) { return decode_s(code) == decode_s(f); };
+                    const auto mid = std::stable_partition(group.begin(), group.end(), pred);
+                    if (state) {
+                        std::reverse(mid, group.end());
                     }
                 }
             }
@@ -207,7 +202,7 @@ namespace legacy {
                 };
 
                 int color = 0;
-                for (codeT code = 0; code < 512; code++) {
+                for (codeT code = 0; code < 512; ++code) {
                     if (part[code] == -1) {
                         equiv(code, color++, equiv);
                     }

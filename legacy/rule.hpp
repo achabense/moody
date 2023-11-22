@@ -8,12 +8,38 @@
 #include <vector>
 
 namespace legacy {
+    // TODO: make global? add optional?
     using std::array;
     using std::string;
     using std::vector;
 
-    // TODO: encode_traits?
+    // TODO: encode_traits (X_mask, from/to_env)?
+#if 0
+    // TODO: is range-for loop applicable? is void++ conformant?
+    // https://en.cppreference.com/w/cpp/language/range-for
+    struct codeT {
+        int v;
+        // TODO: for codeT = int; what's the cost for not being an aggr?
+        constexpr codeT() : v(0) {}
+        constexpr codeT(int v) : v(v) {}
+        constexpr operator int() const { return v; }
+        constexpr void operator++() { ++v; }
+        constexpr void operator--() { --v; }
+
+        constexpr static codeT begin() { return codeT{0}; }
+        constexpr static codeT end() { return codeT{512}; }
+        constexpr codeT operator*() const { return *this; }
+        constexpr friend bool operator==(const codeT&, const codeT&) = default;
+    };
+
+    inline void codeT_test() {
+        for (auto code : codeT{}) {
+
+        }
+    }
+#else
     using codeT = int;
+#endif
 
     // clang-format off
     // TODO: stateT?
