@@ -304,6 +304,7 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
 }
 
 // TODO: refine...
+// TODO: able to create/append/open file?
 struct file_navT {
     using path = std::filesystem::path;
 
@@ -355,17 +356,19 @@ struct file_navT {
 
     file_navT(path p = exe_path()) { set_pos(std::move(p)); }
 
-    [[nodiscard]] std::optional<path> show() {
+    [[nodiscard]] std::optional<path> show(const char* suff = nullptr) {
         using namespace std;
         using namespace std::filesystem;
 
-        optional<path> sel = nullopt;
+        optional<path> selfile = nullopt;
 
         try {
-            // TODO: support filter...
+            // TODO: enhance filter...
             // TODO: add text input.
             // TODO: undo operation...
-            ImGui::TextUnformatted((const char*)pos.u8string().c_str());
+            // TODO: relying on default encoding being utf-8...
+            // TODO: how to decide the default encoding of MB str?
+            ImGui::TextUnformatted(pos.string().c_str());
             ImGui::Separator();
             if (ImGui::MenuItem("-> Exe path")) {
                 set_pos(exe_path());
@@ -380,23 +383,32 @@ struct file_navT {
             ImGui::Separator();
 
             if (imgui_childwindow child("child"); child) {
-                if (!broken) {
+                if (broken) {
+                    // TODO: what's the encoding of exception.what()?
+                    // TODO: wrapped&&disabled...
+                    imgui_strdisabled(broken->c_str());
+                } else {
                     refr();
+
                     int entries = 0;
+                    optional<path> selfolder = nullopt;
                     for (const auto& [entry, status] : list) {
                         // TODO: how to compare file extension without creating a real string?
+                        const auto str = entry.path().filename().string();
+
                         if (is_regular_file(status)) {
-                            ++entries;
-                            const auto str = entry.path().filename().u8string();
-                            if (ImGui::MenuItem((const char*)str.c_str())) {
-                                sel = entry.path();
+                            if (!suff || str.ends_with(suff)) {
+                                ++entries;
+                                // TODO: want double click; how?
+                                if (ImGui::MenuItem(str.c_str())) {
+                                    selfile = entry.path();
+                                }
                             }
                         } else if (is_directory(status)) {
                             ++entries;
-                            const auto str = entry.path().filename().u8string();
                             if (ImGui::MenuItem((const char*)str.c_str(), "dir")) {
-                                set_pos(path(entry.path()));
-                                break; // TODO: use optional too...
+                                selfolder = entry.path();
+                                // Not breaking eagerly to avoid flicking...
                             }
                         }
                     }
@@ -404,22 +416,21 @@ struct file_navT {
                         // TODO: better msg...
                         imgui_strdisabled("None");
                     }
-                } else {
-                    // TODO: what's the encoding of exception.what()?
-                    // TODO: wrapped&&disabled...
-                    imgui_strdisabled(broken->c_str());
+                    if (selfolder) {
+                        set_pos(std::move(*selfolder));
+                    }
                 }
             }
         } catch (const exception& what) {
             broken = what.what();
         }
 
-        return sel;
+        return selfile;
     }
 
-    [[nodiscard]] std::optional<path> window(const char* id_str, bool* p_open) {
+    [[nodiscard]] std::optional<path> window(const char* id_str, bool* p_open, const char* suff = nullptr) {
         if (imgui_window window(id_str, p_open); window) {
-            return show();
+            return show(suff);
         }
         return std::nullopt;
     }
@@ -602,9 +613,7 @@ int main(int argc, char** argv) {
             edit_rule("Rule editor", &show_rule_editor, rule, icons, recorder);
         }
         if (show_nav_window) {
-            if (auto sel = nav.window("File Nav", &show_nav_window)) {
-                // TODO: want double click; how?
-                // TODO: always use u8string?
+            if (auto sel = nav.window("File Nav", &show_nav_window, ".txt")) {
                 logger::log("Tried to open {}", sel->filename().string());
                 // TODO: is string() encoding-safe for fopen()?
                 // TODO: use ifstream(path()) instead?

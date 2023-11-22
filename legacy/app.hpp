@@ -243,7 +243,7 @@ inline bool imgui_keypressed(ImGuiKey key, bool repeat) {
 // I hate these "deprecated but still generated" copiers.
 // TODO: clang-format works wrongly with emojis?
 // #define 🤢(T)
-#define NOCOPY(T)            \
+#define NOCOPY(T)         \
     T(const T&) = delete; \
     T& operator=(const T&) = delete;
 
@@ -323,13 +323,14 @@ class logger {
 public:
     logger() = delete;
 
+    // TODO: logfmt and logplain...
     // Also serve as error handler; must succeed.
     template <class... T>
     static void log(std::format_string<const T&...> fmt, const T&... args) noexcept {
         auto now = timeT::now();
         // TODO: the format should be refined...
         char str[100];
-        snprintf(str, 100, "%d-%d %02d:%02d:%02d [%d] ", now.month, now.day, now.hour, now.min, now.sec, ith++);
+        snprintf(str, 100, "%02d:%02d:%02d [%d] ", now.hour, now.min, now.sec, ith++);
 
         m_strs.push_back(str + std::format(fmt, args...));
         if (m_strs.size() > m_max) {
@@ -338,6 +339,7 @@ public:
     }
 
     // TODO: better name...
+    // TODO: relying on no intercepting call...
     template <class... T>
     static void append(std::format_string<const T&...> fmt, const T&... args) noexcept {
         assert(!m_strs.empty());

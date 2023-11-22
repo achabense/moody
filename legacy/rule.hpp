@@ -12,6 +12,7 @@ namespace legacy {
     using std::string;
     using std::vector;
 
+    // TODO: encode_traits?
     using codeT = int;
 
     // clang-format off
@@ -41,6 +42,7 @@ namespace legacy {
         return {q, w, e, a, s, d, z, x, c};
     }
 
+    // TODO: mask_s?
     // Equivalent to decode(code).s.
     constexpr bool decode_s(codeT code) {
         return (code >> 4) & 1;
@@ -181,7 +183,6 @@ namespace legacy {
     };
 
 } // namespace legacy
-
 
 namespace legacy {
     namespace _impl_details {
