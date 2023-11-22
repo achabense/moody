@@ -308,6 +308,9 @@ struct file_navT {
     using path = std::filesystem::path;
 
     static path exe_path() {
+        // TODO: the program should be allowed to create folders in the exe path.(SDL_GetBasePath(), instead of
+        // PrefPath)
+        // this is a part runtime [dependency]. (btw, where to put imgui config?)
         // The correctness of "pos = base.get()" relies on default coding being utf-8 (asserted; TODO: list all
         // utf8 dependencies)
         const std::unique_ptr<char[], decltype(+SDL_free)> p(SDL_GetBasePath(), SDL_free);
@@ -321,7 +324,7 @@ struct file_navT {
         std::filesystem::file_status status; // entry.status(). unusually expensive call.
     };
     std::vector<entry> list;
-    bool broken = false;
+    std::optional<std::string> broken = std::nullopt;
     int refresh = 20;
 
     void refr() noexcept {
@@ -333,20 +336,20 @@ struct file_navT {
     }
 
     void set_pos(path&& p) noexcept {
-        broken = true;
-        list.clear();
         try {
             if (std::filesystem::exists(p)) {
                 pos = std::filesystem::canonical(p);
                 // TODO: what if too many entries?
+                list.clear();
                 for (const auto& entry : std::filesystem::directory_iterator(pos)) {
                     list.emplace_back(entry, entry.status());
                 }
             }
-        } catch (...) {
+        } catch (const std::exception& what) {
+            broken = what.what();
             return;
         }
-        broken = false;
+        broken.reset();
         refresh = 20;
     }
 
@@ -361,6 +364,7 @@ struct file_navT {
         try {
             // TODO: support filter...
             // TODO: add text input.
+            // TODO: undo operation...
             ImGui::TextUnformatted((const char*)pos.u8string().c_str());
             ImGui::Separator();
             if (ImGui::MenuItem("-> Exe path")) {
@@ -371,33 +375,43 @@ struct file_navT {
             }
             // TODO: the correctness is doubtful here...
             if (path par = pos.parent_path(); ImGui::MenuItem("-> ..", nullptr, nullptr, par != pos)) {
-                set_pos(move(par));
+                set_pos(std::move(par));
             }
             ImGui::Separator();
 
             if (imgui_childwindow child("child"); child) {
                 if (!broken) {
                     refr();
+                    int entries = 0;
                     for (const auto& [entry, status] : list) {
                         // TODO: how to compare file extension without creating a real string?
                         if (is_regular_file(status)) {
+                            ++entries;
                             const auto str = entry.path().filename().u8string();
                             if (ImGui::MenuItem((const char*)str.c_str())) {
                                 sel = entry.path();
                             }
                         } else if (is_directory(status)) {
+                            ++entries;
                             const auto str = entry.path().filename().u8string();
                             if (ImGui::MenuItem((const char*)str.c_str(), "dir")) {
                                 set_pos(path(entry.path()));
+                                break; // TODO: use optional too...
                             }
                         }
                     }
+                    if (!entries) {
+                        // TODO: better msg...
+                        imgui_strdisabled("None");
+                    }
                 } else {
-                    ImGui::TextDisabled("Broken"); // TODO: avoid fmt.
+                    // TODO: what's the encoding of exception.what()?
+                    // TODO: wrapped&&disabled...
+                    imgui_strdisabled(broken->c_str());
                 }
             }
         } catch (const exception& what) {
-            broken = true;
+            broken = what.what();
         }
 
         return sel;
@@ -410,91 +424,6 @@ struct file_navT {
         return std::nullopt;
     }
 };
-
-// TODO: the program should be allowed to create folders in the exe path.(SDL_GetBasePath(), instead of PrefPath)
-// this is a part runtime [dependency]. (btw, where to put imgui config?)
-
-// TODO: is "record" a returnable type?
-// TODO: add input...
-// TODO: undo operation...
-// TODO: should be a class?
-[[nodiscard]] std::optional<std::filesystem::path> file_nav(const char* id_str, bool* p_open) {
-    using namespace std;
-    using namespace std::filesystem;
-
-    // static path pos = current_path();
-    static path pos = R"(C:\*redacted*\Desktop\rulelists_new)";
-    // static path pos = get_pref_path();
-
-    optional<path> sel = nullopt;
-
-    if (imgui_window window(id_str, p_open); window) {
-        try {
-            // TODO: support filter...
-            ImGui::TextUnformatted((const char*)pos.u8string().c_str());
-            ImGui::Separator();
-            // TODO: add text input.
-            // TODO: how to switch driver on windows? (enough to enable text input...)
-            if (ImGui::MenuItem("-> Exe path")) {
-                // The correctness of "pos = base.get()" relies on default coding being utf-8 (asserted; TODO: list all
-                // utf8 dependencies)
-                const unique_ptr<char[], decltype(+SDL_free)> base(SDL_GetBasePath(), SDL_free);
-                if (base) {
-                    pos = base.get();
-                }
-                // TODO: what if this fails?
-            }
-            if (ImGui::MenuItem("-> Cur path")) {
-                pos = current_path(); // TODO: what if invalid?
-            }
-            // TODO: the correctness is doubtful here...
-            if (path par = pos.parent_path(); ImGui::MenuItem("-> ..", nullptr, nullptr, par != pos)) {
-                pos.swap(par);
-            }
-            ImGui::Separator();
-
-            if (imgui_childwindow child("child"); child) {
-                // TODO: what if too many entries?
-                int entries = 0;
-                for (const auto& entry : directory_iterator(pos)) {
-                    // TODO: should ".txt" be needed? or should this be just be a default regex filter?
-                    // TODO: how to compare file extension without creating a real string?
-                    const auto status = entry.status(); // more expensive than thought...
-                    const bool txt = is_regular_file(status) && entry.path().extension() == ".txt";
-                    const bool dir = is_directory(status);
-                    if (txt || dir) {
-                        ++entries;
-                        // TODO: is only showing filename a good idea?
-                        const auto str = entry.path().filename().u8string();
-                        if (ImGui::MenuItem((const char*)str.c_str(), dir ? "dir" : "")) {
-                            if (txt) {
-                                sel = entry.path();
-                            } else if (dir) {
-                                pos = entry.path();
-                                break;
-                            }
-                        }
-                    }
-                }
-                if (entries == 0) {
-                    // TODO: better msg...
-                    ImGui::MenuItem("None##None", nullptr, nullptr, false);
-                }
-            }
-        } catch (const exception& what) {
-            // TODO: as logger can be folded, better show the message in this window...
-            // (this is really an exception that should be posed to users...)
-            // TODO: let every window have its own logger?
-            // TODO: what's the encoding of exception.what()?
-            logger::log("Exception: {}", what.what()); // TODO: a lot of messy fs exceptions (access, encoding)...
-            pos = pos.parent_path();
-            // TODO: this won't fail easily, but may cause exception loop in the following frames.
-            // better: if exception happens after a path change, restore. otherwise, should become "broken" state.
-        }
-    }
-
-    return sel;
-}
 
 // TODO: should enable guide-mode (with a switch...)
 // TODO: changes upon the same rule should be grouped together... how? (editor++)...
@@ -659,7 +588,7 @@ int main(int argc, char** argv) {
         // Frame state:
         // TODO: applying following logic; consider refining it.
         // recorder is modified during display, but will synchronize with runner's before next frame.
-        assert(runner.rule() == recorder.current());
+        assert(rule == recorder.current());
         bool should_restart = false;
 
         // TODO: remove this when all done...

@@ -217,18 +217,39 @@ std::vector<legacy::compressT> read_rule_from_file(const char* filename) {
 
 // Unlike ImGui::TextWrapped, doesn't take fmt str...
 // TODO: the name is awful...
+
+inline void imgui_str(std::string_view str) {
+    ImGui::TextUnformatted(str.data(), str.data() + str.size());
+}
+
 inline void imgui_strwrapped(std::string_view str) {
     ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextUnformatted(str.data(), str.data() + str.size());
+    imgui_str(str);
     ImGui::PopTextWrapPos();
+}
+
+inline void imgui_strdisabled(std::string_view str) {
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
+    imgui_str(str);
+    ImGui::PopStyleColor();
 }
 
 inline bool imgui_keypressed(ImGuiKey key, bool repeat) {
     return !ImGui::GetIO().WantCaptureKeyboard && ImGui::IsKeyPressed(key, repeat);
 };
 
-// TODO: forbid copying...
+// TODO: mouse?
+
+// I hate these "deprecated but still generated" copiers.
+// TODO: clang-format works wrongly with emojis?
+// #define 🤢(T)
+#define NOCOPY(T)            \
+    T(const T&) = delete; \
+    T& operator=(const T&) = delete;
+
 struct [[nodiscard]] imgui_window {
+    NOCOPY(imgui_window);
+
     const bool visible;
     explicit imgui_window(const char* name, bool* p_open = {}, ImGuiWindowFlags flags = {})
         : visible(ImGui::Begin(name, p_open, flags)) {}
@@ -239,6 +260,8 @@ struct [[nodiscard]] imgui_window {
 };
 
 struct [[nodiscard]] imgui_childwindow {
+    NOCOPY(imgui_childwindow);
+
     const bool visible;
     explicit imgui_childwindow(const char* name, const ImVec2& size = {}, ImGuiWindowFlags flags = {})
         : visible(ImGui::BeginChild(name, size, false, flags)) {}
@@ -249,8 +272,9 @@ struct [[nodiscard]] imgui_childwindow {
 };
 
 // TODO: should imgui_childwindow/... support "enabled feature"?
-// TODO: forbid copying...
 struct [[nodiscard]] imgui_itemtooltip {
+    NOCOPY(imgui_itemtooltip);
+
     const bool opened; // TODO: proper name?
     imgui_itemtooltip(bool enabled = true) : opened(enabled && ImGui::BeginItemTooltip()) {}
     ~imgui_itemtooltip() {
