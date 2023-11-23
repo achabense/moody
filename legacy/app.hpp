@@ -16,7 +16,7 @@
 // TODO: notify on quit... (? there seems no such need.)
 // TODO: support more run-mode... (? related: when will the current run-mode cause problems?)
 
-void random_fill(bool* begin, bool* end, int count, auto&& rand) {
+/*inline*/ void random_fill(bool* begin, bool* end, int count, auto&& rand) {
     std::fill(begin, end, false);
     std::fill(begin, begin + std::clamp(count, 0, int(end - begin)), true);
     std::shuffle(begin, end, rand);
@@ -166,7 +166,7 @@ public:
     }
 };
 
-std::vector<legacy::compressT> extract_rules(const char* begin, const char* end) {
+inline std::vector<legacy::compressT> extract_rules(const char* begin, const char* end) {
     std::vector<legacy::compressT> rules;
 
     const auto& regex = legacy::regex_MAP_str();
@@ -181,7 +181,7 @@ std::vector<legacy::compressT> extract_rules(const char* begin, const char* end)
     return rules;
 }
 
-std::optional<std::vector<char>> load_binary(const char* filename, int max_size) {
+inline std::optional<std::vector<char>> load_binary(const char* filename, int max_size) {
     const std::unique_ptr<FILE, decltype(+fclose)> file(fopen(filename, "rb"), fclose);
     if (file) {
         FILE* fp = file.get();
@@ -198,8 +198,7 @@ std::optional<std::vector<char>> load_binary(const char* filename, int max_size)
 }
 
 // TODO: redesign return types... also optional?
-// TODO: add error log.
-std::vector<legacy::compressT> read_rule_from_file(const char* filename) {
+inline std::vector<legacy::compressT> read_rule_from_file(const char* filename) {
     auto result = load_binary(filename, 1'000'000);
     if (result) {
         return extract_rules(result->data(), result->data() + result->size());
@@ -251,7 +250,10 @@ struct [[nodiscard]] imgui_window {
     NOCOPY(imgui_window);
 
     const bool visible;
-    explicit imgui_window(const char* name, bool* p_open = {}, ImGuiWindowFlags flags = {})
+    // TODO: refine interface and documentation
+    explicit imgui_window(const char* name, ImGuiWindowFlags flags = {})
+        : visible(ImGui::Begin(name, nullptr, flags)) {}
+    explicit imgui_window(const char* name, bool* p_open, ImGuiWindowFlags flags = {})
         : visible(ImGui::Begin(name, p_open, flags)) {}
     ~imgui_window() {
         ImGui::End(); // Unconditional.

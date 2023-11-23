@@ -79,6 +79,7 @@ namespace legacy {
         const bool* end() const { return begin() + area(); }
 
     private:
+        // TODO: make into a class? class lr get set
         void _set_lr(int _y, bool l, bool r) {
             assert(_y >= 0 && _y < m_size.height + 2);
             bool* lr = m_data + m_size.width * (m_size.height + 2);
@@ -101,6 +102,8 @@ namespace legacy {
             // assert m_shape == *.m_shape.
             const int width = m_size.width, height = m_size.height;
 
+            // TODO: copy_line method? (std::copy_n is less clear than memcpy here)
+            // (why does memxxx take dest as first arg, while copy_n take dest as last?)
             memcpy(_line(0), w->_line(height), width * sizeof(bool));
             memcpy(_line(height + 1), x->_line(1), width * sizeof(bool));
 

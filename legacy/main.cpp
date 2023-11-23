@@ -400,13 +400,14 @@ struct file_navT {
                             if (!suff || str.ends_with(suff)) {
                                 ++entries;
                                 // TODO: want double click; how?
-                                if (ImGui::MenuItem(str.c_str())) {
+                                // TODO: selected...
+                                if (ImGui::Selectable(str.c_str())) {
                                     selfile = entry.path();
                                 }
                             }
                         } else if (is_directory(status)) {
                             ++entries;
-                            if (ImGui::MenuItem((const char*)str.c_str(), "dir")) {
+                            if (ImGui::MenuItem(str.c_str(), "dir")) {
                                 selfolder = entry.path();
                                 // Not breaking eagerly to avoid flicking...
                             }
@@ -619,6 +620,7 @@ int main(int argc, char** argv) {
                 // TODO: use ifstream(path()) instead?
                 auto result = read_rule_from_file(sel->string().c_str());
                 if (!result.empty()) {
+                    // TODO: "append" is a nasty feature...
                     logger::append(" ~ found {} rules", result.size());
                     recorder.replace(std::move(result));
                 } else {
@@ -627,8 +629,11 @@ int main(int argc, char** argv) {
             }
         }
 
-        if (imgui_window window("-v-", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize);
-            window) {
+        // TODO: rename...
+        if (imgui_window window("_debug", ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize); window) {
+            ImGui::Text("(%.1f FPS) Frame:%d\n", io.Framerate, ImGui::GetFrameCount());
+            ImGui::Separator();
+
             ImGui::Checkbox("Log window", &show_log_window);
             ImGui::SameLine();
             ImGui::Checkbox("Rule editor", &show_rule_editor);
@@ -637,9 +642,10 @@ int main(int argc, char** argv) {
 
             ImGui::Checkbox("Demo window", &show_demo_window);
 
-            ImGui::Text("(%.1f FPS) Frame:%d\n", io.Framerate, ImGui::GetFrameCount());
-            ImGui::Separator();
+        }
 
+        if (imgui_window window("Tile", ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize); window) {
+            ImGui::Text("Gen:%d", runner.gen());
             ImGui::Text("Width:%d,Height:%d,Density:%f", runner.tile().width(), runner.tile().height(),
                         float(runner.tile().count()) / runner.tile().area());
             {
@@ -724,10 +730,12 @@ int main(int argc, char** argv) {
                 }
             }
 
-            ImGui::SeparatorText("Tile");
-            {
-                ImGui::Text("Gen:%d", runner.gen());
-
+            // TODO: better layout
+            if (ImGui::Button("Ctrl")) {
+                ImGui::OpenPopup("Ctrl##0");
+            }
+            // TODO: class?
+            if (ImGui::BeginPopup("Ctrl##0")) {
                 if (ImGui::SliderFloat("Init density [0-1]", &filler.density, 0.0f, 1.0f, "%.3f",
                                        ImGuiSliderFlags_NoInput)) {
                     should_restart = true;
@@ -756,9 +764,7 @@ int main(int argc, char** argv) {
                     ++filler.seed;
                     should_restart = true;
                 }
-            }
 
-            {
                 // TODO: toooo ugly...
                 ImGui::SliderInt("Pergen [1-20]", &pergen, pergen_min, pergen_max, "%d", ImGuiSliderFlags_NoInput);
 
@@ -771,31 +777,34 @@ int main(int argc, char** argv) {
                 ImGui::SliderInt("Start gen [0-1000]", &start_from, start_min, start_max, "%d",
                                  ImGuiSliderFlags_NoInput);
 
-                // TODO: redesign keyboard ctrl...
-                if (imgui_keypressed(ImGuiKey_1, true)) {
-                    gap_frame = std::max(gap_min, gap_frame - 1);
+                // TODO: enable/disable keyboard ctrl (enable by default)
+                ImGui::EndPopup();
+            }
+
+            // TODO: redesign keyboard ctrl...
+            if (imgui_keypressed(ImGuiKey_1, true)) {
+                gap_frame = std::max(gap_min, gap_frame - 1);
+            }
+            if (imgui_keypressed(ImGuiKey_2, true)) {
+                gap_frame = std::min(gap_max, gap_frame + 1);
+            }
+            if (imgui_keypressed(ImGuiKey_3, true)) {
+                pergen = std::max(pergen_min, pergen - 1);
+            }
+            if (imgui_keypressed(ImGuiKey_4, true)) {
+                pergen = std::min(pergen_max, pergen + 1);
+            }
+            if (imgui_keypressed(ImGuiKey_Space, true)) {
+                if (!paused) {
+                    paused = true;
+                } else {
+                    runner.run(rule, actual_pergen()); // ?run(1)
+                    // TODO: whether to take place after set_rule?
+                    // TODO: whether to update image this frame?
                 }
-                if (imgui_keypressed(ImGuiKey_2, true)) {
-                    gap_frame = std::min(gap_max, gap_frame + 1);
-                }
-                if (imgui_keypressed(ImGuiKey_3, true)) {
-                    pergen = std::max(pergen_min, pergen - 1);
-                }
-                if (imgui_keypressed(ImGuiKey_4, true)) {
-                    pergen = std::min(pergen_max, pergen + 1);
-                }
-                if (imgui_keypressed(ImGuiKey_Space, true)) {
-                    if (!paused) {
-                        paused = true;
-                    } else {
-                        runner.run(rule, actual_pergen()); // ?run(1)
-                        // TODO: whether to take place after set_rule?
-                        // TODO: whether to update image this frame?
-                    }
-                }
-                if (imgui_keypressed(ImGuiKey_M, false)) {
-                    paused = !paused;
-                }
+            }
+            if (imgui_keypressed(ImGuiKey_M, false)) {
+                paused = !paused;
             }
         }
 
