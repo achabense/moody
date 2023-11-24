@@ -5,6 +5,7 @@
 #include <deque>
 #include <format>
 #include <random>
+#include <span>
 
 #include "partition.hpp"
 #include "rule.hpp"
@@ -19,6 +20,8 @@
 /*inline*/ void random_fill(bool* begin, bool* end, int count, auto&& rand) {
     std::fill(begin, end, false);
     std::fill(begin, begin + std::clamp(count, 0, int(end - begin)), true);
+    // TODO: result of std::shuffle is impl-defined; not suitable for seeding...
+    // otherwise, TODO: explain that passing without forward is intentional.
     std::shuffle(begin, end, rand);
 }
 
@@ -52,6 +55,7 @@ public:
 
         const auto seed = filler.seed;
         const auto density = filler.density;
+        // TODO: use mt19937 instead?
         random_fill(m_tile.begin(), m_tile.end(), m_tile.area() * density, std::mt19937_64{seed});
     }
 
@@ -81,6 +85,7 @@ public:
     }
 };
 
+// TODO: merge with those in main...
 class rule_runner {
     torus m_tile;
     int m_gen = 0;
@@ -181,6 +186,14 @@ inline std::vector<legacy::compressT> extract_rules(const char* begin, const cha
     return rules;
 }
 
+inline std::vector<legacy::compressT> extract_rules(std::span<const char> data) {
+    return extract_rules(data.data(), data.data() + data.size());
+}
+
+inline std::vector<legacy::compressT> extract_rules(const char* str) {
+    return extract_rules(str, str + strlen(str));
+}
+
 inline std::optional<std::vector<char>> load_binary(const char* filename, int max_size) {
     const std::unique_ptr<FILE, decltype(+fclose)> file(fopen(filename, "rb"), fclose);
     if (file) {
@@ -278,7 +291,7 @@ struct [[nodiscard]] imgui_itemtooltip {
     NOCOPY(imgui_itemtooltip);
 
     const bool opened; // TODO: proper name?
-    imgui_itemtooltip(bool enabled = true) : opened(enabled && ImGui::BeginItemTooltip()) {}
+    explicit imgui_itemtooltip(bool enabled = true) : opened(enabled && ImGui::BeginItemTooltip()) {}
     ~imgui_itemtooltip() {
         if (opened) {
             ImGui::EndTooltip();

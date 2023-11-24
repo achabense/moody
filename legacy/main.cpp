@@ -89,7 +89,7 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
             if (ImGui::Button("Paste")) {
                 // TODO: can text return nullptr?
                 if (const char* text = ImGui::GetClipboardText()) {
-                    auto rules = extract_rules(text, text + strlen(text));
+                    auto rules = extract_rules(text);
                     if (!rules.empty()) {
                         int size = recorder.size();
                         recorder.append(rules); // TODO: requires non-trivial append logic.
@@ -201,6 +201,7 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
 
                 ImGui::SameLine();
                 if (ImGui::Button("Randomize")) {
+                    // TODO: use mt19937 instead?
                     static std::mt19937_64 rand(time(0));
                     // TODO: looks bad.
                     legacy::ruleT_data grule{};
@@ -309,6 +310,7 @@ struct file_navT {
     using path = std::filesystem::path;
 
     static path exe_path() {
+        // TODO: use scope_guard?
         // TODO: the program should be allowed to create folders in the exe path.(SDL_GetBasePath(), instead of
         // PrefPath)
         // this is a part runtime [dependency]. (btw, where to put imgui config?)
@@ -320,9 +322,12 @@ struct file_navT {
     }
 
     path pos;
+    // TODO: rename class name.
+    // TODO: explain why cache `status`.
+    // TODO: cache more values?
     struct entry {
         std::filesystem::directory_entry entry;
-        std::filesystem::file_status status; // entry.status(). unusually expensive call.
+        std::filesystem::file_status status;
     };
     std::vector<entry> list;
     std::optional<std::string> broken = std::nullopt;
@@ -347,6 +352,7 @@ struct file_navT {
                 }
             }
         } catch (const std::exception& what) {
+            // TODO: what encoding?
             broken = what.what();
             return;
         }
@@ -423,6 +429,7 @@ struct file_navT {
                 }
             }
         } catch (const exception& what) {
+            // TODO: what encoding?
             broken = what.what();
         }
 
@@ -501,6 +508,7 @@ int main(int argc, char** argv) {
     logger::log("Entered main");
 
     rule_recorder recorder;
+    // TODO: what encoding?
     if (argc == 2) {
         recorder.replace(read_rule_from_file(argv[1]));
     }
@@ -573,7 +581,7 @@ int main(int argc, char** argv) {
             if (event.type == SDL_QUIT) {
                 done = true;
             }
-            // TODO: this apprears not needed:
+            // TODO: this appears not needed:
             if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE &&
                 event.window.windowID == SDL_GetWindowID(window)) {
                 done = true;
@@ -630,7 +638,7 @@ int main(int argc, char** argv) {
         }
 
         // TODO: rename...
-        if (imgui_window window("_debug", ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize); window) {
+        if (imgui_window window("##Temp", ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize); window) {
             ImGui::Text("(%.1f FPS) Frame:%d\n", io.Framerate, ImGui::GetFrameCount());
             ImGui::Separator();
 
@@ -641,7 +649,6 @@ int main(int argc, char** argv) {
             ImGui::Checkbox("Nav window", &show_nav_window);
 
             ImGui::Checkbox("Demo window", &show_demo_window);
-
         }
 
         if (imgui_window window("Tile", ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize); window) {
@@ -736,6 +743,7 @@ int main(int argc, char** argv) {
             }
             // TODO: class?
             if (ImGui::BeginPopup("Ctrl##0")) {
+                // TODO: button <- set to 0.5?
                 if (ImGui::SliderFloat("Init density [0-1]", &filler.density, 0.0f, 1.0f, "%.3f",
                                        ImGuiSliderFlags_NoInput)) {
                     should_restart = true;
