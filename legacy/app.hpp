@@ -194,38 +194,35 @@ inline std::vector<legacy::compressT> extract_rules(const char* str) {
     return extract_rules(str, str + strlen(str));
 }
 
-inline std::optional<std::vector<char>> load_binary(const char* filename, int max_size) {
-    const std::unique_ptr<FILE, decltype(+fclose)> file(fopen(filename, "rb"), fclose);
-    if (file) {
-        FILE* fp = file.get();
-        fseek(fp, 0, SEEK_END); // <-- what if fails?
-        int size = ftell(fp);
-        if (size < max_size) {
-            fseek(fp, 0, SEEK_SET); // <-- what if fails?
-            std::vector<char> data(size);
-            fread(data.data(), 1, size, fp); // what if fails?
-            return data;
-        }
-    }
-    return {};
-}
-
-// TODO: redesign return types... also optional?
-inline std::vector<legacy::compressT> read_rule_from_file(const char* filename) {
-    auto result = load_binary(filename, 1'000'000);
-    if (result) {
-        return extract_rules(result->data(), result->data() + result->size());
-    }
-    return {};
-}
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 // TODO: whether to accept <imgui.h> as base header?
 
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 
+// TODO: ""?
 #include <imgui.h>
+
+// - Assert that ordinary string literals are encoded with utf-8.
+// - u8"..." is not used in this project, as it becomes `char8_t[]` after C++20 (which is not usable).
+// - TODO: document ways to pass this check (/utf-8 etc; different compilers)...
+inline void assert_utf8_encoding() {
+    constexpr auto a = std::to_array("中文");
+    constexpr auto b = std::to_array(u8"中文");
+
+    static_assert(std::equal(a.begin(), a.end(), b.begin(), b.end(), [](auto l, auto r) {
+        return static_cast<unsigned char>(l) == static_cast<unsigned char>(r);
+    }));
+}
+
+// - Experience in MSVC
+// - It turns out that there are still a lot of messy encoding problems even if "/utf-8" is specified.
+//   (For example, how is `exception.what()` encoded? What does `path` expects from `string`? And what about
+//   `filesystem.path.string()`?)
+inline std::string cpp17_u8string(const std::filesystem::path& p) {
+    return reinterpret_cast<const char*>(p.u8string().c_str());
+}
 
 // Unlike ImGui::TextWrapped, doesn't take fmt str...
 // TODO: the name is awful...
@@ -386,3 +383,29 @@ public:
         }
     }
 };
+
+// TODO: how to report error?
+// - Why using C++ at all: there seems no standard way to `fopen` a unicode C-string path.
+// (The only one being ignore(max)->gcount, which appears )
+inline std::vector<char> load_binary(const std::filesystem::path& path, int max_size) {
+    using namespace std;
+    using namespace std::filesystem;
+
+    error_code ec{};
+    const auto size = file_size(path, ec);
+    if (size != -1 && size < max_size) {
+        ifstream file(path, ios::in | ios::binary);
+        if (file) {
+            vector<char> data(size);
+            file.read(data.data(), size);
+            if (file && file.gcount() == size) {
+                return data;
+            }
+        }
+    }
+    return {};
+}
+
+inline std::vector<legacy::compressT> read_rule_from_file(const std::filesystem::path& path) {
+    return extract_rules(load_binary(path, 1'000'000));
+}

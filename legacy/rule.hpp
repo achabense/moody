@@ -210,6 +210,7 @@ namespace legacy {
 
 } // namespace legacy
 
+// TODO: talk about utf8 compatibility...
 namespace legacy {
     namespace _impl_details {
         inline char to_base64(uint8_t b6) {

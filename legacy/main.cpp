@@ -47,26 +47,6 @@ auto underlying_address(Enum& e) {
     return reinterpret_cast<std::underlying_type_t<Enum>*>(std::addressof(e));
 }
 
-// TODO: move the check elsewhere.
-// TODO: "bytes_equal" is not needed elsewhere, remove it.
-// C/C++ - command line - /utf-8
-// and save file as utf8-encoding...
-template <class T, class U>
-constexpr bool bytes_equal(const T& t, const U& u) noexcept {
-    if constexpr (sizeof(t) != sizeof(u)) {
-        return false;
-    } else {
-        using A = std::array<std::byte, sizeof(t)>;
-        return std::bit_cast<A>(t) == std::bit_cast<A>(u);
-    }
-}
-
-// "aaaaa" and "bbbbb" are workarounds for a compiler bug in clang...
-// https://github.com/llvm/llvm-project/issues/63686
-constexpr char aaaaa[]{"中文"};
-constexpr char8_t bbbbb[]{u8"中文"};
-static_assert(bytes_equal(aaaaa, bbbbb));
-
 // TODO: clumsy...
 // TODO: should be a class... how to decouple? ...
 // TODO: for "paired", support 4-step modification (_,S,B,BS)... add new color?
@@ -318,7 +298,8 @@ struct file_navT {
         // utf8 dependencies)
         const std::unique_ptr<char[], decltype(+SDL_free)> p(SDL_GetBasePath(), SDL_free);
         assert(p); // TODO: what if this fails? what if exe path is invalid?
-        return p.get();
+                   // TODO: silence the warning. The deprecation is very stupid.
+        return std::filesystem::u8path(p.get());
     }
 
     path pos;
@@ -372,9 +353,7 @@ struct file_navT {
             // TODO: enhance filter...
             // TODO: add text input.
             // TODO: undo operation...
-            // TODO: relying on default encoding being utf-8...
-            // TODO: how to decide the default encoding of MB str?
-            ImGui::TextUnformatted(pos.string().c_str());
+            ImGui::TextUnformatted(cpp17_u8string(pos).c_str());
             ImGui::Separator();
             if (ImGui::MenuItem("-> Exe path")) {
                 set_pos(exe_path());
@@ -400,7 +379,8 @@ struct file_navT {
                     optional<path> selfolder = nullopt;
                     for (const auto& [entry, status] : list) {
                         // TODO: how to compare file extension without creating a real string?
-                        const auto str = entry.path().filename().string();
+                        // TODO: why does string() return non-utf8?
+                        const auto str = cpp17_u8string(entry.path().filename());
 
                         if (is_regular_file(status)) {
                             if (!suff || str.ends_with(suff)) {
@@ -502,8 +482,8 @@ int main(int argc, char** argv) {
     ImGui::StyleColorsDark();
 
     // TODO: ... works but blurry, and how to apply in project?
-    // const char* fnpath = R"(C:\*redacted*\Desktop\Deng.ttf)";
-    // io.Fonts->AddFontFromFileTTF(fnpath, 13, nullptr, io.Fonts->GetGlyphRangesChineseFull());
+    const char* fnpath = R"(C:\*redacted*\Desktop\Deng.ttf)";
+    io.Fonts->AddFontFromFileTTF(fnpath, 13, nullptr, io.Fonts->GetGlyphRangesChineseFull());
 
     logger::log("Entered main");
 
@@ -623,10 +603,8 @@ int main(int argc, char** argv) {
         }
         if (show_nav_window) {
             if (auto sel = nav.window("File Nav", &show_nav_window, ".txt")) {
-                logger::log("Tried to open {}", sel->filename().string());
-                // TODO: is string() encoding-safe for fopen()?
-                // TODO: use ifstream(path()) instead?
-                auto result = read_rule_from_file(sel->string().c_str());
+                logger::log("Tried to open {}", cpp17_u8string(*sel));
+                auto result = read_rule_from_file(*sel);
                 if (!result.empty()) {
                     // TODO: "append" is a nasty feature...
                     logger::append(" ~ found {} rules", result.size());
