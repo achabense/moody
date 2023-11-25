@@ -204,6 +204,8 @@ inline std::vector<legacy::compressT> extract_rules(const char* str) {
 // TODO: ""?
 #include <imgui.h>
 
+using namespace std::chrono_literals;
+
 // - Assert that ordinary string literals are encoded with utf-8.
 // - u8"..." is not used in this project, as it becomes `char8_t[]` after C++20 (which is not usable).
 // - TODO: document ways to pass this check (/utf-8 etc; different compilers)...
@@ -324,13 +326,24 @@ struct timeT {
     }
 };
 
-// Likely to be the only singleton...
 class logger {
     // TODO: maybe better if data(inheritance)-based?
     static inline std::deque<std::string> m_strs{};
     static constexpr int m_max = 40;
     // ~ "ith" must not be a static in log(), as it's a template...
     static inline int ith = 0;
+
+    // TODO: refine...
+    using steady = std::chrono::steady_clock;
+    struct temp_str {
+        std::string str;
+        steady::time_point deadline;
+
+        temp_str(std::string&& str, std::chrono::milliseconds ms) : deadline(steady::now() + ms), str(std::move(str)) {}
+        bool expired() { return steady::now() >= deadline; }
+    };
+
+    static inline std::vector<temp_str> m_tempstrs{};
 
 public:
     logger() = delete;
@@ -350,12 +363,25 @@ public:
         }
     }
 
-    // TODO: better name...
-    // TODO: relying on no intercepting call...
-    template <class... T>
-    static void append(std::format_string<const T&...> fmt, const T&... args) noexcept {
-        assert(!m_strs.empty());
-        m_strs.back() += std::format(fmt, args...);
+    template <class... U>
+    static void log_temp(std::chrono::milliseconds ms, std::format_string<const U&...> fmt, const U&... args) noexcept {
+        m_tempstrs.emplace_back(std::format(fmt, args...), ms);
+    }
+
+    // TODO: this might combine with itemtooltip...
+    static void tempwindow() {
+        if (!m_tempstrs.empty()) {
+            ImGui::BeginTooltip();
+            auto pos = m_tempstrs.begin();
+            for (auto& temp : m_tempstrs) {
+                imgui_str(temp.str);
+                if (!temp.expired()) {
+                    *pos++ = std::move(temp);
+                }
+            }
+            m_tempstrs.erase(pos, m_tempstrs.end());
+            ImGui::EndTooltip();
+        }
     }
 
     // TODO: layout is terrible...
@@ -384,7 +410,7 @@ public:
     }
 };
 
-// TODO: how to report error?
+// TODO: report error...
 // - Why using C++ at all: there seems no standard way to `fopen` a unicode C-string path.
 // (The only one being ignore(max)->gcount, which appears )
 inline std::vector<char> load_binary(const std::filesystem::path& path, int max_size) {

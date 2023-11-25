@@ -58,11 +58,9 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
             auto rule_str = to_MAP_str(to_edit);
             imgui_strwrapped(rule_str);
 
-            static int cpy = 0, pst = 0; // TODO: whatever the form is, should have visible effect.
             if (ImGui::Button("Copy to clipboard")) {
                 ImGui::SetClipboardText(rule_str.c_str());
-                // logger::log("Copied");
-                cpy = 15;
+                logger::log_temp(300ms, "Copied");
             }
 
             ImGui::SameLine();
@@ -74,21 +72,9 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                         int size = recorder.size();
                         recorder.append(rules); // TODO: requires non-trivial append logic.
                         recorder.set_pos(size);
-                        // logger::log("Pasted {}", rules.size());
-                        pst = 15;
+                        logger::log_temp(300ms, "Pasted"); // TODO: add additional info if already exists...
                     }
                 }
-            }
-
-            if (cpy > 0) {
-                --cpy;
-                ImGui::SameLine();
-                ImGui::TextUnformatted("Copied");
-            }
-            if (pst > 0) {
-                --pst;
-                ImGui::SameLine();
-                ImGui::TextUnformatted("Pasted");
             }
             // TODO: re-implement
             // ImGui::SameLine();
@@ -353,6 +339,7 @@ struct file_navT {
             // TODO: enhance filter...
             // TODO: add text input.
             // TODO: undo operation...
+            // TODO: cooldown for file...
             ImGui::TextUnformatted(cpp17_u8string(pos).c_str());
             ImGui::Separator();
             if (ImGui::MenuItem("-> Exe path")) {
@@ -482,8 +469,8 @@ int main(int argc, char** argv) {
     ImGui::StyleColorsDark();
 
     // TODO: ... works but blurry, and how to apply in project?
-    const char* fnpath = R"(C:\*redacted*\Desktop\Deng.ttf)";
-    io.Fonts->AddFontFromFileTTF(fnpath, 13, nullptr, io.Fonts->GetGlyphRangesChineseFull());
+    // const char* fnpath = R"(C:\*redacted*\Desktop\Deng.ttf)";
+    // io.Fonts->AddFontFromFileTTF(fnpath, 13, nullptr, io.Fonts->GetGlyphRangesChineseFull());
 
     logger::log("Entered main");
 
@@ -598,6 +585,8 @@ int main(int argc, char** argv) {
         if (show_log_window) {
             logger::window("Events", &show_log_window);
         }
+        logger::tempwindow();
+
         if (show_rule_editor) {
             edit_rule("Rule editor", &show_rule_editor, rule, icons, recorder);
         }
@@ -607,10 +596,10 @@ int main(int argc, char** argv) {
                 auto result = read_rule_from_file(*sel);
                 if (!result.empty()) {
                     // TODO: "append" is a nasty feature...
-                    logger::append(" ~ found {} rules", result.size());
+                    logger::log_temp(500ms, "found {} rules", result.size());
                     recorder.replace(std::move(result));
                 } else {
-                    logger::append(" ~ found nothing");
+                    logger::log_temp(300ms, "found nothing");
                 }
             }
         }
@@ -742,6 +731,7 @@ int main(int argc, char** argv) {
                 ImGui::PopButtonRepeat();
 
                 ImGui::SameLine();
+                // TODO: buggy; move keypressed to outer scope...
                 if (ImGui::Button("Restart") || imgui_keypressed(ImGuiKey_R, false)) {
                     should_restart = true;
                 }
