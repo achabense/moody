@@ -576,7 +576,6 @@ int main(int argc, char** argv) {
         // TODO: applying following logic; consider refining it.
         // recorder is modified during display, but will synchronize with runner's before next frame.
         assert(rule == recorder.current());
-        bool should_restart = false;
 
         // TODO: remove this when all done...
         if (show_demo_window) {
@@ -623,6 +622,22 @@ int main(int argc, char** argv) {
             ImGui::Text("Width:%d,Height:%d,Density:%f", runner.tile().width(), runner.tile().height(),
                         float(runner.tile().count()) / runner.tile().area());
             {
+                // TODO: functionize
+                // TODO: move to rule-editor...
+                if (ImGui::Button("Mir")) {
+                    auto r = rule;
+                    for (legacy::codeT code = 0; code < 512; ++code) {
+                        auto codex = 511 & (~code);
+                        bool flip = legacy::decode_s(codex) != rule.map[codex];
+                        if (flip) {
+                            r.map[code] = !legacy::decode_s(code);
+                        } else {
+                            r.map[code] = legacy::decode_s(code);
+                        }
+                    }
+                    recorder.take(r);
+                }
+
                 const ImVec2 pos = ImGui::GetCursorScreenPos();
                 const ImVec2 img_size = ImVec2(img.width(), img.height()); // TODO: support zooming?
 
@@ -703,60 +718,54 @@ int main(int argc, char** argv) {
                     ImGui::SetKeyboardFocusHere(-1);
                 }
             }
+        }
 
-            // TODO: better layout
-            if (ImGui::Button("Ctrl")) {
-                ImGui::OpenPopup("Ctrl##0");
-            }
-            // TODO: class?
-            if (ImGui::BeginPopup("Ctrl##0")) {
-                // TODO: button <- set to 0.5?
-                if (ImGui::SliderFloat("Init density [0-1]", &filler.density, 0.0f, 1.0f, "%.3f",
-                                       ImGuiSliderFlags_NoInput)) {
-                    should_restart = true;
-                }
+        bool should_restart = false;
 
-                ImGui::Checkbox("Pause", &paused);
-
-                ImGui::SameLine();
-                ImGui::PushButtonRepeat(true);
-                if (ImGui::Button("+1")) {
-                    runner.run(rule, 1); // TODO: should run be called here?
-                    // TODO: should have visible (text) effect even when not paused...
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("+p")) {
-                    runner.run(rule, actual_pergen());
-                }
-                ImGui::PopButtonRepeat();
-
-                ImGui::SameLine();
-                // TODO: buggy; move keypressed to outer scope...
-                if (ImGui::Button("Restart") || imgui_keypressed(ImGuiKey_R, false)) {
-                    should_restart = true;
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("Reseed") || imgui_keypressed(ImGuiKey_S, false)) {
-                    ++filler.seed;
-                    should_restart = true;
-                }
-
-                // TODO: toooo ugly...
-                ImGui::SliderInt("Pergen [1-20]", &pergen, pergen_min, pergen_max, "%d", ImGuiSliderFlags_NoInput);
-
-                ImGui::AlignTextToFramePadding();
-                ImGui::Text("(Actual pergen: %d)", actual_pergen());
-                ImGui::SameLine();
-                ImGui::Checkbox("anti-flick", &anti_flick);
-
-                ImGui::SliderInt("Gap Frame [0-20]", &gap_frame, gap_min, gap_max, "%d", ImGuiSliderFlags_NoInput);
-                ImGui::SliderInt("Start gen [0-1000]", &start_from, start_min, start_max, "%d",
-                                 ImGuiSliderFlags_NoInput);
-
-                // TODO: enable/disable keyboard ctrl (enable by default)
-                ImGui::EndPopup();
+        if (imgui_window window("Tile##Ctrl", ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize);
+            window) {
+            // TODO: button <- set to 0.5?
+            if (ImGui::SliderFloat("Init density [0-1]", &filler.density, 0.0f, 1.0f, "%.3f",
+                                   ImGuiSliderFlags_NoInput)) {
+                should_restart = true;
             }
 
+            ImGui::Checkbox("Pause", &paused);
+
+            ImGui::SameLine();
+            ImGui::PushButtonRepeat(true);
+            if (ImGui::Button("+1")) {
+                runner.run(rule, 1); // TODO: should run be called here?
+                // TODO: should have visible (text) effect even when not paused...
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("+p")) {
+                runner.run(rule, actual_pergen());
+            }
+            ImGui::PopButtonRepeat();
+
+            ImGui::SameLine();
+            if (ImGui::Button("Restart") || imgui_keypressed(ImGuiKey_R, false)) {
+                should_restart = true;
+            }
+            ImGui::SameLine();
+            // TODO: input seed...
+            if (ImGui::Button("Reseed") || imgui_keypressed(ImGuiKey_S, false)) {
+                ++filler.seed;
+                should_restart = true;
+            }
+
+            ImGui::SliderInt("Pergen [1-20]", &pergen, pergen_min, pergen_max, "%d", ImGuiSliderFlags_NoInput);
+
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("(Actual pergen: %d)", actual_pergen());
+            ImGui::SameLine();
+            ImGui::Checkbox("anti-flick", &anti_flick);
+
+            ImGui::SliderInt("Gap Frame [0-20]", &gap_frame, gap_min, gap_max, "%d", ImGuiSliderFlags_NoInput);
+            ImGui::SliderInt("Start gen [0-1000]", &start_from, start_min, start_max, "%d", ImGuiSliderFlags_NoInput);
+
+            // TODO: enable/disable keyboard ctrl (enable by default)
             // TODO: redesign keyboard ctrl...
             if (imgui_keypressed(ImGuiKey_1, true)) {
                 gap_frame = std::max(gap_min, gap_frame - 1);
