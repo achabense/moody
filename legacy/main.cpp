@@ -675,17 +675,36 @@ int main(int argc, char** argv) {
                     }
                     if (imgui_itemtooltip tooltip(show_zoom); tooltip) {
                         assert(ImGui::IsMousePosValid());
-                        const float region_sz = 32.0f;
-                        float region_x = std::clamp(io.MousePos.x - (pos.x + padding.x) - region_sz * 0.5f, 0.0f,
-                                                    img_size.x - region_sz);
-                        float region_y = std::clamp(io.MousePos.y - (pos.y + padding.y) - region_sz * 0.5f, 0.0f,
-                                                    img_size.y - region_sz);
+                        // TODO: better size ctrl
+                        static int region_rx = 32, region_ry = 32;
+                        region_rx = std::clamp(region_rx, 10, 50);
+                        region_ry = std::clamp(region_ry, 10, 50); // TODO: dependent on img_size...
+                        ImGui::Text("%d*%d", region_rx, region_ry);
+
+                        float region_x = std::clamp(io.MousePos.x - (pos.x + padding.x) - region_rx * 0.5f, 0.0f,
+                                                    img_size.x - region_rx);
+                        float region_y = std::clamp(io.MousePos.y - (pos.y + padding.y) - region_ry * 0.5f, 0.0f,
+                                                    img_size.y - region_ry);
 
                         const ImVec2 uv0 = ImVec2((region_x) / img_size.x, (region_y) / img_size.y);
                         const ImVec2 uv1 =
-                            ImVec2((region_x + region_sz) / img_size.x, (region_y + region_sz) / img_size.y);
+                            ImVec2((region_x + region_rx) / img_size.x, (region_y + region_ry) / img_size.y);
                         const float zoom = 4.0f; // TODO: should be settable? 5.0f?
-                        ImGui::Image(img.texture(), ImVec2(region_sz * zoom, region_sz * zoom), uv0, uv1);
+                        ImGui::Image(img.texture(), ImVec2(region_rx * zoom, region_ry * zoom), uv0, uv1);
+
+                        // TODO: some keyctrls can be supported when dragging...
+                        if (imgui_keypressed(ImGuiKey_UpArrow, true)) {
+                            --region_ry;
+                        }
+                        if (imgui_keypressed(ImGuiKey_DownArrow, true)) {
+                            ++region_ry;
+                        }
+                        if (imgui_keypressed(ImGuiKey_LeftArrow, true)) {
+                            --region_rx;
+                        }
+                        if (imgui_keypressed(ImGuiKey_RightArrow, true)) {
+                            ++region_rx;
+                        }
                     }
                 }
 
