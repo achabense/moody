@@ -13,8 +13,14 @@ namespace legacy {
     using std::string;
     using std::vector;
 
+    // The environment around "s".
+    struct envT {
+        bool q, w, e;
+        bool a, s, d;
+        bool z, x, c;
+    };
+
     // TODO: encode_traits (X_mask, from/to_env)?
-    // TODO: define after envT...
     // TODO: remove remaining direct use of "512"...
     struct codeT {
         int v;
@@ -29,24 +35,23 @@ namespace legacy {
         constexpr friend bool operator==(const codeT&, const codeT&) = default;
     };
 
-    // clang-format off
-    // TODO: stateT?
-    // The environment around "s".
-    struct envT {
-        bool q, w, e;
-        bool a, s, d;
-        bool z, x, c;
+    constexpr codeT encode(const envT& env) {
+        // ~ bool is implicitly promoted to int.
+        // clang-format off
+        int code = (env.q << 0) | (env.w << 1) | (env.e << 2) |
+                   (env.a << 3) | (env.s << 4) | (env.d << 5) |
+                   (env.z << 6) | (env.x << 7) | (env.c << 8);
+        // clang-format on
+        assert(code >= 0 && code < 512);
+        return codeT{code};
+    }
 
-        constexpr codeT encode() const {
-            // ~ bool is implicitly promoted to int.
-            int code = (q << 0) | (w << 1) | (e << 2) |
-                       (a << 3) | (s << 4) | (d << 5) |
-                       (z << 6) | (x << 7) | (c << 8);
-            assert(code >= 0 && code < 512);
-            return codeT{code};
-        }
-    };
-    // clang-format on
+    // Equivalent to encode(envT(...)).
+    constexpr codeT encode(bool q, bool w, bool e, bool a, bool s, bool d, bool z, bool x, bool c) {
+        int code = (q << 0) | (w << 1) | (e << 2) | (a << 3) | (s << 4) | (d << 5) | (z << 6) | (x << 7) | (c << 8);
+        assert(code >= 0 && code < 512);
+        return codeT{code};
+    }
 
     constexpr envT decode(codeT code) {
         assert(code >= 0 && code < 512);
@@ -56,7 +61,7 @@ namespace legacy {
         return {q, w, e, a, s, d, z, x, c};
     }
 
-    // Equivalent to decode(code).s.
+    // TODO: better names...
     constexpr bool decode_s(codeT code) {
         return (code >> 4) & 1;
     }
@@ -67,13 +72,6 @@ namespace legacy {
 
     constexpr codeT flip_all(codeT code) {
         return codeT{~code & 511};
-    }
-
-    // Equivalent to envT(...).encode().
-    constexpr codeT encode(bool q, bool w, bool e, bool a, bool s, bool d, bool z, bool x, bool c) {
-        int code = (q << 0) | (w << 1) | (e << 2) | (a << 3) | (s << 4) | (d << 5) | (z << 6) | (x << 7) | (c << 8);
-        assert(code >= 0 && code < 512);
-        return codeT{code};
     }
 
     // TODO: rephrase...
@@ -88,7 +86,7 @@ namespace legacy {
             return map[code];
         }
         bool operator()(const envT& env) const { //
-            return map[env.encode()];
+            return map[encode(env)];
         }
         bool operator()(bool q, bool w, bool e, bool a, bool s, bool d, bool z, bool x, bool c) const { //
             return map[encode(q, w, e, a, s, d, z, x, c)];
