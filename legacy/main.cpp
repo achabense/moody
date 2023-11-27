@@ -1,46 +1,7 @@
-﻿// Dear ImGui: standalone example application for SDL2 + SDL_Renderer
-// (SDL is a cross-platform general purpose library for handling windows, inputs, OpenGL/Vulkan/Metal graphics context
-// creation, etc.)
-
-// Learn about Dear ImGui:
-// - FAQ                  https://dearimgui.com/faq
-// - Getting Started      https://dearimgui.com/getting-started
-// - Documentation        https://dearimgui.com/docs (same as your local docs/ folder).
-// - Introduction, links and more at the top of imgui.cpp
-
-// Important to understand: SDL_Renderer is an _optional_ component of SDL2.
-// For a multi-platform app consider using e.g. SDL+DirectX on Windows and SDL+OpenGL on Linux/OSX.
-
-#include <SDL.h>
-#include <random>
-#include <regex>
-#include <vector>
-
-// TODO: extract all sdl-dependencies into a single header...
-#include "imgui.h"
-#include "imgui_sdl2/imgui_impl_sdl2.h"
-#include "imgui_sdl2/imgui_impl_sdlrenderer2.h"
+﻿#include "app_sdl.hpp"
 
 #include "app.hpp"
-#include "image.hpp"
 #include "rule_traits.hpp"
-
-#if !SDL_VERSION_ATLEAST(2, 0, 17)
-#error This backend requires SDL 2.0.17+ because of SDL_RenderGeometry() function
-#endif
-
-// Unfortunately, SDL2-renderer backend doesn't support docking features...
-// https://github.com/ocornut/imgui/issues/5835
-
-// TODO: apply in several other places...
-template <class F>
-struct [[nodiscard]] scope_guard {
-    F f;
-    scope_guard(F&& f) : f(std::move(f)) {}
-    ~scope_guard() { f(); }
-    scope_guard(const scope_guard&) = delete;
-    scope_guard& operator=(const scope_guard&) = delete;
-};
 
 // TODO: awful... need to be avoided...
 template <class Enum>
@@ -421,50 +382,12 @@ struct file_navT {
 // TODO: how to capture certain patterns? (editor++)...
 
 int main(int argc, char** argv) {
-    // Setup SDL
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0) {
-        printf("Error: %s\n", SDL_GetError());
-        return -1;
-    }
-
-    // IME: "Input Method Editor"
-    // From 2.0.18: Enable native IME.
-#ifdef SDL_HINT_IME_SHOW_UI
-    SDL_SetHint(SDL_HINT_IME_SHOW_UI, "1");
-#endif
-
-    // Create window with SDL_Renderer graphics context
-    SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-    SDL_Window* window = SDL_CreateWindow("Dear ImGui SDL2+SDL_Renderer example", SDL_WINDOWPOS_CENTERED,
-                                          SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
-    // TODO: should be able to control framerate (should not rely on VSYNC rate)
-    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
-    if (renderer == nullptr) {
-        SDL_Log("Error creating SDL_Renderer!");
-        return 0;
-    }
-
-    // Setup Dear ImGui context
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-
-    // Setup Platform/Renderer backends
-    ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
-    ImGui_ImplSDLRenderer2_Init(renderer);
-
-    // TODO: regulate lambda capturing...
-    scope_guard cleanup([=] {
-        ImGui_ImplSDLRenderer2_Shutdown();
-        ImGui_ImplSDL2_Shutdown();
-        ImGui::DestroyContext();
-
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroyWindow(window);
-        SDL_Quit();
-    });
+    // TODO: `new_frame` is using `exit` to quit, which doesn't destroy local object (including this guard),
+    // so the cleanup doesn't actually happen. Need to be redesigned...
+    const auto cleanup = app_backend::init();
 
     // Program logic:
-    ImGuiIO& io = ImGui::GetIO();
+    // ImGuiIO& io = ImGui::GetIO();
     // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
     // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
 
@@ -474,8 +397,6 @@ int main(int argc, char** argv) {
     // TODO: ... works but blurry, and how to apply in project?
     // const char* fnpath = R"(C:\*redacted*\Desktop\Deng.ttf)";
     // io.Fonts->AddFontFromFileTTF(fnpath, 13, nullptr, io.Fonts->GetGlyphRangesChineseFull());
-
-    logger::log("Entered main");
 
     rule_recorder recorder;
     // TODO: what encoding?
@@ -532,51 +453,13 @@ int main(int argc, char** argv) {
     file_navT nav(R"(C:\*redacted*\Desktop\rulelists_new)");
 
     // Main loop
-    tile_image img(renderer, runner.tile());
-    code_image icons(renderer);
-    // TODO: cannot break eagerly?
-    bool done = false;
-    while (!done) {
-        // Poll and handle events (inputs, window resize, etc.)
-        // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your
-        // inputs.
-        // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application, or
-        // clear/overwrite your copy of the mouse data.
-        // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application, or
-        // clear/overwrite your copy of the keyboard data. Generally you may always pass all inputs to dear imgui, and
-        // hide them from your application based on those two flags.
-        SDL_Event event;
-        while (SDL_PollEvent(&event)) {
-            ImGui_ImplSDL2_ProcessEvent(&event);
-            if (event.type == SDL_QUIT) {
-                done = true;
-            }
-            // TODO: this appears not needed:
-            if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE &&
-                event.window.windowID == SDL_GetWindowID(window)) {
-                done = true;
-            }
-        }
+    tile_image img(runner.tile());
+    code_image icons;
+    while (true) {
+        const auto frame_guard = app_backend::new_frame();
 
-        // Start the Dear ImGui frame
-        ImGui_ImplSDLRenderer2_NewFrame();
-        ImGui_ImplSDL2_NewFrame();
-        ImGui::NewFrame();
+        ImGuiIO& io = ImGui::GetIO();
 
-        scope_guard endframe([renderer, &io]() {
-            // Rendering
-            ImGui::Render();
-            // TODO: is this necessary?
-            SDL_RenderSetScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
-            // ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-            // SDL_SetRenderDrawColor(renderer, (Uint8)(clear_color.x * 255), (Uint8)(clear_color.y * 255),
-            //                        (Uint8)(clear_color.z * 255), (Uint8)(clear_color.w * 255));
-            SDL_RenderClear(renderer);
-            ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
-            SDL_RenderPresent(renderer);
-        });
-
-        // Frame state:
         // TODO: applying following logic; consider refining it.
         // recorder is modified during display, but will synchronize with runner's before next frame.
         assert(rule == recorder.current());

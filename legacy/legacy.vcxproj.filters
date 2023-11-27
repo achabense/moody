@@ -39,9 +39,6 @@
     <ClInclude Include="imgui\imgui_internal.h">
       <Filter>imgui</Filter>
     </ClInclude>
-    <ClInclude Include="image.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="partition.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -53,6 +50,9 @@
     </ClInclude>
     <ClInclude Include="imgui\imconfig.h">
       <Filter>imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="app_sdl.hpp">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
