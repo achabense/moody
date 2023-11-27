@@ -50,6 +50,7 @@ class app_backend {
 public:
     app_backend() = delete;
 
+    // ~ Guaranteed copy-elision is supported since C++17.
     // TODO: describe effects...
     // ... return scope-guard which must not be discarded...
     [[nodiscard]] static scope_guard init() {
@@ -101,23 +102,29 @@ public:
         });
     }
 
-    // ~ Guaranteed copy-elision is supported since C++17.
-    // Begin new frame; return scope-guard which must not be discarded...
-    [[nodiscard]] static scope_guard new_frame() {
+    // TODO: better name...
+    // TODO: while(process_events()) looks a bit strange?
+    [[nodiscard]] static bool process_events() {
         assert(window && renderer);
 
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             ImGui_ImplSDL2_ProcessEvent(&event);
             if (event.type == SDL_QUIT) {
-                exit(EXIT_SUCCESS);
+                return false;
             }
             // TODO: this appears not needed:
             if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE &&
                 event.window.windowID == SDL_GetWindowID(window)) {
-                exit(EXIT_SUCCESS);
+                return false;
             }
         }
+        return true;
+    }
+
+    // Begin new frame; return scope-guard which must not be discarded...
+    [[nodiscard]] static scope_guard new_frame() {
+        assert(window && renderer);
 
         // Start the Dear ImGui frame
         ImGui_ImplSDLRenderer2_NewFrame();

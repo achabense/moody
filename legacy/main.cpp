@@ -382,8 +382,6 @@ struct file_navT {
 // TODO: how to capture certain patterns? (editor++)...
 
 int main(int argc, char** argv) {
-    // TODO: `new_frame` is using `exit` to quit, which doesn't destroy local object (including this guard),
-    // so the cleanup doesn't actually happen. Need to be redesigned...
     const auto cleanup = app_backend::init();
 
     // Program logic:
@@ -455,7 +453,8 @@ int main(int argc, char** argv) {
     // Main loop
     tile_image img(runner.tile());
     code_image icons;
-    while (true) {
+
+    while (app_backend::process_events()) {
         const auto frame_guard = app_backend::new_frame();
 
         ImGuiIO& io = ImGui::GetIO();

@@ -340,8 +340,10 @@ class logger {
         std::string str;
         steady::time_point deadline;
 
-        temp_str(std::string&& str, std::chrono::milliseconds ms) : deadline(steady::now() + ms), str(std::move(str)) {}
-        bool expired() { return steady::now() >= deadline; }
+        temp_str(std::string&& str, std::chrono::milliseconds ms) : str(std::move(str)), deadline(steady::now() + ms) {}
+
+        // TODO: better be expired(now=steady::now) return now>=deadline;
+        bool expired() const { return steady::now() >= deadline; }
     };
 
     static inline std::vector<temp_str> m_tempstrs{};
