@@ -171,6 +171,7 @@ public:
     }
 };
 
+// TODO: together with these, move to/from_MAP_str to a standalone header?
 inline std::vector<legacy::compressT> extract_rules(const char* begin, const char* end) {
     std::vector<legacy::compressT> rules;
 

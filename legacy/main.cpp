@@ -16,6 +16,7 @@
 #include <regex>
 #include <vector>
 
+// TODO: extract all sdl-dependencies into a single header...
 #include "imgui.h"
 #include "imgui_sdl2/imgui_impl_sdl2.h"
 #include "imgui_sdl2/imgui_impl_sdlrenderer2.h"
@@ -565,6 +566,7 @@ int main(int argc, char** argv) {
         scope_guard endframe([renderer, &io]() {
             // Rendering
             ImGui::Render();
+            // TODO: is this necessary?
             SDL_RenderSetScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
             // ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
             // SDL_SetRenderDrawColor(renderer, (Uint8)(clear_color.x * 255), (Uint8)(clear_color.y * 255),
@@ -706,6 +708,24 @@ int main(int argc, char** argv) {
                         }
                         if (imgui_keypressed(ImGuiKey_RightArrow, true)) {
                             ++region_rx;
+                        }
+                        // TODO: temporary, should be redesigned.
+                        if (imgui_keypressed(ImGuiKey_L, false)) {
+                            using namespace legacy;
+                            tileT sample({.width = region_rx, .height = region_ry});
+                            for (int y = 0; y < region_ry; ++y) {
+                                for (int x = 0; x < region_rx; ++x) {
+                                    sample.line(y)[x] = runner.tile().line(region_y + y)[int(region_x + x)];
+                                }
+                            }
+                            tileT side(sample.size());
+                            modelT m{};
+                            for (int i = 0; i < 32; i++) {
+                                sample.gather()._apply(m.bind(rule), side);
+                                sample.swap(side);
+                            }
+                            static std::mt19937 r;
+                            recorder.take(legacy::make_rule(m, legacy::partitionT::get_spatial(), 0, r));
                         }
                     }
                 }

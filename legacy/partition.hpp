@@ -316,7 +316,8 @@ namespace legacy {
         return grouped;
     }
 
-    /*inline*/ ruleT make_rule(const modelT& m, const partitionT& p, auto&& rand) {
+    // TODO: temporary, should be redesigned.
+    /*inline*/ ruleT make_rule(const modelT& m, const partitionT& p, int den, auto&& rand) {
         // step 1:
         vector<modelT::stateE> grouped = filter(m, p);
 
@@ -324,7 +325,7 @@ namespace legacy {
         // TODO: doesn't make sense...
         for (auto& s : grouped) {
             if (s == modelT::Unknown) {
-                s = (rand() & 0b111) == 1 ? modelT::S1 : modelT::S0;
+                s = ((rand() % 100) < den) ? modelT::S1 : modelT::S0;
             }
         }
 

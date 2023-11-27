@@ -116,6 +116,8 @@ namespace legacy {
             return *this;
         }
 
+        // TODO: what's the preferred form of public interface?
+    public:
         // TODO: This could be used to support constraint gathering...
         // Relying on width > 1 (which is a reasonable requirement)
         // I hate this function, it is the payment for consecutive data...

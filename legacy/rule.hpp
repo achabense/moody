@@ -8,7 +8,7 @@
 #include <vector>
 
 namespace legacy {
-    // TODO: make global? add optional?
+    // TODO: make global? add optional? or drop all?
     using std::array;
     using std::string;
     using std::vector;
