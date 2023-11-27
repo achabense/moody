@@ -13,9 +13,8 @@ namespace legacy {
 
     // TODO: code_ns etc should be supported in rule.hpp.
     inline bool center_agnostic_abs(const ruleT& rule) {
-        for (codeT code = 0; code < 512; ++code) {
-            codeT code_ns = code ^ (1 << 4); // s->!s
-            if (rule(code) != rule(code_ns)) {
+        for (codeT code : codeT{}) {
+            if (rule(code) != rule(flip_s(code))) {
                 return false;
             }
         }
@@ -23,8 +22,8 @@ namespace legacy {
     }
 
     inline bool center_agnostic_xor(const ruleT& rule) {
-        for (codeT code = 0; code < 512; ++code) {
-            codeT code_ns = code ^ (1 << 4); // s->!s
+        for (codeT code : codeT{}) {
+            codeT code_ns = flip_s(code);
             if ((decode_s(code) == rule(code)) != (decode_s(code_ns) == rule(code_ns))) {
                 return false;
             }
@@ -33,9 +32,9 @@ namespace legacy {
     }
 
     inline bool state_symmetric(const ruleT& rule) {
-        for (codeT code = 0; code < 512; ++code) {
-            codeT code_n = (~code) & 511;
-            if ((decode_s(code) == rule(code)) != (decode_s(code_n) == rule(code_n))) {
+        for (codeT code : codeT{}) {
+            codeT codex = flip_all(code);
+            if ((decode_s(code) == rule(code)) != (decode_s(codex) == rule(codex))) {
                 return false;
             }
         }
@@ -43,7 +42,8 @@ namespace legacy {
     }
 
     inline bool will_flick(const ruleT& rule) {
-        return rule(0) == 1 && rule(511) == 0; // TODO: more robust encoding?
+        // TODO: adhoc...
+        return rule(codeT{0}) == 1 && rule(codeT{511}) == 0; // TODO: more robust encoding?
     }
 
     // TODO: how to incoporate this fact in the program?

@@ -39,7 +39,7 @@ namespace legacy {
 
             // TODO: temporary; should be dealt with by getp...
             // (this part should be redesigned)
-            for (codeT code = 0; code < 512; ++code) {
+            for (codeT code : codeT{}) {
                 m_groups[m_map[code]].push_back(code);
             }
             const bool paired = m_map[0] == m_map[16];
@@ -62,7 +62,6 @@ namespace legacy {
         const vector<vector<codeT>>& groups() const { //
             return m_groups;
         }
-        // TODO: too fragile unless codeT is strong-typed (impractical)
         const vector<codeT>& group_for(codeT code) const { //
             return m_groups[map(code)];
         }
@@ -128,15 +127,16 @@ namespace legacy {
         // TODO: the arg type is problematic.
         ruleT_data dispatch_from(const ruleT_data& grule) const {
             ruleT_data rule;
-            for (codeT code = 0; code < 512; ++code) {
+            for (codeT code : codeT{}) {
                 rule[code] = grule[map(code)];
             }
+            // TODO: false positive after applying range-for...
             return rule;
         }
 
         // TODO: bad name...
         bool matches(const ruleT_data& rule) const {
-            for (codeT code = 0; code < 512; ++code) {
+            for (codeT code : codeT{}) {
                 if (rule[code] != rule[head_for(code)]) {
                     return false;
                 }
@@ -202,7 +202,7 @@ namespace legacy {
                 };
 
                 int color = 0;
-                for (codeT code = 0; code < 512; ++code) {
+                for (codeT code : codeT{}) {
                     if (part[code] == -1) {
                         equiv(code, color++, equiv);
                     }
@@ -236,14 +236,6 @@ namespace legacy {
             // q s c
             // a z x
             constexpr mapperP rotate_45 = MAPTO(w, e, d, q, s, c, a, z, x);
-            // q w e
-            // a !s d
-            // z x c
-            constexpr mapperP s_flipped = MAPTO(q, w, e, a, !s, d, z, x, c);
-            // !q !w !e
-            // !a !s !d
-            // !z !x !c
-            constexpr mapperP all_flipped = MAPTO(!q, !w, !e, !a, !s, !d, !z, !x, !c);
             // w q e
             // a s d
             // z x c
@@ -267,10 +259,10 @@ namespace legacy {
                 case extrspecE::None_:
                     break;
                 case extrspecE::Paired:
-                    arg.push_back(s_flipped);
+                    arg.push_back(flip_s);
                     break;
                 case extrspecE::State:
-                    arg.push_back(all_flipped);
+                    arg.push_back(flip_all);
                     break;
                 default:
                     abort();
@@ -315,7 +307,7 @@ namespace legacy {
 
     inline vector<modelT::stateE> filter(const modelT& m, const partitionT& p) {
         vector<modelT::stateE> grouped(p.k(), modelT::Unknown);
-        for (codeT code = 0; code < 512; ++code) {
+        for (codeT code : codeT{}) {
             if (m.data[code] != modelT::Unknown) {
                 grouped[p.map(code)] = m.data[code];
                 // TODO: what if conflict?
@@ -324,7 +316,7 @@ namespace legacy {
         return grouped;
     }
 
-    ruleT make_rule(const modelT& m, const partitionT& p, auto&& rand) {
+    /*inline*/ ruleT make_rule(const modelT& m, const partitionT& p, auto&& rand) {
         // step 1:
         vector<modelT::stateE> grouped = filter(m, p);
 
@@ -338,7 +330,7 @@ namespace legacy {
 
         // step 3: dispatch...
         ruleT rule{};
-        for (codeT code = 0; code < 512; ++code) {
+        for (codeT code : codeT{}) {
             rule.map[code] = grouped[p.map(code)] == modelT::S0 ? 0 : 1;
         }
         return rule;

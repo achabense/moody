@@ -628,8 +628,8 @@ int main(int argc, char** argv) {
                 // TODO: move to rule-editor...
                 if (ImGui::Button("Mir")) {
                     auto r = rule;
-                    for (legacy::codeT code = 0; code < 512; ++code) {
-                        auto codex = 511 & (~code);
+                    for (auto code : legacy::codeT{}) {
+                        auto codex = legacy::flip_all(code);
                         bool flip = legacy::decode_s(codex) != rule.map[codex];
                         if (flip) {
                             r.map[code] = !legacy::decode_s(code);

@@ -14,32 +14,20 @@ namespace legacy {
     using std::vector;
 
     // TODO: encode_traits (X_mask, from/to_env)?
-#if 0
-    // TODO: is range-for loop applicable? is void++ conformant?
-    // https://en.cppreference.com/w/cpp/language/range-for
+    // TODO: define after envT...
+    // TODO: remove remaining direct use of "512"...
     struct codeT {
         int v;
-        // TODO: for codeT = int; what's the cost for not being an aggr?
-        constexpr codeT() : v(0) {}
-        constexpr codeT(int v) : v(v) {}
-        constexpr operator int() const { return v; }
-        constexpr void operator++() { ++v; }
-        constexpr void operator--() { --v; }
+        constexpr /*implicit*/ operator int() const { return v; }
 
+        // Enough to support range-for loop.
+        // https://en.cppreference.com/w/cpp/language/range-for
         constexpr static codeT begin() { return codeT{0}; }
         constexpr static codeT end() { return codeT{512}; }
+        constexpr void operator++() { ++v; }
         constexpr codeT operator*() const { return *this; }
         constexpr friend bool operator==(const codeT&, const codeT&) = default;
     };
-
-    inline void codeT_test() {
-        for (auto code : codeT{}) {
-
-        }
-    }
-#else
-    using codeT = int;
-#endif
 
     // clang-format off
     // TODO: stateT?
@@ -51,11 +39,11 @@ namespace legacy {
 
         constexpr codeT encode() const {
             // ~ bool is implicitly promoted to int.
-            codeT code = (q << 0) | (w << 1) | (e << 2) |
-                         (a << 3) | (s << 4) | (d << 5) |
-                         (z << 6) | (x << 7) | (c << 8);
+            int code = (q << 0) | (w << 1) | (e << 2) |
+                       (a << 3) | (s << 4) | (d << 5) |
+                       (z << 6) | (x << 7) | (c << 8);
             assert(code >= 0 && code < 512);
-            return code;
+            return codeT{code};
         }
     };
     // clang-format on
@@ -68,17 +56,24 @@ namespace legacy {
         return {q, w, e, a, s, d, z, x, c};
     }
 
-    // TODO: mask_s?
     // Equivalent to decode(code).s.
     constexpr bool decode_s(codeT code) {
         return (code >> 4) & 1;
     }
 
+    constexpr codeT flip_s(codeT code) {
+        return codeT{code ^ (1 << 4)};
+    }
+
+    constexpr codeT flip_all(codeT code) {
+        return codeT{~code & 511};
+    }
+
     // Equivalent to envT(...).encode().
     constexpr codeT encode(bool q, bool w, bool e, bool a, bool s, bool d, bool z, bool x, bool c) {
-        codeT code = (q << 0) | (w << 1) | (e << 2) | (a << 3) | (s << 4) | (d << 5) | (z << 6) | (x << 7) | (c << 8);
+        int code = (q << 0) | (w << 1) | (e << 2) | (a << 3) | (s << 4) | (d << 5) | (z << 6) | (x << 7) | (c << 8);
         assert(code >= 0 && code < 512);
-        return code;
+        return codeT{code};
     }
 
     // TODO: rephrase...
@@ -106,7 +101,7 @@ namespace legacy {
     inline ruleT game_of_life() {
         // b3 s23
         ruleT rule{};
-        for (codeT code = 0; code < 512; ++code) {
+        for (codeT code : codeT{}) {
             auto [q, w, e, a, s, d, z, x, c] = decode(code);
             int count = q + w + e + a + d + z + x + c;
             if (count == 2) { // 2:s ~ 0->0, 1->1 ~ equal to "s".
@@ -127,14 +122,14 @@ namespace legacy {
         array<uint8_t, 64> bits; // as bitset.
     public:
         explicit compressT(const ruleT& rule) : bits{} {
-            for (codeT code = 0; code < 512; ++code) {
+            for (codeT code : codeT{}) {
                 bits[code / 8] |= rule(code) << (code % 8);
             }
         }
 
         explicit operator ruleT() const {
             ruleT rule{};
-            for (codeT code = 0; code < 512; ++code) {
+            for (codeT code : codeT{}) {
                 rule.map[code] = (bits[code / 8] >> (code % 8)) & 1;
             }
             return rule;
@@ -171,7 +166,7 @@ namespace legacy {
             static constexpr ruleT zero{};
             static constexpr ruleT identity = []() {
                 ruleT id{};
-                for (codeT code = 0; code < 512; ++code) {
+                for (codeT code : codeT{}) {
                     id.map[code] = decode_s(code);
                 }
                 return id;
@@ -193,7 +188,7 @@ namespace legacy {
         ruleT_data from_rule(const ruleT& rule) const {
             const ruleT& base = get_base();
             ruleT_data diff{};
-            for (codeT code = 0; code < 512; ++code) {
+            for (codeT code : codeT{}) {
                 diff[code] = rule(code) == base(code) ? 0 : 1;
             }
             return diff;
@@ -202,7 +197,7 @@ namespace legacy {
         ruleT to_rule(const ruleT_data& diff) const {
             const ruleT& base = get_base();
             ruleT rule{};
-            for (codeT code = 0; code < 512; ++code) {
+            for (codeT code : codeT{}) {
                 rule.map[code] = diff[code] ? !base(code) : base(code);
             }
             return rule;
@@ -258,7 +253,7 @@ namespace legacy {
     inline string to_MAP_str(const ruleT& rule) {
         // MAP rule uses a different coding scheme.
         bool reordered[512]{};
-        for (codeT code = 0; code < 512; ++code) {
+        for (codeT code : codeT{}) {
             auto [q, w, e, a, s, d, z, x, c] = decode(code);
             reordered[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1] = rule(code);
         }
@@ -302,7 +297,7 @@ namespace legacy {
             i += 6;
         }
         ruleT rule{};
-        for (codeT code = 0; code < 512; ++code) {
+        for (codeT code : codeT{}) {
             auto [q, w, e, a, s, d, z, x, c] = decode(code);
             rule.map[code] = reordered[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1];
         }
