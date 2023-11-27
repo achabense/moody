@@ -187,6 +187,8 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                         vec.emplace_back(inter.to_rule(r));
                     }
                     recorder.replace(std::move(vec));
+                    logger::log_temp(300ms, "...");
+                    // TODO: the effect is still obscure...
                 }
             }
 
@@ -524,7 +526,7 @@ int main(int argc, char** argv) {
 
     bool show_rule_editor = true;
     bool show_demo_window = false; // TODO: remove this in the future...
-    bool show_log_window = true;
+    bool show_log_window = false;  // TODO: less useful than thought...
     bool show_nav_window = true;
     file_navT nav(R"(C:\*redacted*\Desktop\rulelists_new)");
 
@@ -715,6 +717,7 @@ int main(int argc, char** argv) {
 
                 // It seems the whole recorder model is problematic...
                 ImGui::AlignTextToFramePadding(); // TODO: +1 is clumsy.
+                // TODO: -> editor?
                 ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1);
                 // TODO: pos may not reflect runner's real pos, as recorder can be modified on the way... may not
                 // matters
@@ -755,11 +758,12 @@ int main(int argc, char** argv) {
             ImGui::PushButtonRepeat(true);
             if (ImGui::Button("+1")) {
                 runner.run(rule, 1); // TODO: should run be called here?
-                // TODO: should have visible (text) effect even when not paused...
+                logger::log_temp(200ms, "+1");
             }
             ImGui::SameLine();
             if (ImGui::Button("+p")) {
                 runner.run(rule, actual_pergen());
+                logger::log_temp(200ms, "+p({})", actual_pergen());
             }
             ImGui::PopButtonRepeat();
 
@@ -768,9 +772,10 @@ int main(int argc, char** argv) {
                 should_restart = true;
             }
             ImGui::SameLine();
-            // TODO: input seed...
             if (ImGui::Button("Reseed") || imgui_keypressed(ImGuiKey_S, false)) {
                 ++filler.seed;
+                // TODO: temporary... seed should be editable
+                logger::log_temp(300ms, "seed={}", filler.seed);
                 should_restart = true;
             }
 
@@ -802,6 +807,7 @@ int main(int argc, char** argv) {
                 if (!paused) {
                     paused = true;
                 } else {
+                    // TODO: log too?
                     runner.run(rule, actual_pergen()); // ?run(1)
                     // TODO: whether to take place after set_rule?
                     // TODO: whether to update image this frame?

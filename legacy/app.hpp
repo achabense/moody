@@ -410,7 +410,6 @@ public:
     }
 };
 
-// TODO: report error...
 // - Why using C++ at all: there seems no standard way to `fopen` a unicode C-string path.
 // (The only one being ignore(max)->gcount, which appears )
 inline std::vector<char> load_binary(const std::filesystem::path& path, int max_size) {
@@ -429,6 +428,8 @@ inline std::vector<char> load_binary(const std::filesystem::path& path, int max_
             }
         }
     }
+    // TODO: refine msg?
+    logger::log_temp(300ms, "Cannot load");
     return {};
 }
 

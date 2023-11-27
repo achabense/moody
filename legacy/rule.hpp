@@ -158,6 +158,7 @@ struct std::hash<legacy::compressT> {
     }
 };
 
+// TODO: put partitionT, interT and modelT(temp name) into a single header...
 namespace legacy {
     // TODO: explain...
     // TODO: refine... better names; consistently use Abc naming convention?
