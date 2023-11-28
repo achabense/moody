@@ -11,23 +11,27 @@
 #include "rule.hpp"
 #include "tile.hpp"
 
-// TODO: partial rule (e.g. collect from tile; the rest is generated from another generator...)
 // TODO: allow resizing the grid.
 
-// TODO: notify on quit... (? there seems no such need.)
-// TODO: support more run-mode... (? related: when will the current run-mode cause problems?)
+// TODO: is the algo correct?
+// TODO: explain count's impl-specific behavior...
+inline void random_fill_density(bool* begin, bool* end, double density, std::mt19937& rand) {
+    const uint32_t c = std::mt19937::max() * std::clamp(density, 0.0, 1.0);
+    while (begin < end) {
+        *begin++ = rand() < c;
+    }
+}
 
-/*inline*/ void random_fill(bool* begin, bool* end, int count, auto&& rand) {
+inline void random_fill_count(bool* begin, bool* end, int count, std::mt19937& rand) {
     std::fill(begin, end, false);
     std::fill(begin, begin + std::clamp(count, 0, int(end - begin)), true);
-    // TODO: result of std::shuffle is impl-defined; not suitable for seeding...
-    // otherwise, TODO: explain that passing without forward is intentional.
     std::shuffle(begin, end, rand);
 }
 
 // TODO: rename...
+// TODO: explain why not double...
 struct tile_filler {
-    uint64_t seed; // arbitrary value
+    uint32_t seed; // arbitrary value
     float density; // ∈ [0.0f, 1.0f]
 };
 
@@ -53,10 +57,9 @@ public:
             m_tile.resize(*resize);
         }
 
-        const auto seed = filler.seed;
-        const auto density = filler.density;
-        // TODO: use mt19937 instead?
-        random_fill(m_tile.begin(), m_tile.end(), m_tile.area() * density, std::mt19937_64{seed});
+        // TODO: count or density?
+        std::mt19937 rand{filler.seed};
+        random_fill_density(m_tile.begin(), m_tile.end(), filler.density, rand);
     }
 
     void run(const legacy::ruleT& rule) {

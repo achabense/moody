@@ -129,11 +129,10 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
 
                 ImGui::SameLine();
                 if (ImGui::Button("Randomize")) {
-                    // TODO: use mt19937 instead?
-                    static std::mt19937_64 rand(time(0));
+                    static std::mt19937 rand(time(0));
                     // TODO: looks bad.
                     legacy::ruleT_data grule{};
-                    random_fill(grule.data(), grule.data() + k, rcount, rand);
+                    random_fill_count(grule.data(), grule.data() + k, rcount, rand);
                     rule = part.dispatch_from(grule);
                     recorder.take(inter.to_rule(rule));
                 }
@@ -648,14 +647,23 @@ int main(int argc, char** argv) {
 
         if (imgui_window window("Tile##Ctrl", ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize);
             window) {
+            // TODO: better control.
+            int seed = filler.seed;
+            if (ImGui::SliderInt("Seed [0-25]", &seed, 0, 25, "%d", ImGuiSliderFlags_NoInput)) {
+                if (seed != filler.seed) {
+                    filler.seed = seed;
+                    should_restart = true;
+                }
+            }
             // TODO: button <- set to 0.5?
             if (ImGui::SliderFloat("Init density [0-1]", &filler.density, 0.0f, 1.0f, "%.3f",
                                    ImGuiSliderFlags_NoInput)) {
                 should_restart = true;
             }
 
-            ImGui::Checkbox("Pause", &paused);
+            ImGui::Separator();
 
+            ImGui::Checkbox("Pause", &paused);
             ImGui::SameLine();
             ImGui::PushButtonRepeat(true);
             if (ImGui::Button("+1")) {
@@ -668,16 +676,8 @@ int main(int argc, char** argv) {
                 logger::log_temp(200ms, "+p({})", actual_pergen());
             }
             ImGui::PopButtonRepeat();
-
             ImGui::SameLine();
             if (ImGui::Button("Restart") || imgui_keypressed(ImGuiKey_R, false)) {
-                should_restart = true;
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Reseed") || imgui_keypressed(ImGuiKey_S, false)) {
-                ++filler.seed;
-                // TODO: temporary... seed should be editable
-                logger::log_temp(300ms, "seed={}", filler.seed);
                 should_restart = true;
             }
 
