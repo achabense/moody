@@ -95,6 +95,53 @@ namespace legacy {
         friend bool operator==(const ruleT&, const ruleT&) = default;
     };
 
+    // TODO: not widely applied; whether to remove?
+    constexpr ruleT mkrule(const auto& rulefn /*bool(codeT)*/) {
+        ruleT rule{};
+        for (codeT code : codeT{}) {
+            rule.map[code] = rulefn(code);
+        }
+        return rule;
+    }
+
+#if 0
+    // TODO: whether to support BS format in app?
+    inline ruleT mkrule1(const bool (&B)[9], const bool (&S)[9]) {
+        return mkrule([&](codeT code) -> bool {
+            auto [q, w, e, a, s, d, z, x, c] = decode(code);
+            int count = q + w + e + a + d + z + x + c;
+            if (!B[count] && !S[count]) {
+                return 0;
+            } else if (!B[count] && S[count]) {
+                return s;
+            } else if (B[count] && !S[count]) {
+                return !s;
+            } else {
+                return 1;
+            }
+        });
+    }
+
+    inline ruleT mkrule2(const vector<int>& Bs, const vector<int>& Ss) {
+        bool B[9]{}, S[9]{};
+        for (auto b : Bs) {
+            if (b >= 0 && b <= 8) {
+                B[b] = true;
+            }
+        }
+        for (auto s : Ss) {
+            if (s >= 0 && s <= 8) {
+
+                S[s] = true;
+            }
+        }
+        return mkrule1(B, S);
+    }
+
+    inline ruleT game_of_life2() {
+        return mkrule2({3}, {2, 3});
+    }
+#else
     // "Convay's Game of Life" rule.
     inline ruleT game_of_life() {
         // b3 s23
@@ -112,6 +159,7 @@ namespace legacy {
         }
         return rule;
     }
+#endif
 
     // TODO: still here?
     using ruleT_data = ruleT::data_type;
@@ -125,7 +173,7 @@ namespace legacy {
             }
         }
 
-        explicit operator ruleT() const {
+        /*implicit*/ operator ruleT() const {
             ruleT rule{};
             for (codeT code : codeT{}) {
                 rule.map[code] = (bits[code / 8] >> (code % 8)) & 1;
@@ -134,22 +182,16 @@ namespace legacy {
         }
 
         friend bool operator==(const compressT& l, const compressT& r) = default;
-        friend std::strong_ordering operator<=>(const compressT& l, const compressT& r) = default;
 
-        size_t hash() const {
-            // ~ not ub.
-            const char* data = reinterpret_cast<const char*>(bits.data());
-            return std::hash<std::string_view>{}(std::string_view(data, 64));
-        }
+        struct hashT {
+            size_t operator()(const compressT& cmpr) const {
+                // ~ not UB.
+                const char* data = reinterpret_cast<const char*>(cmpr.bits.data());
+                return std::hash<std::string_view>{}(std::string_view(data, 64));
+            }
+        };
     };
 } // namespace legacy
-
-template <>
-struct std::hash<legacy::compressT> {
-    size_t operator()(const legacy::compressT& cmpr) const { //
-        return cmpr.hash();
-    }
-};
 
 // TODO: put partitionT, interT and modelT(temp name) into a single header...
 namespace legacy {
@@ -162,13 +204,7 @@ namespace legacy {
 
         const ruleT& get_base() const {
             static constexpr ruleT zero{};
-            static constexpr ruleT identity = []() {
-                ruleT id{};
-                for (codeT code : codeT{}) {
-                    id.map[code] = decode_s(code);
-                }
-                return id;
-            }();
+            static constexpr ruleT identity = mkrule(decode_s);
 
             switch (tag) {
             case Value:

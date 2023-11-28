@@ -14,6 +14,9 @@ auto underlying_address(Enum& e) {
 // TODO: for "paired", support 4-step modification (_,S,B,BS)... add new color?
 void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, code_image& icons,
                rule_recorder& recorder) {
+    // TODO: so why need to_edit?
+    assert(to_edit == recorder.current());
+
     if (imgui_window window(id_str, p_open, ImGuiWindowFlags_AlwaysAutoResize); window) {
         ImGui::TextUnformatted("Current rule:");
         {
@@ -31,10 +34,16 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                 if (const char* text = ImGui::GetClipboardText()) {
                     auto rules = extract_rules(text);
                     if (!rules.empty()) {
-                        int size = recorder.size();
-                        recorder.append(rules); // TODO: requires non-trivial append logic.
-                        recorder.set_pos(size);
-                        logger::log_temp(300ms, "Pasted"); // TODO: add additional info if already exists...
+                        // TODO: redesign recorder... whether to accept multiple rules?
+                        // int size = recorder.size();
+                        // recorder.append(rules); // TODO: requires non-trivial append logic.
+                        // recorder.set_pos(size);
+                        // logger::log_temp(300ms, "Pasted"); // TODO: add additional info if already exists...
+                        if (to_edit != rules.front()) {
+                            recorder.take(rules.front());
+                        } else {
+                            logger::log_temp(300ms, "Same rule");
+                        }
                     }
                 }
             }
