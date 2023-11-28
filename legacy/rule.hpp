@@ -193,53 +193,6 @@ namespace legacy {
     };
 } // namespace legacy
 
-// TODO: put partitionT, interT and modelT(temp name) into a single header...
-namespace legacy {
-    // TODO: explain...
-    // TODO: refine... better names; consistently use Abc naming convention?
-    struct interT {
-        enum tagE { Value, Flip, Diff };
-        tagE tag = Value;
-        ruleT custom{};
-
-        const ruleT& get_base() const {
-            static constexpr ruleT zero{};
-            static constexpr ruleT identity = mkrule(decode_s);
-
-            switch (tag) {
-            case Value:
-                return zero;
-            case Flip:
-                return identity;
-            case Diff:
-                return custom;
-            default:
-                abort();
-            }
-        }
-
-        // both methods are actually XOR...
-        ruleT_data from_rule(const ruleT& rule) const {
-            const ruleT& base = get_base();
-            ruleT_data diff{};
-            for (codeT code : codeT{}) {
-                diff[code] = rule(code) == base(code) ? 0 : 1;
-            }
-            return diff;
-        }
-
-        ruleT to_rule(const ruleT_data& diff) const {
-            const ruleT& base = get_base();
-            ruleT rule{};
-            for (codeT code : codeT{}) {
-                rule.map[code] = diff[code] ? !base(code) : base(code);
-            }
-            return rule;
-        }
-    };
-
-} // namespace legacy
-
 // TODO: talk about utf8 compatibility...
 namespace legacy {
     namespace _impl_details {
