@@ -20,6 +20,24 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
     if (imgui_window window(id_str, p_open, ImGuiWindowFlags_AlwaysAutoResize); window) {
         ImGui::TextUnformatted("Current rule:");
         {
+            // TODO: functionize
+            // TODO: move elsewhere...
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Mir")) {
+                auto r = to_edit;
+                for (auto code : legacy::codeT{}) {
+                    auto codex = legacy::flip_all(code);
+                    bool flip = legacy::decode_s(codex) != to_edit.map[codex];
+                    if (flip) {
+                        r.map[code] = !legacy::decode_s(code);
+                    } else {
+                        r.map[code] = legacy::decode_s(code);
+                    }
+                }
+                recorder.take(r);
+            }
+        }
+        {
             auto rule_str = to_MAP_str(to_edit);
             imgui_strwrapped(rule_str);
 
@@ -214,7 +232,7 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                         ImGui::PopStyleColor(3);
                     }
 
-                    if (imgui_itemtooltip tooltip; tooltip) {
+                    if (ImGui::BeginItemTooltip()) {
                         for (int x = 0; codeT code : group) {
                             if (x++ % perline != 0) { // TODO: sharing the same perline (not necessary)
                                 ImGui::SameLine();
@@ -229,6 +247,7 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                             ImGui::AlignTextToFramePadding();
                             ImGui::TextUnformatted(rule[code] ? ":1" : ":0");
                         }
+                        ImGui::EndTooltip();
                     }
 
                     ImGui::SameLine();
@@ -516,22 +535,6 @@ int main(int argc, char** argv) {
             ImGui::Text("Width:%d,Height:%d,Density:%f", runner.tile().width(), runner.tile().height(),
                         float(runner.tile().count()) / runner.tile().area());
             {
-                // TODO: functionize
-                // TODO: move to rule-editor...
-                if (ImGui::Button("Mir")) {
-                    auto r = rule;
-                    for (auto code : legacy::codeT{}) {
-                        auto codex = legacy::flip_all(code);
-                        bool flip = legacy::decode_s(codex) != rule.map[codex];
-                        if (flip) {
-                            r.map[code] = !legacy::decode_s(code);
-                        } else {
-                            r.map[code] = legacy::decode_s(code);
-                        }
-                    }
-                    recorder.take(r);
-                }
-
                 const ImVec2 pos = ImGui::GetCursorScreenPos();
                 const ImVec2 img_size = ImVec2(img.width(), img.height()); // TODO: support zooming?
 
@@ -567,7 +570,7 @@ int main(int argc, char** argv) {
                         // TODO: how to support other operations?
                         show_zoom = !show_zoom;
                     }
-                    if (imgui_itemtooltip tooltip(show_zoom); tooltip) {
+                    if (show_zoom && ImGui::BeginItemTooltip()) {
                         assert(ImGui::IsMousePosValid());
                         // TODO: better size ctrl
                         static int region_rx = 32, region_ry = 32;
@@ -617,6 +620,7 @@ int main(int argc, char** argv) {
                             static std::mt19937 r;
                             recorder.take(legacy::make_rule(m, legacy::partitionT::get_spatial(), 0, r));
                         }
+                        ImGui::EndTooltip();
                     }
                 }
 
@@ -670,7 +674,7 @@ int main(int argc, char** argv) {
                 should_restart = true;
             }
 
-            ImGui::Separator();
+            ImGui::SeparatorText("");
 
             ImGui::Checkbox("Pause", &paused);
             ImGui::SameLine();
@@ -690,13 +694,12 @@ int main(int argc, char** argv) {
                 should_restart = true;
             }
 
-            ImGui::SliderInt("Pergen [1-20]", &pergen, pergen_min, pergen_max, "%d", ImGuiSliderFlags_NoInput);
-
             ImGui::AlignTextToFramePadding();
             ImGui::Text("(Actual pergen: %d)", actual_pergen());
             ImGui::SameLine();
             ImGui::Checkbox("anti-flick", &anti_flick);
 
+            ImGui::SliderInt("Pergen [1-20]", &pergen, pergen_min, pergen_max, "%d", ImGuiSliderFlags_NoInput);
             ImGui::SliderInt("Gap Frame [0-20]", &gap_frame, gap_min, gap_max, "%d", ImGuiSliderFlags_NoInput);
             ImGui::SliderInt("Start gen [0-1000]", &start_from, start_min, start_max, "%d", ImGuiSliderFlags_NoInput);
 

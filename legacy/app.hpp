@@ -253,15 +253,9 @@ inline bool imgui_keypressed(ImGuiKey key, bool repeat) {
 
 // TODO: mouse?
 
-// I hate these "deprecated but still generated" copiers.
-// TODO: clang-format works wrongly with emojis?
-// #define 🤢(T)
-#define NOCOPY(T)         \
-    T(const T&) = delete; \
-    T& operator=(const T&) = delete;
-
 struct [[nodiscard]] imgui_window {
-    NOCOPY(imgui_window);
+    imgui_window(const imgui_window&) = delete;
+    imgui_window& operator=(const imgui_window&) = delete;
 
     const bool visible;
     // TODO: refine interface and documentation
@@ -276,7 +270,8 @@ struct [[nodiscard]] imgui_window {
 };
 
 struct [[nodiscard]] imgui_childwindow {
-    NOCOPY(imgui_childwindow);
+    imgui_childwindow(const imgui_childwindow&) = delete;
+    imgui_childwindow& operator=(const imgui_childwindow&) = delete;
 
     const bool visible;
     explicit imgui_childwindow(const char* name, const ImVec2& size = {}, ImGuiWindowFlags flags = {})
@@ -285,20 +280,6 @@ struct [[nodiscard]] imgui_childwindow {
         ImGui::EndChild(); // Unconditional.
     }
     explicit operator bool() const { return visible; }
-};
-
-// TODO: should imgui_childwindow/... support "enabled feature"?
-struct [[nodiscard]] imgui_itemtooltip {
-    NOCOPY(imgui_itemtooltip);
-
-    const bool opened; // TODO: proper name?
-    explicit imgui_itemtooltip(bool enabled = true) : opened(enabled && ImGui::BeginItemTooltip()) {}
-    ~imgui_itemtooltip() {
-        if (opened) {
-            ImGui::EndTooltip();
-        }
-    }
-    explicit operator bool() const { return opened; }
 };
 
 struct timeT {
