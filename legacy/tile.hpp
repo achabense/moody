@@ -56,8 +56,11 @@ namespace legacy {
         int area() const { return m_size.width * m_size.height; }
 
     private:
-        // TODO: explain why const
-        bool* _line(int _y) const {
+        bool* _line(int _y) {
+            assert(_y >= 0 && _y < m_size.height + 2);
+            return m_data + _y * m_size.width;
+        }
+        const bool* _line(int _y) const {
             assert(_y >= 0 && _y < m_size.height + 2);
             return m_data + _y * m_size.width;
         }
@@ -79,7 +82,6 @@ namespace legacy {
         const bool* end() const { return begin() + area(); }
 
     private:
-        // TODO: make into a class? class lr get set
         void _set_lr(int _y, bool l, bool r) {
             assert(_y >= 0 && _y < m_size.height + 2);
             bool* lr = m_data + m_size.width * (m_size.height + 2);

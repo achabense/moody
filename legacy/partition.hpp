@@ -55,12 +55,13 @@ namespace legacy {
     // TODO: better variable names...
     class partitionT {
     public:
-        using array_base = array<int, 512>;
+        using array_base = std::array<int, 512>;
+        using groupT = std::vector<codeT>;
 
     private:
         array_base m_map;
         int m_k;
-        vector<vector<codeT>> m_groups;
+        std::vector<groupT> m_groups;
 
         static int regulate(array_base& data) {
             std::map<int, int> mapper;
@@ -104,10 +105,10 @@ namespace legacy {
             assert(code >= 0 && code < 512);
             return m_map[code];
         }
-        const vector<vector<codeT>>& groups() const { //
+        const std::vector<groupT>& groups() const { //
             return m_groups;
         }
-        const vector<codeT>& group_for(codeT code) const { //
+        const groupT& group_for(codeT code) const { //
             return m_groups[map(code)];
         }
         codeT head_for(codeT code) const { //
@@ -117,56 +118,10 @@ namespace legacy {
         int k() const { return m_k; }
 
         // TODO: refine partitionT methods...
-        static void flip(const vector<codeT>& group, ruleT_data& rule) {
+        static void flip(const groupT& group, ruleT_data& rule) {
             for (codeT code : group) {
                 rule[code] = !rule[code];
             }
-        }
-
-        class scanlistT {
-        public:
-            // TODO: better names.
-            enum scanE : int {
-                Inconsistent,
-                All_0, // TODO: A0, A1?
-                All_1,
-            };
-
-        private:
-            std::array<scanE, 512> m_data; // TODO: vector?
-            int m_k;
-
-        public:
-            explicit scanlistT(int k) : m_data{}, m_k(k) {}
-
-            auto begin() const { return m_data.cbegin(); }
-            auto end() const { return m_data.cbegin() + m_k; }
-
-            int k() const { return m_k; }
-
-            scanE& operator[](int j) { return m_data[j]; }
-            const scanE& operator[](int j) const { return m_data[j]; }
-
-            // TODO: cache, or count in ctor (need redesign)?
-            int count(scanE s) const { //
-                return std::count(begin(), end(), s);
-            }
-        };
-
-        scanlistT scan(const ruleT_data& rule) const {
-            scanlistT result(k());
-            for (int j = 0; j < k(); ++j) {
-                const auto& group = m_groups[j];
-                bool first = rule[group[0]];
-                result[j] = first ? result.All_1 : result.All_0;
-                for (codeT code : group) {
-                    if (rule[code] != first) {
-                        result[j] = result.Inconsistent;
-                        break;
-                    }
-                }
-            }
-            return result;
         }
 
         // TODO: the arg type is problematic.
@@ -229,7 +184,7 @@ namespace legacy {
         static const partitionT& getp(basespecE basic, extrspecE extr) {
             using mapperP = codeT (*)(codeT);
 
-            constexpr auto make_partition = [](const vector<mapperP>& mappers) -> partitionT {
+            constexpr auto make_partition = [](const std::vector<mapperP>& mappers) -> partitionT {
                 partitionT::array_base part;
                 part.fill(-1);
 
@@ -298,7 +253,7 @@ namespace legacy {
             static std::optional<partitionT> parts[basespecE_size][extrspecE_size];
             // apparently not thread-safe... TODO: should be thread safe or not?
             if (!parts[basic][extr]) {
-                vector<mapperP> arg = args[basic];
+                std::vector<mapperP> arg = args[basic];
                 switch (extr) {
                 case extrspecE::None_:
                     break;
@@ -318,6 +273,48 @@ namespace legacy {
 
         // TODO: better name...
         static const partitionT& get_spatial() { return getp(Spatial, extrspecE::None_); }
+    };
+
+    class scanlistT {
+    public:
+        // TODO: better names.
+        enum scanE : int {
+            Inconsistent,
+            All_0, // TODO: A0, A1?
+            All_1,
+        };
+
+    private:
+        std::array<scanE, 512> m_data; // TODO: vector?
+        int m_k;
+        int m_count[3];
+
+    public:
+        static scanE scan(const partitionT::groupT& group, const ruleT_data& rule) {
+            bool first = rule[group[0]];
+            scanlistT::scanE r = first ? scanlistT::All_1 : scanlistT::All_0;
+            for (codeT code : group) {
+                if (rule[code] != first) {
+                    r = scanlistT::Inconsistent;
+                    break;
+                }
+            }
+            return r;
+        }
+
+        explicit scanlistT(const partitionT& p, const ruleT_data& rule) : m_data{}, m_k{p.k()}, m_count{} {
+            for (int j = 0; j < m_k; ++j) {
+                m_data[j] = scan(p.groups()[j], rule);
+                ++m_count[m_data[j]];
+            }
+        }
+
+        auto begin() const { return m_data.cbegin(); }
+        auto end() const { return m_data.cbegin() + m_k; }
+        const scanE& operator[](int j) const { return m_data[j]; }
+
+        int k() const { return m_k; }
+        int count(scanE s) const { return m_count[s]; }
     };
 } // namespace legacy
 
@@ -349,8 +346,8 @@ namespace legacy {
         }
     };
 
-    inline vector<modelT::stateE> filter(const modelT& m, const partitionT& p) {
-        vector<modelT::stateE> grouped(p.k(), modelT::Unknown);
+    inline std::vector<modelT::stateE> filter(const modelT& m, const partitionT& p) {
+        std::vector<modelT::stateE> grouped(p.k(), modelT::Unknown);
         for (codeT code : codeT{}) {
             if (m.data[code] != modelT::Unknown) {
                 grouped[p.map(code)] = m.data[code];
@@ -363,7 +360,7 @@ namespace legacy {
     // TODO: temporary, should be redesigned.
     /*inline*/ ruleT make_rule(const modelT& m, const partitionT& p, int den, auto&& rand) {
         // step 1:
-        vector<modelT::stateE> grouped = filter(m, p);
+        std::vector<modelT::stateE> grouped = filter(m, p);
 
         // step 2:
         // TODO: doesn't make sense...

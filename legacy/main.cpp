@@ -178,7 +178,7 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                 // TODO: the effect is still obscure...
             }
 
-            const auto scans = part.scan(rule);
+            const legacy::scanlistT scans(part, rule);
             ImGui::Text("[1:%d] [0:%d] [x:%d]", scans.count(scans.All_1), scans.count(scans.All_0),
                         scans.count(scans.Inconsistent));
 

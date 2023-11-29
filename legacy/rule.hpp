@@ -8,11 +8,6 @@
 #include <vector>
 
 namespace legacy {
-    // TODO: make global? add optional? or drop all?
-    using std::array;
-    using std::string;
-    using std::vector;
-
     // The environment around "s".
     struct envT {
         bool q, w, e;
@@ -77,7 +72,7 @@ namespace legacy {
     // TODO: rephrase...
     // Unambiguously refer to the map from env-code to the new state.
     struct ruleT {
-        using data_type = array<bool, 512>;
+        using data_type = std::array<bool, 512>;
 
         data_type map{}; // mapping of s->s'.
 
@@ -162,7 +157,7 @@ namespace legacy {
 #endif
 
     class compressT {
-        array<uint8_t, 64> bits; // as bitset.
+        std::array<uint8_t, 64> bits; // as bitset.
     public:
         explicit compressT(const ruleT& rule) : bits{} {
             for (codeT code : codeT{}) {
@@ -234,7 +229,7 @@ namespace legacy {
     // Source: https://golly.sourceforge.io/Help/Algorithms/QuickLife.html
     // > So, Conway's Life (B3/S23) encoded as a MAP rule is:
     // > rule = MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA
-    inline string to_MAP_str(const ruleT& rule) {
+    inline std::string to_MAP_str(const ruleT& rule) {
         // MAP rule uses a different coding scheme.
         bool reordered[512]{};
         for (codeT code : codeT{}) {
@@ -242,7 +237,7 @@ namespace legacy {
             reordered[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1] = rule(code);
         }
         auto get = [&reordered](int i) { return i < 512 ? reordered[i] : 0; };
-        string str = "MAP";
+        std::string str = "MAP";
         int i = 0;
         while (i < 512) {
             uint8_t b6 = (get(i + 5) << 0) | (get(i + 4) << 1) | (get(i + 3) << 2) | (get(i + 2) << 3) |
@@ -259,7 +254,7 @@ namespace legacy {
         return reg;
     }
 
-    inline ruleT from_MAP_str(const string& map_str) {
+    inline ruleT from_MAP_str(const std::string& map_str) {
         assert(std::regex_match(map_str, regex_MAP_str()));
         bool reordered[512]{};
         auto put = [&reordered](int i, bool b) {

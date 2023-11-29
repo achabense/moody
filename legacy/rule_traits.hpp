@@ -11,7 +11,6 @@ namespace legacy {
         return partitionT::get_spatial().matches(rule.map);
     }
 
-    // TODO: code_ns etc should be supported in rule.hpp.
     inline bool center_agnostic_abs(const ruleT& rule) {
         for (codeT code : codeT{}) {
             if (rule(code) != rule(flip_s(code))) {

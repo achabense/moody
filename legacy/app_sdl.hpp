@@ -186,9 +186,9 @@ public:
     void update(const legacy::tileT& tile) {
         assert(tile.width() == m_w && tile.height() == m_h);
 
-        void* pixels = NULL;
+        void* pixels = nullptr;
         [[maybe_unused]] int pitch = 0;
-        [[maybe_unused]] bool succ = SDL_LockTexture(m_texture, NULL, &pixels, &pitch) == 0;
+        [[maybe_unused]] bool succ = SDL_LockTexture(m_texture, nullptr, &pixels, &pitch) == 0;
         assert(succ && pitch == m_w * sizeof(Uint32));
 
         // Relying on both image and tile data being consecutive.
@@ -205,8 +205,6 @@ public:
     SDL_Texture* texture() { return m_texture; }
 };
 
-// TODO: looks horrible...
-// TODO: lacks useful imgui interface...
 // TODO: can be merged into app_backend...
 class code_image {
     SDL_Texture* m_texture;
@@ -215,7 +213,8 @@ public:
     code_image() {
         const int width = 3, height = 3 * 512;
         m_texture = app_backend::create_texture(SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, width, height);
-        Uint32 pixels[512][3][3];
+        // Uint32 pixels[512][3][3]; // TODO: explain why allocate...
+        std::unique_ptr<Uint32[][3][3]> pixels(new Uint32[512][3][3]);
         for (auto code : legacy::codeT{}) {
             auto [q, w, e, a, s, d, z, x, c] = legacy::decode(code);
             bool fill[3][3] = {{q, w, e}, {a, s, d}, {z, x, c}};
@@ -226,7 +225,7 @@ public:
             }
         }
 
-        SDL_UpdateTexture(m_texture, NULL, pixels, width * sizeof(Uint32));
+        SDL_UpdateTexture(m_texture, nullptr, pixels.get(), width * sizeof(Uint32));
     }
 
     ~code_image() { SDL_DestroyTexture(m_texture); }
