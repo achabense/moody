@@ -3,15 +3,7 @@
 #include "app.hpp"
 #include "rule_traits.hpp"
 
-// TODO: awful... need to be avoided...
-template <class Enum>
-auto underlying_address(Enum& e) {
-    return reinterpret_cast<std::underlying_type_t<Enum>*>(std::addressof(e));
-}
-
-// TODO: clumsy...
 // TODO: should be a class... how to decouple? ...
-// TODO: for "paired", support 4-step modification (_,S,B,BS)... add new color?
 void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, code_image& icons,
                rule_recorder& recorder) {
     // TODO: so why need to_edit?
@@ -48,15 +40,10 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
 
             ImGui::SameLine();
             if (ImGui::Button("Paste")) {
-                // TODO: can text return nullptr?
                 if (const char* text = ImGui::GetClipboardText()) {
                     auto rules = extract_rules(text);
                     if (!rules.empty()) {
                         // TODO: redesign recorder... whether to accept multiple rules?
-                        // int size = recorder.size();
-                        // recorder.append(rules); // TODO: requires non-trivial append logic.
-                        // recorder.set_pos(size);
-                        // logger::log_temp(300ms, "Pasted"); // TODO: add additional info if already exists...
                         if (to_edit != rules.front()) {
                             recorder.take(rules.front());
                         } else {
@@ -65,50 +52,54 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                     }
                 }
             }
-            // TODO: re-implement
-            // ImGui::SameLine();
-            // if (ImGui::Button("Save to file")) {
-            //     logger::log("Saved");
-            // }
+            // TODO: re-implement file-saving
         }
 
-        using legacy::partitionT;
-
         // TODO: explain...
-        // TODO: support 4-state modification when extr==paired...
+        // TODO: for "paired", support 4-step modification (_,S,B,BS)... add new color?
+        // TODO: why does clang-format sort using clauses?
+        using legacy::interT;
+        using legacy::partitionT;
         static partitionT::basespecE base = partitionT::Spatial;
         static partitionT::extrspecE extr = partitionT::None_;
-        static legacy::interT inter = {};
+        static interT inter = {};
 
-        ImGui::SeparatorText("Settings");
-        {
+        auto set_base_extr = [] {
+            int ibase = base;
+            int iextr = extr;
+
             ImGui::AlignTextToFramePadding();
             ImGui::TextUnformatted("Base");
             ImGui::SameLine();
-            ImGui::Combo("##MainMode", underlying_address(base), partitionT::basespecE_names,
-                         partitionT::basespecE_size);
+            ImGui::Combo("##MainMode", &ibase, partitionT::basespecE_names, partitionT::basespecE_size);
 
             ImGui::AlignTextToFramePadding();
             ImGui::TextUnformatted("Extr");
             ImGui::SameLine();
-            ImGui::RadioButton("none", underlying_address(extr), partitionT::None_);
+            ImGui::RadioButton("none", &iextr, partitionT::None_);
             ImGui::SameLine();
-            ImGui::RadioButton("paired", underlying_address(extr), partitionT::Paired);
+            ImGui::RadioButton("paired", &iextr, partitionT::Paired);
             ImGui::SameLine();
-            ImGui::RadioButton("state", underlying_address(extr), partitionT::State);
+            ImGui::RadioButton("state", &iextr, partitionT::State);
 
-            ImGui::Text("Groups: %d", partitionT::getp(base, extr).k()); // TODO: use variable "part"?
-            ImGui::Separator();
+            base = partitionT::basespecE{ibase};
+            extr = partitionT::extrspecE{iextr};
+            ImGui::Text("Groups: %d", partitionT::getp(base, extr).k());
+        };
+        auto set_inter = [&to_edit] {
+            int itag = inter.tag;
 
+            // TODO: better name (e.g. might be better named "direct")
             ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted("Inter"); // TODO: suitable name...
+            ImGui::TextUnformatted("Inter");
             ImGui::SameLine();
-            // TODO: might be better named "direct"
-            ImGui::RadioButton("Val", underlying_address(inter.tag), inter.Value);
+            ImGui::RadioButton("Val", &itag, inter.Value);
             ImGui::SameLine();
-            ImGui::RadioButton("Flp", underlying_address(inter.tag), inter.Flip);
+            ImGui::RadioButton("Flp", &itag, inter.Flip);
             ImGui::SameLine();
-            ImGui::RadioButton("Dif", underlying_address(inter.tag), inter.Diff);
+            ImGui::RadioButton("Dif", &itag, inter.Diff);
+
+            inter.tag = interT::tagE{itag};
             if (inter.tag == inter.Diff) {
                 ImGui::SameLine();
                 if (ImGui::Button("Take current")) {
@@ -116,15 +107,24 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                 }
                 imgui_strwrapped(to_MAP_str(inter.custom));
             }
-            // TODO: how to keep state-symmetry in Diff mode?
-            ImGui::Text("State symmetry: %d", (int)legacy::state_symmetric(to_edit));
-            ImGui::SameLine();
-            if (ImGui::SmallButton("details")) {
-                extr = partitionT::State;
-                inter.tag = inter.Flip;
-            }
+        };
+
+        ImGui::SeparatorText("Settings");
+        set_base_extr();
+        ImGui::Separator();
+        set_inter();
+        ImGui::Separator();
+
+        // TODO: incorrect place...
+        // TODO: how to keep state-symmetry in Diff mode?
+        ImGui::Text("State symmetry: %d", (int)legacy::state_symmetric(to_edit));
+        ImGui::SameLine();
+        if (ImGui::SmallButton("details")) {
+            extr = partitionT::State;
+            inter.tag = inter.Flip;
         }
 
+        // TODO: rename...
         const auto& part = partitionT::getp(base, extr);
         const int k = part.k();
         legacy::ruleT_data rule = inter.from_rule(to_edit);
@@ -162,21 +162,20 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                     rule = part.dispatch_from(grule);
                     recorder.take(inter.to_rule(rule));
                 }
-
-                // TODO: experimental; not suitable place... should be totally redesigned...
-                // Flip each group; the result is [actually] independent of inter.
-                if (ImGui::Button("Flip each group")) {
-                    std::vector<legacy::compressT> vec;
-                    vec.emplace_back(inter.to_rule(rule));
-                    for (const auto& group : part.groups()) {
-                        legacy::ruleT_data r = rule;
-                        part.flip(group, r);
-                        vec.emplace_back(inter.to_rule(r));
-                    }
-                    recorder.replace(std::move(vec));
-                    logger::log_temp(300ms, "...");
-                    // TODO: the effect is still obscure...
+            }
+            // TODO: experimental; not suitable place... should be totally redesigned...
+            // Flip each group; the result is [actually] independent of inter.
+            if (ImGui::Button("Flip each group")) {
+                std::vector<legacy::compressT> vec;
+                vec.emplace_back(inter.to_rule(rule));
+                for (const auto& group : part.groups()) {
+                    legacy::ruleT_data r = rule;
+                    part.flip(group, r);
+                    vec.emplace_back(inter.to_rule(r));
                 }
+                recorder.replace(std::move(vec));
+                logger::log_temp(300ms, "...");
+                // TODO: the effect is still obscure...
             }
 
             const auto scans = part.scan(rule);
@@ -187,10 +186,7 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
             const int perline = 8;
             const int lines = 7;
             const float child_height = lines * (3 * zoom + 4 /*padding.y*2*/) + (lines - 1) * 4 /*spacing.y*/;
-            // TOOD: this should always return true...
             if (auto child = imgui_childwindow("Details", ImVec2(390, child_height))) {
-                using legacy::codeT;
-
                 ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 4));
                 ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
                 for (int j = 0; j < k; ++j) {
@@ -198,7 +194,7 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                         ImGui::SameLine();
                     }
                     if (j != 0 && j % (perline * lines) == 0) {
-                        ImGui::Separator(); // TODO: refine...
+                        ImGui::SeparatorText(""); // TODO: refine...
                     }
                     const bool inconsistent = scans[j] == scans.Inconsistent;
                     const auto& group = part.groups()[j];
@@ -212,7 +208,7 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                         // TODO: document this behavior... (keyctrl->resolve conflicts)
                         if (ImGui::GetIO().KeyCtrl) {
                             const bool b = !rule[group[0]];
-                            for (codeT code : group) {
+                            for (auto code : group) {
                                 rule[code] = b;
                             }
                         } else {
@@ -228,13 +224,16 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                         ImGui::PopStyleColor(3);
                     }
 
-                    if (ImGui::BeginItemTooltip()) {
-                        for (int x = 0; codeT code : group) {
+                    static bool show_group = true;
+                    if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+                        show_group = !show_group;
+                    }
+                    if (show_group && ImGui::BeginItemTooltip()) {
+                        for (int x = 0; auto code : group) {
                             if (x++ % perline != 0) { // TODO: sharing the same perline (not necessary)
                                 ImGui::SameLine();
                             }
-
-                            // TODO: use the same bordercol as button's?
+                            // TODO: change color?
                             icons.image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
                             ImGui::SameLine();
                             ImGui::AlignTextToFramePadding();
@@ -260,27 +259,21 @@ struct file_navT {
     using path = std::filesystem::path;
 
     static path exe_path() {
-        // TODO: use scope_guard?
-        // TODO: the program should be allowed to create folders in the exe path.(SDL_GetBasePath(), instead of
-        // PrefPath)
-        // this is a part runtime [dependency]. (btw, where to put imgui config?)
-        // The correctness of "pos = base.get()" relies on default coding being utf-8 (asserted; TODO: list all
-        // utf8 dependencies)
         const std::unique_ptr<char[], decltype(+SDL_free)> p(SDL_GetBasePath(), SDL_free);
         assert(p); // TODO: what if this fails? what if exe path is invalid?
                    // TODO: silence the warning. The deprecation is very stupid.
+                   // TODO: start_lifetime (new(...)) as char8_t?
         return std::filesystem::u8path(p.get());
     }
 
     path pos;
-    // TODO: rename class name.
     // TODO: explain why cache `status`.
     // TODO: cache more values?
-    struct entry {
+    struct entryT {
         std::filesystem::directory_entry entry;
         std::filesystem::file_status status;
     };
-    std::vector<entry> list;
+    std::vector<entryT> list;
     std::optional<std::string> broken = std::nullopt;
     int refresh = 20;
 

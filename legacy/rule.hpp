@@ -161,9 +161,6 @@ namespace legacy {
     }
 #endif
 
-    // TODO: still here?
-    using ruleT_data = ruleT::data_type;
-
     class compressT {
         array<uint8_t, 64> bits; // as bitset.
     public:

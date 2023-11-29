@@ -6,10 +6,12 @@
 #include "rule.hpp"
 
 namespace legacy {
+    using ruleT_data = ruleT::data_type;
+
     // TODO: explain...
     // TODO: refine... better names; consistently use Abc naming convention?
     struct interT {
-        enum tagE { Value, Flip, Diff };
+        enum tagE : int { Value, Flip, Diff };
         tagE tag = Value;
         ruleT custom{};
 
@@ -169,11 +171,10 @@ namespace legacy {
 
         // TODO: the arg type is problematic.
         ruleT_data dispatch_from(const ruleT_data& grule) const {
-            ruleT_data rule;
+            ruleT_data rule{}; // TODO: without {}, msvc gives false positive after applying range-for...
             for (codeT code : codeT{}) {
                 rule[code] = grule[map(code)];
             }
-            // TODO: false positive after applying range-for...
             return rule;
         }
 
