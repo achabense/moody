@@ -17,7 +17,7 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
     // TODO: so why need to_edit?
     assert(to_edit == recorder.current());
 
-    if (imgui_window window(id_str, p_open, ImGuiWindowFlags_AlwaysAutoResize); window) {
+    if (auto window = imgui_window(id_str, p_open, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted("Current rule:");
         {
             // TODO: functionize
@@ -74,6 +74,8 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
 
         using legacy::partitionT;
 
+        // TODO: explain...
+        // TODO: support 4-state modification when extr==paired...
         static partitionT::basespecE base = partitionT::Spatial;
         static partitionT::extrspecE extr = partitionT::None_;
         static legacy::interT inter = {};
@@ -86,16 +88,13 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
             ImGui::Combo("##MainMode", underlying_address(base), partitionT::basespecE_names,
                          partitionT::basespecE_size);
 
-            // TODO: use extra_specification_names...
             ImGui::AlignTextToFramePadding();
             ImGui::TextUnformatted("Extr");
             ImGui::SameLine();
             ImGui::RadioButton("none", underlying_address(extr), partitionT::None_);
             ImGui::SameLine();
-            // TODO: support 4-state modification when paired...
             ImGui::RadioButton("paired", underlying_address(extr), partitionT::Paired);
             ImGui::SameLine();
-            // TODO: explain...
             ImGui::RadioButton("state", underlying_address(extr), partitionT::State);
 
             ImGui::Text("Groups: %d", partitionT::getp(base, extr).k()); // TODO: use variable "part"?
@@ -184,12 +183,12 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
             ImGui::Text("[1:%d] [0:%d] [x:%d]", scans.count(scans.All_1), scans.count(scans.All_0),
                         scans.count(scans.Inconsistent));
 
-            const ImVec2 icon_size(3 * 7, 3 * 7); // zoom = 7.
+            const int zoom = 7;
             const int perline = 8;
             const int lines = 7;
-            const float child_height = lines * (21 /*r*/ + 4 /*padding.y*2*/) + (lines - 1) * 4 /*spacing.y*/;
+            const float child_height = lines * (3 * zoom + 4 /*padding.y*2*/) + (lines - 1) * 4 /*spacing.y*/;
             // TOOD: this should always return true...
-            if (imgui_childwindow child("Details", ImVec2(390, child_height)); child) {
+            if (auto child = imgui_childwindow("Details", ImVec2(390, child_height))) {
                 using legacy::codeT;
 
                 ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 4));
@@ -205,14 +204,11 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                     const auto& group = part.groups()[j];
 
                     if (inconsistent) {
-                        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6, 0, 0, 1));
-                        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8, 0, 0, 1));
-                        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.9, 0, 0, 1));
+                        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0, 0, 1));
+                        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0, 0, 1));
+                        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.9f, 0, 0, 1));
                     }
-                    // TODO: "to_string(j).c_str()" looks extremely ugly.
-                    if (ImGui::ImageButton(std::to_string(j).c_str(), icons.texture(), icon_size,
-                                           ImVec2(0, group[0] * (1.0f / 512)),
-                                           ImVec2(1, (group[0] + 1) * (1.0f / 512)))) {
+                    if (icons.button(group[0], zoom)) {
                         // TODO: document this behavior... (keyctrl->resolve conflicts)
                         if (ImGui::GetIO().KeyCtrl) {
                             const bool b = !rule[group[0]];
@@ -239,10 +235,7 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                             }
 
                             // TODO: use the same bordercol as button's?
-                            // TODO: icons should provide codeT methods...
-                            ImGui::Image(icons.texture(), icon_size, ImVec2(0, code * (1.0f / 512)),
-                                         ImVec2(1, (code + 1) * (1.0f / 512)), ImVec4(1, 1, 1, 1),
-                                         ImVec4(0.5, 0.5, 0.5, 1));
+                            icons.image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
                             ImGui::SameLine();
                             ImGui::AlignTextToFramePadding();
                             ImGui::TextUnformatted(rule[code] ? ":1" : ":0");
@@ -345,7 +338,7 @@ struct file_navT {
             }
             ImGui::Separator();
 
-            if (imgui_childwindow child("child"); child) {
+            if (auto child = imgui_childwindow("Child")) {
                 if (broken) {
                     // TODO: what's the encoding of exception.what()?
                     // TODO: wrapped&&disabled...
@@ -395,7 +388,7 @@ struct file_navT {
     }
 
     [[nodiscard]] std::optional<path> window(const char* id_str, bool* p_open, const char* suff = nullptr) {
-        if (imgui_window window(id_str, p_open); window) {
+        if (auto window = imgui_window(id_str, p_open)) {
             return show(suff);
         }
         return std::nullopt;
@@ -517,7 +510,7 @@ int main(int argc, char** argv) {
         }
 
         // TODO: rename...
-        if (imgui_window window("##Temp", ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize); window) {
+        if (auto window = imgui_window("##Temp", ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize)) {
             ImGui::Text("(%.1f FPS) Frame:%d\n", io.Framerate, ImGui::GetFrameCount());
             ImGui::Separator();
 
@@ -530,7 +523,7 @@ int main(int argc, char** argv) {
             ImGui::Checkbox("Demo window", &show_demo_window);
         }
 
-        if (imgui_window window("Tile", ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize); window) {
+        if (auto window = imgui_window("Tile", ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize)) {
             ImGui::Text("Gen:%d", runner.gen());
             ImGui::Text("Width:%d,Height:%d,Density:%f", runner.tile().width(), runner.tile().height(),
                         float(runner.tile().count()) / runner.tile().area());
@@ -658,16 +651,21 @@ int main(int argc, char** argv) {
 
         bool should_restart = false;
 
-        if (imgui_window window("Tile##Ctrl", ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize);
-            window) {
-            // TODO: better control.
+        if (auto window = imgui_window("Tile##Ctrl", ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize)) {
+            // TODO: uint32_t...
+            // TODO: want resetting only when +/-/enter...
             int seed = filler.seed;
-            if (ImGui::SliderInt("Seed [0-25]", &seed, 0, 25, "%d", ImGuiSliderFlags_NoInput)) {
-                if (seed != filler.seed) {
+            // TODO: same as "rule_editor"'s... but don't want to affect Label...
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(2, 0));
+            if (ImGui::InputInt("Seed", &seed)) {
+                seed = std::clamp(seed, 0, 9999);
+                if (seed >= 0 && seed != filler.seed) {
                     filler.seed = seed;
                     should_restart = true;
                 }
             }
+            ImGui::PopStyleVar();
+
             // TODO: button <- set to 0.5?
             if (ImGui::SliderFloat("Init density [0-1]", &filler.density, 0.0f, 1.0f, "%.3f",
                                    ImGuiSliderFlags_NoInput)) {

@@ -371,7 +371,7 @@ public:
 
     // TODO: layout is terrible...
     static void window(const char* id_str, bool* p_open) {
-        if (imgui_window window(id_str, p_open); window) {
+        if (auto window = imgui_window(id_str, p_open)) {
             if (ImGui::Button("Clear")) {
                 m_strs.clear();
             }
@@ -379,7 +379,7 @@ public:
             bool to_bottom = ImGui::Button("Bottom");
             ImGui::Separator();
 
-            if (imgui_childwindow child("Child"); child) {
+            if (auto child = imgui_childwindow("Child")) {
                 // TODO: optimize...
                 std::string str;
                 for (const auto& s : m_strs) {

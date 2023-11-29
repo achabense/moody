@@ -213,7 +213,8 @@ class code_image {
 
 public:
     code_image() {
-        m_texture = app_backend::create_texture(SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, width(), height());
+        const int width = 3, height = 3 * 512;
+        m_texture = app_backend::create_texture(SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, width, height);
         Uint32 pixels[512][3][3];
         for (auto code : legacy::codeT{}) {
             auto [q, w, e, a, s, d, z, x, c] = legacy::decode(code);
@@ -225,7 +226,7 @@ public:
             }
         }
 
-        SDL_UpdateTexture(m_texture, NULL, pixels, width() * sizeof(Uint32));
+        SDL_UpdateTexture(m_texture, NULL, pixels, width * sizeof(Uint32));
     }
 
     ~code_image() { SDL_DestroyTexture(m_texture); }
@@ -233,8 +234,22 @@ public:
     code_image(const code_image&) = delete;
     code_image& operator=(const code_image&) = delete;
 
-    static int width() { return 3; }
-    static int height() { return 3 * 512; }
+    void image(legacy::codeT code, int zoom, const ImVec4& tint_col = ImVec4(1, 1, 1, 1),
+               const ImVec4 border_col = ImVec4(0, 0, 0, 0)) const {
+        const ImVec2 size(3 * zoom, 3 * zoom);
+        const ImVec2 uv0(0, code * (1.0f / 512));
+        const ImVec2 uv1(1, (code + 1) * (1.0f / 512));
+        ImGui::Image(m_texture, size, uv0, uv1, tint_col, border_col);
+    }
 
-    SDL_Texture* texture() { return m_texture; }
+    bool button(legacy::codeT code, int zoom, const ImVec4& bg_col = ImVec4(0, 0, 0, 0),
+                const ImVec4& tint_col = ImVec4(1, 1, 1, 1)) const {
+        const ImVec2 size(3 * zoom, 3 * zoom);
+        const ImVec2 uv0(0, code * (1.0f / 512));
+        const ImVec2 uv1(1, (code + 1) * (1.0f / 512));
+        ImGui::PushID(code);
+        bool ret = ImGui::ImageButton("", m_texture, size, uv0, uv1, bg_col, tint_col);
+        ImGui::PopID();
+        return ret;
+    }
 };
