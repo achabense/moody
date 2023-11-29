@@ -42,11 +42,11 @@ inline int round_clip(int v, int r) {
 }
 
 // TODO: better name...
-class torus {
+class torusT {
     legacy::tileT m_tile, m_side;
 
 public:
-    explicit torus(legacy::rectT size) : m_tile(size), m_side(size) {}
+    explicit torusT(legacy::rectT size) : m_tile(size), m_side(size) {}
 
     const legacy::tileT& tile() const { return m_tile; }
 
@@ -90,7 +90,7 @@ public:
 
 // TODO: merge with those in main...
 class rule_runner {
-    torus m_tile;
+    torusT m_tile;
     int m_gen = 0;
 
     int init_shift_x = 0, init_shift_y = 0;

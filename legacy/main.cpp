@@ -394,6 +394,52 @@ struct file_navT {
 // (maybe a lot less useful than pattern saving)
 // TODO: how to capture certain patterns? (editor++)...
 
+struct runner_ctrl {
+    legacy::ruleT rule;
+
+    static constexpr int pergen_min = 1, pergen_max = 20;
+    int pergen = 1;
+    bool anti_flick = true; // TODO: add explanation
+    int actual_pergen() const {
+        if (anti_flick && legacy::will_flick(rule) && pergen % 2) {
+            return pergen + 1;
+        }
+        return pergen;
+    }
+
+    static constexpr int start_min = 0, start_max = 1000;
+    int start_from = 0;
+
+    static constexpr int gap_min = 0, gap_max = 20;
+    int gap_frame = 0;
+
+    bool pause = false;
+
+    bool spaused = false;
+    // TODO: fragile...
+    void push_pause(bool p) {
+        spaused = pause;
+        pause = p;
+    }
+    void pop_pause() { pause = spaused; }
+
+    void run(rule_runner& runner, int extra = 0) const {
+        if (runner.gen() < start_from) {
+            runner.run(rule, start_from - runner.gen());
+        } else {
+            if (extra != 0) {
+                runner.run(rule, extra);
+                extra = 0;
+            }
+            if (!pause) {
+                if (ImGui::GetFrameCount() % (gap_frame + 1) == 0) {
+                    runner.run(rule, actual_pergen());
+                }
+            }
+        }
+    }
+};
+
 int main(int argc, char** argv) {
     const auto cleanup = app_backend::init();
 
@@ -419,43 +465,8 @@ int main(int argc, char** argv) {
     rule_runner runner({.width = 320, .height = 240});
     runner.restart(filler);
 
-    legacy::ruleT rule = recorder.current();
-
-    // TODO: combine to tile_runner...
-    constexpr int pergen_min = 1, pergen_max = 20;
-    int pergen = 1;
-    bool anti_flick = true; // TODO: add explanation
-    auto actual_pergen = [&]() {
-        if (anti_flick && legacy::will_flick(rule) && pergen % 2) {
-            return pergen + 1;
-        }
-        return pergen;
-    };
-
-    constexpr int start_min = 0, start_max = 1000;
-    int start_from = 0;
-
-    constexpr int gap_min = 0, gap_max = 20;
-    int gap_frame = 0;
-
-    bool paused = false;
-
-    auto run = [&](bool restart) {
-        if (rule != recorder.current()) {
-            rule = recorder.current();
-            restart = true;
-        }
-        if (restart) {
-            runner.restart(filler);
-        }
-        if (runner.gen() < start_from) {
-            runner.run(rule, start_from - runner.gen());
-        } else if (!paused) {
-            if (ImGui::GetFrameCount() % (gap_frame + 1) == 0) {
-                runner.run(rule, actual_pergen());
-            }
-        }
-    };
+    runner_ctrl ctrl{
+        .rule = recorder.current(), .pergen = 1, .anti_flick = true, .start_from = 0, .gap_frame = 0, .pause = false};
 
     bool show_rule_editor = true;
     bool show_demo_window = false; // TODO: remove this in the future...
@@ -486,7 +497,7 @@ int main(int argc, char** argv) {
         logger::tempwindow();
 
         if (show_rule_editor) {
-            edit_rule("Rule editor", &show_rule_editor, rule, icons, recorder);
+            edit_rule("Rule editor", &show_rule_editor, ctrl.rule, icons, recorder);
         }
         if (show_nav_window) {
             if (auto sel = nav.window("File Nav", &show_nav_window, ".txt")) {
@@ -530,13 +541,11 @@ int main(int argc, char** argv) {
                 ImGui::ImageButton("##Tile", img.texture(), img_size);
                 ImGui::PopStyleVar();
 
-                static bool spaused = false;
                 if (ImGui::IsItemActivated()) {
-                    spaused = paused;
-                    paused = true;
+                    ctrl.push_pause(true);
                 }
                 if (ImGui::IsItemDeactivated()) {
-                    paused = spaused;
+                    ctrl.pop_pause();
                 }
                 if (ImGui::IsItemHovered()) {
                     if (ImGui::IsItemActive()) {
@@ -600,7 +609,7 @@ int main(int argc, char** argv) {
                             tileT side(sample.size());
                             modelT m{};
                             for (int i = 0; i < 32; i++) {
-                                sample.gather()._apply(m.bind(rule), side);
+                                sample.gather()._apply(m.bind(ctrl.rule), side);
                                 sample.swap(side);
                             }
                             static std::mt19937 r;
@@ -642,8 +651,7 @@ int main(int argc, char** argv) {
             }
         }
 
-        bool should_restart = false;
-
+        int extra = 0;
         if (auto window = imgui_window("Tile##Ctrl", ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize)) {
             // TODO: uint32_t...
             // TODO: want resetting only when +/-/enter...
@@ -654,7 +662,7 @@ int main(int argc, char** argv) {
                 seed = std::clamp(seed, 0, 9999);
                 if (seed >= 0 && seed != filler.seed) {
                     filler.seed = seed;
-                    should_restart = true;
+                    runner.restart(filler);
                 }
             }
             ImGui::PopStyleVar();
@@ -662,69 +670,74 @@ int main(int argc, char** argv) {
             // TODO: button <- set to 0.5?
             if (ImGui::SliderFloat("Init density [0-1]", &filler.density, 0.0f, 1.0f, "%.3f",
                                    ImGuiSliderFlags_NoInput)) {
-                should_restart = true;
+                runner.restart(filler);
             }
 
             ImGui::SeparatorText("");
 
-            ImGui::Checkbox("Pause", &paused);
+            ImGui::Checkbox("Pause", &ctrl.pause);
             ImGui::SameLine();
             ImGui::PushButtonRepeat(true);
             if (ImGui::Button("+1")) {
-                runner.run(rule, 1); // TODO: should run be called here?
+                extra = 1;
                 logger::log_temp(200ms, "+1");
             }
             ImGui::SameLine();
             if (ImGui::Button("+p")) {
-                runner.run(rule, actual_pergen());
-                logger::log_temp(200ms, "+p({})", actual_pergen());
+                extra = ctrl.actual_pergen();
+                logger::log_temp(200ms, "+p({})", ctrl.actual_pergen());
             }
             ImGui::PopButtonRepeat();
             ImGui::SameLine();
             if (ImGui::Button("Restart") || imgui_keypressed(ImGuiKey_R, false)) {
-                should_restart = true;
+                runner.restart(filler);
             }
 
             ImGui::AlignTextToFramePadding();
-            ImGui::Text("(Actual pergen: %d)", actual_pergen());
+            ImGui::Text("(Actual pergen: %d)", ctrl.actual_pergen());
             ImGui::SameLine();
-            ImGui::Checkbox("anti-flick", &anti_flick);
+            ImGui::Checkbox("anti-flick", &ctrl.anti_flick);
 
-            ImGui::SliderInt("Pergen [1-20]", &pergen, pergen_min, pergen_max, "%d", ImGuiSliderFlags_NoInput);
-            ImGui::SliderInt("Gap Frame [0-20]", &gap_frame, gap_min, gap_max, "%d", ImGuiSliderFlags_NoInput);
-            ImGui::SliderInt("Start gen [0-1000]", &start_from, start_min, start_max, "%d", ImGuiSliderFlags_NoInput);
+            ImGui::SliderInt("Pergen [1-20]", &ctrl.pergen, ctrl.pergen_min, ctrl.pergen_max, "%d",
+                             ImGuiSliderFlags_NoInput);
+            ImGui::SliderInt("Gap Frame [0-20]", &ctrl.gap_frame, ctrl.gap_min, ctrl.gap_max, "%d",
+                             ImGuiSliderFlags_NoInput);
+            ImGui::SliderInt("Start gen [0-1000]", &ctrl.start_from, ctrl.start_min, ctrl.start_max, "%d",
+                             ImGuiSliderFlags_NoInput);
 
             // TODO: enable/disable keyboard ctrl (enable by default)
             // TODO: redesign keyboard ctrl...
             if (imgui_keypressed(ImGuiKey_1, true)) {
-                gap_frame = std::max(gap_min, gap_frame - 1);
+                ctrl.gap_frame = std::max(ctrl.gap_min, ctrl.gap_frame - 1);
             }
             if (imgui_keypressed(ImGuiKey_2, true)) {
-                gap_frame = std::min(gap_max, gap_frame + 1);
+                ctrl.gap_frame = std::min(ctrl.gap_max, ctrl.gap_frame + 1);
             }
             if (imgui_keypressed(ImGuiKey_3, true)) {
-                pergen = std::max(pergen_min, pergen - 1);
+                ctrl.pergen = std::max(ctrl.pergen_min, ctrl.pergen - 1);
             }
             if (imgui_keypressed(ImGuiKey_4, true)) {
-                pergen = std::min(pergen_max, pergen + 1);
+                ctrl.pergen = std::min(ctrl.pergen_max, ctrl.pergen + 1);
             }
             if (imgui_keypressed(ImGuiKey_Space, true)) {
-                if (!paused) {
-                    paused = true;
+                if (!ctrl.pause) {
+                    ctrl.pause = true;
                 } else {
                     // TODO: log too?
-                    runner.run(rule, actual_pergen()); // ?run(1)
-                    // TODO: whether to take place after set_rule?
-                    // TODO: whether to update image this frame?
+                    extra = ctrl.actual_pergen();
                 }
             }
             if (imgui_keypressed(ImGuiKey_M, false)) {
-                paused = !paused;
+                ctrl.pause = !ctrl.pause;
             }
         }
 
         // TODO: should this be put before begin-frame?
-        run(should_restart);
+        if (ctrl.rule != recorder.current()) {
+            ctrl.rule = recorder.current();
+            runner.restart(filler);
+        }
+        ctrl.run(runner, extra);
     }
 
     return 0;
