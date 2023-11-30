@@ -3,48 +3,46 @@
 #include "app.hpp"
 #include "rule_traits.hpp"
 
-// TODO: should be a class... how to decouple? ...
-void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, code_image& icons,
-               rule_recorder& recorder) {
-    // TODO: so why need to_edit?
-    assert(to_edit == recorder.current());
-
-    if (auto window = imgui_window(id_str, p_open, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextUnformatted("Current rule:");
-        {
-            // TODO: functionize
-            // TODO: move elsewhere...
-            ImGui::SameLine();
-            if (ImGui::SmallButton("Mir")) {
-                auto r = to_edit;
-                for (auto code : legacy::codeT{}) {
-                    auto codex = legacy::flip_all(code);
-                    bool flip = legacy::decode_s(codex) != to_edit.map[codex];
-                    if (flip) {
-                        r.map[code] = !legacy::decode_s(code);
-                    } else {
-                        r.map[code] = legacy::decode_s(code);
-                    }
-                }
-                recorder.take(r);
+namespace legacy {
+    // TODO: proper name...
+    // TODO: not using mkrule; tends to be very obscure...
+    ruleT mirror(const ruleT& rule) {
+        ruleT mir{};
+        for (codeT code : codeT{}) {
+            codeT codex = flip_all(code);
+            bool flip = decode_s(codex) != rule(codex);
+            if (flip) {
+                mir.map[code] = !decode_s(code);
+            } else {
+                mir.map[code] = decode_s(code);
             }
         }
-        {
-            auto rule_str = to_MAP_str(to_edit);
-            imgui_strwrapped(rule_str);
+        return mir;
+    }
+} // namespace legacy
 
-            if (ImGui::Button("Copy to clipboard")) {
+// TODO: should be a class... how to decouple? ...
+void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& target, const code_image& icons,
+               rule_recorder& recorder) {
+    if (auto window = imgui_window(id_str, p_open, ImGuiWindowFlags_AlwaysAutoResize)) {
+        const auto display_target = [&target, &recorder] {
+            std::string rule_str = to_MAP_str(target);
+
+            ImGui::AlignTextToFramePadding();
+            imgui_str("[Current rule]");
+            ImGui::SameLine();
+            if (ImGui::Button("Copy")) {
                 ImGui::SetClipboardText(rule_str.c_str());
                 logger::log_temp(300ms, "Copied");
             }
-
             ImGui::SameLine();
             if (ImGui::Button("Paste")) {
                 if (const char* text = ImGui::GetClipboardText()) {
                     auto rules = extract_rules(text);
                     if (!rules.empty()) {
                         // TODO: redesign recorder... whether to accept multiple rules?
-                        if (to_edit != rules.front()) {
+                        // TODO: target??
+                        if (target != rules.front()) {
                             recorder.take(rules.front());
                         } else {
                             logger::log_temp(300ms, "Same rule");
@@ -53,7 +51,8 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                 }
             }
             // TODO: re-implement file-saving
-        }
+            imgui_strwrapped(rule_str);
+        };
 
         // TODO: explain...
         // TODO: for "paired", support 4-step modification (_,S,B,BS)... add new color?
@@ -64,7 +63,7 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
         static partitionT::extrspecE extr = partitionT::None_;
         static interT inter = {};
 
-        auto set_base_extr = [] {
+        const auto set_base_extr = [] {
             int ibase = base;
             int iextr = extr;
 
@@ -84,14 +83,13 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
 
             base = partitionT::basespecE{ibase};
             extr = partitionT::extrspecE{iextr};
-            ImGui::Text("Groups: %d", partitionT::getp(base, extr).k());
         };
-        auto set_inter = [&to_edit] {
+        const auto set_inter = [&target] {
             int itag = inter.tag;
 
             // TODO: better name (e.g. might be better named "direct")
             ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted("Inter");
+            ImGui::TextUnformatted("View"); // TODO: rename vars...
             ImGui::SameLine();
             ImGui::RadioButton("Val", &itag, inter.Value);
             ImGui::SameLine();
@@ -103,73 +101,78 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
             if (inter.tag == inter.Diff) {
                 ImGui::SameLine();
                 if (ImGui::Button("Take current")) {
-                    inter.custom = to_edit;
+                    inter.custom = target;
                 }
                 imgui_strwrapped(to_MAP_str(inter.custom));
             }
         };
 
+        display_target();
         ImGui::SeparatorText("Settings");
         set_base_extr();
         ImGui::Separator();
         set_inter();
-        ImGui::Separator();
-
-        // TODO: incorrect place...
-        // TODO: how to keep state-symmetry in Diff mode?
-        ImGui::Text("State symmetry: %d", (int)legacy::state_symmetric(to_edit));
-        ImGui::SameLine();
-        if (ImGui::SmallButton("details")) {
-            extr = partitionT::State;
-            inter.tag = inter.Flip;
-        }
 
         // TODO: rename...
         const auto& part = partitionT::getp(base, extr);
         const int k = part.k();
-        legacy::ruleT_data rule = inter.from_rule(to_edit);
-
-        // TODO: should be foldable; should be able to set max height...
-        ImGui::SeparatorText("Rule details");
+        const legacy::ruleT_data drule = inter.from_rule(target);
         {
-            {
-                // TODO: unstable between base/extr switchs; ratio-based approach is on-trivial though... (double has
-                // inaccessible values)
-                static int rcount = 0.3 * k;
-                rcount = std::clamp(rcount, 0, k);
+            // TODO: unstable between base/extr switchs; ratio-based approach is on-trivial though... (double has
+            // inaccessible values)
+            static int rcount = 0.3 * k;
+            rcount = std::clamp(rcount, 0, k);
 
-                ImGui::SliderInt("##Active", &rcount, 0, k, "%d", ImGuiSliderFlags_NoInput);
-                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 0));
-                ImGui::PushButtonRepeat(true);
-                const float r = ImGui::GetFrameHeight();
-                ImGui::SameLine();
-                if (ImGui::Button("-", ImVec2(r, r))) {
-                    rcount = std::max(0, rcount - 1);
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("+", ImVec2(r, r))) {
-                    rcount = std::min(k, rcount + 1);
-                }
-                ImGui::PopButtonRepeat();
-                ImGui::PopStyleVar();
-
-                ImGui::SameLine();
-                if (ImGui::Button("Randomize")) {
-                    static std::mt19937 rand(time(0));
-                    // TODO: looks bad.
-                    legacy::ruleT_data grule{};
-                    random_fill_count(grule.data(), grule.data() + k, rcount, rand);
-                    rule = part.dispatch_from(grule);
-                    recorder.take(inter.to_rule(rule));
-                }
+            ImGui::SliderInt("##Active", &rcount, 0, k, "%d", ImGuiSliderFlags_NoInput);
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 0));
+            ImGui::PushButtonRepeat(true);
+            const float r = ImGui::GetFrameHeight();
+            ImGui::SameLine();
+            if (ImGui::Button("-", ImVec2(r, r))) {
+                rcount = std::max(0, rcount - 1);
             }
+            ImGui::SameLine();
+            if (ImGui::Button("+", ImVec2(r, r))) {
+                rcount = std::min(k, rcount + 1);
+            }
+            ImGui::PopButtonRepeat();
+            ImGui::PopStyleVar();
+
+            ImGui::SameLine();
+            if (ImGui::Button("Randomize")) {
+                static std::mt19937 rand(time(0));
+                // TODO: looks bad.
+                legacy::ruleT_data grule{};
+                random_fill_count(grule.data(), grule.data() + k, rcount, rand);
+                recorder.take(inter.to_rule(part.dispatch_from(grule)));
+            }
+        }
+        ImGui::Separator();
+        {
+            // TODO: should be redesigned...
+
+            // TODO: incorrect place...
+            // TODO: how to keep state-symmetry in Diff mode?
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("State symmetry: %d", (int)legacy::state_symmetric(target));
+            ImGui::SameLine();
+            if (ImGui::Button("Details")) {
+                extr = partitionT::State;
+                inter.tag = inter.Flip;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Mir")) {
+                recorder.take(legacy::mirror(target));
+            }
+
             // TODO: experimental; not suitable place... should be totally redesigned...
-            // Flip each group; the result is [actually] independent of inter.
+            // Flip each group; the result is actually independent of inter.
+            ImGui::SameLine();
             if (ImGui::Button("Flip each group")) {
                 std::vector<legacy::compressT> vec;
-                vec.emplace_back(inter.to_rule(rule));
+                vec.emplace_back(inter.to_rule(drule));
                 for (const auto& group : part.groups()) {
-                    legacy::ruleT_data r = rule;
+                    legacy::ruleT_data r = drule;
                     part.flip(group, r);
                     vec.emplace_back(inter.to_rule(r));
                 }
@@ -177,9 +180,12 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                 logger::log_temp(300ms, "...");
                 // TODO: the effect is still obscure...
             }
-
-            const legacy::scanlistT scans(part, rule);
-            ImGui::Text("[1:%d] [0:%d] [x:%d]", scans.count(scans.All_1), scans.count(scans.All_0),
+        }
+        ImGui::SeparatorText("Rule details");
+        {
+            // TODO: should be foldable; should be able to set max height...
+            const legacy::scanlistT scans(part, drule);
+            ImGui::Text("Groups:%d [1:%d] [0:%d] [x:%d]", k, scans.count(scans.All_1), scans.count(scans.All_0),
                         scans.count(scans.Inconsistent));
 
             const int zoom = 7;
@@ -206,19 +212,17 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                     }
                     if (icons.button(group[0], zoom)) {
                         // TODO: document this behavior... (keyctrl->resolve conflicts)
+                        legacy::ruleT_data r = drule;
                         if (ImGui::GetIO().KeyCtrl) {
-                            const bool b = !rule[group[0]];
+                            const bool b = !drule[group[0]];
                             for (auto code : group) {
-                                rule[code] = b;
+                                r[code] = b;
                             }
                         } else {
-                            part.flip(group, rule);
+                            part.flip(group, r);
                         }
 
-                        recorder.take(inter.to_rule(rule));
-
-                        // TODO: TextUnformatted(strs[scans[j]]) may yield false result at this frame, but is
-                        // negligible...
+                        recorder.take(inter.to_rule(r));
                     }
                     if (inconsistent) {
                         ImGui::PopStyleColor(3);
@@ -237,7 +241,7 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& to_edit, c
                             icons.image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
                             ImGui::SameLine();
                             ImGui::AlignTextToFramePadding();
-                            ImGui::TextUnformatted(rule[code] ? ":1" : ":0");
+                            ImGui::TextUnformatted(drule[code] ? ":1" : ":0");
                         }
                         ImGui::EndTooltip();
                     }
