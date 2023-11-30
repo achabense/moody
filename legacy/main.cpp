@@ -86,16 +86,28 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& target, co
         };
         const auto set_inter = [&target] {
             int itag = inter.tag;
+            const auto tooltip = [](interT::tagE tag, const char* msg = "View from:") {
+                if (ImGui::BeginItemTooltip()) {
+                    imgui_str(msg);
+                    ImGui::PushTextWrapPos(250); // TODO: how to decide wrap pos properly?
+                    imgui_str(to_MAP_str(inter.get_viewer(tag)));
+                    ImGui::PopTextWrapPos();
+                    ImGui::EndTooltip();
+                }
+            };
 
             // TODO: better name (e.g. might be better named "direct")
             ImGui::AlignTextToFramePadding();
             ImGui::TextUnformatted("View"); // TODO: rename vars...
             ImGui::SameLine();
             ImGui::RadioButton("Val", &itag, inter.Value);
+            tooltip(inter.Value);
             ImGui::SameLine();
             ImGui::RadioButton("Flp", &itag, inter.Flip);
+            tooltip(inter.Flip);
             ImGui::SameLine();
             ImGui::RadioButton("Dif", &itag, inter.Diff);
+            tooltip(inter.Diff);
 
             inter.tag = interT::tagE{itag};
             if (inter.tag == inter.Diff) {
@@ -103,14 +115,14 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& target, co
                 if (ImGui::Button("Take current")) {
                     inter.custom = target;
                 }
-                imgui_strwrapped(to_MAP_str(inter.custom));
+                tooltip(inter.Diff);
             }
         };
 
         display_target();
         ImGui::SeparatorText("Settings");
         set_base_extr();
-        ImGui::Separator();
+        ImGui::SeparatorText("Rule details");
         set_inter();
 
         // TODO: rename...
@@ -147,8 +159,8 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& target, co
                 recorder.take(inter.to_rule(part.dispatch_from(grule)));
             }
         }
-        ImGui::Separator();
-        {
+        // TODO: redesign...
+        if (false && ImGui::TreeNode("Misc")) {
             // TODO: should be redesigned...
 
             // TODO: incorrect place...
@@ -180,13 +192,18 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& target, co
                 logger::log_temp(300ms, "...");
                 // TODO: the effect is still obscure...
             }
+            ImGui::TreePop();
         }
-        ImGui::SeparatorText("Rule details");
         {
+            static const char* const strss[3][3]{{"-0", "-1", "-x"}, //
+                                                 {"-.", "-f", "-x"},
+                                                 {"-.", "-d", "-x"}};
+            const auto strs = strss[inter.tag];
+
             // TODO: should be foldable; should be able to set max height...
             const legacy::scanlistT scans(part, drule);
-            ImGui::Text("Groups:%d [1:%d] [0:%d] [x:%d]", k, scans.count(scans.All_1), scans.count(scans.All_0),
-                        scans.count(scans.Inconsistent));
+            ImGui::Text("Groups:%d [%s:%d] [%s:%d] [%s:%d]", k, strs[0], scans.count(scans.All_0), strs[1],
+                        scans.count(scans.All_1), strs[2], scans.count(scans.Inconsistent));
 
             const int zoom = 7;
             const int perline = 8;
@@ -241,15 +258,14 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& target, co
                             icons.image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
                             ImGui::SameLine();
                             ImGui::AlignTextToFramePadding();
-                            ImGui::TextUnformatted(drule[code] ? ":1" : ":0");
+                            ImGui::TextUnformatted(strs[drule[code]]);
                         }
                         ImGui::EndTooltip();
                     }
 
                     ImGui::SameLine();
                     ImGui::AlignTextToFramePadding();
-                    static const char* const strs[]{":x", ":0", ":1"};
-                    ImGui::TextUnformatted(strs[scans[j]]); // TODO: is ":x" useless?
+                    ImGui::TextUnformatted(strs[scans[j]]);
                 }
                 ImGui::PopStyleVar(2);
             }
@@ -445,6 +461,7 @@ struct runner_ctrl {
 };
 
 int main(int argc, char** argv) {
+    // TODO: static object? contextT?
     const auto cleanup = app_backend::init();
 
     // Program logic:

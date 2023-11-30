@@ -15,7 +15,7 @@ namespace legacy {
         tagE tag = Value;
         ruleT custom{};
 
-        const ruleT& get_base() const {
+        const ruleT& get_viewer(tagE tag) const {
             static constexpr ruleT zero{};
             static constexpr ruleT identity = mkrule(decode_s);
 
@@ -33,7 +33,7 @@ namespace legacy {
 
         // both methods are actually XOR...
         ruleT_data from_rule(const ruleT& rule) const {
-            const ruleT& base = get_base();
+            const ruleT& base = get_viewer(tag);
             ruleT_data diff{};
             for (codeT code : codeT{}) {
                 diff[code] = rule(code) == base(code) ? 0 : 1;
@@ -42,7 +42,7 @@ namespace legacy {
         }
 
         ruleT to_rule(const ruleT_data& diff) const {
-            const ruleT& base = get_base();
+            const ruleT& base = get_viewer(tag);
             ruleT rule{};
             for (codeT code : codeT{}) {
                 rule.map[code] = diff[code] ? !base(code) : base(code);
@@ -275,13 +275,14 @@ namespace legacy {
         static const partitionT& get_spatial() { return getp(Spatial, extrspecE::None_); }
     };
 
+    // TODO: share with modelT?
     class scanlistT {
     public:
         // TODO: better names.
         enum scanE : int {
-            Inconsistent,
             All_0, // TODO: A0, A1?
             All_1,
+            Inconsistent
         };
 
     private:
@@ -291,15 +292,14 @@ namespace legacy {
 
     public:
         static scanE scan(const partitionT::groupT& group, const ruleT_data& rule) {
-            bool first = rule[group[0]];
-            scanlistT::scanE r = first ? scanlistT::All_1 : scanlistT::All_0;
+            bool has[2]{};
             for (codeT code : group) {
-                if (rule[code] != first) {
-                    r = scanlistT::Inconsistent;
-                    break;
+                if (has[!rule[code]]) {
+                    return Inconsistent;
                 }
+                has[rule[code]] = true;
             }
-            return r;
+            return has[0] ? All_0 : All_1;
         }
 
         explicit scanlistT(const partitionT& p, const ruleT_data& rule) : m_data{}, m_k{p.k()}, m_count{} {
