@@ -15,6 +15,8 @@ namespace legacy {
         tagE tag = Value;
         ruleT custom{};
 
+        const ruleT& get_viewer() const { return get_viewer(tag); }
+
         const ruleT& get_viewer(tagE tag) const {
             static constexpr ruleT zero{};
             static constexpr ruleT identity = mkrule(decode_s);
@@ -33,7 +35,7 @@ namespace legacy {
 
         // both methods are actually XOR...
         ruleT_data from_rule(const ruleT& rule) const {
-            const ruleT& base = get_viewer(tag);
+            const ruleT& base = get_viewer();
             ruleT_data diff{};
             for (codeT code : codeT{}) {
                 diff[code] = rule(code) == base(code) ? 0 : 1;
@@ -42,7 +44,7 @@ namespace legacy {
         }
 
         ruleT to_rule(const ruleT_data& diff) const {
-            const ruleT& base = get_viewer(tag);
+            const ruleT& base = get_viewer();
             ruleT rule{};
             for (codeT code : codeT{}) {
                 rule.map[code] = diff[code] ? !base(code) : base(code);
@@ -51,12 +53,13 @@ namespace legacy {
         }
     };
 
+    using groupT = std::vector<codeT>;
+
     // TODO: using gcodeT (or other names) = int;
     // TODO: better variable names...
     class partitionT {
     public:
         using array_base = std::array<int, 512>;
-        using groupT = std::vector<codeT>;
 
     private:
         array_base m_map;
@@ -116,13 +119,6 @@ namespace legacy {
         }
 
         int k() const { return m_k; }
-
-        // TODO: refine partitionT methods...
-        static void flip(const groupT& group, ruleT_data& rule) {
-            for (codeT code : group) {
-                rule[code] = !rule[code];
-            }
-        }
 
         // TODO: the arg type is problematic.
         ruleT_data dispatch_from(const ruleT_data& grule) const {
@@ -275,15 +271,9 @@ namespace legacy {
         static const partitionT& get_spatial() { return getp(Spatial, extrspecE::None_); }
     };
 
-    // TODO: share with modelT?
     class scanlistT {
     public:
-        // TODO: better names.
-        enum scanE : int {
-            All_0, // TODO: A0, A1?
-            All_1,
-            Inconsistent
-        };
+        enum scanE : char { A0, A1, Inconsistent };
 
     private:
         std::array<scanE, 512> m_data; // TODO: vector?
@@ -291,7 +281,7 @@ namespace legacy {
         int m_count[3];
 
     public:
-        static scanE scan(const partitionT::groupT& group, const ruleT_data& rule) {
+        static scanE scan(const groupT& group, const ruleT_data& rule) {
             bool has[2]{};
             for (codeT code : group) {
                 if (has[!rule[code]]) {
@@ -299,10 +289,10 @@ namespace legacy {
                 }
                 has[rule[code]] = true;
             }
-            return has[0] ? All_0 : All_1;
+            return has[0] ? A0 : A1;
         }
 
-        explicit scanlistT(const partitionT& p, const ruleT_data& rule) : m_data{}, m_k{p.k()}, m_count{} {
+        scanlistT(const partitionT& p, const ruleT_data& rule) : m_data{}, m_k{p.k()}, m_count{} {
             for (int j = 0; j < m_k; ++j) {
                 m_data[j] = scan(p.groups()[j], rule);
                 ++m_count[m_data[j]];
@@ -316,65 +306,27 @@ namespace legacy {
         int k() const { return m_k; }
         int count(scanE s) const { return m_count[s]; }
     };
-} // namespace legacy
 
-// TODO: in development...
-namespace legacy {
-    // TODO: whether to allow flip mode?
-    struct modelT {
-        // TODO: it's easy to define an invalid state, but how to adapt with partition?
+    // TODO: rename...
+    struct partialT {
         enum stateE : char { S0, S1, Unknown };
-        std::array<stateE, 512> data;
+        std::array<stateE, 512> map;
+        void reset() { map.fill(Unknown); }
+        partialT() { reset(); }
 
-        modelT() { reset(); }
-
+        // Conflicts are not allowed
         void set(codeT code, bool b) {
-            // TODO: explain decision against invalid situ
-            if (data[code] == Unknown) {
-                data[code] = stateE{b};
-            }
+            assert(map[code] == Unknown || map[code] == b);
+            map[code] = stateE{b};
         }
 
-        void reset() { data.fill(Unknown); }
-
-        auto bind(const legacy::ruleT& rule) {
-            // TODO: is this const?
+        // TODO: sometimes need to listen to selected area...
+        auto bind(const ruleT& rule) {
             return [this, rule](codeT code) /*const*/ {
                 set(code, rule(code));
                 return rule(code);
             };
         }
     };
-
-    inline std::vector<modelT::stateE> filter(const modelT& m, const partitionT& p) {
-        std::vector<modelT::stateE> grouped(p.k(), modelT::Unknown);
-        for (codeT code : codeT{}) {
-            if (m.data[code] != modelT::Unknown) {
-                grouped[p.map(code)] = m.data[code];
-                // TODO: what if conflict?
-            }
-        }
-        return grouped;
-    }
-
-    // TODO: temporary, should be redesigned.
-    /*inline*/ ruleT make_rule(const modelT& m, const partitionT& p, int den, auto&& rand) {
-        // step 1:
-        std::vector<modelT::stateE> grouped = filter(m, p);
-
-        // step 2:
-        // TODO: doesn't make sense...
-        for (auto& s : grouped) {
-            if (s == modelT::Unknown) {
-                s = ((rand() % 100) < den) ? modelT::S1 : modelT::S0;
-            }
-        }
-
-        // step 3: dispatch...
-        ruleT rule{};
-        for (codeT code : codeT{}) {
-            rule.map[code] = grouped[p.map(code)] == modelT::S0 ? 0 : 1;
-        }
-        return rule;
-    }
+    // TODO: generate randomizer based on partialT and partitionT...
 } // namespace legacy

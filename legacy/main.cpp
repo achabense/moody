@@ -19,6 +19,20 @@ namespace legacy {
         }
         return mir;
     }
+
+    // TODO: flip is able to pass through interT (flip on group directly)...
+    void flip_inplace(const groupT& group, ruleT_data& rule) {
+        for (codeT code : group) {
+            rule[code] = !rule[code];
+        }
+    }
+
+    void set_inplace(const groupT& group, ruleT_data& rule, bool b) {
+        for (codeT code : group) {
+            rule[code] = b;
+        }
+    }
+
 } // namespace legacy
 
 // TODO: should be a class... how to decouple? ...
@@ -182,10 +196,11 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& target, co
             ImGui::SameLine();
             if (ImGui::Button("Flip each group")) {
                 std::vector<legacy::compressT> vec;
+                // TODO: actually independent of inter.
                 vec.emplace_back(inter.to_rule(drule));
                 for (const auto& group : part.groups()) {
                     legacy::ruleT_data r = drule;
-                    part.flip(group, r);
+                    legacy::flip_inplace(group, r);
                     vec.emplace_back(inter.to_rule(r));
                 }
                 recorder.replace(std::move(vec));
@@ -202,8 +217,8 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& target, co
 
             // TODO: should be foldable; should be able to set max height...
             const legacy::scanlistT scans(part, drule);
-            ImGui::Text("Groups:%d [%s:%d] [%s:%d] [%s:%d]", k, strs[0], scans.count(scans.All_0), strs[1],
-                        scans.count(scans.All_1), strs[2], scans.count(scans.Inconsistent));
+            ImGui::Text("Groups:%d [%c:%d] [%c:%d] [%c:%d]", k, strs[0][1], scans.count(scans.A0), strs[1][1],
+                        scans.count(scans.A1), strs[2][1], scans.count(scans.Inconsistent));
 
             const int zoom = 7;
             const int perline = 8;
@@ -221,51 +236,53 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& target, co
                     }
                     const bool inconsistent = scans[j] == scans.Inconsistent;
                     const auto& group = part.groups()[j];
+                    const legacy::codeT head = group[0];
 
                     if (inconsistent) {
                         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0, 0, 1));
                         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0, 0, 1));
                         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.9f, 0, 0, 1));
                     }
-                    if (icons.button(group[0], zoom)) {
-                        // TODO: document this behavior... (keyctrl->resolve conflicts)
-                        legacy::ruleT_data r = drule;
-                        if (ImGui::GetIO().KeyCtrl) {
-                            const bool b = !drule[group[0]];
-                            for (auto code : group) {
-                                r[code] = b;
-                            }
-                        } else {
-                            part.flip(group, r);
-                        }
-
-                        recorder.take(inter.to_rule(r));
-                    }
+                    const bool button = icons.button(head, zoom);
+                    const bool hover = ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip);
+                    ImGui::SameLine();
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::TextUnformatted(strs[drule[head]]);
                     if (inconsistent) {
                         ImGui::PopStyleColor(3);
                     }
 
                     static bool show_group = true;
-                    if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-                        show_group = !show_group;
-                    }
-                    if (show_group && ImGui::BeginItemTooltip()) {
-                        for (int x = 0; auto code : group) {
-                            if (x++ % perline != 0) { // TODO: sharing the same perline (not necessary)
-                                ImGui::SameLine();
-                            }
-                            // TODO: change color?
-                            icons.image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
-                            ImGui::SameLine();
-                            ImGui::AlignTextToFramePadding();
-                            ImGui::TextUnformatted(strs[drule[code]]);
+                    if (hover) {
+                        if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+                            show_group = !show_group;
                         }
-                        ImGui::EndTooltip();
+                        if (show_group && ImGui::BeginTooltip()) {
+                            for (int x = 0; auto code : group) {
+                                if (x++ % perline != 0) { // TODO: sharing the same perline (not necessary)
+                                    ImGui::SameLine();
+                                }
+                                // TODO: change color?
+                                icons.image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
+                                ImGui::SameLine();
+                                ImGui::AlignTextToFramePadding();
+                                ImGui::TextUnformatted(strs[drule[code]]);
+                            }
+                            ImGui::EndTooltip();
+                        }
                     }
-
-                    ImGui::SameLine();
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::TextUnformatted(strs[scans[j]]);
+                    if (button) {
+                        // TODO: document this behavior... (keyctrl->resolve conflicts)
+                        legacy::ruleT_data r = drule;
+                        if (ImGui::GetIO().KeyCtrl) {
+                            const bool b = !drule[group[0]];
+                            legacy::set_inplace(group, r, b);
+                        } else {
+                            // TODO: actually independent of inter.
+                            legacy::flip_inplace(group, r);
+                        }
+                        recorder.take(inter.to_rule(r));
+                    }
                 }
                 ImGui::PopStyleVar(2);
             }
@@ -506,7 +523,7 @@ int main(int argc, char** argv) {
 
         // TODO: applying following logic; consider refining it.
         // recorder is modified during display, but will synchronize with runner's before next frame.
-        assert(rule == recorder.current());
+        assert(ctrl.rule == recorder.current());
 
         // TODO: remove this when all done...
         if (show_demo_window) {
@@ -617,24 +634,6 @@ int main(int argc, char** argv) {
                         }
                         if (imgui_keypressed(ImGuiKey_RightArrow, true)) {
                             ++region_rx;
-                        }
-                        // TODO: temporary, should be redesigned.
-                        if (imgui_keypressed(ImGuiKey_L, false)) {
-                            using namespace legacy;
-                            tileT sample({.width = region_rx, .height = region_ry});
-                            for (int y = 0; y < region_ry; ++y) {
-                                for (int x = 0; x < region_rx; ++x) {
-                                    sample.line(y)[x] = runner.tile().line(region_y + y)[int(region_x + x)];
-                                }
-                            }
-                            tileT side(sample.size());
-                            modelT m{};
-                            for (int i = 0; i < 32; i++) {
-                                sample.gather()._apply(m.bind(ctrl.rule), side);
-                                sample.swap(side);
-                            }
-                            static std::mt19937 r;
-                            recorder.take(legacy::make_rule(m, legacy::partitionT::get_spatial(), 0, r));
                         }
                         ImGui::EndTooltip();
                     }
