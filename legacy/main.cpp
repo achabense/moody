@@ -460,7 +460,7 @@ struct runner_ctrl {
     }
     void pop_pause() { pause = spaused; }
 
-    void run(rule_runner& runner, int extra = 0) const {
+    void run(torusT& runner, int extra = 0) const {
         if (runner.gen() < start_from) {
             runner.run(rule, start_from - runner.gen());
         } else {
@@ -500,7 +500,7 @@ int main(int argc, char** argv) {
     }
 
     tile_filler filler{.seed = 0, .density = 0.5};
-    rule_runner runner({.width = 320, .height = 240});
+    torusT runner({.width = 320, .height = 240});
     runner.restart(filler);
 
     runner_ctrl ctrl{

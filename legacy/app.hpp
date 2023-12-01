@@ -35,24 +35,24 @@ struct tile_filler {
     float density; // ∈ [0.0f, 1.0f]
 };
 
-// TODO: better name...
-inline int round_clip(int v, int r) {
-    assert(r > 0);
-    return ((v % r) + r) % r;
-}
-
-// TODO: better name...
 class torusT {
     legacy::tileT m_tile, m_side;
+    int m_gen;
+
+    // TODO: proper name...
+    static int round_clip(int v, int r) {
+        assert(r > 0);
+        return ((v % r) + r) % r;
+    }
 
 public:
-    explicit torusT(legacy::rectT size) : m_tile(size), m_side(size) {}
+    explicit torusT(legacy::rectT size) : m_tile(size), m_side(size), m_gen(0) {}
 
     const legacy::tileT& tile() const { return m_tile; }
+    int gen() const { return m_gen; }
 
-    // TODO: is passing by optional acceptible?
     // by value or by cref? (also in tileT)
-    void fill(tile_filler filler, std::optional<legacy::rectT> resize = {}) {
+    void restart(tile_filler filler, std::optional<legacy::rectT> resize = {}) {
         if (resize) {
             m_tile.resize(*resize);
         }
@@ -60,11 +60,17 @@ public:
         // TODO: count or density?
         std::mt19937 rand{filler.seed};
         random_fill_density(m_tile.begin(), m_tile.end(), filler.density, rand);
+
+        m_gen = 0;
     }
 
-    void run(const legacy::ruleT& rule) {
-        m_tile.gather().apply(rule, m_side);
-        m_tile.swap(m_side);
+    void run(const legacy::ruleT& rule, int count = 1) {
+        for (int c = 0; c < count; ++c) {
+            m_tile.gather().apply(rule, m_side);
+            m_tile.swap(m_side);
+
+            ++m_gen;
+        }
     }
 
     // TODO: recheck logic...
@@ -86,39 +92,8 @@ public:
         }
         m_tile.swap(m_side);
     }
-};
 
-// TODO: merge with those in main...
-class rule_runner {
-    torusT m_tile;
-    int m_gen = 0;
-
-    int init_shift_x = 0, init_shift_y = 0;
-
-public:
-    explicit rule_runner(legacy::rectT size) : m_tile(size) {}
-
-    const legacy::tileT& tile() const { return m_tile.tile(); }
-    int gen() const { return m_gen; }
-
-    void restart(tile_filler filler, std::optional<legacy::rectT> resize = {}) {
-        m_tile.fill(filler, resize);
-        m_tile.shift(init_shift_x, init_shift_y);
-        m_gen = 0;
-    }
-
-    void run(const legacy::ruleT& rule, int count) {
-        for (int i = 0; i < count; ++i) {
-            m_tile.run(rule);
-            ++m_gen;
-        }
-    }
-
-    void shift(int dx, int dy) {
-        m_tile.shift(dx, dy);
-        init_shift_x = round_clip(init_shift_x + dx, tile().width());
-        init_shift_y = round_clip(init_shift_x + dy, tile().height());
-    }
+    // TODO: replace shift with sampling function (view-only...)
 };
 
 // Never empty.
