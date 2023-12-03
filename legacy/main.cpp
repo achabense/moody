@@ -165,7 +165,7 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& target, co
             ImGui::PopStyleVar();
 
             ImGui::SameLine();
-            if (ImGui::Button("Randomize")) {
+            if (ImGui::Button("Randomize") || imgui_keypressed(ImGuiKey_Enter, false)) {
                 static std::mt19937 rand(time(0));
                 // TODO: looks bad.
                 legacy::ruleT_data grule{};

@@ -5,11 +5,30 @@
 
 #include "rule.hpp"
 
+// TODO: this header shall be redesigned... pending partition_v2...
+
+// 2023/12/3
+// I've had great difficulty reasoning about "constrained randomizer".
+// Currently, I want to write down the following interface:
+// | randomize(const interT& [inter],const partitionT& [p],int [count],const partialT& [constraint])
+// | return a rule that:
+// | viewed by [inter], there should be [count] groups in [p] flipped on, with the exception that, all
+// | for a code [c] , if [constraint].c is not unknown, then rule[c] must be of that value.
+// So, if some [c] in [constraint] is known, then the group should not be flipped. Then,
+// Fuck I cannot describe that well...
+
 namespace legacy {
+    // TODO: reconsider what can be "valid interpretation" of ruleT_data...
+
     using ruleT_data = ruleT::data_type;
 
     // TODO: explain...
-    // TODO: refine... better names; consistently use Abc naming convention?
+    // The data in `ruleT` has fixed meaning - the value `s` is mapped to.
+    // However, it is not the only natural interpretation of the data.
+    // For example, it's also meaningful to interpret the data as - whether `s` is "flipped"?
+    // ...
+
+    // TODO: is arbitrary `Diff` really well-formed?
     struct interT {
         enum tagE : int { Value, Flip, Diff };
         tagE tag = Value;
@@ -55,6 +74,8 @@ namespace legacy {
 
     using groupT = std::vector<codeT>;
 
+    // TODO: emphasis that a partitionT is supposed to hold [semantics]???
+
     // TODO: using gcodeT (or other names) = int;
     // TODO: better variable names...
     class partitionT {
@@ -91,6 +112,7 @@ namespace legacy {
             for (codeT code : codeT{}) {
                 m_groups[m_map[code]].push_back(code);
             }
+#if 0
             const bool paired = m_map[0] == m_map[16];
             const bool state = m_map[0] == m_map[511];
             if (paired || state) {
@@ -102,6 +124,7 @@ namespace legacy {
                     }
                 }
             }
+#endif
         }
 
         int map(codeT code) const {
@@ -113,9 +136,6 @@ namespace legacy {
         }
         const groupT& group_for(codeT code) const { //
             return m_groups[map(code)];
-        }
-        codeT head_for(codeT code) const { //
-            return group_for(code)[0];
         }
 
         int k() const { return m_k; }
@@ -132,7 +152,8 @@ namespace legacy {
         // TODO: bad name...
         bool matches(const ruleT_data& rule) const {
             for (codeT code : codeT{}) {
-                if (rule[code] != rule[head_for(code)]) {
+                const codeT head = group_for(code)[0];
+                if (rule[code] != rule[head]) {
                     return false;
                 }
             }
@@ -148,6 +169,41 @@ namespace legacy {
                 }
             }
             return true;
+        }
+
+        static partitionT pand(const partitionT& a, const partitionT& b) {
+            array_base p{};
+            for (codeT code : codeT{}) {
+                p[code] = a.m_map[code] | (b.m_map[code] << 10);
+            }
+            return p;
+        }
+
+        static partitionT por(const partitionT& a, const partitionT& b) {
+            array_base p{};
+            p.fill(-1);
+            auto equiv = [&](codeT code, int color, auto& equiv) -> void {
+                assert(color != -1);
+                if (p[code] != -1) {
+                    assert(p[code] == color);
+                    return;
+                }
+                p[code] = color;
+                for (codeT c : a.group_for(code)) {
+                    equiv(c, color, equiv);
+                }
+                for (codeT c : b.group_for(code)) {
+                    equiv(c, color, equiv);
+                }
+            };
+
+            int color = 0;
+            for (codeT code : codeT{}) {
+                if (p[code] == -1) {
+                    equiv(code, color++, equiv);
+                }
+            }
+            return p;
         }
 
         enum basespecE : int { //
@@ -181,7 +237,7 @@ namespace legacy {
             using mapperP = codeT (*)(codeT);
 
             constexpr auto make_partition = [](const std::vector<mapperP>& mappers) -> partitionT {
-                partitionT::array_base part;
+                array_base part;
                 part.fill(-1);
 
                 auto equiv = [&](codeT code, int color, auto& equiv) -> void {
