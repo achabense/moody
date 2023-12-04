@@ -54,6 +54,9 @@
     <ClInclude Include="app_sdl.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="rule_pp.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
