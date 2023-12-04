@@ -7,6 +7,9 @@
 #include <string>
 #include <vector>
 
+// TODO: bool might not be a good idea...
+// For example, bool is allowed to have padding bits, so memcmp may not apply...
+
 namespace legacy {
     // The environment around "s".
     struct envT {

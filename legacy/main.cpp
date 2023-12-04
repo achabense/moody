@@ -292,136 +292,128 @@ void edit_rule(const char* id_str, bool* p_open, const legacy::ruleT& target, co
 
 // TODO: refine...
 // TODO: able to create/append/open file?
-struct file_navT {
+class file_navT {
     using path = std::filesystem::path;
+    using clock = std::chrono::steady_clock;
+
+    static path _u8path(const char* str) {
+        assert(str);
+        // TODO: silence the warning. The deprecation is very stupid.
+        // TODO: start_lifetime (new(...)) as char8_t?
+        return std::filesystem::u8path(str);
+    }
 
     static path exe_path() {
         const std::unique_ptr<char[], decltype(+SDL_free)> p(SDL_GetBasePath(), SDL_free);
         assert(p); // TODO: what if this fails? what if exe path is invalid?
-                   // TODO: silence the warning. The deprecation is very stupid.
-                   // TODO: start_lifetime (new(...)) as char8_t?
-        return std::filesystem::u8path(p.get());
+        return _u8path(p.get());
     }
 
-    path pos;
-    // TODO: explain why cache `status`.
-    // TODO: cache more values?
-    struct entryT {
-        std::filesystem::directory_entry entry;
-        std::filesystem::file_status status;
-    };
-    std::vector<entryT> list;
-    std::optional<std::string> broken = std::nullopt;
-    int refresh = 20;
+    char buf_path[200]{};
+    char buf_filter[20]{};
 
-    void refr() noexcept {
-        if (!broken) {
-            if (--refresh <= 0) {
-                set_pos(std::move(pos));
-            }
+    std::vector<std::filesystem::directory_entry> dirs;
+    std::vector<std::filesystem::directory_entry> files;
+
+    clock::time_point expired = {};
+
+    void set_current(const path& p) {
+        // (Catching eagerly to avoid some flickering...)
+        try {
+            std::filesystem::current_path(p);
+            expired = {};
+        } catch (const std::exception& what) {
+            // TODO: what encoding?
+            logger::log_temp(1000ms, "Exception:\n{}", what.what());
         }
     }
-
-    void set_pos(path&& p) noexcept {
+    void refresh() {
+        // Setting outside of try-block to avoid too frequent failures...
+        // TODO: log_temp is global; can be problematic...
+        expired = std::chrono::steady_clock::now() + 3000ms;
         try {
-            if (std::filesystem::exists(p)) {
-                pos = std::filesystem::canonical(p);
-                // TODO: what if too many entries?
-                list.clear();
-                for (const auto& entry : std::filesystem::directory_iterator(pos)) {
-                    list.emplace_back(entry, entry.status());
+            dirs.clear();
+            files.clear();
+            for (const auto& entry : std::filesystem::directory_iterator(std::filesystem::current_path())) {
+                auto status = entry.status();
+                if (is_regular_file(status)) {
+                    files.emplace_back(entry);
+                }
+                if (is_directory(status)) {
+                    dirs.emplace_back(entry);
                 }
             }
         } catch (const std::exception& what) {
             // TODO: what encoding?
-            broken = what.what();
-            return;
+            logger::log_temp(1000ms, "Exception:\n{}", what.what());
         }
-        broken.reset();
-        refresh = 20;
     }
 
-    file_navT(path p = exe_path()) { set_pos(std::move(p)); }
+public:
+    [[nodiscard]] std::optional<path> window(const char* id_str, bool* p_open) {
+        auto window = imgui_window(id_str, p_open);
+        if (!window) {
+            return std::nullopt;
+        }
 
-    [[nodiscard]] std::optional<path> show(const char* suff = nullptr) {
         using namespace std;
         using namespace std::filesystem;
-
         optional<path> selfile = nullopt;
 
-        try {
-            // TODO: enhance filter...
-            // TODO: add text input.
-            // TODO: undo operation...
-            // TODO: cooldown for file...
-            ImGui::TextUnformatted(cpp17_u8string(pos).c_str());
-            ImGui::Separator();
+        imgui_str(cpp17_u8string(current_path()));
+        // TODO: ugly...
+        if (ImGui::InputText("Path", buf_path, std::size(buf_path), ImGuiInputTextFlags_EnterReturnsTrue)) {
+            set_current(_u8path(buf_path));
+            buf_path[0] = '\0';
+        }
+
+        if (clock::now() > expired) {
+            refresh();
+        }
+
+        // TODO: layout is ugly...
+        if (auto child = imgui_childwindow("Folders", ImVec2(200, 0), true)) {
             if (ImGui::MenuItem("-> Exe path")) {
-                set_pos(exe_path());
+                set_current(exe_path());
             }
-            if (ImGui::MenuItem("-> Cur path")) {
-                set_pos(current_path());
-            }
-            // TODO: the correctness is doubtful here...
-            if (path par = pos.parent_path(); ImGui::MenuItem("-> ..", nullptr, nullptr, par != pos)) {
-                set_pos(std::move(par));
+            if (ImGui::MenuItem("-> ..")) {
+                set_current("..");
             }
             ImGui::Separator();
 
-            if (auto child = imgui_childwindow("Child")) {
-                if (broken) {
-                    // TODO: what's the encoding of exception.what()?
-                    // TODO: wrapped&&disabled...
-                    imgui_strdisabled(broken->c_str());
-                } else {
-                    refr();
+            if (dirs.empty()) {
+                imgui_strdisabled("None");
+            }
+            for (const auto& entry : dirs) {
+                // TODO: cache str?
+                const auto str = cpp17_u8string(entry.path().filename());
+                if (ImGui::Selectable(str.c_str())) {
+                    // Won't affect the loop at this frame.
+                    set_current(entry.path());
+                }
+            }
+        }
+        ImGui::SameLine();
+        if (auto child = imgui_childwindow("Files", ImVec2(0, 0), true)) {
+            ImGui::InputText("Filter", buf_filter, std::size(buf_filter));
+            ImGui::Separator();
 
-                    int entries = 0;
-                    optional<path> selfolder = nullopt;
-                    for (const auto& [entry, status] : list) {
-                        // TODO: how to compare file extension without creating a real string?
-                        // TODO: why does string() return non-utf8?
-                        const auto str = cpp17_u8string(entry.path().filename());
-
-                        if (is_regular_file(status)) {
-                            if (!suff || str.ends_with(suff)) {
-                                ++entries;
-                                // TODO: want double click; how?
-                                // TODO: selected...
-                                if (ImGui::Selectable(str.c_str())) {
-                                    selfile = entry.path();
-                                }
-                            }
-                        } else if (is_directory(status)) {
-                            ++entries;
-                            if (ImGui::MenuItem(str.c_str(), "dir")) {
-                                selfolder = entry.path();
-                                // Not breaking eagerly to avoid flicking...
-                            }
-                        }
-                    }
-                    if (!entries) {
-                        // TODO: better msg...
-                        imgui_strdisabled("None");
-                    }
-                    if (selfolder) {
-                        set_pos(std::move(*selfolder));
+            if (files.empty()) {
+                imgui_strdisabled("None");
+            }
+            for (const auto& entry : files) {
+                const auto str = cpp17_u8string(entry.path().filename());
+                if (str.find(buf_filter) != str.npos) {
+                    // TODO: want double click?
+                    if (ImGui::Selectable(str.c_str())) {
+                        selfile = entry.path();
                     }
                 }
             }
-        } catch (const exception& what) {
-            // TODO: what encoding?
-            broken = what.what();
+            ImGui::TreePop();
         }
 
         return selfile;
-    }
-
-    [[nodiscard]] std::optional<path> window(const char* id_str, bool* p_open, const char* suff = nullptr) {
-        if (auto window = imgui_window(id_str, p_open)) {
-            return show(suff);
-        }
-        return std::nullopt;
     }
 };
 
@@ -510,7 +502,16 @@ int main(int argc, char** argv) {
     bool show_demo_window = false; // TODO: remove this in the future...
     bool show_log_window = false;  // TODO: less useful than thought...
     bool show_nav_window = true;
-    file_navT nav(R"(C:\*redacted*\Desktop\rulelists_new)");
+
+    // Avoid "imgui.ini" (and maybe also "imgui_log.txt") sprinking everywhere.
+    // TODO: maybe setting to SDL_GetBasePath / ...
+    const auto cur = std::filesystem::current_path();
+    const auto ini = cpp17_u8string(cur / "imgui.ini");
+    const auto log = cpp17_u8string(cur / "imgui_log.txt");
+    ImGui::GetIO().IniFilename = ini.c_str();
+    ImGui::GetIO().LogFilename = log.c_str();
+    std::filesystem::current_path(R"(C:\*redacted*\Desktop\rulelists_new)");
+    file_navT nav;
 
     // Main loop
     tile_image img(runner.tile());
@@ -538,7 +539,7 @@ int main(int argc, char** argv) {
             edit_rule("Rule editor", &show_rule_editor, ctrl.rule, icons, recorder);
         }
         if (show_nav_window) {
-            if (auto sel = nav.window("File Nav", &show_nav_window, ".txt")) {
+            if (auto sel = nav.window("File Nav", &show_nav_window)) {
                 logger::log("Tried to open {}", cpp17_u8string(*sel));
                 auto result = read_rule_from_file(*sel);
                 if (!result.empty()) {
@@ -549,6 +550,15 @@ int main(int argc, char** argv) {
                     logger::log_temp(300ms, "found nothing");
                 }
             }
+        }
+
+        ImGui::SetNextWindowBgAlpha(0.0f);
+        if (auto window = imgui_window("TestXXX")) {
+            ImVec2 pos = ImGui::GetCursorScreenPos();
+            ImVec2 size = ImGui::GetContentRegionAvail();
+            ImGui::GetWindowDrawList()->AddRectFilled(pos, {pos.x + size.x, pos.y + size.y},
+                                                      IM_COL32(255, 0, 255, 255));
+            ImGui::Text("Pos:%f-%f\nSize:%f-%f", pos.x, pos.y, size.x, size.y);
         }
 
         // TODO: rename...
@@ -607,8 +617,10 @@ int main(int argc, char** argv) {
                         assert(ImGui::IsMousePosValid());
                         // TODO: better size ctrl
                         static int region_rx = 32, region_ry = 32;
+#if 0
                         region_rx = std::clamp(region_rx, 10, 50);
                         region_ry = std::clamp(region_ry, 10, 50); // TODO: dependent on img_size...
+#endif
                         ImGui::Text("%d*%d", region_rx, region_ry);
 
                         float region_x = std::clamp(io.MousePos.x - (pos.x + padding.x) - region_rx * 0.5f, 0.0f,
@@ -622,6 +634,8 @@ int main(int argc, char** argv) {
                         const float zoom = 4.0f; // TODO: should be settable? 5.0f?
                         ImGui::Image(img.texture(), ImVec2(region_rx * zoom, region_ry * zoom), uv0, uv1);
 
+                        // Too wasteful...
+#if 0
                         // TODO: some keyctrls can be supported when dragging...
                         if (imgui_keypressed(ImGuiKey_UpArrow, true)) {
                             --region_ry;
@@ -635,6 +649,7 @@ int main(int argc, char** argv) {
                         if (imgui_keypressed(ImGuiKey_RightArrow, true)) {
                             ++region_rx;
                         }
+#endif
                         ImGui::EndTooltip();
                     }
                 }

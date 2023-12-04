@@ -249,8 +249,9 @@ struct [[nodiscard]] imgui_childwindow {
     imgui_childwindow& operator=(const imgui_childwindow&) = delete;
 
     const bool visible;
-    explicit imgui_childwindow(const char* name, const ImVec2& size = {}, ImGuiWindowFlags flags = {})
-        : visible(ImGui::BeginChild(name, size, false, flags)) {}
+    explicit imgui_childwindow(const char* name, const ImVec2& size = {}, ImGuiChildFlags child_flags = {},
+                               ImGuiWindowFlags window_flags = {})
+        : visible(ImGui::BeginChild(name, size, child_flags, window_flags)) {}
     ~imgui_childwindow() {
         ImGui::EndChild(); // Unconditional.
     }
