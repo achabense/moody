@@ -686,6 +686,7 @@ int main(int argc, char** argv) {
             }
         }
 
+        // TODO: it's not wise to separate ctrl into different windows...
         int extra = 0;
         if (auto window = imgui_window("Tile##Ctrl", ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize)) {
             // TODO: uint32_t...

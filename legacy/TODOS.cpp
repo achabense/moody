@@ -23,3 +23,11 @@
 // Refine logs
 // Improve layout
 // Support tile clipping?
+
+// TODO:
+// The program shall fulfill as much as features mentioned in:
+// https://conwaylife.com/wiki/Static_symmetry
+// https://conwaylife.com/wiki/Neighbourhood
+// https://conwaylife.com/wiki/Black/white_reversal
+// https://conwaylife.com/wiki/Self-complementary
+// https://golly.sourceforge.io/Help/Algorithms/QuickLife.html

@@ -81,4 +81,44 @@ namespace legacy {
         }
     };
 
+    // TODO: concept-based partitions...
+    // Every well-defined concept should be supported by a class...
+    // Such a class should be able to check and generate rules...
+
+    // TODO: what does it mean when saying a rule is independent of certain neighbors?
+    wpartitionT dependent_on(bool q, bool w, bool e, bool a, bool s, bool d, bool z, bool x, bool c) {
+        const codeT mask = encode(q, w, e, a, s, d, z, x, c);
+        vpartitionT p{};
+        for (codeT code : codeT{}) {
+            p[code] = code & mask;
+        }
+        return p;
+    }
+
+    // ud, lr, m, s... iso...
+
+    // state...
+    // when viewed in flip mode...
+    wpartitionT statep() {
+        vpartitionT p{};
+        for (codeT code : codeT{}) {
+            if (decode_s(code)) {
+                p[code] = code;
+            } else {
+                p[code] = flip_all(code);
+            }
+        }
+        return p;
+    }
+
+    // TODO: and ... a partialT can be regarded as a constraint...
+    // Detect whether a rule meets certain constraints.
+    // A way to generate all the rules that can meet certain constraints.
+
+    // ... in this stance a partition is not more special than a partialT?
+
+    // TODO: how to correctly understand interT? is it even well-defined?
+    // It's for sure that, an interT poses no constraint.
+
+    // How to decide whether different constraints can coexit?
 } // namespace legacy

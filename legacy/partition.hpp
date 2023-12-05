@@ -291,7 +291,32 @@ namespace legacy {
             // a s d
             // z x c
             constexpr mapperP perm_specific = MAPTO(w, q, e, a, s, d, z, x, c);
+            // edc qwe
+            // wsx asd
+            // qaz zxc
+            constexpr mapperP rotate_sq =
+                MAPTO(e, d, c, w, s, x, q, a,
+                      z); // Only this is what rect space can have... rotate_45 is really not about symmetry.
+            // qed
+            // wsx
+            // azc skip q,c.
+            constexpr mapperP rotate_6 = MAPTO(q, e, d, w, s, x, a, z, c);
 #undef MAPTO
+
+            constexpr auto make_partition_mask = [](bool q, bool w, bool e, bool a, bool s, bool d, bool z, bool x,
+                                                    bool c) -> partitionT {
+                codeT mask = encode(q, w, e, a, s, d, z, x, c);
+                partitionT::array_base p{};
+                for (codeT code : codeT{}) {
+                    p[code] = code & mask;
+                }
+                return p;
+            };
+
+            static partitionT msk = make_partition_mask(0, 1, 1, 1, 1, 1, 1, 1, 0);
+            static partitionT r6 = make_partition({rotate_6});
+            static partitionT res = partitionT::por(msk, r6); // rename to lcm?
+            return res;
 
             static const std::initializer_list<mapperP> args[basespecE_size]{
                 {},                                                     // none
