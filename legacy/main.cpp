@@ -3,6 +3,12 @@
 #include "app.hpp"
 #include "rule_traits.hpp"
 
+void debug_putavail() {
+    ImVec2 pos = ImGui::GetCursorScreenPos();
+    ImVec2 size = ImGui::GetContentRegionAvail();
+    ImGui::GetWindowDrawList()->AddRectFilled(pos, {pos.x + size.x, pos.y + size.y}, IM_COL32(255, 0, 255, 255));
+}
+
 namespace legacy {
     // TODO: proper name...
     // TODO: not using mkrule; tends to be very obscure...
@@ -310,7 +316,7 @@ class file_navT {
     }
 
     char buf_path[200]{};
-    char buf_filter[20]{};
+    char buf_filter[20]{".txt"};
 
     std::vector<std::filesystem::directory_entry> dirs;
     std::vector<std::filesystem::directory_entry> files;
@@ -334,8 +340,9 @@ class file_navT {
         try {
             dirs.clear();
             files.clear();
-            for (const auto& entry : std::filesystem::directory_iterator(std::filesystem::current_path())) {
-                auto status = entry.status();
+            for (const auto& entry : std::filesystem::directory_iterator(
+                     std::filesystem::current_path(), std::filesystem::directory_options::skip_permission_denied)) {
+                const auto status = entry.status();
                 if (is_regular_file(status)) {
                     files.emplace_back(entry);
                 }
@@ -358,59 +365,71 @@ public:
 
         using namespace std;
         using namespace std::filesystem;
-        optional<path> selfile = nullopt;
+        optional<path> target = nullopt;
 
-        imgui_str(cpp17_u8string(current_path()));
-        if (clock::now() > expired) {
-            refresh();
-        }
-        if (auto child = imgui_childwindow("Folders", {}, true | ImGuiChildFlags_ResizeX)) {
-            if (ImGui::InputText("Path", buf_path, std::size(buf_path), ImGuiInputTextFlags_EnterReturnsTrue)) {
-                set_current(_u8path(buf_path));
-                buf_path[0] = '\0';
+        imgui_strwrapped(cpp17_u8string(current_path()));
+        ImGui::Separator();
+
+        if (ImGui::BeginTable("##Table", 2, ImGuiTableFlags_Resizable)) {
+            if (clock::now() > expired) {
+                refresh();
             }
-            if (ImGui::MenuItem("-> Exe path")) {
-                set_current(exe_path());
-            }
-            if (ImGui::MenuItem("-> ..")) {
-                set_current("..");
-            }
-            ImGui::Separator();
-            if (auto child = imgui_childwindow("Folders")) {
-                if (dirs.empty()) {
-                    imgui_strdisabled("None");
+
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            {
+                if (ImGui::InputText("Path", buf_path, std::size(buf_path), ImGuiInputTextFlags_EnterReturnsTrue)) {
+                    set_current(_u8path(buf_path));
+                    buf_path[0] = '\0';
                 }
-                for (const auto& entry : dirs) {
-                    // TODO: cache str?
-                    const auto str = cpp17_u8string(entry.path().filename());
-                    if (ImGui::Selectable(str.c_str())) {
-                        // Won't affect the loop at this frame.
-                        set_current(entry.path());
+                if (ImGui::MenuItem("-> Exe path")) {
+                    set_current(exe_path());
+                }
+                if (ImGui::MenuItem("-> ..")) {
+                    set_current("..");
+                }
+                ImGui::Separator();
+                if (auto child = imgui_childwindow("Folders")) {
+                    if (dirs.empty()) {
+                        imgui_strdisabled("None");
                     }
-                }
-            }
-        }
-        ImGui::SameLine();
-        if (auto child = imgui_childwindow("Files", ImVec2(0, 0), true)) {
-            ImGui::InputText("Filter", buf_filter, std::size(buf_filter));
-            ImGui::Separator();
-            if (auto child = imgui_childwindow("Files")) {
-                if (files.empty()) {
-                    imgui_strdisabled("None");
-                }
-                for (const auto& entry : files) {
-                    const auto str = cpp17_u8string(entry.path().filename());
-                    if (str.find(buf_filter) != str.npos) {
-                        // TODO: want double click?
+                    for (const auto& entry : dirs) {
+                        // TODO: cache str?
+                        const auto str = cpp17_u8string(entry.path().filename());
                         if (ImGui::Selectable(str.c_str())) {
-                            selfile = entry.path();
+                            // Won't affect the loop at this frame.
+                            set_current(entry.path());
                         }
                     }
                 }
             }
+            ImGui::TableNextColumn();
+            {
+                ImGui::InputText("Filter", buf_filter, std::size(buf_filter));
+                ImGui::Separator();
+                if (auto child = imgui_childwindow("Files")) {
+                    if (ImGui::GetIO().KeyCtrl) {
+                        debug_putavail();
+                    }
+                    bool has = false;
+                    for (const auto& entry : files) {
+                        const auto str = cpp17_u8string(entry.path().filename());
+                        if (str.find(buf_filter) != str.npos) {
+                            has = true;
+                            if (ImGui::Selectable(str.c_str())) {
+                                target = entry.path();
+                            }
+                        }
+                    }
+                    if (!has) {
+                        imgui_strdisabled("None");
+                    }
+                }
+            }
+            ImGui::EndTable();
         }
 
-        return selfile;
+        return target;
     }
 };
 
@@ -585,11 +604,7 @@ int main(int argc, char** argv) {
 
         ImGui::SetNextWindowBgAlpha(0.0f);
         if (auto window = imgui_window("TestXXX")) {
-            ImVec2 pos = ImGui::GetCursorScreenPos();
-            ImVec2 size = ImGui::GetContentRegionAvail();
-            ImGui::GetWindowDrawList()->AddRectFilled(pos, {pos.x + size.x, pos.y + size.y},
-                                                      IM_COL32(255, 0, 255, 255));
-            ImGui::Text("Pos:%f-%f\nSize:%f-%f", pos.x, pos.y, size.x, size.y);
+            debug_putavail();
         }
 
         // TODO: rename...
