@@ -361,18 +361,14 @@ public:
         optional<path> selfile = nullopt;
 
         imgui_str(cpp17_u8string(current_path()));
-        // TODO: ugly...
-        if (ImGui::InputText("Path", buf_path, std::size(buf_path), ImGuiInputTextFlags_EnterReturnsTrue)) {
-            set_current(_u8path(buf_path));
-            buf_path[0] = '\0';
-        }
-
         if (clock::now() > expired) {
             refresh();
         }
-
-        // TODO: layout is ugly...
-        if (auto child = imgui_childwindow("Folders", ImVec2(200, 0), true)) {
+        if (auto child = imgui_childwindow("Folders", {}, true | ImGuiChildFlags_ResizeX)) {
+            if (ImGui::InputText("Path", buf_path, std::size(buf_path), ImGuiInputTextFlags_EnterReturnsTrue)) {
+                set_current(_u8path(buf_path));
+                buf_path[0] = '\0';
+            }
             if (ImGui::MenuItem("-> Exe path")) {
                 set_current(exe_path());
             }
@@ -380,16 +376,17 @@ public:
                 set_current("..");
             }
             ImGui::Separator();
-
-            if (dirs.empty()) {
-                imgui_strdisabled("None");
-            }
-            for (const auto& entry : dirs) {
-                // TODO: cache str?
-                const auto str = cpp17_u8string(entry.path().filename());
-                if (ImGui::Selectable(str.c_str())) {
-                    // Won't affect the loop at this frame.
-                    set_current(entry.path());
+            if (auto child = imgui_childwindow("Folders")) {
+                if (dirs.empty()) {
+                    imgui_strdisabled("None");
+                }
+                for (const auto& entry : dirs) {
+                    // TODO: cache str?
+                    const auto str = cpp17_u8string(entry.path().filename());
+                    if (ImGui::Selectable(str.c_str())) {
+                        // Won't affect the loop at this frame.
+                        set_current(entry.path());
+                    }
                 }
             }
         }
@@ -397,20 +394,20 @@ public:
         if (auto child = imgui_childwindow("Files", ImVec2(0, 0), true)) {
             ImGui::InputText("Filter", buf_filter, std::size(buf_filter));
             ImGui::Separator();
-
-            if (files.empty()) {
-                imgui_strdisabled("None");
-            }
-            for (const auto& entry : files) {
-                const auto str = cpp17_u8string(entry.path().filename());
-                if (str.find(buf_filter) != str.npos) {
-                    // TODO: want double click?
-                    if (ImGui::Selectable(str.c_str())) {
-                        selfile = entry.path();
+            if (auto child = imgui_childwindow("Files")) {
+                if (files.empty()) {
+                    imgui_strdisabled("None");
+                }
+                for (const auto& entry : files) {
+                    const auto str = cpp17_u8string(entry.path().filename());
+                    if (str.find(buf_filter) != str.npos) {
+                        // TODO: want double click?
+                        if (ImGui::Selectable(str.c_str())) {
+                            selfile = entry.path();
+                        }
                     }
                 }
             }
-            ImGui::TreePop();
         }
 
         return selfile;
@@ -469,9 +466,48 @@ struct runner_ctrl {
     }
 };
 
+// What should a screen-window do:
+
+#if 0
+namespace legacy {
+    // spaceT:
+    // clear(bool). bool:value.
+    // randomize(?,rand_arg).
+    // copy(pos,size).
+    // paste(tileT,pos).
+    // updated().
+
+} // namespace legacy
+
+struct spaceT;
+
+// Foreground for ...
+// Directly dependent on imgui...
+struct canvasT {
+    spaceT* space;
+
+    void size() {}
+    void show() {
+        // TODO: imdrawlist...
+    
+    }
+};
+#endif
+
 int main(int argc, char** argv) {
+    // As found in debug mode, these variables shall outlive the scope_guard to avoid UB... (c_str got invalidated...)
+    // (otherwise the program made mojibake-named ini file at rulelists_new on exit...)
+    // Avoid "imgui.ini" (and maybe also "imgui_log.txt") sprinking everywhere.
+    // TODO: maybe setting to SDL_GetBasePath / ...
+    const auto cur = std::filesystem::current_path();
+    const auto ini = cpp17_u8string(cur / "imgui.ini");
+    const auto log = cpp17_u8string(cur / "imgui_log.txt");
+
     // TODO: static object? contextT?
     const auto cleanup = app_backend::init();
+    ImGui::GetIO().IniFilename = ini.c_str();
+    ImGui::GetIO().LogFilename = log.c_str();
+    std::filesystem::current_path(R"(C:\*redacted*\Desktop\rulelists_new)");
 
     // Program logic:
     // ImGuiIO& io = ImGui::GetIO();
@@ -506,15 +542,6 @@ int main(int argc, char** argv) {
     bool show_demo_window = false; // TODO: remove this in the future...
     bool show_log_window = false;  // TODO: less useful than thought...
     bool show_nav_window = true;
-
-    // Avoid "imgui.ini" (and maybe also "imgui_log.txt") sprinking everywhere.
-    // TODO: maybe setting to SDL_GetBasePath / ...
-    const auto cur = std::filesystem::current_path();
-    const auto ini = cpp17_u8string(cur / "imgui.ini");
-    const auto log = cpp17_u8string(cur / "imgui_log.txt");
-    ImGui::GetIO().IniFilename = ini.c_str();
-    ImGui::GetIO().LogFilename = log.c_str();
-    std::filesystem::current_path(R"(C:\*redacted*\Desktop\rulelists_new)");
     file_navT nav;
 
     // Main loop
