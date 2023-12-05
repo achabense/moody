@@ -12,6 +12,7 @@
 
 namespace legacy {
     // The environment around "s".
+    // TODO: how widespread is `qwerty` keyboard? without it this notation will pose no benefit...
     struct envT {
         bool q, w, e;
         bool a, s, d;
@@ -102,44 +103,6 @@ namespace legacy {
         return rule;
     }
 
-#if 0
-    // TODO: whether to support BS format in app?
-    inline ruleT mkrule1(const bool (&B)[9], const bool (&S)[9]) {
-        return mkrule([&](codeT code) -> bool {
-            auto [q, w, e, a, s, d, z, x, c] = decode(code);
-            int count = q + w + e + a + d + z + x + c;
-            if (!B[count] && !S[count]) {
-                return 0;
-            } else if (!B[count] && S[count]) {
-                return s;
-            } else if (B[count] && !S[count]) {
-                return !s;
-            } else {
-                return 1;
-            }
-        });
-    }
-
-    inline ruleT mkrule2(const vector<int>& Bs, const vector<int>& Ss) {
-        bool B[9]{}, S[9]{};
-        for (auto b : Bs) {
-            if (b >= 0 && b <= 8) {
-                B[b] = true;
-            }
-        }
-        for (auto s : Ss) {
-            if (s >= 0 && s <= 8) {
-
-                S[s] = true;
-            }
-        }
-        return mkrule1(B, S);
-    }
-
-    inline ruleT game_of_life2() {
-        return mkrule2({3}, {2, 3});
-    }
-#else
     // "Convay's Game of Life" rule.
     inline ruleT game_of_life() {
         // b3 s23
@@ -157,7 +120,6 @@ namespace legacy {
         }
         return rule;
     }
-#endif
 
     class compressT {
         std::array<uint8_t, 64> bits; // as bitset.

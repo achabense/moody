@@ -171,6 +171,8 @@ namespace legacy {
             return true;
         }
 
+        // TODO: technically not needing regulation, as long as e.g. int~i32 and use i64 map for bit concatenation...
+        // (And this is not actually needed in the app...)
         static partitionT pand(const partitionT& a, const partitionT& b) {
             array_base p{};
             for (codeT code : codeT{}) {
@@ -179,7 +181,9 @@ namespace legacy {
             return p;
         }
 
-        static partitionT por(const partitionT& a, const partitionT& b) {
+        // TODO: more formal name?
+        // TODO: time-complexity? (<=512*512, so not important...)
+        static partitionT lcm(const partitionT& a, const partitionT& b) {
             array_base p{};
             p.fill(-1);
             auto equiv = [&](codeT code, int color, auto& equiv) -> void {
@@ -291,6 +295,9 @@ namespace legacy {
             // a s d
             // z x c
             constexpr mapperP perm_specific = MAPTO(w, q, e, a, s, d, z, x, c);
+#if 1
+            // 1. I misunderstood "rotate" symmetry. "ro45" is never about symmetry (I've no idea what it is)
+            // 2. As seemingly-senseless partition like ro45 can make non-trivial patterns, should support after all...
             // edc qwe
             // wsx asd
             // qaz zxc
@@ -301,8 +308,10 @@ namespace legacy {
             // wsx
             // azc skip q,c.
             constexpr mapperP rotate_6 = MAPTO(q, e, d, w, s, x, a, z, c);
+            // constexpr mapperP perm_6 = MAPTO(q, e, w, a, s, d, z, x, c);
+#endif
 #undef MAPTO
-
+#if 1
             constexpr auto make_partition_mask = [](bool q, bool w, bool e, bool a, bool s, bool d, bool z, bool x,
                                                     bool c) -> partitionT {
                 codeT mask = encode(q, w, e, a, s, d, z, x, c);
@@ -315,9 +324,9 @@ namespace legacy {
 
             static partitionT msk = make_partition_mask(0, 1, 1, 1, 1, 1, 1, 1, 0);
             static partitionT r6 = make_partition({rotate_6});
-            static partitionT res = partitionT::por(msk, r6); // rename to lcm?
+            static partitionT res = lcm(msk, r6);
             return res;
-
+#endif
             static const std::initializer_list<mapperP> args[basespecE_size]{
                 {},                                                     // none
                 {upside_down, leftside_right},                          // orthogonal

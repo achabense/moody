@@ -489,10 +489,14 @@ int main(int argc, char** argv) {
     // TODO: what encoding?
     if (argc == 2) {
         recorder.replace(read_rule_from_file(argv[1]));
+        // TODO: what if the path is invalid?
     }
 
     tile_filler filler{.seed = 0, .density = 0.5};
-    torusT runner({.width = 320, .height = 240});
+    // TODO: the canvas shall not be too small...
+    // TODO: should support in-screen zooming... (instead of relying on a window...)
+    // TODO: should support basic-level pattern copy/pasting...
+    torusT runner({.width = 320 * 2, .height = 240 * 2});
     runner.restart(filler);
 
     runner_ctrl ctrl{
@@ -736,6 +740,7 @@ int main(int argc, char** argv) {
 
             ImGui::SliderInt("Pergen [1-20]", &ctrl.pergen, ctrl.pergen_min, ctrl.pergen_max, "%d",
                              ImGuiSliderFlags_NoInput);
+            // TODO: Gap-frame shall be really timer-based...
             ImGui::SliderInt("Gap Frame [0-20]", &ctrl.gap_frame, ctrl.gap_min, ctrl.gap_max, "%d",
                              ImGuiSliderFlags_NoInput);
             ImGui::SliderInt("Start gen [0-1000]", &ctrl.start_from, ctrl.start_min, ctrl.start_max, "%d",
