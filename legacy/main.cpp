@@ -1,4 +1,6 @@
-﻿#include "app_sdl.hpp"
+﻿
+#define IMGUI_DEFINE_MATH_OPERATORS
+#include "app_sdl.hpp"
 
 #include "app.hpp"
 #include "rule_traits.hpp"
@@ -557,7 +559,7 @@ int main(int argc, char** argv) {
 
     bool show_demo_window = false; // TODO: remove this in the future...
     bool show_log_window = false;  // TODO: less useful than thought...
-    bool show_nav_window = false;
+    bool show_nav_window = true;
     file_navT nav;
 
     // Main loop
@@ -588,115 +590,95 @@ int main(int argc, char** argv) {
         }
 
         const auto show_tile = [&] {
-            ImGui::Text("Gen:%d", runner.gen());
-            ImGui::Text("Width:%d,Height:%d,Density:%f", runner.tile().width(), runner.tile().height(),
-                        float(runner.tile().count()) / runner.tile().area());
             {
-                const ImVec2 pos = ImGui::GetCursorScreenPos();
-                const ImVec2 img_size = ImVec2(img.width(), img.height()); // TODO: support zooming?
-
-                const ImVec2 padding(2, 2);
-                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, padding);
-                // img.update(runner.tile());
-                ImGui::ImageButton("##Tile", img.texture(), img_size);
-                ImGui::PopStyleVar();
-
-                if (ImGui::IsItemActivated()) {
-                    ctrl.push_pause(true);
-                }
-                if (ImGui::IsItemDeactivated()) {
-                    ctrl.pop_pause();
-                }
+                // TODO: refine...
+                ImGui::Button("Scroll to ...");
                 if (ImGui::IsItemHovered()) {
-                    if (ImGui::IsItemActive()) {
-                        if (io.MouseDelta.x != 0 || io.MouseDelta.y != 0) {
-                            runner.shift(io.MouseDelta.x, io.MouseDelta.y);
-                        }
+                    if (io.MouseWheel < 0) { // scroll down
+                        recorder.next();
+                    } else if (io.MouseWheel > 0) { // scroll up
+                        recorder.prev();
+                    }
+                }
+                // TODO: +1 is clumsy. TODO: -> editor?
+                // TODO: pos may not reflect runner's real pos, as recorder can be modified on the way... may not
+                // matters
+                ImGui::SameLine();
+                ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1);
+
+                static char buf_pos[20]{};
+                const auto filter = [](ImGuiInputTextCallbackData* data) {
+                    return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
+                };
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(200);
+                if (ImGui::InputTextWithHint(
+                        "##Goto", "GOTO e.g. 2->enter", buf_pos, 20,
+                        ImGuiInputTextFlags_CallbackCharFilter | ImGuiInputTextFlags_EnterReturnsTrue, filter)) {
+                    int val{};
+                    if (std::from_chars(buf_pos, buf_pos + strlen(buf_pos), val).ec == std::errc{}) {
+                        recorder.set_pos(val - 1); // TODO: -1 is clumsy.
+                    }
+                    buf_pos[0] = '\0';
+
+                    // Regain focus:
+                    ImGui::SetKeyboardFocusHere(-1);
+                }
+            }
+
+            ImGui::Text("Width:%d,Height:%d,Gen:%d,Density:%f", runner.tile().width(), runner.tile().height(),
+                        runner.gen(), float(runner.tile().count()) / runner.tile().area());
+
+            ImVec2 pos = ImGui::GetCursorScreenPos();
+            ImVec2 size = ImGui::GetContentRegionAvail();
+            ImDrawList& drawlist = *ImGui::GetWindowDrawList();
+
+            drawlist.PushClipRect(pos, pos + size);
+            drawlist.AddRectFilled(pos, pos + size, IM_COL32(20, 20, 20, 255));
+            static float zoom = 1;
+            static ImVec2 off = {0, 0}; // TODO: should off be cell-idx, or real pixel offset (now)?
+            ImVec2 img_pos = pos + off;
+            ImVec2 img_posz = img_pos + ImVec2(img.width(), img.height()) * zoom;
+            img.update(runner.tile());
+            drawlist.AddImage(img.texture(), img_pos, img_posz);
+            drawlist.PopClipRect();
+
+            ImGui::InvisibleButton("Canvas", size);
+            if (ImGui::IsItemActivated()) {
+                ctrl.push_pause(true);
+            }
+            if (ImGui::IsItemDeactivated()) {
+                ctrl.pop_pause();
+            }
+            if (ImGui::IsItemHovered()) {
+                if (ImGui::IsItemActive()) {
+                    if (!io.KeyCtrl) {
+                        off += io.MouseDelta;
                     } else {
-                        if (io.MouseWheel < 0) { // scroll down
-                            recorder.next();
-                        } else if (io.MouseWheel > 0) { // scroll up
-                            recorder.prev();
+                        ImVec2 mouse = io.MousePos;
+                        if (mouse.x >= img_pos.x && mouse.x <= img_posz.x && mouse.y >= img_pos.y &&
+                            mouse.y <= img_posz.y) {
+                            // TODO: this approach is highly imprecise when zoom != 1, but does this matter?
+                            runner.shift(io.MouseDelta.x / zoom, io.MouseDelta.y / zoom);
                         }
-                        // TODO: reconsider whether/where to support next/prev actions
                     }
-                    static bool show_zoom = true; // TODO: should be here?
-                    if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-                        // TODO: how to support other operations?
-                        show_zoom = !show_zoom;
-                    }
-                    if (show_zoom && ImGui::BeginItemTooltip()) {
-                        assert(ImGui::IsMousePosValid());
-                        // TODO: better size ctrl
-                        static int region_rx = 32, region_ry = 32;
-#if 0
-                        region_rx = std::clamp(region_rx, 10, 50);
-                        region_ry = std::clamp(region_ry, 10, 50); // TODO: dependent on img_size...
-#endif
-                        ImGui::Text("%d*%d", region_rx, region_ry);
-
-                        float region_x = std::clamp(io.MousePos.x - (pos.x + padding.x) - region_rx * 0.5f, 0.0f,
-                                                    img_size.x - region_rx);
-                        float region_y = std::clamp(io.MousePos.y - (pos.y + padding.y) - region_ry * 0.5f, 0.0f,
-                                                    img_size.y - region_ry);
-
-                        const ImVec2 uv0 = ImVec2((region_x) / img_size.x, (region_y) / img_size.y);
-                        const ImVec2 uv1 =
-                            ImVec2((region_x + region_rx) / img_size.x, (region_y + region_ry) / img_size.y);
-                        const float zoom = 4.0f; // TODO: should be settable? 5.0f?
-                        ImGui::Image(img.texture(), ImVec2(region_rx * zoom, region_ry * zoom), uv0, uv1);
-
-                        // Too wasteful...
-#if 0
-                        // TODO: some keyctrls can be supported when dragging...
-                        if (imgui_keypressed(ImGuiKey_UpArrow, true)) {
-                            --region_ry;
+                } else {
+                    // TODO: not always precise...
+                    ImVec2 mouse = io.MousePos;
+                    if (io.MouseWheel && mouse.x >= img_pos.x && mouse.x <= img_posz.x && mouse.y >= img_pos.y &&
+                        mouse.y <= img_posz.y) {
+                        ImVec2 cellidx = (mouse - img_pos) / zoom;
+                        if (io.MouseWheel < 0 && zoom != 0.5) {
+                            zoom /= 2;
                         }
-                        if (imgui_keypressed(ImGuiKey_DownArrow, true)) {
-                            ++region_ry;
+                        if (io.MouseWheel > 0 && zoom != 8) {
+                            zoom *= 2;
                         }
-                        if (imgui_keypressed(ImGuiKey_LeftArrow, true)) {
-                            --region_rx;
-                        }
-                        if (imgui_keypressed(ImGuiKey_RightArrow, true)) {
-                            ++region_rx;
-                        }
-#endif
-                        ImGui::EndTooltip();
+                        off = (mouse - cellidx * zoom) - pos;
                     }
                 }
 
-                // TODO: reconsider this design...
-                // put off to here, for "runner.shift(io.MouseDelta.x, io.MouseDelta.y);".
-                // works fine as texture() (pointer) is unchanged by update, and the rendering happens very later...
-                img.update(runner.tile());
-
-                // It seems the whole recorder model is problematic...
-                if (false) {
-                    ImGui::AlignTextToFramePadding(); // TODO: +1 is clumsy.
-                    // TODO: -> editor?
-                    ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1);
-                    // TODO: pos may not reflect runner's real pos, as recorder can be modified on the way... may not
-                    // matters
-
-                    static char go_to[20]{};
-                    const auto filter = [](ImGuiInputTextCallbackData* data) {
-                        return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
-                    };
-                    ImGui::SameLine();
-                    if (ImGui::InputTextWithHint(
-                            "##Goto", "GOTO e.g. 2->enter", go_to, 20,
-                            ImGuiInputTextFlags_CallbackCharFilter | ImGuiInputTextFlags_EnterReturnsTrue, filter)) {
-                        int val{};
-                        if (std::from_chars(go_to, go_to + strlen(go_to), val).ec == std::errc{}) {
-                            recorder.set_pos(val - 1); // TODO: -1 is clumsy.
-                        }
-                        go_to[0] = '\0';
-
-                        // Regain focus:
-                        ImGui::SetKeyboardFocusHere(-1);
-                    }
-                }
+                // TODO: support Rclick operation: range-selection...
             }
         };
 
@@ -787,6 +769,7 @@ int main(int argc, char** argv) {
                 ImGui::EndGroup();
                 ImGui::PopItemWidth();
 
+                // TODO: shall redesign...
                 // TODO: enable/disable keyboard ctrl (enable by default)
                 // TODO: redesign keyboard ctrl...
                 if (imgui_keypressed(ImGuiKey_1, true)) {
