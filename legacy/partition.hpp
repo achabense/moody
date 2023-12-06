@@ -295,7 +295,7 @@ namespace legacy {
             // a s d
             // z x c
             constexpr mapperP perm_specific = MAPTO(w, q, e, a, s, d, z, x, c);
-#if 1
+#if 0
             // 1. I misunderstood "rotate" symmetry. "ro45" is never about symmetry (I've no idea what it is)
             // 2. As seemingly-senseless partition like ro45 can make non-trivial patterns, should support after all...
             // edc qwe
@@ -309,9 +309,7 @@ namespace legacy {
             // azc skip q,c.
             constexpr mapperP rotate_6 = MAPTO(q, e, d, w, s, x, a, z, c);
             // constexpr mapperP perm_6 = MAPTO(q, e, w, a, s, d, z, x, c);
-#endif
-#undef MAPTO
-#if 1
+
             constexpr auto make_partition_mask = [](bool q, bool w, bool e, bool a, bool s, bool d, bool z, bool x,
                                                     bool c) -> partitionT {
                 codeT mask = encode(q, w, e, a, s, d, z, x, c);
@@ -327,6 +325,8 @@ namespace legacy {
             static partitionT res = lcm(msk, r6);
             return res;
 #endif
+#undef MAPTO
+
             static const std::initializer_list<mapperP> args[basespecE_size]{
                 {},                                                     // none
                 {upside_down, leftside_right},                          // orthogonal
