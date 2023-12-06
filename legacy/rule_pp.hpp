@@ -9,6 +9,7 @@
 #include "rule.hpp"
 
 namespace legacy {
+    // TODO: when to introduce "interT"?
     using ruleT_data = ruleT::data_type;
 
     using colorT = int;
@@ -84,9 +85,9 @@ namespace legacy {
         std::vector<std::span<const codeT>> group_spans;
 
     public:
-        colorT color_for(codeT code) { return m_p[code]; }
-        std::span<const codeT> group_for(codeT code) { return group_spans[color_for(code)]; }
-        codeT head_for(codeT code) { return group_for(code).front(); }
+        colorT color_for(codeT code) const { return m_p[code]; }
+        std::span<const codeT> group_for(codeT code) const { return group_spans[color_for(code)]; }
+        codeT head_for(codeT code) const { return group_for(code).front(); }
 
         operator const vpartitionT&() const { return m_p; }
 
@@ -113,12 +114,17 @@ namespace legacy {
         }
 
         // TODO: ...
-        bool matches(const ruleT_data& r) {}
+        bool matches(const ruleT_data& r) const {
+            for (codeT code : codeT{}) {
+                if (r[code] != r[head_for(code)]) {
+                    return false;
+                }
+            }
+            return true;
+        }
 
     private:
         void make_groups() {
-            // Assert regulated...
-
             std::vector<int> count(m_k, 0);
             for (colorT col : m_p) {
                 ++count[col];
@@ -198,7 +204,15 @@ namespace legacy {
 
     struct independence {
         // TODO: what does it mean when saying a rule is independent of certain neighbors?
-        static vpartitionT make_partition(bool q, bool w, bool e, bool a, bool s, bool d, bool z, bool x, bool c) {
+        // This is important as it decides whether/how to support "s" independence...
+
+        struct property {
+            bool q, w, e, a, s, d, z, x, c;
+        };
+
+        // generative.
+        vpartitionT make_partition(property req) {
+            const auto [q, w, e, a, s, d, z, x, c] = req;
             const codeT mask = encode(q, w, e, a, s, d, z, x, c);
             vpartitionT p{};
             for (codeT code : codeT{}) {
@@ -207,29 +221,79 @@ namespace legacy {
             return p;
         }
 
-        // TODO: not needed...
-        inline static const wpartitionT q = make_partition(1, 0, 0, 0, 0, 0, 0, 0, 0);
-        inline static const wpartitionT w = make_partition(0, 1, 0, 0, 0, 0, 0, 0, 0);
-        inline static const wpartitionT e = make_partition(0, 0, 1, 0, 0, 0, 0, 0, 0);
-        inline static const wpartitionT a = make_partition(0, 0, 0, 1, 0, 0, 0, 0, 0);
-        inline static const wpartitionT s = make_partition(0, 0, 0, 0, 1, 0, 0, 0, 0);
-        inline static const wpartitionT d = make_partition(0, 0, 0, 0, 0, 1, 0, 0, 0);
-        inline static const wpartitionT z = make_partition(0, 0, 0, 0, 0, 0, 1, 0, 0);
-        inline static const wpartitionT x = make_partition(0, 0, 0, 0, 0, 0, 0, 1, 0);
-        inline static const wpartitionT c = make_partition(0, 0, 0, 0, 0, 0, 0, 0, 1);
+        // TODO: formalize requirements on interT...
+
+        property test_property(const ruleT_data& r) {
+            return {
+                verify(r, {1, 0, 0, 0, 0, 0, 0, 0, 0}), //
+                verify(r, {0, 1, 0, 0, 0, 0, 0, 0, 0}), //
+                verify(r, {0, 0, 1, 0, 0, 0, 0, 0, 0}), //
+                verify(r, {0, 0, 0, 1, 0, 0, 0, 0, 0}), //
+                verify(r, {0, 0, 0, 0, 1, 0, 0, 0, 0}), //
+                verify(r, {0, 0, 0, 0, 0, 1, 0, 0, 0}), //
+                verify(r, {0, 0, 0, 0, 0, 0, 1, 0, 0}), //
+                verify(r, {0, 0, 0, 0, 0, 0, 0, 1, 0}), //
+                verify(r, {0, 0, 0, 0, 0, 0, 0, 0, 1}), //
+            };
+        }
+
+        // TODO ...
+        // What does this p provides?
+        property test_property(const vpartitionT& p);
+
+        // TODO: what about partial rule?
+
+    private:
+        // Does r satisfies... (TODO)
+        bool verify(const ruleT_data& r, property req) {
+            const auto [q, w, e, a, s, d, z, x, c] = req;
+            const codeT mask = encode(q, w, e, a, s, d, z, x, c);
+            for (codeT code : codeT{}) {
+                if (r[code] != r[code & mask]) {
+                    return false;
+                }
+            }
+            return true;
+        }
     };
 
     // Recognizer and... [centered] on a cell...
     struct square_symmetry {
-        enum effect {
-            a, // -
-            b, // |
-            c, // \ (avoid ending with \)
-            d, // /
-            r180,
-            r90
+        struct property {
+            bool a; // -
+            bool b; // |
+            bool c; // \ (avoid ending with \)
+            bool d; // /
+            bool r180;
+            bool r90;
         };
 
+        vpartitionT make_partition(property req) {
+            const wpartitionT* ps[]{&a_p, &b_p, &c_p, &d_p, &r180_p, &r90_p};
+            auto [a, b, c, d, r180, r90] = req;
+            bool reqs[]{a, b, c, d, r180, r90}; // TODO: how to do this?
+
+            vpartitionT p = make1();
+            for (int i = 0; i < 6; ++i) {
+                if (reqs[i]) {
+                    p = lcm(p, *ps[i], nullptr);
+                }
+            }
+            return p;
+        }
+
+        property test_property(const ruleT_data& r) {
+            return {a_p.matches(r), b_p.matches(r),    c_p.matches(r),
+                    d_p.matches(r), r180_p.matches(r), r90_p.matches(r)};
+        }
+
+        property test_property(const wpartitionT& p) {
+            return {a_p.subdivides(p), b_p.subdivides(p),    c_p.subdivides(p),
+                    d_p.subdivides(p), r180_p.subdivides(p), r90_p.subdivides(p)};
+        }
+
+        // TODO: valid interT...
+    private:
         // z x c
         // a s d
         // q w e
@@ -256,20 +320,6 @@ namespace legacy {
         // q s c
         // a z x
         inline static const wpartitionT r90_p = make_partition_chain(MAPPER(w, e, d, q, s, c, a, z, x));
-
-        using req = std::array<bool, 6>;
-        wpartitionT make_partition(req r) {
-            vpartitionT p = make1();
-            if (r[0]) {
-                p = lcm(p, a_p, nullptr);
-            }
-            if (r[1]) {
-            }
-            // ...
-        }
-        req test_partition(const wpartitionT& p) { //
-            return {a_p.subdivides(p), b_p.subdivides(p), c_p.subdivides(p), d_p.subdivides(p) /*TODO*/};
-        }
     };
 
     /*
@@ -280,6 +330,7 @@ namespace legacy {
      \_/ \_/
        \_/
     */
+    // TODO: complex, has constraints on ...
     struct hexagonal_symmetry {
         enum effect {
             a, // -
