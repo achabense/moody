@@ -187,22 +187,9 @@ namespace legacy {
 
     // TODO: experimental; refine...
     // TODO: together with to_MAP_str, shall be incorporated into a single header...
-    // Not including x = ..., y = ...
-    inline std::string to_rle_str_v0(const tileT& tile) {
-        // Not actually rle format...
-        std::string str;
-        const bool* data = tile.begin();
-        for (int y = 0; y < tile.height(); ++y) {
-            for (int x = 0; x < tile.width(); ++x) {
-                str += *data++ ? 'o' : '.';
-            }
-            str += '\n';
-        }
-        return str;
-    }
     inline std::string to_rle_str(const tileT& tile) {
         // TODO: problematic... (sub-optimal... / maybe has bugs...)
-        // TODO: neglet empty lines...
+        // TODO: empty lines should be neglected; and consecutive '$'s should be combined...
         std::string str;
         bool v = 0;
         int c = 0;
@@ -229,6 +216,7 @@ namespace legacy {
             flush();
             str += '$';
         }
+        // TODO: when is '!' needed?
         return str;
     }
 

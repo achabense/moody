@@ -607,6 +607,7 @@ int main(int argc, char** argv) {
             // Experimental: select:
             // TODO: this shall belong to the runner.
             static ImVec2 select_0{}, select_1{}; // tile index.
+            // TODO: the range should be invalid if the selected area <= 1*1.
             drawlist.AddRectFilled(img_pos + select_0 * zoom, img_pos + select_1 * zoom, IM_COL32(0, 255, 0, 60));
 
             drawlist.PopClipRect();
@@ -620,8 +621,8 @@ int main(int argc, char** argv) {
                 const bool within_img = mouse_pos.x >= img_pos.x && mouse_pos.x <= img_posz.x &&
                                         mouse_pos.y >= img_pos.y && mouse_pos.y <= img_posz.y;
                 if (active) {
-                    img_off += io.MouseDelta;
-#if 0
+                    // img_off += io.MouseDelta;
+#if 1
                     // TODO: whether to support shifting at all?
                     if (!io.KeyCtrl) {
                         img_off += io.MouseDelta;
@@ -631,6 +632,7 @@ int main(int argc, char** argv) {
                     }
 #endif
                 }
+                // TODO: drop within_img constraint?
                 if (io.MouseWheel != 0 && within_img) {
                     ImVec2 cellidx = (mouse_pos - img_pos) / zoom;
                     if (io.MouseWheel < 0 && zoom != 1) { // TODO: 0.5?
@@ -647,6 +649,7 @@ int main(int argc, char** argv) {
                 // Experimental: select:
                 // TODO: this shall belong to the runner.
                 // TODO: move select area...
+                // TODO: precedence against left-clicking?
                 if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
                     // ctrl.pause = true;
                     // TODO: is ceiling correct?
@@ -683,9 +686,8 @@ int main(int argc, char** argv) {
                                                       legacy::to_MAP_str(ctrl.rule), legacy::to_rle_str(t));
                         ImGui::SetClipboardText(str.c_str());
                     }
-                    // TODO: clear outer.
-                    // TODO: clear inner.
                     // TODO: rand-mode (whether reproducible...)
+                    // TODO: clear mode (random/all-0,all-1/paste...) / (clear inner/outer)
                     if (imgui_keypressed(ImGuiKey_Backspace, false)) {
                         legacy::tileT& tile = const_cast<legacy::tileT&>(runner.tile());
                         for (int y = y1; y < y2; ++y) {
