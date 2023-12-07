@@ -627,7 +627,7 @@ int main(int argc, char** argv) {
             drawlist.PushClipRect(pos, pos + size);
             drawlist.AddRectFilled(pos, pos + size, IM_COL32(20, 20, 20, 255));
             static float zoom = 1;
-            static ImVec2 img_off = {0, 0};
+            static ImVec2 img_off = {0, 0}; // TODO: supposed to be of integer-precision...
             ImVec2 img_pos = pos + img_off;
             ImVec2 img_posz = img_pos + ImVec2(img.width(), img.height()) * zoom;
             img.update(runner.tile());
@@ -638,6 +638,7 @@ int main(int argc, char** argv) {
             const bool active = ImGui::IsItemActive();
             ctrl.pause2 = active;
             if (ImGui::IsItemHovered()) {
+                assert(ImGui::IsMousePosValid());
                 const ImVec2 mouse_pos = io.MousePos;
                 const bool within_img = mouse_pos.x >= img_pos.x && mouse_pos.x <= img_posz.x &&
                                         mouse_pos.y >= img_pos.y && mouse_pos.y <= img_posz.y;
@@ -662,12 +663,17 @@ int main(int argc, char** argv) {
                         zoom *= 2;
                     }
                     img_off = (mouse_pos - cellidx * zoom) - pos;
+                    img_off.x = round(img_off.x);
+                    img_off.y = round(img_off.y); // TODO: is rounding correct?
                 }
 
                 // TODO: support Rclick operation: range-selection...
             }
         };
 
+        // TODO: not robust
+        // ~ runner.restart(...) shall not happen before rendering.
+        bool restart = false;
         int extra = 0;
 
         const ImGuiWindowFlags flags =
@@ -719,7 +725,7 @@ int main(int argc, char** argv) {
                     ImGui::PopButtonRepeat();
                     ImGui::SameLine();
                     if (ImGui::Button("Restart") || imgui_keypressed(ImGuiKey_R, false)) {
-                        runner.restart(filler);
+                        restart = true;
                     }
 
                     ImGui::AlignTextToFramePadding();
@@ -748,14 +754,14 @@ int main(int argc, char** argv) {
                         seed = std::clamp(seed, 0, 9999);
                         if (seed >= 0 && seed != filler.seed) {
                             filler.seed = seed;
-                            runner.restart(filler);
+                            restart = true;
                         }
                     }
                     // ImGui::PopStyleVar();
                     // TODO: button <- set to 0.5?
                     if (ImGui::SliderFloat("Init density [0-1]", &filler.density, 0.0f, 1.0f, "%.3f",
                                            ImGuiSliderFlags_NoInput)) {
-                        runner.restart(filler);
+                        restart = true;
                     }
                 }
                 ImGui::EndGroup();
@@ -804,6 +810,9 @@ int main(int argc, char** argv) {
         // TODO: should this be put before begin-frame?
         if (ctrl.rule != recorder.current()) {
             ctrl.rule = recorder.current();
+            restart = true;
+        }
+        if (restart) {
             runner.restart(filler);
         }
         ctrl.run(runner, extra);
