@@ -172,5 +172,64 @@ namespace legacy {
         int count() const { //
             return std::accumulate(begin(), end(), 0);
         }
+
+        // TODO: experimental, redesign...
+        // TODO: how to return correctly?
+        // TODO: condition...
+        void _sample_unchecked(int fx, int fy, int width, int height, tileT& dest) const {
+            assert(this != &dest);
+            dest.resize({.width = width, .height = height});
+            for (int y = fy; y < fy + height; ++y) {
+                std::copy_n(line(y) + fx, width, dest.line(y - fy));
+            }
+        }
     };
+
+    // TODO: experimental; refine...
+    // TODO: together with to_MAP_str, shall be incorporated into a single header...
+    // Not including x = ..., y = ...
+    inline std::string to_rle_str_v0(const tileT& tile) {
+        // Not actually rle format...
+        std::string str;
+        const bool* data = tile.begin();
+        for (int y = 0; y < tile.height(); ++y) {
+            for (int x = 0; x < tile.width(); ++x) {
+                str += *data++ ? 'o' : '.';
+            }
+            str += '\n';
+        }
+        return str;
+    }
+    inline std::string to_rle_str(const tileT& tile) {
+        // TODO: problematic... (sub-optimal... / maybe has bugs...)
+        // TODO: neglet empty lines...
+        std::string str;
+        bool v = 0;
+        int c = 0;
+        auto flush = [&]() {
+            if (c != 0) {
+                if (c != 1) {
+                    str += std::to_string(c);
+                }
+                str += "bo"[v];
+            }
+            c = 0;
+        };
+
+        const bool* data = tile.begin();
+        for (int y = 0; y < tile.height(); ++y) {
+            for (int x = 0; x < tile.width(); ++x) {
+                bool v2 = *data++;
+                if (v != v2) {
+                    flush();
+                    v = v2;
+                }
+                ++c;
+            }
+            flush();
+            str += '$';
+        }
+        return str;
+    }
+
 } // namespace legacy

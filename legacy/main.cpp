@@ -476,34 +476,6 @@ struct runner_ctrl {
     }
 };
 
-// What should a screen-window do:
-
-#if 0
-namespace legacy {
-    // spaceT:
-    // clear(bool). bool:value.
-    // randomize(?,rand_arg).
-    // copy(pos,size).
-    // paste(tileT,pos).
-    // updated().
-
-} // namespace legacy
-
-struct spaceT;
-
-// Foreground for ...
-// Directly dependent on imgui...
-struct canvasT {
-    spaceT* space;
-
-    void size() {}
-    void show() {
-        // TODO: imdrawlist...
-    
-    }
-};
-#endif
-
 int main(int argc, char** argv) {
     // As found in debug mode, these variables shall outlive the scope_guard to avoid UB... (c_str got invalidated...)
     // (otherwise the program made mojibake-named ini file at rulelists_new on exit...)
@@ -632,6 +604,11 @@ int main(int argc, char** argv) {
             ImVec2 img_posz = img_pos + ImVec2(img.width(), img.height()) * zoom;
             img.update(runner.tile());
             drawlist.AddImage(img.texture(), img_pos, img_posz);
+            // Experimental: select:
+            // TODO: this shall belong to the runner.
+            static ImVec2 select_0{}, select_1{}; // tile index.
+            drawlist.AddRectFilled(img_pos + select_0 * zoom, img_pos + select_1 * zoom, IM_COL32(0, 255, 0, 60));
+
             drawlist.PopClipRect();
 
             ImGui::InvisibleButton("Canvas", size);
@@ -667,7 +644,57 @@ int main(int argc, char** argv) {
                     img_off.y = round(img_off.y); // TODO: is rounding correct?
                 }
 
-                // TODO: support Rclick operation: range-selection...
+                // Experimental: select:
+                // TODO: this shall belong to the runner.
+                // TODO: move select area...
+                if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+                    // ctrl.pause = true;
+                    // TODO: is ceiling correct?
+                    if (within_img) {
+                        int celx = floor((mouse_pos.x - img_pos.x) / zoom);
+                        int cely = floor((mouse_pos.y - img_pos.y) / zoom);
+                        select_0 = ImVec2(celx, cely);
+                    }
+                }
+                if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+                    if (within_img) {
+                        int celx = ceil((mouse_pos.x - img_pos.x) / zoom);
+                        int cely = ceil((mouse_pos.y - img_pos.y) / zoom);
+                        select_1 = ImVec2(celx, cely);
+                    }
+                }
+            }
+            {
+                int x1 = select_0.x, x2 = select_1.x;
+                int y1 = select_0.y, y2 = select_1.y;
+                if (x1 != x2 && y1 != y2) {
+                    if (x1 > x2) {
+                        std::swap(x1, x2);
+                    }
+                    if (y1 > y2) {
+                        std::swap(y1, y2);
+                    }
+                    // (x1,x2) (y1,y2)
+                    if (imgui_keypressed(ImGuiKey_C, false)) {
+                        // TODO: export-as-rle...
+                        legacy::tileT t({.width = x2 - x1, .height = y2 - y1});
+                        runner.tile()._sample_unchecked(x1, y1, x2 - x1, y2 - y1, t);
+                        std::string str = std::format("x = {}, y = {}, rule = {}\n{}", t.width(), t.height(),
+                                                      legacy::to_MAP_str(ctrl.rule), legacy::to_rle_str(t));
+                        ImGui::SetClipboardText(str.c_str());
+                    }
+                    // TODO: clear outer.
+                    // TODO: clear inner.
+                    // TODO: rand-mode (whether reproducible...)
+                    if (imgui_keypressed(ImGuiKey_Backspace, false)) {
+                        legacy::tileT& tile = const_cast<legacy::tileT&>(runner.tile());
+                        for (int y = y1; y < y2; ++y) {
+                            for (int x = x1; x < x2; ++x) {
+                                tile.line(y)[x] = 0;
+                            }
+                        }
+                    }
+                }
             }
         };
 
