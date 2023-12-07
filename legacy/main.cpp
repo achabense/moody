@@ -459,14 +459,7 @@ struct runner_ctrl {
     int gap_frame = 0;
 
     bool pause = false;
-
-    bool spaused = false;
-    // TODO: fragile...
-    void push_pause(bool p) {
-        spaused = pause;
-        pause = p;
-    }
-    void pop_pause() { pause = spaused; }
+    bool pause2 = false; // TODO: explain...
 
     void run(torusT& runner, int extra = 0) const {
         if (runner.gen() < start_from) {
@@ -476,7 +469,7 @@ struct runner_ctrl {
                 runner.run(rule, extra);
                 extra = 0;
             }
-            if (!pause) {
+            if (!pause && !pause2) {
                 if (ImGui::GetFrameCount() % (gap_frame + 1) == 0) {
                     runner.run(rule, actual_pergen());
                 }
@@ -636,46 +629,41 @@ int main(int argc, char** argv) {
             drawlist.PushClipRect(pos, pos + size);
             drawlist.AddRectFilled(pos, pos + size, IM_COL32(20, 20, 20, 255));
             static float zoom = 1;
-            static ImVec2 off = {0, 0}; // TODO: should off be cell-idx, or real pixel offset (now)?
-            ImVec2 img_pos = pos + off;
+            static ImVec2 img_off = {0, 0};
+            ImVec2 img_pos = pos + img_off;
             ImVec2 img_posz = img_pos + ImVec2(img.width(), img.height()) * zoom;
             img.update(runner.tile());
             drawlist.AddImage(img.texture(), img_pos, img_posz);
             drawlist.PopClipRect();
 
             ImGui::InvisibleButton("Canvas", size);
-            if (ImGui::IsItemActivated()) {
-                ctrl.push_pause(true);
-            }
-            if (ImGui::IsItemDeactivated()) {
-                ctrl.pop_pause();
-            }
+            const bool active = ImGui::IsItemActive();
+            ctrl.pause2 = active;
             if (ImGui::IsItemHovered()) {
-                if (ImGui::IsItemActive()) {
+                const ImVec2 mouse_pos = io.MousePos;
+                const bool within_img = mouse_pos.x >= img_pos.x && mouse_pos.x <= img_posz.x &&
+                                        mouse_pos.y >= img_pos.y && mouse_pos.y <= img_posz.y;
+                if (active) {
+                    img_off += io.MouseDelta;
+#if 0
+                    // TODO: whether to support shifting at all?
                     if (!io.KeyCtrl) {
-                        off += io.MouseDelta;
-                    } else {
-                        ImVec2 mouse = io.MousePos;
-                        if (mouse.x >= img_pos.x && mouse.x <= img_posz.x && mouse.y >= img_pos.y &&
-                            mouse.y <= img_posz.y) {
-                            // TODO: this approach is highly imprecise when zoom != 1, but does this matter?
-                            runner.shift(io.MouseDelta.x / zoom, io.MouseDelta.y / zoom);
-                        }
+                        img_off += io.MouseDelta;
+                    } else if (within_img) {
+                        // TODO: this approach is highly imprecise when zoom != 1, but does this matter?
+                        runner.shift(io.MouseDelta.x / zoom, io.MouseDelta.y / zoom);
                     }
-                } else {
-                    // TODO: not always precise...
-                    ImVec2 mouse = io.MousePos;
-                    if (io.MouseWheel && mouse.x >= img_pos.x && mouse.x <= img_posz.x && mouse.y >= img_pos.y &&
-                        mouse.y <= img_posz.y) {
-                        ImVec2 cellidx = (mouse - img_pos) / zoom;
-                        if (io.MouseWheel < 0 && zoom != 0.5) {
-                            zoom /= 2;
-                        }
-                        if (io.MouseWheel > 0 && zoom != 8) {
-                            zoom *= 2;
-                        }
-                        off = (mouse - cellidx * zoom) - pos;
+#endif
+                }
+                if (io.MouseWheel != 0 && within_img) {
+                    ImVec2 cellidx = (mouse_pos - img_pos) / zoom;
+                    if (io.MouseWheel < 0 && zoom != 1) { // TODO: 0.5?
+                        zoom /= 2;
                     }
+                    if (io.MouseWheel > 0 && zoom != 8) {
+                        zoom *= 2;
+                    }
+                    img_off = (mouse_pos - cellidx * zoom) - pos;
                 }
 
                 // TODO: support Rclick operation: range-selection...
@@ -714,6 +702,12 @@ int main(int argc, char** argv) {
                 {
                     ImGui::Checkbox("Pause", &ctrl.pause);
                     ImGui::SameLine();
+                    ImGui::BeginDisabled();
+                    ImGui::Checkbox("Pause2", &ctrl.pause2);
+                    ImGui::EndDisabled();
+                    ImGui::SameLine();
+                    // ↑ TODO: better visual?
+                    // ↓ TODO: imgui_repeatbutton?
                     ImGui::PushButtonRepeat(true);
                     if (ImGui::Button("+1")) {
                         extra = 1;
@@ -751,7 +745,7 @@ int main(int argc, char** argv) {
                     // TODO: want resetting only when +/-/enter...
                     int seed = filler.seed;
                     // TODO: same as "rule_editor"'s... but don't want to affect Label...
-                    ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(2, 0));
+                    // ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(2, 0));
                     if (ImGui::InputInt("Seed", &seed)) {
                         seed = std::clamp(seed, 0, 9999);
                         if (seed >= 0 && seed != filler.seed) {
@@ -759,7 +753,7 @@ int main(int argc, char** argv) {
                             runner.restart(filler);
                         }
                     }
-                    ImGui::PopStyleVar();
+                    // ImGui::PopStyleVar();
                     // TODO: button <- set to 0.5?
                     if (ImGui::SliderFloat("Init density [0-1]", &filler.density, 0.0f, 1.0f, "%.3f",
                                            ImGuiSliderFlags_NoInput)) {
