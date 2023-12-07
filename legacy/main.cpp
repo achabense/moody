@@ -1,9 +1,7 @@
-﻿
-#define IMGUI_DEFINE_MATH_OPERATORS
-#include "app_sdl.hpp"
+﻿#define IMGUI_DEFINE_MATH_OPERATORS
 
-#include "app.hpp"
-#include "rule_traits.hpp"
+#include "app2.hpp"
+#include "app_sdl.hpp"
 
 void debug_putavail() {
     ImVec2 pos = ImGui::GetCursorScreenPos();

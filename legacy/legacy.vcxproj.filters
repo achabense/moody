@@ -45,9 +45,6 @@
     <ClInclude Include="app.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="rule_traits.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="imgui\imconfig.h">
       <Filter>imgui</Filter>
     </ClInclude>
@@ -55,6 +52,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="rule_pp.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="app2.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
