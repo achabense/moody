@@ -22,3 +22,5 @@ PointerAlignment: Left
 # };
 IndentAccessModifiers: false
 AccessModifierOffset: -4
+
+AllowShortCaseLabelsOnASingleLine: true

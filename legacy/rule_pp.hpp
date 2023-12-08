@@ -93,12 +93,26 @@ namespace legacy {
 
         wpartitionT(const vpartitionT& p) : m_p(p) {
             m_k = regulate(m_p);
-            make_groups();
-        }
-        // LCM.
-        wpartitionT(const vpartitionT& a, const vpartitionT& b) {
-            m_p = lcm(a, b, &m_k);
-            make_groups();
+
+            std::vector<int> count(m_k, 0);
+            for (colorT col : m_p) {
+                ++count[col];
+            }
+
+            std::vector<int> pos(m_k, 0);
+            for (int j = 1; j < m_k; ++j) {
+                pos[j] = pos[j - 1] + count[j - 1];
+            }
+
+            group_spans.resize(m_k);
+            for (int j = 0; j < m_k; ++j) {
+                group_spans[j] = {group_data.data() + pos[j], count[j]};
+            }
+
+            for (codeT code : codeT{}) {
+                colorT col = m_p[code];
+                group_data[pos[col]++] = code;
+            }
         }
 
         //  TODO: this is also called that a is a refinement of b.
@@ -122,29 +136,6 @@ namespace legacy {
             }
             return true;
         }
-
-    private:
-        void make_groups() {
-            std::vector<int> count(m_k, 0);
-            for (colorT col : m_p) {
-                ++count[col];
-            }
-
-            std::vector<int> pos(m_k, 0);
-            for (int j = 1; j < m_k; ++j) {
-                pos[j] = pos[j - 1] + count[j - 1];
-            }
-
-            group_spans.resize(m_k);
-            for (int j = 0; j < m_k; ++j) {
-                group_spans[j] = {group_data.data() + pos[j], count[j]};
-            }
-
-            for (codeT code : codeT{}) {
-                colorT col = m_p[code];
-                group_data[pos[col]++] = code;
-            }
-        }
     };
 
     vpartitionT make1() {
@@ -158,20 +149,6 @@ namespace legacy {
     // TODO: concept-based partitions...
     // Every well-defined concept should be supported by a class...
     // Such a class should be able to check and generate rules...
-
-    // state...
-    // when viewed in flip mode...
-    wpartitionT statep() {
-        vpartitionT p{};
-        for (codeT code : codeT{}) {
-            if (decode_s(code)) {
-                p[code] = code;
-            } else {
-                p[code] = flip_all(code);
-            }
-        }
-        return p;
-    }
 
     using mapperT = codeT (*)(codeT);
 #define MAPPER(...)                                      \
@@ -342,19 +319,149 @@ namespace legacy {
         };
     };
 
-    struct state_symmetry {};
+    // TODO: should "view" and "randomize" be treated separately?
+    struct state_symmetry {
+        static bool test_property(const ruleT& rule) {
+            for (codeT code : codeT{}) {
+                codeT codex = flip_all(code);
+                if ((decode_s(code) == rule(code)) != (decode_s(codex) == rule(codex))) {
+                    return false;
+                }
+            }
+            return true;
+        }
 
-    // All other partitions...
-    struct unsystematic {};
+        // TODO: still, how to consume?
+        static inline wpartitionT p = [] {
+            vpartitionT p{};
+            for (codeT code : codeT{}) {
+                if (decode_s(code)) {
+                    p[code] = code;
+                } else {
+                    p[code] = flip_all(code);
+                }
+            }
+            return p;
+        }();
+    };
 
-    // TODO: and ... a partialT can be regarded as a constraint...
-    // Detect whether a rule meets certain constraints.
-    // A way to generate all the rules that can meet certain constraints.
+    // Constraints consistute of:
+    // partialT: should ... TO satisfy a constraint, some other traits cannot not be met...
+    // neglect: the MAP rule behaves as if not ... `s` should not
+    // symmetry:
+    //
+    // state symmetry:
+    // customized: the value of... expressed by partitions...
+    // TODO: how to customize?
 
-    // ... in this stance a partition is not more special than a partialT?
+    // -> Detect whether a rule meets certain constraints.
+    // -> A way to generate all the rules that can meet certain constraints.
+
+    // Randomization is allowed iff all constraints can be met (can co-exist)... (how?)
 
     // TODO: how to correctly understand interT? is it even well-defined?
     // It's for sure that, an interT poses no constraint.
-
-    // How to decide whether different constraints can coexit?
 } // namespace legacy
+
+// What about uset-based partition?
+#if 0
+namespace legacy {
+    // Problem: how to consume? how to regulate? how to join?
+    class uniT {
+        std::array<codeT, 512> pars;
+
+    public:
+        uniT() {
+            for (codeT c : codeT{}) {
+                pars[c] = c;
+            }
+        }
+
+        codeT rootof(codeT c) {
+            if (pars[c] == c) {
+                return c;
+            } else {
+                return pars[c] = rootof(pars[c]);
+            }
+        }
+
+        void tie(codeT a, codeT b) { pars[rootof(a)] = rootof(b); }
+    };
+
+    struct mapperT2 {
+        enum takeE { _0, _1, q, w, e, a, s, d, z, x, c, nq, nw, ne, na, ns, nd, nz, nx, nc };
+        takeE q2, w2, e2;
+        takeE a2, s2, d2;
+        takeE z2, x2, c2;
+
+        mapperT2() : q2{q}, w2{w}, e2{e}, a2{a}, s2{s}, d2{d}, z2{z}, x2{x}, c2{c} {}
+
+        mapperT2(std::string_view str) {
+            // TODO: assert format ([01]|!?[qweasdzxc]){9}...
+            const char *pos = str.data(), *end = pos + str.size();
+            auto take = [&]() {
+                assert(pos != end);
+                bool neg = false;
+                switch (*pos) {
+                case '0': ++pos; return _0;
+                case '1': ++pos; return _1;
+                case '!':
+                    ++pos;
+                    neg = true;
+                    break;
+                }
+                assert(pos != end);
+                switch (*pos++) {
+                case 'q': return neg ? nq : q;
+                case 'w': return neg ? nw : w;
+                case 'e': return neg ? ne : e;
+                case 'a': return neg ? na : a;
+                case 's': return neg ? ns : s;
+                case 'd': return neg ? nd : d;
+                case 'z': return neg ? nz : z;
+                case 'x': return neg ? nx : x;
+                case 'c': return neg ? nc : c;
+                default: assert(false);
+                }
+            };
+            q2 = take();
+            w2 = take();
+            e2 = take();
+            a2 = take();
+            s2 = take();
+            d2 = take();
+            z2 = take();
+            x2 = take();
+            c2 = take();
+        }
+
+        codeT map(codeT code) const {
+            const envT env = decode(code);
+            const bool qweasdzxc[9]{env.q, env.w, env.e, env.a, env.s, env.d, env.z, env.x, env.c};
+            const auto take = [&qweasdzxc](takeE t) -> bool {
+                if (t == _0) {
+                    return 0;
+                } else if (t == _1) {
+                    return 1;
+                } else if (t >= q && t <= c) {
+                    return qweasdzxc[t - q];
+                } else {
+                    return !qweasdzxc[t - nq];
+                }
+            };
+
+            // clang-format off
+            return encode(take(q2), take(w2), take(e2),
+                          take(a2), take(s2), take(d2),
+                          take(z2), take(x2), take(c2));
+            // clang-format on
+        }
+    };
+
+    void tie(uniT& e, mapperT2 a, mapperT2 b = {}) {
+        for (codeT c : codeT{}) {
+            e.tie(a.map(c), b.map(c));
+        }
+    }
+} // namespace legacy
+#endif
