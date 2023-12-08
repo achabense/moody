@@ -13,8 +13,8 @@ using namespace std::chrono_literals;
 // - u8"..." is not used in this project, as it becomes `char8_t[]` after C++20 (which is not usable).
 // - TODO: document ways to pass this check (/utf-8 etc; different compilers)...
 inline void assert_utf8_encoding() {
-    constexpr auto a = std::to_array("中文");
-    constexpr auto b = std::to_array(u8"中文");
+    constexpr auto a = std::to_array("涓枃");
+    constexpr auto b = std::to_array(u8"涓枃");
 
     static_assert(std::equal(a.begin(), a.end(), b.begin(), b.end(), [](auto l, auto r) {
         return static_cast<unsigned char>(l) == static_cast<unsigned char>(r);

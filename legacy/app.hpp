@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 // TODO: the utilities provided by "app.hpp" appears unsystematic, and generally too weak.
 

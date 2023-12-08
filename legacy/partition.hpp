@@ -41,14 +41,10 @@ namespace legacy {
             static constexpr ruleT identity = mkrule(decode_s);
 
             switch (tag) {
-            case Value:
-                return zero;
-            case Flip:
-                return identity;
-            case Diff:
-                return custom;
-            default:
-                abort();
+            case Value: return zero;
+            case Flip: return identity;
+            case Diff: return custom;
+            default: abort();
             }
         }
 
@@ -127,10 +123,7 @@ namespace legacy {
 #endif
         }
 
-        int map(codeT code) const {
-            assert(code >= 0 && code < 512);
-            return m_map[code];
-        }
+        int map(codeT code) const { return m_map[code]; }
         const std::vector<groupT>& groups() const { //
             return m_groups;
         }
@@ -341,16 +334,10 @@ namespace legacy {
             if (!parts[basic][extr]) {
                 std::vector<mapperP> arg = args[basic];
                 switch (extr) {
-                case extrspecE::None_:
-                    break;
-                case extrspecE::Paired:
-                    arg.push_back(flip_s);
-                    break;
-                case extrspecE::State:
-                    arg.push_back(flip_all);
-                    break;
-                default:
-                    abort();
+                case extrspecE::None_: break;
+                case extrspecE::Paired: arg.push_back(flip_s); break;
+                case extrspecE::State: arg.push_back(flip_all); break;
+                default: abort();
                 }
                 parts[basic][extr].emplace(make_partition(arg));
             }
@@ -366,7 +353,9 @@ namespace legacy {
         enum scanE : char { A0, A1, Inconsistent };
 
     private:
-        std::array<scanE, 512> m_data; // TODO: vector?
+        // NOTICE: not a map-type. It's just that 512 will be always enough space.
+        // TODO: use vector instead?
+        std::array<scanE, 512> m_data;
         int m_k;
         int m_count[3];
 

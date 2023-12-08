@@ -32,6 +32,10 @@ namespace legacy {
         constexpr void operator++() { ++v; }
         constexpr codeT operator*() const { return *this; }
         constexpr friend bool operator==(const codeT&, const codeT&) = default;
+
+        // TODO: apply this in the future...
+        template <class T>
+        using map_to = std::array<T, 512>;
     };
 
     constexpr codeT encode(const envT& env) {
@@ -80,10 +84,7 @@ namespace legacy {
 
         data_type map{}; // mapping of s->s'.
 
-        bool operator()(codeT code) const {
-            assert(code >= 0 && code < 512);
-            return map[code];
-        }
+        bool operator()(codeT code) const { return map[code]; }
         bool operator()(const envT& env) const { //
             return map[encode(env)];
         }
