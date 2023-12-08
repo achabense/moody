@@ -9,6 +9,28 @@
 #include "rule.hpp"
 
 namespace legacy {
+    // TODO: rename / explain...
+    struct partialT {
+        enum stateE : char { S0, S1, Unknown };
+        std::array<stateE, 512> map;
+        void reset() { map.fill(Unknown); }
+        partialT() { reset(); }
+
+        // Conflicts are not allowed
+        void set(codeT code, bool b) {
+            assert(map[code] == Unknown || map[code] == b);
+            map[code] = stateE{b};
+        }
+
+        // TODO: sometimes need to listen to selected area...
+        auto bind(const ruleT& rule) {
+            return [this, rule](codeT code) /*const*/ {
+                set(code, rule(code));
+                return rule(code);
+            };
+        }
+    };
+
     // TODO: when to introduce "interT"?
     using ruleT_data = ruleT::data_type;
 
@@ -51,8 +73,6 @@ namespace legacy {
     // Return the smallest partition that is ...
     // TODO: more formal name...
     vpartitionT lcm(const vpartitionT& a, const vpartitionT& b, int* groupc) {
-        // int a;
-        // int b;
         vpartitionT p{};
         p.fill(-1);
         auto flood = [&p, &a, &b](codeT code, int v, const auto& flood) -> void {
@@ -115,6 +135,10 @@ namespace legacy {
             }
         }
 
+        // As `group_spans` refer to data in group_data, this is not directly copyable.
+        wpartitionT(const wpartitionT&) = delete;
+        wpartitionT& operator=(const wpartitionT&) = delete;
+
         //  TODO: this is also called that a is a refinement of b.
         bool subdivides(const vpartitionT& p) const {
             for (const auto& group : group_spans) {
@@ -138,7 +162,7 @@ namespace legacy {
         }
     };
 
-    vpartitionT make1() {
+    inline vpartitionT make1() {
         vpartitionT p{};
         for (codeT code : codeT{}) {
             p[code] = code;

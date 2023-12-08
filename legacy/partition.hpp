@@ -385,29 +385,6 @@ namespace legacy {
         int k() const { return m_k; }
         int count(scanE s) const { return m_count[s]; }
     };
-
-    // TODO: rename...
-    struct partialT {
-        enum stateE : char { S0, S1, Unknown };
-        std::array<stateE, 512> map;
-        void reset() { map.fill(Unknown); }
-        partialT() { reset(); }
-
-        // Conflicts are not allowed
-        void set(codeT code, bool b) {
-            assert(map[code] == Unknown || map[code] == b);
-            map[code] = stateE{b};
-        }
-
-        // TODO: sometimes need to listen to selected area...
-        auto bind(const ruleT& rule) {
-            return [this, rule](codeT code) /*const*/ {
-                set(code, rule(code));
-                return rule(code);
-            };
-        }
-    };
-    // TODO: generate randomizer based on partialT and partitionT...
 } // namespace legacy
 
 // TODO: temp...
@@ -415,25 +392,6 @@ namespace legacy {
     // TODO: ud, lr, mdiag, sdiag...
     inline bool spatial_symmetric(const ruleT& rule) {
         return partitionT::get_spatial().matches(rule.map);
-    }
-
-    inline bool center_agnostic_abs(const ruleT& rule) {
-        for (codeT code : codeT{}) {
-            if (rule(code) != rule(flip_s(code))) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    inline bool center_agnostic_xor(const ruleT& rule) {
-        for (codeT code : codeT{}) {
-            codeT code_ns = flip_s(code);
-            if ((decode_s(code) == rule(code)) != (decode_s(code_ns) == rule(code_ns))) {
-                return false;
-            }
-        }
-        return true;
     }
 
     inline bool state_symmetric(const ruleT& rule) {
