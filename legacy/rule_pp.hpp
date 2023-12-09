@@ -7,6 +7,8 @@
 #include <span>
 
 #include "rule.hpp"
+// TODO: this header is supposed to replace all contents in partition.hpp.
+#include "partition.hpp"
 
 namespace legacy {
     // TODO: rename / explain...
@@ -165,220 +167,14 @@ namespace legacy {
         }
     };
 
-#if 0
-    // TODO: interT is still developed in partition.hpp...
-    inline bool satisfies(const interT& i, const wpartitionT& p, const ruleT& rule) {
-        auto data = i.from_rule(rule);
-        return p.matches(data);
-    }
-#endif
-
-    inline vpartitionT make1() {
-        vpartitionT p{};
-        for (codeT code : codeT{}) {
-            p[code] = code;
-        }
-        return p;
-    }
-
     // TODO: concept-based partitions...
     // Every well-defined concept should be supported by a class...
     // Such a class should be able to check and generate rules...
 
-    using mapperT = codeT (*)(codeT);
-#define MAPPER(...)                                      \
-    +[](codeT code) {                                    \
-        auto [q, w, e, a, s, d, z, x, c] = decode(code); \
-        return encode(__VA_ARGS__);                      \
-    }
-
-    vpartitionT make_partition_chain(mapperT mapper, int* groupc = nullptr) {
-        vpartitionT p{};
-        p.fill(-1);
-        auto flood = [&p, &mapper](codeT code, int v, const auto& flood) -> void {
-            if (p[code] == -1) {
-                p[code] = v;
-                flood(mapper(code), v, flood);
-            }
-        };
-
-        int v = 0;
-        for (codeT code : codeT{}) {
-            if (p[code] == -1) {
-                flood(code, v++, flood);
-            }
-        }
-        if (groupc) {
-            *groupc = v;
-        }
-        return p;
-    }
-
-    struct independence {
-        // TODO: what does it mean when saying a rule is independent of certain neighbors?
-        // This is important as it decides whether/how to support "s" independence...
-
-        struct property {
-            bool q, w, e, a, s, d, z, x, c;
-        };
-
-        // generative.
-        vpartitionT make_partition(property req) {
-            const auto [q, w, e, a, s, d, z, x, c] = req;
-            const codeT mask = encode(q, w, e, a, s, d, z, x, c);
-            vpartitionT p{};
-            for (codeT code : codeT{}) {
-                p[code] = code & mask;
-            }
-            return p;
-        }
-
-        // TODO: formalize requirements on interT...
-
-        property test_property(const ruleT_data& r) {
-            return {
-                verify(r, {1, 0, 0, 0, 0, 0, 0, 0, 0}), //
-                verify(r, {0, 1, 0, 0, 0, 0, 0, 0, 0}), //
-                verify(r, {0, 0, 1, 0, 0, 0, 0, 0, 0}), //
-                verify(r, {0, 0, 0, 1, 0, 0, 0, 0, 0}), //
-                verify(r, {0, 0, 0, 0, 1, 0, 0, 0, 0}), //
-                verify(r, {0, 0, 0, 0, 0, 1, 0, 0, 0}), //
-                verify(r, {0, 0, 0, 0, 0, 0, 1, 0, 0}), //
-                verify(r, {0, 0, 0, 0, 0, 0, 0, 1, 0}), //
-                verify(r, {0, 0, 0, 0, 0, 0, 0, 0, 1}), //
-            };
-        }
-
-        // TODO ...
-        // What does this p provides?
-        property test_property(const vpartitionT& p);
-
-        // TODO: what about partial rule?
-
-    private:
-        // Does r satisfies... (TODO)
-        bool verify(const ruleT_data& r, property req) {
-            const auto [q, w, e, a, s, d, z, x, c] = req;
-            const codeT mask = encode(q, w, e, a, s, d, z, x, c);
-            for (codeT code : codeT{}) {
-                if (r[code] != r[code & mask]) {
-                    return false;
-                }
-            }
-            return true;
-        }
-    };
-
-    // Recognizer and... [centered] on a cell...
-    struct square_symmetry {
-        struct property {
-            bool a; // -
-            bool b; // |
-            bool c; // \ (avoid ending with \)
-            bool d; // /
-            bool r180;
-            bool r90;
-        };
-
-        vpartitionT make_partition(property req) {
-            const wpartitionT* ps[]{&a_p, &b_p, &c_p, &d_p, &r180_p, &r90_p};
-            auto [a, b, c, d, r180, r90] = req;
-            bool reqs[]{a, b, c, d, r180, r90}; // TODO: how to do this?
-
-            vpartitionT p = make1();
-            for (int i = 0; i < 6; ++i) {
-                if (reqs[i]) {
-                    p = lcm(p, *ps[i], nullptr);
-                }
-            }
-            return p;
-        }
-
-        property test_property(const ruleT_data& r) {
-            return {a_p.matches(r), b_p.matches(r),    c_p.matches(r),
-                    d_p.matches(r), r180_p.matches(r), r90_p.matches(r)};
-        }
-
-        property test_property(const wpartitionT& p) {
-            return {a_p.subdivides(p), b_p.subdivides(p),    c_p.subdivides(p),
-                    d_p.subdivides(p), r180_p.subdivides(p), r90_p.subdivides(p)};
-        }
-
-        // TODO: valid interT...
-    private:
-        // z x c
-        // a s d
-        // q w e
-        inline static const wpartitionT a_p = make_partition_chain(MAPPER(z, x, c, a, s, d, q, w, e));
-        // e w q
-        // d s a
-        // c x z
-        inline static const wpartitionT b_p = make_partition_chain(MAPPER(e, w, q, d, s, a, c, x, z));
-        // q a z
-        // w s x
-        // e d c
-        inline static const wpartitionT c_p = make_partition_chain(MAPPER(q, a, z, w, s, x, e, d, c));
-        // c d e
-        // x s w
-        // z a q
-        inline static const wpartitionT d_p = make_partition_chain(MAPPER(c, d, e, x, s, w, z, a, q));
-        // TODO: is clockwise/counterclockwise significant here?
-        // All clockwise, 270?
-        // c x z
-        // d s a
-        // e w q
-        inline static const wpartitionT r180_p = make_partition_chain(MAPPER(c, x, z, d, s, a, e, w, q));
-        // w e d
-        // q s c
-        // a z x
-        inline static const wpartitionT r90_p = make_partition_chain(MAPPER(w, e, d, q, s, c, a, z, x));
-    };
-
-    /*
-      _/ \_
-     / \_/ \
-     \_/ \_/
-     / \_/ \
-     \_/ \_/
-       \_/
-    */
-    // TODO: complex, has constraints on ...
-    struct hexagonal_symmetry {
-        enum effect {
-            a, // -
-            b, // /
-            c, // \ (avoid ending with \)
-            ro180,
-            ro120,
-            ro60
-        };
-    };
+    // TODO: what does it mean when saying a rule is independent of certain neighbors?
+    // This is important as it decides whether/how to support "s" independence...
 
     // TODO: should "view" and "randomize" be treated separately?
-    struct state_symmetry {
-        static bool test_property(const ruleT& rule) {
-            for (codeT code : codeT{}) {
-                codeT codex = flip_all(code);
-                if ((decode_s(code) == rule(code)) != (decode_s(codex) == rule(codex))) {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        // TODO: still, how to consume?
-        static inline wpartitionT p = [] {
-            vpartitionT p{};
-            for (codeT code : codeT{}) {
-                if (decode_s(code)) {
-                    p[code] = code;
-                } else {
-                    p[code] = flip_all(code);
-                }
-            }
-            return p;
-        }();
-    };
 
     // Constraints consistute of:
     // partialT: should ... TO satisfy a constraint, some other traits cannot not be met...
@@ -403,25 +199,44 @@ namespace legacy {
 namespace legacy {
     // Problem: how to consume? how to regulate? how to join?
     class uniT {
-        std::array<codeT, 512> pars;
+        std::array<codeT, 512> parof;
 
     public:
         uniT() {
             for (codeT c : codeT{}) {
-                pars[c] = c;
+                parof[c] = c;
             }
         }
 
+        // TODO: how to use publicly?
         codeT rootof(codeT c) {
-            if (pars[c] == c) {
+            if (parof[c] == c) {
                 return c;
             } else {
-                return pars[c] = rootof(pars[c]);
+                return parof[c] = rootof(parof[c]);
             }
         }
 
-        void tie(codeT a, codeT b) { pars[rootof(a)] = rootof(b); }
+        bool test(const ruleT_data& r) const {
+            for (codeT code : codeT{}) {
+                if (r[code] != r[parof[code]]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        void tie(codeT a, codeT b) { parof[rootof(a)] = rootof(b); }
     };
+
+    // TODO: refine this "concept"...
+    bool satisfies(const interT& i, const uniT& u, const ruleT& rule) {
+        auto data = i.from_rule(rule);
+        return u.test(data);
+    }
+
+    // A concept is
+    struct conceptT {};
 
     struct mapperT2 {
         enum takeE { _0, _1, q, w, e, a, s, d, z, x, c, nq, nw, ne, na, ns, nd, nz, nx, nc };
