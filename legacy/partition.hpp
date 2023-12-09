@@ -28,9 +28,14 @@ namespace legacy {
     // For example, it's also meaningful to interpret the data as - whether `s` is "flipped"?
     // ...
 
-    // TODO: is arbitrary `Diff` really well-formed?
+    // Interpretation of ruleT_data.
     struct interT {
-        enum tagE : int { Value, Flip, Diff };
+        // Without any constraints, these
+        enum tagE : int {
+            Value, // The value s is mapped to (the same as in ruleT).
+            Flip,  // Is s flipped.
+            Diff   // Is the result the same as that of a custom rule.
+        };
         tagE tag = Value;
         ruleT custom{};
 
@@ -50,19 +55,19 @@ namespace legacy {
 
         // both methods are actually XOR...
         ruleT_data from_rule(const ruleT& rule) const {
-            const ruleT& base = get_viewer();
+            const ruleT& viewer = get_viewer();
             ruleT_data diff{};
             for (codeT code : codeT{}) {
-                diff[code] = rule(code) == base(code) ? 0 : 1;
+                diff[code] = rule(code) == viewer(code) ? 0 : 1;
             }
             return diff;
         }
 
         ruleT to_rule(const ruleT_data& diff) const {
-            const ruleT& base = get_viewer();
+            const ruleT& viewer = get_viewer();
             ruleT rule{};
             for (codeT code : codeT{}) {
-                rule.map[code] = diff[code] ? !base(code) : base(code);
+                rule.map[code] = diff[code] ? !viewer(code) : viewer(code);
             }
             return rule;
         }

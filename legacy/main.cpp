@@ -556,6 +556,7 @@ int main(int argc, char** argv) {
             {
                 // TODO: refine...
                 ImGui::Button("Scroll to ...");
+                // TODO: should belong to left plane...
                 if (ImGui::IsItemHovered()) {
                     if (io.MouseWheel < 0) { // scroll down
                         recorder.next();

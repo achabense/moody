@@ -12,7 +12,8 @@ namespace legacy {
     // TODO: rename / explain...
     struct partialT {
         enum stateE : char { S0, S1, Unknown };
-        std::array<stateE, 512> map;
+        using data_type = std::array<stateE, 512>;
+        data_type map;
         void reset() { map.fill(Unknown); }
         partialT() { reset(); }
 
@@ -161,6 +162,14 @@ namespace legacy {
             return true;
         }
     };
+
+#if 0
+    // TODO: interT is still developed in partition.hpp...
+    inline bool satisfies(const interT& i, const wpartitionT& p, const ruleT& rule) {
+        auto data = i.from_rule(rule);
+        return p.matches(data);
+    }
+#endif
 
     inline vpartitionT make1() {
         vpartitionT p{};
