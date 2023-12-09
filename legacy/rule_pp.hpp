@@ -127,7 +127,9 @@ namespace legacy {
 
             group_spans.resize(m_k);
             for (int j = 0; j < m_k; ++j) {
-                group_spans[j] = {group_data.data() + pos[j], count[j]};
+                group_spans[j] = {
+                    group_data.data() + pos[j],
+                    /* TODO: ugly; without this will cause narrowing which is not allowed in {}*/ (size_t)count[j]};
             }
 
             for (codeT code : codeT{}) {
@@ -397,7 +399,7 @@ namespace legacy {
 } // namespace legacy
 
 // What about uset-based partition?
-#if 0
+#if 1
 namespace legacy {
     // Problem: how to consume? how to regulate? how to join?
     class uniT {
@@ -427,9 +429,7 @@ namespace legacy {
         takeE a2, s2, d2;
         takeE z2, x2, c2;
 
-        mapperT2() : q2{q}, w2{w}, e2{e}, a2{a}, s2{s}, d2{d}, z2{z}, x2{x}, c2{c} {}
-
-        mapperT2(std::string_view str) {
+        constexpr mapperT2(std::string_view str) {
             // TODO: assert format ([01]|!?[qweasdzxc]){9}...
             const char *pos = str.data(), *end = pos + str.size();
             auto take = [&]() {
@@ -454,8 +454,9 @@ namespace legacy {
                 case 'z': return neg ? nz : z;
                 case 'x': return neg ? nx : x;
                 case 'c': return neg ? nc : c;
-                default: assert(false);
                 }
+                assert(false);
+                return _0;
             };
             q2 = take();
             w2 = take();
@@ -468,7 +469,7 @@ namespace legacy {
             c2 = take();
         }
 
-        codeT map(codeT code) const {
+        constexpr codeT map(codeT code) const {
             const envT env = decode(code);
             const bool qweasdzxc[9]{env.q, env.w, env.e, env.a, env.s, env.d, env.z, env.x, env.c};
             const auto take = [&qweasdzxc](takeE t) -> bool {
@@ -491,10 +492,107 @@ namespace legacy {
         }
     };
 
-    void tie(uniT& e, mapperT2 a, mapperT2 b = {}) {
+    namespace special_mappers {
+        // TODO: explain...
+        inline constexpr mapperT2 identity("qweasdzxc");
+
+        // Native symmetry.
+        // Combination of these requirements can lead to ... TODO: explain, and explain "requirements"...
+        inline constexpr mapperT2 asd_refl("zxc"
+                                           "asd"
+                                           "qwe"); // '-'
+        inline constexpr mapperT2 wsx_refl("ewq"
+                                           "dsa"
+                                           "cxz"); // '|'
+        inline constexpr mapperT2 qsc_refl("qaz"
+                                           "wsx"
+                                           "edc"); // '\'
+        inline constexpr mapperT2 esz_refl("cde"
+                                           "xsw"
+                                           "zaq"); // '/'
+        inline constexpr mapperT2 ro_180("cxz"
+                                         "dsa"
+                                         "ewq"); // 180
+        inline constexpr mapperT2 ro_90("zaq"
+                                        "xsw"
+                                        "cde"); // 90 (clockwise)
+        // TODO: does this imply 270 clockwise?
+
+        // TODO: explain; actually irrelevant of symmetry...
+        inline constexpr mapperT2 ro_45("aqw"
+                                        "zse"
+                                        "xcd"); // "45" clockwise. TODO: explain...
+        // TODO: support that totalistic...
+
+        // TODO: explain. TODO: better name...
+        inline constexpr mapperT2 dual("!q!w!e"
+                                       "!a!s!d"
+                                       "!z!x!c");
+
+        inline constexpr mapperT2 ignore_q("0weasdzxc");
+        inline constexpr mapperT2 ignore_w("q0easdzxc");
+        inline constexpr mapperT2 ignore_e("qw0asdzxc");
+        inline constexpr mapperT2 ignore_a("qwe0sdzxc");
+        inline constexpr mapperT2 ignore_s("qwea0dzxc");
+        inline constexpr mapperT2 ignore_d("qweas0zxc");
+        inline constexpr mapperT2 ignore_z("qweasd0xc");
+        inline constexpr mapperT2 ignore_x("qweasdz0c");
+        inline constexpr mapperT2 ignore_c("qweasdzx0");
+
+        // Hexagonal emulation and emulated symmetry.
+
+        // qw-     q w
+        // asd -> a s d
+        // -xc     x c
+        // TODO: super problematic, especially refl...
+        inline constexpr mapperT2 hex_ignore("qw0"
+                                             "asd"
+                                             "0xc"); // ignore_(e, z)
+        // TODO: explain why 0 instead of e-z... ... is this really correct?
+        inline constexpr mapperT2 hex_wsx_refl("dw0"
+                                               "csq"
+                                               "0xa"); // swap q-a and d-c
+        inline constexpr mapperT2 hex_qsc_refl("qa0"
+                                               "wsx"
+                                               "0dc"); // swap ... TODO: complete...
+        inline constexpr mapperT2 hex_asd_refl("xc0"
+                                               "asd"
+                                               "0qw"); // swap (q,x) (w,c)
+
+        // TODO: complete...
+        // TODO: better name...
+        inline constexpr mapperT2 hex_qwxc_refl("wq0"
+                                                "dsa"
+                                                "0cx"); // swap(q,w), swap(a,d), swap(x,c)
+
+        inline constexpr mapperT2 hex_ro_180("cx0"
+                                             "dsa"
+                                             "0wq"); // 180
+        inline constexpr mapperT2 hex_ro_120("xa0"
+                                             "csq"
+                                             "0dw"); // 120 (clockwise)
+        inline constexpr mapperT2 hex_ro_60("aq0"
+                                            "xsw"
+                                            "0cd"); // 60 (clockwise)
+
+        // TODO: support ignore_(q, c) version?
+
+    } // namespace special_mappers
+
+    void tie(uniT& e, mapperT2 a, mapperT2 b = special_mappers::identity) {
         for (codeT c : codeT{}) {
             e.tie(a.map(c), b.map(c));
         }
+    }
+
+    // TODO: is this correct? can this correctly guarantee partition refinement
+    bool has_tie(uniT& e, mapperT2 a, mapperT2 b = special_mappers::identity) {
+        for (codeT c : codeT{}) {
+            if (e.rootof(a.map(c)) != e.rootof(b.map(c))) {
+                return false;
+            }
+        }
+        return true;
     }
 } // namespace legacy
 #endif
