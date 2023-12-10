@@ -19,12 +19,14 @@ namespace legacy {
         bool z, x, c;
     };
 
+    // TODO: remove the `T` suffix? initially this was for things like `codeT code`...
     // TODO: encode_traits (X_mask, from/to_env)?
     // TODO: remove remaining direct use of "512"...
     struct codeT {
         int v;
         constexpr /*implicit*/ operator int() const { return v; }
 
+        // TODO: might be better to define a separate type for range-for util...
         // Enough to support range-for loop.
         // https://en.cppreference.com/w/cpp/language/range-for
         constexpr static codeT begin() { return codeT{0}; }
@@ -38,6 +40,7 @@ namespace legacy {
         using map_to = std::array<T, 512>;
     };
 
+    // TODO: `encode` and `decode` are strictly subutils for codeT...
     constexpr codeT encode(const envT& env) {
         // ~ bool is implicitly promoted to int.
         // clang-format off
@@ -65,6 +68,7 @@ namespace legacy {
     }
 
     // TODO: better names...
+    // TODO: whether still useful after applying rule_pp header?
     constexpr bool decode_s(codeT code) {
         return (code >> 4) & 1;
     }
@@ -122,6 +126,7 @@ namespace legacy {
         return rule;
     }
 
+    // TODO: is this actually useful in the application? even if recorder is needed, is plain ruleT not affordable?
     class compressT {
         std::array<uint8_t, 64> bits; // as bitset.
     public:
@@ -151,6 +156,7 @@ namespace legacy {
     };
 } // namespace legacy
 
+// TODO: (together with pattern copy/pasting) move to a separate header...
 // TODO: talk about utf8 compatibility...
 namespace legacy {
     namespace _impl_details {
