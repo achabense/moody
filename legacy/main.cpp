@@ -3,6 +3,8 @@
 #include "app2.hpp"
 #include "app_sdl.hpp"
 
+#include "rule_pp.hpp"
+
 void debug_putavail() {
     ImVec2 pos = ImGui::GetCursorScreenPos();
     ImVec2 size = ImGui::GetContentRegionAvail();
@@ -78,9 +80,11 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
     // TODO: why does clang-format sort using clauses?
     using legacy::interT;
     using legacy::partitionT;
+
+    static interT inter = {};
+#if 0
     static partitionT::basespecE base = partitionT::Spatial;
     static partitionT::extrspecE extr = partitionT::None_;
-    static interT inter = {};
 
     const auto set_base_extr = [] {
         int ibase = base;
@@ -103,6 +107,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         base = partitionT::basespecE{ibase};
         extr = partitionT::extrspecE{iextr};
     };
+#endif
     const auto set_inter = [&target] {
         int itag = inter.tag;
         const auto tooltip = [](interT::tagE tag, const char* msg = "View from:") {
@@ -143,12 +148,12 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         display_target();
     }
     ImGui::SeparatorText("Settings");
-    set_base_extr();
-    ImGui::SeparatorText("Rule details");
+    // set_base_extr();
+    // ImGui::SeparatorText("Rule details");
     set_inter();
 
     // TODO: rename...
-    const auto& part = partitionT::getp(base, extr);
+    const auto& part = legacy::sample_partition(); // TODO: temporary
     const int k = part.k();
     const legacy::ruleT_data drule = inter.from_rule(target);
     {
@@ -174,11 +179,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
 
         ImGui::SameLine();
         if (ImGui::Button("Randomize") || imgui_keypressed(ImGuiKey_Enter, false)) {
-            static std::mt19937 rand(time(0));
-            // TODO: looks bad.
-            legacy::ruleT_data grule{};
-            random_fill_count(grule.data(), grule.data() + k, rcount, rand);
-            recorder.take(inter.to_rule(part.dispatch_from(grule)));
+            recorder.take(random_flip(inter, part, rcount, rcount)); // TODO: range...
         }
     }
     // TODO: redesign...
@@ -188,13 +189,13 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         // TODO: incorrect place...
         // TODO: how to keep state-symmetry in Diff mode?
         ImGui::AlignTextToFramePadding();
-        ImGui::Text("State symmetry: %d", (int)legacy::state_symmetric(target));
-        ImGui::SameLine();
-        if (ImGui::Button("Details")) {
-            extr = partitionT::State;
-            inter.tag = inter.Flip;
-        }
-        ImGui::SameLine();
+        // ImGui::Text("State symmetry: %d", (int)legacy::state_symmetric(target));
+        // ImGui::SameLine();
+        // if (ImGui::Button("Details")) {
+        //     extr = partitionT::State;
+        //     inter.tag = inter.Flip;
+        // }
+        // ImGui::SameLine();
         if (ImGui::Button("Mir")) {
             recorder.take(legacy::mirror(target));
         }
@@ -206,7 +207,8 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
             std::vector<legacy::compressT> vec;
             // TODO: actually independent of inter.
             vec.emplace_back(inter.to_rule(drule));
-            for (const auto& group : part.groups()) {
+            for (int j = 0; j < part.k(); ++j) {
+                const auto& group = part.jth_group(j);
                 legacy::ruleT_data r = drule;
                 legacy::flip_inplace(group, r);
                 vec.emplace_back(inter.to_rule(r));
@@ -240,7 +242,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                     ImGui::Separator(); // TODO: refine...
                 }
                 const bool inconsistent = scans[j] == scans.Inconsistent;
-                const auto& group = part.groups()[j];
+                const auto& group = part.jth_group(j);
                 const legacy::codeT head = group[0];
 
                 if (inconsistent) {

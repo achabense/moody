@@ -1,3 +1,4 @@
+#if 0
 #pragma once
 
 #include <map>
@@ -446,3 +447,4 @@ namespace legacy {
     000
     */
 } // namespace legacy
+#endif

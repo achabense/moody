@@ -7,7 +7,6 @@
 #include <random>
 #include <span>
 
-#include "partition.hpp"
 #include "rule.hpp"
 #include "tile.hpp"
 
