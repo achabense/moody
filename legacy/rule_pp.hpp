@@ -215,6 +215,7 @@ namespace legacy {
         }
         void add_eq(const equivT& e) {
             for (codeT c : codeT{}) {
+                // TODO: can be parof?
                 add_eq(c, e.rootof(c));
             }
         }
@@ -231,6 +232,7 @@ namespace legacy {
         // TODO: can this correctly check refinement-relation?
         bool has_eq(const equivT& e) const {
             for (codeT c : codeT{}) {
+                // TODO: can be parof?
                 if (!has_eq(c, e.rootof(c))) {
                     return false;
                 }
@@ -243,56 +245,55 @@ namespace legacy {
     }
 } // namespace legacy
 
-namespace legacy::special_mappers {
-    // TODO: add common prefix for better auto-completion...
+namespace legacy::inline special_mappers {
     // TODO: explain...
-    inline constexpr mapperT identity("qweasdzxc");
+    inline constexpr mapperT mp_identity("qweasdzxc");
 
     // Native symmetry.
     // Combination of these requirements can lead to ... TODO: explain, and explain "requirements"...
-    inline constexpr mapperT asd_refl("zxc"
-                                      "asd"
-                                      "qwe"); // '-'
-    inline constexpr mapperT wsx_refl("ewq"
-                                      "dsa"
-                                      "cxz"); // '|'
-    inline constexpr mapperT qsc_refl("qaz"
-                                      "wsx"
-                                      "edc"); // '\'
-    inline constexpr mapperT esz_refl("cde"
+    inline constexpr mapperT mp_asd_refl("zxc"
+                                         "asd"
+                                         "qwe"); // '-'
+    inline constexpr mapperT mp_wsx_refl("ewq"
+                                         "dsa"
+                                         "cxz"); // '|'
+    inline constexpr mapperT mp_qsc_refl("qaz"
+                                         "wsx"
+                                         "edc"); // '\'
+    inline constexpr mapperT mp_esz_refl("cde"
+                                         "xsw"
+                                         "zaq"); // '/'
+    inline constexpr mapperT mp_ro_180("cxz"
+                                       "dsa"
+                                       "ewq"); // 180
+    inline constexpr mapperT mp_ro_90("zaq"
                                       "xsw"
-                                      "zaq"); // '/'
-    inline constexpr mapperT ro_180("cxz"
-                                    "dsa"
-                                    "ewq"); // 180
-    inline constexpr mapperT ro_90("zaq"
-                                   "xsw"
-                                   "cde"); // 90 (clockwise)
+                                      "cde"); // 90 (clockwise)
     // TODO: does this imply 270 clockwise?
 
     // TODO: explain; actually irrelevant of symmetry...
     // 1. I misunderstood "rotate" symmetry. "ro45" is never about symmetry (I've no idea what it is)
     // 2. As seemingly-senseless partition like ro45 can make non-trivial patterns, should support after all...
-    inline constexpr mapperT ro_45("aqw"
-                                   "zse"
-                                   "xcd"); // "45" clockwise. TODO: explain...
+    inline constexpr mapperT mp_ro_45("aqw"
+                                      "zse"
+                                      "xcd"); // "45" clockwise. TODO: explain...
     // TODO: support that totalistic...
 
     // TODO: explain. TODO: better name...
-    inline constexpr mapperT dual("!q!w!e"
-                                  "!a!s!d"
-                                  "!z!x!c");
+    inline constexpr mapperT mp_dual("!q!w!e"
+                                     "!a!s!d"
+                                     "!z!x!c");
 
     // TODO: about ignore_s and interT...
-    inline constexpr mapperT ignore_q("0weasdzxc");
-    inline constexpr mapperT ignore_w("q0easdzxc");
-    inline constexpr mapperT ignore_e("qw0asdzxc");
-    inline constexpr mapperT ignore_a("qwe0sdzxc");
-    inline constexpr mapperT ignore_s("qwea0dzxc");
-    inline constexpr mapperT ignore_d("qweas0zxc");
-    inline constexpr mapperT ignore_z("qweasd0xc");
-    inline constexpr mapperT ignore_x("qweasdz0c");
-    inline constexpr mapperT ignore_c("qweasdzx0");
+    inline constexpr mapperT mp_ignore_q("0weasdzxc");
+    inline constexpr mapperT mp_ignore_w("q0easdzxc");
+    inline constexpr mapperT mp_ignore_e("qw0asdzxc");
+    inline constexpr mapperT mp_ignore_a("qwe0sdzxc");
+    inline constexpr mapperT mp_ignore_s("qwea0dzxc");
+    inline constexpr mapperT mp_ignore_d("qweas0zxc");
+    inline constexpr mapperT mp_ignore_z("qweasd0xc");
+    inline constexpr mapperT mp_ignore_x("qweasdz0c");
+    inline constexpr mapperT mp_ignore_c("qweasdzx0");
 
     // Hexagonal emulation and emulated symmetry.
 
@@ -300,39 +301,39 @@ namespace legacy::special_mappers {
     // asd -> a s d
     // -xc     x c
     // TODO: super problematic, especially refl...
-    inline constexpr mapperT hex_ignore("qw0"
-                                        "asd"
-                                        "0xc"); // ignore_(e, z)
+    inline constexpr mapperT mp_hex_ignore("qw0"
+                                           "asd"
+                                           "0xc"); // ignore_(e, z)
     // TODO: explain why 0 instead of e-z... ... is this really correct?
-    inline constexpr mapperT hex_wsx_refl("dw0"
-                                          "csq"
-                                          "0xa"); // swap q-a and d-c
-    inline constexpr mapperT hex_qsc_refl("qa0"
-                                          "wsx"
-                                          "0dc"); // swap ... TODO: complete...
-    inline constexpr mapperT hex_asd_refl("xc0"
-                                          "asd"
-                                          "0qw"); // swap (q,x) (w,c)
+    inline constexpr mapperT mp_hex_wsx_refl("dw0"
+                                             "csq"
+                                             "0xa"); // swap q-a and d-c
+    inline constexpr mapperT mp_hex_qsc_refl("qa0"
+                                             "wsx"
+                                             "0dc"); // swap ... TODO: complete...
+    inline constexpr mapperT mp_hex_asd_refl("xc0"
+                                             "asd"
+                                             "0qw"); // swap (q,x) (w,c)
 
     // TODO: complete...
     // TODO: better name...
-    inline constexpr mapperT hex_qwxc_refl("wq0"
-                                           "dsa"
-                                           "0cx"); // swap(q,w), swap(a,d), swap(x,c)
+    inline constexpr mapperT mp_hex_qwxc_refl("wq0"
+                                              "dsa"
+                                              "0cx"); // swap(q,w), swap(a,d), swap(x,c)
 
-    inline constexpr mapperT hex_ro_180("cx0"
-                                        "dsa"
-                                        "0wq"); // 180
-    inline constexpr mapperT hex_ro_120("xa0"
-                                        "csq"
-                                        "0dw"); // 120 (clockwise)
-    inline constexpr mapperT hex_ro_60("aq0"
-                                       "xsw"
-                                       "0cd"); // 60 (clockwise)
+    inline constexpr mapperT mp_hex_ro_180("cx0"
+                                           "dsa"
+                                           "0wq"); // 180
+    inline constexpr mapperT mp_hex_ro_120("xa0"
+                                           "csq"
+                                           "0dw"); // 120 (clockwise)
+    inline constexpr mapperT mp_hex_ro_60("aq0"
+                                          "xsw"
+                                          "0cd"); // 60 (clockwise)
 
     // TODO: support ignore_(q, c) version?
 
-} // namespace legacy::special_mappers
+} // namespace legacy::inline special_mappers
 
 namespace legacy {
 
@@ -436,7 +437,7 @@ namespace legacy {
         int m_count[3];
 
     public:
-        static scanE scan(std::span<const codeT> group, const ruleT_data& rule) {
+        static scanE scan(groupT group, const ruleT_data& rule) {
             bool has[2]{};
             for (codeT code : group) {
                 if (has[!rule[code]]) {
@@ -468,6 +469,14 @@ namespace legacy {
             rule.map[c] = !rule.map[c];
         }
     }
+
+    // TODO: obscure???
+    inline void copy(groupT group, const ruleT& source, ruleT& dest) {
+        for (codeT c : group) {
+            dest.map[c] = source.map[c];
+        }
+    }
+
     // TODO: preconditions...
     // void random_flip(const interT& inter, const partitionT& par, const partialT& constraints, int count);
     inline ruleT random_flip(const interT& inter, const partitionT& par, int count_min, int count_max) {
@@ -500,17 +509,20 @@ namespace legacy {
         }
         return eq;
     }
+    inline equivT make_eq(mapperT a, mapperT b = mp_identity) {
+        equivT eq{};
+        eq.add_eq(a, b);
+        return eq;
+    }
     inline equivT make_eq_internal(std::vector<mapperT> eqs) {
         equivT eq{};
         for (const auto& e : eqs) {
-            eq.add_eq(e, special_mappers::identity);
+            eq.add_eq(e, mp_identity);
         }
         return eq;
     }
     inline const partitionT& sample_partition() {
-        using namespace special_mappers;
-        // static const partitionT p(make_eq_internal({asd_refl, wsx_refl, qsc_refl, esz_refl, ro_90}));
-        static const partitionT p(make_eq_internal({hex_ro_60, hex_asd_refl, hex_ignore}));
+        static const partitionT p(make_eq_internal({mp_asd_refl, mp_wsx_refl, mp_qsc_refl, mp_esz_refl, mp_ro_90}));
 
         return p;
     }

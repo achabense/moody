@@ -27,20 +27,6 @@ namespace legacy {
         }
         return mir;
     }
-
-    // TODO: flip is able to pass through interT (flip on group directly)...
-    void flip_inplace(const groupT& group, ruleT_data& rule) {
-        for (codeT code : group) {
-            rule[code] = !rule[code];
-        }
-    }
-
-    void set_inplace(const groupT& group, ruleT_data& rule, bool b) {
-        for (codeT code : group) {
-            rule[code] = b;
-        }
-    }
-
 } // namespace legacy
 
 // TODO: should be a class... how to decouple? ...
@@ -82,32 +68,6 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
     using legacy::partitionT;
 
     static interT inter = {};
-#if 0
-    static partitionT::basespecE base = partitionT::Spatial;
-    static partitionT::extrspecE extr = partitionT::None_;
-
-    const auto set_base_extr = [] {
-        int ibase = base;
-        int iextr = extr;
-
-        ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted("Base");
-        ImGui::SameLine();
-        ImGui::Combo("##MainMode", &ibase, partitionT::basespecE_names, partitionT::basespecE_size);
-
-        ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted("Extr");
-        ImGui::SameLine();
-        ImGui::RadioButton("none", &iextr, partitionT::None_);
-        ImGui::SameLine();
-        ImGui::RadioButton("paired", &iextr, partitionT::Paired);
-        ImGui::SameLine();
-        ImGui::RadioButton("state", &iextr, partitionT::State);
-
-        base = partitionT::basespecE{ibase};
-        extr = partitionT::extrspecE{iextr};
-    };
-#endif
     const auto set_inter = [&target] {
         int itag = inter.tag;
         const auto tooltip = [](interT::tagE tag, const char* msg = "View from:") {
@@ -148,8 +108,6 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         display_target();
     }
     ImGui::SeparatorText("Settings");
-    // set_base_extr();
-    // ImGui::SeparatorText("Rule details");
     set_inter();
 
     // TODO: rename...
@@ -205,13 +163,12 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         ImGui::SameLine();
         if (ImGui::Button("Flip each group")) {
             std::vector<legacy::compressT> vec;
-            // TODO: actually independent of inter.
-            vec.emplace_back(inter.to_rule(drule));
+            vec.emplace_back(target);
             for (int j = 0; j < part.k(); ++j) {
                 const auto& group = part.jth_group(j);
-                legacy::ruleT_data r = drule;
-                legacy::flip_inplace(group, r);
-                vec.emplace_back(inter.to_rule(r));
+                legacy::ruleT r = target;
+                legacy::flip(group, r);
+                vec.emplace_back(r);
             }
             recorder.replace(std::move(vec));
             logger::log_temp(300ms, "...");
@@ -270,6 +227,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                                 ImGui::SameLine();
                             }
                             // TODO: change color?
+                            // TODO: what is tint_col?
                             icons.image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
                             ImGui::SameLine();
                             ImGui::AlignTextToFramePadding();
@@ -280,15 +238,13 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                 }
                 if (button) {
                     // TODO: document this behavior... (keyctrl->resolve conflicts)
-                    legacy::ruleT_data r = drule;
+                    legacy::ruleT r = target;
                     if (ImGui::GetIO().KeyCtrl) {
-                        const bool b = !drule[group[0]];
-                        legacy::set_inplace(group, r, b);
+                        legacy::copy(group, inter.get_viewer(), r);
                     } else {
-                        // TODO: actually independent of inter.
-                        legacy::flip_inplace(group, r);
+                        legacy::flip(group, r);
                     }
-                    recorder.take(inter.to_rule(r));
+                    recorder.take(r);
                 }
             }
             ImGui::PopStyleVar(2);
