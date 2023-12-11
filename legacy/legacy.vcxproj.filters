@@ -39,9 +39,6 @@
     <ClInclude Include="imgui\imgui_internal.h">
       <Filter>imgui</Filter>
     </ClInclude>
-    <ClInclude Include="partition.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="app.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
