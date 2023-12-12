@@ -137,7 +137,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
 
         ImGui::SameLine();
         if (ImGui::Button("Randomize") || imgui_keypressed(ImGuiKey_Enter, false)) {
-            recorder.take(random_flip(inter, part, rcount, rcount)); // TODO: range...
+            recorder.take(random_flip(inter.get_viewer(), part, rcount, rcount)); // TODO: range...
         }
     }
     // TODO: redesign...
@@ -529,7 +529,7 @@ int main(int argc, char** argv) {
                 ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1);
 
                 static char buf_pos[20]{};
-                const auto filter = [](ImGuiInputTextCallbackData* data) {
+                const auto filter = [](ImGuiInputTextCallbackData* data) -> int {
                     return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
                 };
                 ImGui::SameLine();
@@ -640,7 +640,7 @@ int main(int argc, char** argv) {
                     if (imgui_keypressed(ImGuiKey_C, false)) {
                         // TODO: export-as-rle...
                         legacy::tileT t({.width = x2 - x1, .height = y2 - y1});
-                        runner.tile()._sample_unchecked(x1, y1, x2 - x1, y2 - y1, t);
+                        runner.tile().copy_to(x1, y1, x2 - x1, y2 - y1, t, 0, 0);
                         std::string str = std::format("x = {}, y = {}, rule = {}\n{}", t.width(), t.height(),
                                                       legacy::to_MAP_str(ctrl.rule), legacy::to_rle_str(t));
                         ImGui::SetClipboardText(str.c_str());

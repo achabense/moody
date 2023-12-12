@@ -173,14 +173,12 @@ namespace legacy {
             return std::accumulate(begin(), end(), 0);
         }
 
-        // TODO: experimental, redesign...
-        // TODO: how to return correctly?
-        // TODO: condition...
-        void _sample_unchecked(int fx, int fy, int width, int height, tileT& dest) const {
+        void copy_to(int sx, int sy, int width, int height, tileT& dest, int dx, int dy) const {
             assert(this != &dest);
-            dest.resize({.width = width, .height = height});
-            for (int y = fy; y < fy + height; ++y) {
-                std::copy_n(line(y) + fx, width, dest.line(y - fy));
+            // TODO: precondition...
+
+            for (int y = 0; y < height; ++y) {
+                std::copy_n(line(sy + y) + sx, width, dest.line(dy + y) + dx);
             }
         }
     };

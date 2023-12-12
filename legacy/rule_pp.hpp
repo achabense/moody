@@ -8,8 +8,10 @@
 
 namespace legacy {
     inline bool will_flick(const ruleT& rule) {
-        // TODO: adhoc...
-        return rule(codeT{0}) == 1 && rule(codeT{511}) == 0; // TODO: more robust encoding?
+        // TODO: still ugly...
+        assert(encode({0, 0, 0, 0, 0, 0, 0, 0, 0}) == 0);
+        assert(encode({1, 1, 1, 1, 1, 1, 1, 1, 1}) == 511);
+        return rule(codeT{0}) == 1 && rule(codeT{511}) == 0;
     }
 
     // TODO: rename / explain...
@@ -33,8 +35,6 @@ namespace legacy {
         }
 #endif
     };
-
-    using ruleT_data = ruleT::data_type;
 
     // Interpretation of ruleT_data.
     // TODO: explain...
@@ -141,6 +141,8 @@ namespace legacy {
                 } else if (t >= q && t <= c) {
                     return qweasdzxc[t - q];
                 } else {
+                    assert(t >= nq && t <= nz);
+                    // TODO: how to silence the warning?
                     return !qweasdzxc[t - nq];
                 }
             };
@@ -463,7 +465,6 @@ namespace legacy {
         int count(scanE s) const { return m_count[s]; }
     };
 
-    // TODO: remove that in main.cpp
     inline void flip(groupT group, ruleT& rule) {
         for (codeT c : group) {
             rule.map[c] = !rule.map[c];
@@ -471,6 +472,7 @@ namespace legacy {
     }
 
     // TODO: obscure???
+    // inline void set(groupT group, const interT& i, bool b, ruleT& dest);
     inline void copy(groupT group, const ruleT& source, ruleT& dest) {
         for (codeT c : group) {
             dest.map[c] = source.map[c];
@@ -479,9 +481,8 @@ namespace legacy {
 
     // TODO: preconditions...
     // void random_flip(const interT& inter, const partitionT& par, const partialT& constraints, int count);
-    inline ruleT random_flip(const interT& inter, const partitionT& par, int count_min, int count_max) {
+    inline ruleT random_flip(ruleT r, const partitionT& par, int count_min, int count_max) {
         static std::mt19937 rand(time(0));
-        ruleT r = inter.get_viewer();
         // flip some...
         std::vector<groupT> gs;
         for (int j = 0; j < par.k(); ++j) {
@@ -495,7 +496,7 @@ namespace legacy {
         return r;
     }
 
-    // TODO: preconditions...
+    // TODO: precondition: r satisfies {inter,par...}
     inline ruleT next_v(const interT& inter, const partitionT& par, const ruleT& r) {}
     inline ruleT prev_v(const interT& inter, const partitionT& par, const ruleT& r) {}
     inline ruleT next_perm(const interT& inter, const partitionT& par, const ruleT& r) {}

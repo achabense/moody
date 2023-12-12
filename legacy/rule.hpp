@@ -20,7 +20,6 @@ namespace legacy {
     };
 
     // TODO: remove the `T` suffix? initially this was for things like `codeT code`...
-    // TODO: encode_traits (X_mask, from/to_env)?
     // TODO: remove remaining direct use of "512"...
     struct codeT {
         int v;
@@ -73,20 +72,23 @@ namespace legacy {
         return (code >> 4) & 1;
     }
 
+#if 0
     constexpr codeT flip_s(codeT code) {
         return codeT{code ^ (1 << 4)};
     }
+#endif
 
     constexpr codeT flip_all(codeT code) {
         return codeT{~code & 511};
     }
 
+    // TODO: better rename to something independent of ruleT...
+    using ruleT_data = codeT::map_to<bool>;
+
     // TODO: rephrase...
     // Unambiguously refer to the map from env-code to the new state.
     struct ruleT {
-        using data_type = std::array<bool, 512>;
-
-        data_type map{}; // mapping of s->s'.
+        ruleT_data map{};
 
         bool operator()(codeT code) const { return map[code]; }
         bool operator()(const envT& env) const { //
