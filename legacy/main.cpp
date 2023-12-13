@@ -37,21 +37,44 @@ namespace legacy {
         bool selected = false;
         bool covered = false;
     };
-
+    // TODO: analyzer?
     class partition_collection {
-        std::vector<termT> terms; // TODO: group by concepts...
+        using termT_vec = std::vector<termT>;
+
+        termT_vec terms_ignore;
+        termT_vec terms_native;
+        termT_vec terms_misc;
+        termT_vec terms_hex;
+
+        // TODO: customized...
+
         std::optional<partitionT> par;
 
         void reset_par() {
             equivT q{};
-            for (auto& t : terms) {
-                if (t.selected) {
-                    q.add_eq(t.eq);
+            auto set = [&q](auto& terms) {
+                for (auto& t : terms) {
+                    if (t.selected) {
+                        q.add_eq(t.eq);
+                    }
                 }
-            }
-            for (auto& t : terms) {
-                t.covered = q.has_eq(t.eq);
-            }
+            };
+            set(terms_ignore);
+            set(terms_native);
+            set(terms_misc);
+            set(terms_hex);
+
+            auto test = [&q](auto& terms) {
+                for (auto& t : terms) {
+                    t.covered = q.has_eq(t.eq);
+                }
+            };
+
+            test(terms_ignore);
+            test(terms_native);
+            test(terms_misc);
+            test(terms_hex);
+
             par.emplace(q);
         }
 
@@ -59,49 +82,101 @@ namespace legacy {
         partition_collection() {
             auto mk = [](mapperT m) { return mapperT_pair{mp_identity, m}; };
 
-            terms.emplace_back("|", mk(mp_wsx_refl));
-            terms.emplace_back("-", mk(mp_asd_refl));
-            terms.emplace_back("\\", mk(mp_qsc_refl));
-            terms.emplace_back("/", mk(mp_esz_refl));
-            terms.emplace_back("R180", mk(mp_ro_180));
-            terms.emplace_back("R90", mk(mp_ro_90));
+            terms_ignore.emplace_back("q", mk(mp_ignore_q));
+            terms_ignore.emplace_back("w", mk(mp_ignore_w));
+            terms_ignore.emplace_back("e", mk(mp_ignore_e));
+            terms_ignore.emplace_back("a", mk(mp_ignore_a));
+            terms_ignore.emplace_back("s", mk(mp_ignore_s));
+            terms_ignore.emplace_back("d", mk(mp_ignore_d));
+            terms_ignore.emplace_back("z", mk(mp_ignore_z));
+            terms_ignore.emplace_back("x", mk(mp_ignore_x));
+            terms_ignore.emplace_back("c", mk(mp_ignore_c));
 
-            // TODO: misc?
-            terms.emplace_back("R45*", mk(mp_ro_45));
+            terms_native.emplace_back("|", mk(mp_wsx_refl));
+            terms_native.emplace_back("-", mk(mp_asd_refl));
+            terms_native.emplace_back("\\", mk(mp_qsc_refl));
+            terms_native.emplace_back("/", mk(mp_esz_refl));
+            terms_native.emplace_back("R180", mk(mp_ro_180));
+            terms_native.emplace_back("R90", mk(mp_ro_90));
 
-            terms.emplace_back("Dual", mk(mp_dual));
+            terms_misc.emplace_back("*R45", mk(mp_ro_45));
+            terms_misc.emplace_back("*Tota", mk(mp_tot_a));
+            terms_misc.emplace_back("*Totb", mk(mp_tot_b));
+            terms_misc.emplace_back("Dual", mk(mp_dual));
 
-            terms.emplace_back("q", mk(mp_ignore_q));
-            terms.emplace_back("w", mk(mp_ignore_w));
-            terms.emplace_back("e", mk(mp_ignore_e));
-            terms.emplace_back("a", mk(mp_ignore_a));
-            terms.emplace_back("s", mk(mp_ignore_s));
-            terms.emplace_back("d", mk(mp_ignore_d));
-            terms.emplace_back("z", mk(mp_ignore_z));
-            terms.emplace_back("x", mk(mp_ignore_x));
-            terms.emplace_back("c", mk(mp_ignore_c));
+            terms_hex.emplace_back("Hex", mk(mp_hex_ignore));
+            terms_hex.emplace_back("|", mk(mp_hex_wsx_refl));
+            terms_hex.emplace_back("-", mk(mp_hex_asd_refl));
+            terms_hex.emplace_back("HexR180", mk(mp_hex_ro_180));
+            terms_hex.emplace_back("HexR120", mk(mp_hex_ro_120));
+            terms_hex.emplace_back("HexR60", mk(mp_hex_ro_60));
+            // TODO: more...
 
             reset_par();
         }
 
         const partitionT& get_par() {
-            bool sel = false;
-            if (ImGui::BeginTable(".....", terms.size(), ImGuiTableFlags_BordersInner)) {
-                ImGui::TableNextRow();
-                for (auto& t : terms) {
-                    ImGui::TableNextColumn();
-                    if (ImGui::Selectable(t.msg, &t.selected)) {
-                        sel = true;
-                    }
-                }
-                ImGui::TableNextRow();
+            auto show_pair = [](const mapperT_pair& q) {
+                std::string up, cn, dw;
+                // TODO: too clumsy...
+                static const char* const strs[]{" 0", " 1", " q", " w", " e", " a", " s", " d", " z", " x",
+                                                " c", "!q", "!w", "!e", "!a", "!s", "!d", "!z", "!x", "!c"};
 
-                for (auto& t : terms) {
-                    ImGui::TableNextColumn();
-                    ImGui::Text(t.covered ? "y" : "-");
+                up += strs[q.a.q2];
+                up += strs[q.a.w2];
+                up += strs[q.a.e2];
+                up += "  ";
+                up += strs[q.b.q2];
+                up += strs[q.b.w2];
+                up += strs[q.b.e2];
+
+                cn += strs[q.a.a2];
+                cn += strs[q.a.s2];
+                cn += strs[q.a.d2];
+                cn += " ~";
+                cn += strs[q.b.a2];
+                cn += strs[q.b.s2];
+                cn += strs[q.b.d2];
+
+                dw += strs[q.a.z2];
+                dw += strs[q.a.x2];
+                dw += strs[q.a.c2];
+                dw += "  ";
+                dw += strs[q.b.z2];
+                dw += strs[q.b.x2];
+                dw += strs[q.b.c2];
+
+                imgui_str(up + " \n" + cn + " \n" + dw + " ");
+            };
+
+            bool sel = false;
+            // TODO: tooo ugly...
+            auto table = [&](auto& terms) {
+                if (ImGui::BeginTable(".....", terms.size(), ImGuiTableFlags_BordersInner)) {
+                    ImGui::TableNextRow();
+                    for (auto& t : terms) {
+                        ImGui::TableNextColumn();
+                        if (ImGui::Selectable(t.msg, &t.selected)) {
+                            sel = true;
+                        }
+                        if (ImGui::BeginItemTooltip()) {
+                            show_pair(t.eq);
+                            ImGui::EndTooltip();
+                        }
+                    }
+                    ImGui::TableNextRow();
+
+                    for (auto& t : terms) {
+                        ImGui::TableNextColumn();
+                        ImGui::Text(t.covered ? "y" : "-");
+                    }
+                    ImGui::EndTable();
                 }
-                ImGui::EndTable();
-            }
+            };
+            table(terms_ignore); // ignore should be rendered differently...
+            table(terms_native);
+            table(terms_misc);
+            table(terms_hex);
 
             if (sel) {
                 reset_par();

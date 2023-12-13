@@ -270,6 +270,14 @@ namespace legacy::inline special_mappers {
     inline constexpr mapperT mp_ro_45("aqw"
                                       "zse"
                                       "xcd"); // "45" clockwise. TODO: explain...
+    // TODO: better name...
+    inline constexpr mapperT mp_tot_a("wqe"
+                                      "asd"
+                                      "zxc");
+    inline constexpr mapperT mp_tot_b("qse"
+                                      "awd"
+                                      "zxc");
+
     // TODO: support that totalistic...
 
     // TODO: explain. TODO: better name...
