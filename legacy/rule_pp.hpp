@@ -9,8 +9,8 @@
 namespace legacy {
     inline bool will_flick(const ruleT& rule) {
         // TODO: still ugly...
-        assert(encode({0, 0, 0, 0, 0, 0, 0, 0, 0}) == 0);
-        assert(encode({1, 1, 1, 1, 1, 1, 1, 1, 1}) == 511);
+        static_assert(encode({0, 0, 0, 0, 0, 0, 0, 0, 0}) == 0);
+        static_assert(encode({1, 1, 1, 1, 1, 1, 1, 1, 1}) == 511);
         return rule(codeT{0}) == 1 && rule(codeT{511}) == 0;
     }
 
@@ -54,8 +54,13 @@ namespace legacy {
 
         const ruleT& get_viewer(tagE tag) const {
             static constexpr ruleT zero{};
-            // TODO: mkrule is not  quite useful... remove it finally...
-            static constexpr ruleT identity = mkrule(decode_s);
+            static constexpr ruleT identity = [] {
+                ruleT rule{};
+                for (codeT code : codeT{}) {
+                    rule.map[code] = decode_s(code);
+                }
+                return rule;
+            }();
 
             switch (tag) {
             case Value: return zero;

@@ -13,8 +13,7 @@ void debug_putavail() {
 
 namespace legacy {
     // TODO: proper name...
-    // TODO: not using mkrule; tends to be very obscure...
-    ruleT mirror(const ruleT& rule) {
+    inline ruleT mirror(const ruleT& rule) {
         ruleT mir{};
         for (codeT code : codeT{}) {
             codeT codex = flip_all(code);

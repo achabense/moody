@@ -65,7 +65,8 @@ public:
 
     void run(const legacy::ruleT& rule, int count = 1) {
         for (int c = 0; c < count; ++c) {
-            m_tile.gather().apply(rule, m_side);
+            m_tile.gather(m_tile, m_tile, m_tile, m_tile, m_tile, m_tile, m_tile, m_tile);
+            m_tile.apply(rule, m_side);
             m_tile.swap(m_side);
 
             ++m_gen;

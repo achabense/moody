@@ -101,15 +101,6 @@ namespace legacy {
         friend bool operator==(const ruleT&, const ruleT&) = default;
     };
 
-    // TODO: not widely applied; whether to remove?
-    constexpr ruleT mkrule(const auto& rulefn /*bool(codeT)*/) {
-        ruleT rule{};
-        for (codeT code : codeT{}) {
-            rule.map[code] = rulefn(code);
-        }
-        return rule;
-    }
-
     // "Convay's Game of Life" rule.
     inline ruleT game_of_life() {
         // b3 s23

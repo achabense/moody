@@ -2,6 +2,7 @@
 
 // TODO: only for accumulate...
 #include <numeric>
+// #include <span>
 
 #include "rule.hpp"
 
@@ -75,6 +76,10 @@ namespace legacy {
             return _line(y + 1);
         }
 
+        // TODO: ? whether to expose consecutive data?
+        // std::span<bool> data() { return {line(0), line(0) + area()}; }
+        // std::span<const bool> data() const { return {line(0), line(0) + area()}; }
+
         bool* begin() { return line(0); }
         const bool* begin() const { return line(0); }
 
@@ -95,24 +100,26 @@ namespace legacy {
             return {lr[_y * 2], lr[_y * 2 + 1]};
         }
 
+    public:
         // TODO: This could be used to support boundless space.
-        const tileT& _gather( // clang-format off
-            const tileT* q, const tileT* w, const tileT* e,
-            const tileT* a, /*    this   */ const tileT* d,
-            const tileT* z, const tileT* x, const tileT* c
+        // TODO: const or not?
+        const tileT& gather( // clang-format off
+            const tileT& q, const tileT& w, const tileT& e,
+            const tileT& a, /*   *this   */ const tileT& d,
+            const tileT& z, const tileT& x, const tileT& c
         ) { // clang-format on
             // assert m_shape == *.m_shape.
             const int width = m_size.width, height = m_size.height;
 
             // TODO: copy_line method? (std::copy_n is less clear than memcpy here)
             // (why does memxxx take dest as first arg, while copy_n take dest as last?)
-            memcpy(_line(0), w->_line(height), width * sizeof(bool));
-            memcpy(_line(height + 1), x->_line(1), width * sizeof(bool));
+            memcpy(_line(0), w._line(height), width * sizeof(bool));
+            memcpy(_line(height + 1), x._line(1), width * sizeof(bool));
 
-            _set_lr(0, q->_line(height)[width - 1], e->_line(height)[0]);
-            _set_lr(height + 1, z->_line(1)[width - 1], c->_line(1)[0]);
+            _set_lr(0, q._line(height)[width - 1], e._line(height)[0]);
+            _set_lr(height + 1, z._line(1)[width - 1], c._line(1)[0]);
             for (int _y = 1; _y <= height; ++_y) {
-                _set_lr(_y, a->_line(_y)[width - 1], d->_line(_y)[0]);
+                _set_lr(_y, a._line(_y)[width - 1], d._line(_y)[0]);
             }
 
             return *this;
@@ -158,13 +165,6 @@ namespace legacy {
         }
 
     public:
-        // Torus.
-        // TODO: remove this?
-        const tileT& gather() {
-            _gather(this, this, this, this, this, this, this, this);
-            return *this;
-        }
-
         void apply(const ruleT& rule, tileT& dest) const { //
             _apply(rule, dest);
         }
