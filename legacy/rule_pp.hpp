@@ -56,7 +56,7 @@ namespace legacy {
             static constexpr ruleT zero{};
             static constexpr ruleT identity = [] {
                 ruleT rule{};
-                for (codeT code : codeT{}) {
+                for_each_code(code) {
                     rule.map[code] = decode_s(code);
                 }
                 return rule;
@@ -75,7 +75,7 @@ namespace legacy {
         ruleT_data from_rule(const ruleT& rule) const {
             const ruleT& viewer = get_viewer();
             ruleT_data diff{};
-            for (codeT code : codeT{}) {
+            for_each_code(code) {
                 diff[code] = rule(code) == viewer(code) ? 0 : 1;
             }
             return diff;
@@ -84,7 +84,7 @@ namespace legacy {
         ruleT to_rule(const ruleT_data& diff) const {
             const ruleT& viewer = get_viewer();
             ruleT rule{};
-            for (codeT code : codeT{}) {
+            for_each_code(code) {
                 rule.map[code] = diff[code] ? !viewer(code) : viewer(code);
             }
             return rule;
@@ -168,8 +168,8 @@ namespace legacy {
     struct mapperT_pair {
         mapperT a, b;
         bool test(const ruleT_data& rule) const {
-            for (codeT c : codeT{}) {
-                if (rule[a(c)] != rule[b(c)]) {
+            for_each_code(code) {
+                if (rule[a(code)] != rule[b(code)]) {
                     return false;
                 }
             }
@@ -185,8 +185,8 @@ namespace legacy {
 
     public:
         equivT() {
-            for (codeT c : codeT{}) {
-                parof[c] = c;
+            for_each_code(code) {
+                parof[code] = code;
             }
         }
 
@@ -201,7 +201,7 @@ namespace legacy {
         }
 
         bool test(const ruleT_data& r) const {
-            for (codeT code : codeT{}) {
+            for_each_code(code) {
                 if (r[code] != r[parof[code]]) {
                     return false;
                 }
@@ -211,21 +211,21 @@ namespace legacy {
 
         void add_eq(codeT a, codeT b) { parof[rootof(a)] = rootof(b); }
         void add_eq(const mapperT_pair& e) {
-            for (codeT c : codeT{}) {
-                add_eq(e.a(c), e.b(c));
+            for_each_code(code) {
+                add_eq(e.a(code), e.b(code));
             }
         }
         void add_eq(const equivT& e) {
-            for (codeT c : codeT{}) {
+            for_each_code(code) {
                 // TODO: can be parof?
-                add_eq(c, e.rootof(c));
+                add_eq(code, e.rootof(code));
             }
         }
 
         bool has_eq(codeT a, codeT b) const { return rootof(a) == rootof(b); }
         bool has_eq(const mapperT_pair& e) const {
-            for (codeT c : codeT{}) {
-                if (!has_eq(e.a(c), e.b(c))) {
+            for_each_code(code) {
+                if (!has_eq(e.a(code), e.b(code))) {
                     return false;
                 }
             }
@@ -233,9 +233,9 @@ namespace legacy {
         }
         // TODO: can this correctly check refinement-relation?
         bool has_eq(const equivT& e) const {
-            for (codeT c : codeT{}) {
+            for_each_code(code) {
                 // TODO: can be parof?
-                if (!has_eq(c, e.rootof(c))) {
+                if (!has_eq(code, e.rootof(code))) {
                     return false;
                 }
             }
@@ -383,12 +383,12 @@ namespace legacy {
         /*implicit*/ partitionT(const equivT& u) {
             std::map<codeT, indexT> m;
             indexT i = 0;
-            for (codeT c : codeT{}) {
-                codeT head = u.rootof(c);
+            for_each_code(code) {
+                codeT head = u.rootof(code);
                 if (!m.contains(head)) {
                     m[head] = i++;
                 }
-                m_p[c] = m[head];
+                m_p[code] = m[head];
             }
 
             m_k = i;
@@ -408,14 +408,14 @@ namespace legacy {
                 m_groups[j] = {pos[j], count[j]};
             }
 
-            for (codeT code : codeT{}) {
+            for_each_code(code) {
                 indexT col = m_p[code];
                 m_data[pos[col]++] = code;
             }
         }
         // TODO: Is this needed?
         bool test(const ruleT_data& r) const {
-            for (codeT code : codeT{}) {
+            for_each_code(code) {
                 if (r[code] != r[head_for(code)]) {
                     return false;
                 }

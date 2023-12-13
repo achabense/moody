@@ -15,7 +15,7 @@ namespace legacy {
     // TODO: proper name...
     inline ruleT mirror(const ruleT& rule) {
         ruleT mir{};
-        for (codeT code : codeT{}) {
+        for_each_code(code) {
             codeT codex = flip_all(code);
             bool flip = decode_s(codex) != rule(codex);
             if (flip) {

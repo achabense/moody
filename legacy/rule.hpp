@@ -25,19 +25,16 @@ namespace legacy {
         int v;
         constexpr /*implicit*/ operator int() const { return v; }
 
-        // TODO: might be better to define a separate type for range-for util...
-        // Enough to support range-for loop.
-        // https://en.cppreference.com/w/cpp/language/range-for
-        constexpr static codeT begin() { return codeT{0}; }
-        constexpr static codeT end() { return codeT{512}; }
-        constexpr void operator++() { ++v; }
-        constexpr codeT operator*() const { return *this; }
-        constexpr friend bool operator==(const codeT&, const codeT&) = default;
+        // constexpr friend bool operator==(const codeT&, const codeT&) = default;
 
         // TODO: apply this in the future...
         template <class T>
         using map_to = std::array<T, 512>;
     };
+
+    // TODO: better name?
+    // This has been proven better than defining a bunch of code for range-for loop.
+#define for_each_code(name) for (::legacy::codeT name{.v = 0}; name.v < 512; ++name.v)
 
     // TODO: `encode` and `decode` are strictly subutils for codeT...
     constexpr codeT encode(const envT& env) {
@@ -105,7 +102,7 @@ namespace legacy {
     inline ruleT game_of_life() {
         // b3 s23
         ruleT rule{};
-        for (codeT code : codeT{}) {
+        for_each_code(code) {
             auto [q, w, e, a, s, d, z, x, c] = decode(code);
             int count = q + w + e + a + d + z + x + c;
             if (count == 2) { // 2:s ~ 0->0, 1->1 ~ equal to "s".
@@ -124,14 +121,14 @@ namespace legacy {
         std::array<uint8_t, 64> bits; // as bitset.
     public:
         explicit compressT(const ruleT& rule) : bits{} {
-            for (codeT code : codeT{}) {
+            for_each_code(code) {
                 bits[code / 8] |= rule(code) << (code % 8);
             }
         }
 
         /*implicit*/ operator ruleT() const {
             ruleT rule{};
-            for (codeT code : codeT{}) {
+            for_each_code(code) {
                 rule.map[code] = (bits[code / 8] >> (code % 8)) & 1;
             }
             return rule;
@@ -197,7 +194,7 @@ namespace legacy {
     inline std::string to_MAP_str(const ruleT& rule) {
         // MAP rule uses a different coding scheme.
         bool reordered[512]{};
-        for (codeT code : codeT{}) {
+        for_each_code(code) {
             auto [q, w, e, a, s, d, z, x, c] = decode(code);
             reordered[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1] = rule(code);
         }
@@ -241,7 +238,7 @@ namespace legacy {
             i += 6;
         }
         ruleT rule{};
-        for (codeT code : codeT{}) {
+        for_each_code(code) {
             auto [q, w, e, a, s, d, z, x, c] = decode(code);
             rule.map[code] = reordered[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1];
         }

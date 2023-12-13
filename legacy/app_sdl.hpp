@@ -215,7 +215,7 @@ public:
         m_texture = app_backend::create_texture(SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, width, height);
         // Uint32 pixels[512][3][3]; // TODO: explain why allocate...
         std::unique_ptr<Uint32[][3][3]> pixels(new Uint32[512][3][3]);
-        for (auto code : legacy::codeT{}) {
+        for_each_code(code) {
             auto [q, w, e, a, s, d, z, x, c] = legacy::decode(code);
             bool fill[3][3] = {{q, w, e}, {a, s, d}, {z, x, c}};
             for (int y = 0; y < 3; ++y) {
