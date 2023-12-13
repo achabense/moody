@@ -157,25 +157,20 @@ namespace legacy {
 
     // A pair of mapperT defines an equivalence relation.
     // TODO: explain... how to transfer to rule-concepts?
-
     // TODO: is this correct(enough)?
     // Conceptual:
     // Efficient rule-checking doesn't actually need intermediate types:
-    inline bool test(const ruleT_data& rule, mapperT a, mapperT b) {
-        for (codeT c : codeT{}) {
-            if (rule[a(c)] != rule[b(c)]) {
-                return false;
+    struct mapperT_pair {
+        mapperT a, b;
+        bool test(const ruleT_data& rule) const {
+            for (codeT c : codeT{}) {
+                if (rule[a(c)] != rule[b(c)]) {
+                    return false;
+                }
             }
+            return true;
         }
-        return true;
-    }
-
-    // TODO: refine "concept"...
-    // 1. Does a rule satisfy the concept.
-    // 2. How to generate all possible rules that satisfy some concepts...
-    inline bool satisfies(const ruleT& rule, const interT& inter, mapperT a, mapperT b) {
-        return test(inter.from_rule(rule), a, b);
-    }
+    };
 
     // Partition of all codeT ({0}~{511}), in the form of union-find set.
     // (Lacks the ability to efficiently list groups)
@@ -210,9 +205,9 @@ namespace legacy {
         }
 
         void add_eq(codeT a, codeT b) { parof[rootof(a)] = rootof(b); }
-        void add_eq(mapperT a, mapperT b) {
+        void add_eq(const mapperT_pair& e) {
             for (codeT c : codeT{}) {
-                add_eq(a(c), b(c));
+                add_eq(e.a(c), e.b(c));
             }
         }
         void add_eq(const equivT& e) {
@@ -223,9 +218,9 @@ namespace legacy {
         }
 
         bool has_eq(codeT a, codeT b) const { return rootof(a) == rootof(b); }
-        bool has_eq(mapperT a, mapperT b) const {
+        bool has_eq(const mapperT_pair& e) const {
             for (codeT c : codeT{}) {
-                if (!has_eq(a(c), b(c))) {
+                if (!has_eq(e.a(c), e.b(c))) {
                     return false;
                 }
             }
@@ -241,10 +236,6 @@ namespace legacy {
             }
         }
     };
-
-    inline bool satisfies(const ruleT& rule, const interT& inter, const equivT& q) {
-        return q.test(inter.from_rule(rule));
-    }
 } // namespace legacy
 
 namespace legacy::inline special_mappers {
@@ -422,9 +413,18 @@ namespace legacy {
         // TODO: refer to https://en.wikipedia.org/wiki/Partition_of_a_set#Refinement_of_partitions
     };
 
+    // TODO: refine "concept"...
+    // 1. Does a rule satisfy the concept.
+    // 2. How to generate all possible rules that satisfy some concepts...
     // TODO: but where does inter come from?
-    inline bool satisfies(const ruleT& rule, const interT& inter, const partitionT& par) {
-        return par.test(inter.from_rule(rule));
+    inline bool satisfies(const ruleT& rule, const interT& inter, const mapperT_pair& q) {
+        return q.test(inter.from_rule(rule));
+    }
+    inline bool satisfies(const ruleT& rule, const interT& inter, const equivT& q) {
+        return q.test(inter.from_rule(rule));
+    }
+    inline bool satisfies(const ruleT& rule, const interT& inter, const partitionT& q) {
+        return q.test(inter.from_rule(rule));
     }
 
     class scanlistT {
@@ -501,31 +501,4 @@ namespace legacy {
     inline ruleT prev_v(const interT& inter, const partitionT& par, const ruleT& r) {}
     inline ruleT next_perm(const interT& inter, const partitionT& par, const ruleT& r) {}
     inline ruleT prev_perm(const interT& inter, const partitionT& par, const ruleT& r) {}
-
-    // TODO: example. should not be used this way...
-    inline equivT make_eq(std::vector<std::pair<mapperT, mapperT>> eqs) {
-        equivT eq{};
-        for (const auto& [a, b] : eqs) {
-            eq.add_eq(a, b);
-        }
-        return eq;
-    }
-    inline equivT make_eq(mapperT a, mapperT b = mp_identity) {
-        equivT eq{};
-        eq.add_eq(a, b);
-        return eq;
-    }
-    inline equivT make_eq_internal(std::vector<mapperT> eqs) {
-        equivT eq{};
-        for (const auto& e : eqs) {
-            eq.add_eq(e, mp_identity);
-        }
-        return eq;
-    }
-    inline const partitionT& sample_partition() {
-        static const partitionT p(make_eq_internal({mp_asd_refl, mp_wsx_refl, mp_qsc_refl, mp_esz_refl, mp_ro_90}));
-
-        return p;
-    }
-
 } // namespace legacy

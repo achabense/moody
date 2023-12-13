@@ -29,6 +29,89 @@ namespace legacy {
     }
 } // namespace legacy
 
+namespace legacy {
+    struct termT {
+        const char* msg;
+        mapperT_pair eq;
+
+        bool selected = false;
+        bool covered = false;
+    };
+
+    class partition_collection {
+        std::vector<termT> terms; // TODO: group by concepts...
+        std::optional<partitionT> par;
+
+        void reset_par() {
+            equivT q{};
+            for (auto& t : terms) {
+                if (t.selected) {
+                    q.add_eq(t.eq);
+                }
+            }
+            for (auto& t : terms) {
+                t.covered = q.has_eq(t.eq);
+            }
+            par.emplace(q);
+        }
+
+    public:
+        partition_collection() {
+            auto mk = [](mapperT m) { return mapperT_pair{mp_identity, m}; };
+
+            terms.emplace_back("|", mk(mp_wsx_refl));
+            terms.emplace_back("-", mk(mp_asd_refl));
+            terms.emplace_back("\\", mk(mp_qsc_refl));
+            terms.emplace_back("/", mk(mp_esz_refl));
+            terms.emplace_back("R180", mk(mp_ro_180));
+            terms.emplace_back("R90", mk(mp_ro_90));
+
+            // TODO: misc?
+            terms.emplace_back("R45*", mk(mp_ro_45));
+
+            terms.emplace_back("Dual", mk(mp_dual));
+
+            terms.emplace_back("q", mk(mp_ignore_q));
+            terms.emplace_back("w", mk(mp_ignore_w));
+            terms.emplace_back("e", mk(mp_ignore_e));
+            terms.emplace_back("a", mk(mp_ignore_a));
+            terms.emplace_back("s", mk(mp_ignore_s));
+            terms.emplace_back("d", mk(mp_ignore_d));
+            terms.emplace_back("z", mk(mp_ignore_z));
+            terms.emplace_back("x", mk(mp_ignore_x));
+            terms.emplace_back("c", mk(mp_ignore_c));
+
+            reset_par();
+        }
+
+        const partitionT& get_par() {
+            bool sel = false;
+            if (ImGui::BeginTable(".....", terms.size(), ImGuiTableFlags_BordersInner)) {
+                ImGui::TableNextRow();
+                for (auto& t : terms) {
+                    ImGui::TableNextColumn();
+                    if (ImGui::Selectable(t.msg, &t.selected)) {
+                        sel = true;
+                    }
+                }
+                ImGui::TableNextRow();
+
+                for (auto& t : terms) {
+                    ImGui::TableNextColumn();
+                    ImGui::Text(t.covered ? "y" : "-");
+                }
+                ImGui::EndTable();
+            }
+
+            if (sel) {
+                reset_par();
+            }
+
+            return *par;
+        }
+    };
+} // namespace legacy
+
 // TODO: should be a class... how to decouple? ...
 void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_recorder& recorder) {
     const auto display_target = [&target, &recorder] {
@@ -111,7 +194,8 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
     set_inter();
 
     // TODO: rename...
-    const auto& part = legacy::sample_partition(); // TODO: temporary
+    static legacy::partition_collection parcol;
+    const auto& part = parcol.get_par();
     const int k = part.k();
     const legacy::ruleT_data drule = inter.from_rule(target);
     {
@@ -141,7 +225,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         }
     }
     // TODO: redesign...
-    if (false && ImGui::TreeNode("Misc")) {
+    if (true && ImGui::TreeNode("Misc")) {
         // TODO: should be redesigned...
 
         // TODO: incorrect place...
