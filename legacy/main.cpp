@@ -218,6 +218,51 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         imgui_strwrapped(rule_str);
     };
 
+    // TODO: redesign...
+    const auto cur_pos = [&recorder]() {
+        // TODO: +1 is clumsy. TODO: -> editor?
+        // TODO: pos may not reflect runner's real pos, as recorder can be modified on the way... may not
+        // matters
+        if (ImGui::Button("|<")) {
+            recorder.set_pos(0);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(">|")) {
+            recorder.set_pos(recorder.size() - 1);
+        }
+        ImGui::SameLine();
+        ImGui::Button(std::format("Total:{} At:{}###...", recorder.size(), recorder.pos() + 1).c_str());
+        if (ImGui::IsItemHovered()) {
+            if (ImGui::GetIO().MouseWheel < 0) { // scroll down
+                recorder.next();
+            } else if (ImGui::GetIO().MouseWheel > 0) { // scroll up
+                recorder.prev();
+            }
+        }
+        // TODO: is random-access useful?
+#if 0
+
+                static char buf_pos[20]{};
+                const auto filter = [](ImGuiInputTextCallbackData* data) -> int {
+                    return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
+                };
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(200);
+                if (ImGui::InputTextWithHint(
+                        "##Goto", "GOTO e.g. 2->enter", buf_pos, 20,
+                        ImGuiInputTextFlags_CallbackCharFilter | ImGuiInputTextFlags_EnterReturnsTrue, filter)) {
+                    int val{};
+                    if (std::from_chars(buf_pos, buf_pos + strlen(buf_pos), val).ec == std::errc{}) {
+                        recorder.set_pos(val - 1); // TODO: -1 is clumsy.
+                    }
+                    buf_pos[0] = '\0';
+
+                    // Regain focus:
+                    ImGui::SetKeyboardFocusHere(-1);
+                }
+#endif
+    };
+
     // TODO: explain...
     // TODO: for "paired", support 4-step modification (_,S,B,BS)... add new color?
     // TODO: why does clang-format sort using clauses?
@@ -263,6 +308,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
     if (auto child =
             imgui_childwindow("ForBorder", {}, true | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysAutoResize)) {
         display_target();
+        cur_pos();
     }
     ImGui::SeparatorText("Settings");
     set_inter();
@@ -667,52 +713,6 @@ int main(int argc, char** argv) {
         }
 
         const auto show_tile = [&] {
-            {
-                // TODO: redesign...
-                // TODO: +1 is clumsy. TODO: -> editor?
-                // TODO: pos may not reflect runner's real pos, as recorder can be modified on the way... may not
-                // matters
-                if (ImGui::Button("|<")) {
-                    recorder.set_pos(0);
-                }
-                ImGui::SameLine();
-                if (ImGui::Button(">|")) {
-                    recorder.set_pos(recorder.size() - 1);
-                }
-                ImGui::SameLine();
-                ImGui::Button(std::format("Total:{} At:{}###...", recorder.size(), recorder.pos() + 1).c_str());
-                // TODO: should belong to left plane...
-                if (ImGui::IsItemHovered()) {
-                    if (io.MouseWheel < 0) { // scroll down
-                        recorder.next();
-                    } else if (io.MouseWheel > 0) { // scroll up
-                        recorder.prev();
-                    }
-                }
-                // TODO: is random-access useful?
-#if 0
-
-                static char buf_pos[20]{};
-                const auto filter = [](ImGuiInputTextCallbackData* data) -> int {
-                    return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
-                };
-                ImGui::SameLine();
-                ImGui::SetNextItemWidth(200);
-                if (ImGui::InputTextWithHint(
-                        "##Goto", "GOTO e.g. 2->enter", buf_pos, 20,
-                        ImGuiInputTextFlags_CallbackCharFilter | ImGuiInputTextFlags_EnterReturnsTrue, filter)) {
-                    int val{};
-                    if (std::from_chars(buf_pos, buf_pos + strlen(buf_pos), val).ec == std::errc{}) {
-                        recorder.set_pos(val - 1); // TODO: -1 is clumsy.
-                    }
-                    buf_pos[0] = '\0';
-
-                    // Regain focus:
-                    ImGui::SetKeyboardFocusHere(-1);
-                }
-#endif
-            }
-
             ImGui::Text("Width:%d,Height:%d,Gen:%d,Density:%f", runner.tile().width(), runner.tile().height(),
                         runner.gen(), float(runner.tile().count()) / runner.tile().area());
 
