@@ -7,6 +7,7 @@
 #include "rule.hpp"
 
 namespace legacy {
+    // TODO: Document that this is not the only situation that flicking effect can occur...
     inline bool will_flick(const ruleT& rule) {
         // TODO: still ugly...
         static_assert(encode({0, 0, 0, 0, 0, 0, 0, 0, 0}) == 0);
@@ -146,7 +147,7 @@ namespace legacy {
                 } else if (t >= q && t <= c) {
                     return qweasdzxc[t - q];
                 } else {
-                    assert(t >= nq && t <= nz);
+                    assert(t >= nq && t <= nc);
                     // TODO: how to silence the warning?
                     return !qweasdzxc[t - nq];
                 }
@@ -512,6 +513,7 @@ namespace legacy {
     // TODO: precondition: r satisfies {inter,par...}
     inline ruleT next_v(const interT& inter, const partitionT& par, const ruleT& r) {}
     inline ruleT prev_v(const interT& inter, const partitionT& par, const ruleT& r) {}
+    // TODO: ++/--count when reaching end?
     inline ruleT next_perm(const interT& inter, const partitionT& par, const ruleT& r) {}
     inline ruleT prev_perm(const interT& inter, const partitionT& par, const ruleT& r) {}
 } // namespace legacy

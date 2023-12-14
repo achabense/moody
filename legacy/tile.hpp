@@ -113,8 +113,10 @@ namespace legacy {
 
             // TODO: copy_line method? (std::copy_n is less clear than memcpy here)
             // (why does memxxx take dest as first arg, while copy_n take dest as last?)
-            memcpy(_line(0), w._line(height), width * sizeof(bool));
-            memcpy(_line(height + 1), x._line(1), width * sizeof(bool));
+            // memcpy(_line(0), w._line(height), width * sizeof(bool));
+            // memcpy(_line(height + 1), x._line(1), width * sizeof(bool));
+            std::copy_n(w._line(height), width, _line(0));
+            std::copy_n(x._line(1), width, _line(height + 1));
 
             _set_lr(0, q._line(height)[width - 1], e._line(height)[0]);
             _set_lr(height + 1, z._line(1)[width - 1], c._line(1)[0]);
@@ -172,16 +174,16 @@ namespace legacy {
         int count() const { //
             return std::accumulate(begin(), end(), 0);
         }
-
-        void copy_to(int sx, int sy, int width, int height, tileT& dest, int dx, int dy) const {
-            assert(this != &dest);
-            // TODO: precondition...
-
-            for (int y = 0; y < height; ++y) {
-                std::copy_n(line(sy + y) + sx, width, dest.line(dy + y) + dx);
-            }
-        }
     };
+
+    inline void copy(const tileT& source, int sx, int sy, int width, int height, tileT& dest, int dx, int dy) {
+        assert(&source != &dest);
+        // TODO: precondition...
+
+        for (int y = 0; y < height; ++y) {
+            std::copy_n(source.line(sy + y) + sx, width, dest.line(dy + y) + dx);
+        }
+    }
 
     // TODO: experimental; refine...
     // TODO: together with to_MAP_str, shall be incorporated into a single header...

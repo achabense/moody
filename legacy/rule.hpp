@@ -23,7 +23,10 @@ namespace legacy {
     // TODO: remove remaining direct use of "512"...
     struct codeT {
         int v;
-        constexpr /*implicit*/ operator int() const { return v; }
+        constexpr /*implicit*/ operator int() const {
+            assert(v >= 0 && v < 512);
+            return v;
+        }
 
         // constexpr friend bool operator==(const codeT&, const codeT&) = default;
 
@@ -32,7 +35,8 @@ namespace legacy {
         using map_to = std::array<T, 512>;
     };
 
-    // TODO: better name?
+    // TODO: better name? for_each_situ?
+    // ~ should be name.v < 512
     // This has been proven better than defining a bunch of code for range-for loop.
 #define for_each_code(name) for (::legacy::codeT name{.v = 0}; name.v < 512; ++name.v)
 

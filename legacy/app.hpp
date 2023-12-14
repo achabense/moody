@@ -92,8 +92,6 @@ public:
         }
         m_tile.swap(m_side);
     }
-
-    // TODO: replace shift with sampling function (view-only...)
 };
 
 // Never empty.

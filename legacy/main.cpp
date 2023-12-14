@@ -549,8 +549,6 @@ public:
 
 // TODO: should enable guide-mode (with a switch...)
 // TODO: changes upon the same rule should be grouped together... how? (editor++)...
-// TODO: whether to support seed-saving? some patterns are located in certain seed states...
-// (maybe a lot less useful than pattern saving)
 // TODO: how to capture certain patterns? (editor++)...
 
 struct runner_ctrl {
@@ -670,8 +668,19 @@ int main(int argc, char** argv) {
 
         const auto show_tile = [&] {
             {
-                // TODO: refine...
-                ImGui::Button("Scroll to ...");
+                // TODO: redesign...
+                // TODO: +1 is clumsy. TODO: -> editor?
+                // TODO: pos may not reflect runner's real pos, as recorder can be modified on the way... may not
+                // matters
+                if (ImGui::Button("|<")) {
+                    recorder.set_pos(0);
+                }
+                ImGui::SameLine();
+                if (ImGui::Button(">|")) {
+                    recorder.set_pos(recorder.size() - 1);
+                }
+                ImGui::SameLine();
+                ImGui::Button(std::format("Total:{} At:{}###...", recorder.size(), recorder.pos() + 1).c_str());
                 // TODO: should belong to left plane...
                 if (ImGui::IsItemHovered()) {
                     if (io.MouseWheel < 0) { // scroll down
@@ -680,11 +689,8 @@ int main(int argc, char** argv) {
                         recorder.prev();
                     }
                 }
-                // TODO: +1 is clumsy. TODO: -> editor?
-                // TODO: pos may not reflect runner's real pos, as recorder can be modified on the way... may not
-                // matters
-                ImGui::SameLine();
-                ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1);
+                // TODO: is random-access useful?
+#if 0
 
                 static char buf_pos[20]{};
                 const auto filter = [](ImGuiInputTextCallbackData* data) -> int {
@@ -704,6 +710,7 @@ int main(int argc, char** argv) {
                     // Regain focus:
                     ImGui::SetKeyboardFocusHere(-1);
                 }
+#endif
             }
 
             ImGui::Text("Width:%d,Height:%d,Gen:%d,Density:%f", runner.tile().width(), runner.tile().height(),
@@ -798,7 +805,7 @@ int main(int argc, char** argv) {
                     if (imgui_keypressed(ImGuiKey_C, false)) {
                         // TODO: export-as-rle...
                         legacy::tileT t({.width = x2 - x1, .height = y2 - y1});
-                        runner.tile().copy_to(x1, y1, x2 - x1, y2 - y1, t, 0, 0);
+                        legacy::copy(runner.tile(), x1, y1, x2 - x1, y2 - y1, t, 0, 0);
                         std::string str = std::format("x = {}, y = {}, rule = {}\n{}", t.width(), t.height(),
                                                       legacy::to_MAP_str(ctrl.rule), legacy::to_rle_str(t));
                         ImGui::SetClipboardText(str.c_str());
