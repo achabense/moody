@@ -4,11 +4,15 @@
 
 #include <deque>
 #include <format>
+#include <optional>
 #include <random>
 #include <span>
 
 #include "rule.hpp"
 #include "tile.hpp"
+
+// TODO: add the rationale...
+static std::mt19937 global_mt19937(time(0));
 
 // TODO: allow resizing the grid.
 
@@ -27,12 +31,23 @@ inline void random_fill_count(bool* begin, bool* end, int count, std::mt19937& r
     std::shuffle(begin, end, rand);
 }
 
-// TODO: rename...
-// TODO: explain why not double...
-struct tile_filler {
-    uint32_t seed; // arbitrary value
+// TODO: better name...
+// TODO: explain why float (there is no instant ImGui::SliderDouble)
+// (std::optional<uint32_t> has proven to be very awkward)
+struct tileT_fill_arg {
+    bool use_seed;
+    uint32_t seed;
     float density; // ∈ [0.0f, 1.0f]
 };
+
+inline void random_fill(legacy::tileT& tile, const tileT_fill_arg& filler) {
+    if (filler.use_seed) {
+        std::mt19937 rand(filler.seed);
+        random_fill_density(tile.begin(), tile.end(), filler.density, rand);
+    } else {
+        random_fill_density(tile.begin(), tile.end(), filler.density, global_mt19937);
+    }
+}
 
 class torusT {
     legacy::tileT m_tile, m_side;
@@ -50,16 +65,13 @@ public:
     const legacy::tileT& tile() const { return m_tile; }
     int gen() const { return m_gen; }
 
-    // by value or by cref? (also in tileT)
-    void restart(tile_filler filler, std::optional<legacy::rectT> resize = {}) {
+    // (&&rectT) by value or by cref? (also in tileT)
+    void restart(tileT_fill_arg filler, std::optional<legacy::rectT> resize = {}) {
         if (resize) {
             m_tile.resize(*resize);
         }
 
-        // TODO: count or density?
-        std::mt19937 rand{filler.seed};
-        random_fill_density(m_tile.begin(), m_tile.end(), filler.density, rand);
-
+        random_fill(m_tile, filler);
         m_gen = 0;
     }
 

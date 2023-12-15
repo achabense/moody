@@ -368,7 +368,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
 
         ImGui::SameLine();
         if (ImGui::Button("Randomize") || imgui_keypressed(ImGuiKey_Enter, false)) {
-            recorder.take(random_flip(inter.get_viewer(), part, rcount, rcount)); // TODO: range...
+            recorder.take(random_flip(inter.get_viewer(), part, rcount, rcount, global_mt19937)); // TODO: range...
         }
     }
     // TODO: redesign...
@@ -624,6 +624,7 @@ public:
 // TODO: changes upon the same rule should be grouped together... how? (editor++)...
 // TODO: how to capture certain patterns? (editor++)...
 
+// TODO: reconsider: where should "current-rule" be located...
 struct runner_ctrl {
     legacy::ruleT rule;
 
@@ -697,7 +698,7 @@ int main(int argc, char** argv) {
         // TODO: what if the path is invalid?
     }
 
-    tile_filler filler{.seed = 0, .density = 0.5};
+    tileT_fill_arg filler{.use_seed = true, .seed = 0, .density = 0.5};
     // TODO: the canvas shall not be too small...
     // TODO: should support in-screen zooming... (instead of relying on a window...)
     // TODO: should support basic-level pattern copy/pasting...
@@ -929,6 +930,17 @@ int main(int argc, char** argv) {
                 ImGui::SameLine();
                 ImGui::BeginGroup();
                 {
+                    // TODO: use radio instead...
+                    // TODO: imgui_binaryradio???
+                    if (ImGui::Checkbox("Use seed", &filler.use_seed)) {
+                        // TODO: unconditional?
+                        if (filler.use_seed) {
+                            restart = true;
+                        }
+                    }
+                    if (!filler.use_seed) {
+                        ImGui::BeginDisabled();
+                    }
                     // TODO: uint32_t...
                     // TODO: want resetting only when +/-/enter...
                     int seed = filler.seed;
@@ -942,6 +954,10 @@ int main(int argc, char** argv) {
                         }
                     }
                     // ImGui::PopStyleVar();
+                    if (!filler.use_seed) {
+                        ImGui::EndDisabled();
+                    }
+
                     // TODO: button <- set to 0.5?
                     if (ImGui::SliderFloat("Init density [0-1]", &filler.density, 0.0f, 1.0f, "%.3f",
                                            ImGuiSliderFlags_NoInput)) {

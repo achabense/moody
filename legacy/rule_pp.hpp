@@ -338,7 +338,16 @@ namespace legacy::inline special_mappers {
                                           "xsw"
                                           "0cd"); // 60 (clockwise)
 
-    // TODO: support ignore_(q, c) version?
+    // -we     w e
+    // asd -> a s d
+    // zx-     z x
+    inline constexpr mapperT mp_hex2_ignore("0we"
+                                            "asd"
+                                            "zx0"); // ignore_(q, c)
+    inline constexpr mapperT mp_hex2_wsx_refl("0wa"
+                                              "esz"
+                                              "dx0"); // swap e-a and z-d
+    // TODO ...
 
 } // namespace legacy::inline special_mappers
 
@@ -495,8 +504,7 @@ namespace legacy {
 
     // TODO: preconditions...
     // void random_flip(const interT& inter, const partitionT& par, const partialT& constraints, int count);
-    inline ruleT random_flip(ruleT r, const partitionT& par, int count_min, int count_max) {
-        static std::mt19937 rand(time(0));
+    inline ruleT random_flip(ruleT r, const partitionT& par, int count_min, int count_max, std::mt19937& rand) {
         // flip some...
         std::vector<groupT> gs;
         for (int j = 0; j < par.k(); ++j) {
