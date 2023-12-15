@@ -172,7 +172,45 @@ namespace legacy {
                     ImGui::EndTable();
                 }
             };
+#if 1
+            // TODO: redesign... "√" is misleading...
+            ImGui::BeginGroup();
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1, 1));
+            static const char* const labels[]{"##q", "##w", "##e", "##a", "##s", "##d", "##z", "##x", "##c"};
+            for (int l = 0; l < 3; ++l) {
+                if (ImGui::Checkbox(labels[l * 3 + 0], &terms_ignore[l * 3 + 0].selected)) {
+                    sel = true;
+                }
+                ImGui::SameLine();
+                if (ImGui::Checkbox(labels[l * 3 + 1], &terms_ignore[l * 3 + 1].selected)) {
+                    sel = true;
+                }
+                ImGui::SameLine();
+                if (ImGui::Checkbox(labels[l * 3 + 2], &terms_ignore[l * 3 + 2].selected)) {
+                    sel = true;
+                }
+            }
+            ImGui::PopStyleVar();
+            ImGui::EndGroup();
+            ImGui::SameLine();
+
+            // TODO: how to avoid this?
+            ImGui::BeginGroup();
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1, 1));
+            ImGui::BeginDisabled();
+            for (int l = 0; l < 3; ++l) {
+                ImGui::Checkbox(labels[l * 3 + 0], &terms_ignore[l * 3 + 0].covered);
+                ImGui::SameLine();
+                ImGui::Checkbox(labels[l * 3 + 1], &terms_ignore[l * 3 + 1].covered);
+                ImGui::SameLine();
+                ImGui::Checkbox(labels[l * 3 + 2], &terms_ignore[l * 3 + 2].covered);
+            }
+            ImGui::EndDisabled();
+            ImGui::PopStyleVar();
+            ImGui::EndGroup();
+#else
             table(terms_ignore); // ignore should be rendered differently...
+#endif
             table(terms_native);
             table(terms_misc);
             table(terms_hex);
@@ -186,60 +224,55 @@ namespace legacy {
     };
 } // namespace legacy
 
-// TODO: should be a class... how to decouple? ...
-void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_recorder& recorder) {
-    const auto display_target = [&target, &recorder] {
-        std::string rule_str = to_MAP_str(target);
+void show_target_rule(const legacy::ruleT& target, rule_recorder& recorder) {
+    std::string rule_str = to_MAP_str(target);
 
-        ImGui::AlignTextToFramePadding();
-        imgui_str("[Current rule]");
-        ImGui::SameLine();
-        if (ImGui::Button("Copy")) {
-            ImGui::SetClipboardText(rule_str.c_str());
-            logger::log_temp(300ms, "Copied");
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Paste")) {
-            if (const char* text = ImGui::GetClipboardText()) {
-                auto rules = extract_rules(text);
-                if (!rules.empty()) {
-                    // TODO: redesign recorder... whether to accept multiple rules?
-                    // TODO: target??
-                    if (target != rules.front()) {
-                        recorder.take(rules.front());
-                    } else {
-                        logger::log_temp(300ms, "Same rule");
-                    }
+    ImGui::AlignTextToFramePadding();
+    imgui_str("[Current rule]");
+    ImGui::SameLine();
+    if (ImGui::Button("Copy")) {
+        ImGui::SetClipboardText(rule_str.c_str());
+        logger::log_temp(300ms, "Copied");
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Paste")) {
+        if (const char* text = ImGui::GetClipboardText()) {
+            auto rules = extract_rules(text);
+            if (!rules.empty()) {
+                // TODO: redesign recorder... whether to accept multiple rules?
+                // TODO: target??
+                if (target != rules.front()) {
+                    recorder.take(rules.front());
+                } else {
+                    logger::log_temp(300ms, "Same rule");
                 }
             }
         }
-        // TODO: re-implement file-saving
-        // TODO: add border...
-        imgui_strwrapped(rule_str);
-    };
+    }
+    // TODO: re-implement file-saving
+    // TODO: add border...
+    imgui_strwrapped(rule_str);
 
-    // TODO: redesign...
-    const auto cur_pos = [&recorder]() {
-        // TODO: +1 is clumsy. TODO: -> editor?
-        // TODO: pos may not reflect runner's real pos, as recorder can be modified on the way... may not
-        // matters
-        if (ImGui::Button("|<")) {
-            recorder.set_pos(0);
+    // TODO: +1 is clumsy. TODO: -> editor?
+    // TODO: pos may not reflect runner's real pos, as recorder can be modified on the way... may not
+    // matters
+    if (ImGui::Button("|<")) {
+        recorder.set_pos(0);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button(">|")) {
+        recorder.set_pos(recorder.size() - 1);
+    }
+    ImGui::SameLine();
+    ImGui::Button(std::format("Total:{} At:{}###...", recorder.size(), recorder.pos() + 1).c_str());
+    if (ImGui::IsItemHovered()) {
+        if (ImGui::GetIO().MouseWheel < 0) { // scroll down
+            recorder.next();
+        } else if (ImGui::GetIO().MouseWheel > 0) { // scroll up
+            recorder.prev();
         }
-        ImGui::SameLine();
-        if (ImGui::Button(">|")) {
-            recorder.set_pos(recorder.size() - 1);
-        }
-        ImGui::SameLine();
-        ImGui::Button(std::format("Total:{} At:{}###...", recorder.size(), recorder.pos() + 1).c_str());
-        if (ImGui::IsItemHovered()) {
-            if (ImGui::GetIO().MouseWheel < 0) { // scroll down
-                recorder.next();
-            } else if (ImGui::GetIO().MouseWheel > 0) { // scroll up
-                recorder.prev();
-            }
-        }
-        // TODO: is random-access useful?
+    }
+    // TODO: is random-access useful?
 #if 0
 
                 static char buf_pos[20]{};
@@ -261,8 +294,10 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                     ImGui::SetKeyboardFocusHere(-1);
                 }
 #endif
-    };
+}
 
+// TODO: should be a class... how to decouple? ...
+void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_recorder& recorder) {
     // TODO: explain...
     // TODO: for "paired", support 4-step modification (_,S,B,BS)... add new color?
     // TODO: why does clang-format sort using clauses?
@@ -270,7 +305,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
     using legacy::partitionT;
 
     static interT inter = {};
-    const auto set_inter = [&target] {
+    {
         int itag = inter.tag;
         const auto tooltip = [](interT::tagE tag, const char* msg = "View from:") {
             if (ImGui::BeginItemTooltip()) {
@@ -303,15 +338,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
             }
             tooltip(inter.Diff);
         }
-    };
-
-    if (auto child =
-            imgui_childwindow("ForBorder", {}, true | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysAutoResize)) {
-        display_target();
-        cur_pos();
     }
-    ImGui::SeparatorText("Settings");
-    set_inter();
 
     // TODO: rename...
     static legacy::partition_collection parcol;
@@ -835,14 +862,14 @@ int main(int argc, char** argv) {
         ImGui::SetNextWindowPos(viewport->WorkPos);
         ImGui::SetNextWindowSize(viewport->WorkSize);
         if (auto window = imgui_window("Tile", flags)) {
-            ImGui::Text("(%.1f FPS) Frame:%d\n", io.Framerate, ImGui::GetFrameCount());
-            ImGui::Separator();
-
             ImGui::Checkbox("Log window", &show_log_window);
             ImGui::SameLine();
             ImGui::Checkbox("Nav window", &show_nav_window);
             ImGui::SameLine();
             ImGui::Checkbox("Demo window", &show_demo_window);
+            ImGui::SameLine();
+            ImGui::Text("   (%.1f FPS) Frame:%d\n", io.Framerate, ImGui::GetFrameCount());
+
             ImGui::Separator();
 
             // TODO: begin-table has return value...
@@ -850,6 +877,10 @@ int main(int argc, char** argv) {
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             if (auto child = imgui_childwindow("Rul")) {
+                if (auto child = imgui_childwindow(
+                        "ForBorder", {}, true | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysAutoResize)) {
+                    show_target_rule(ctrl.rule, recorder);
+                }
                 edit_rule(ctrl.rule, icons, recorder);
             }
             ImGui::TableNextColumn();
