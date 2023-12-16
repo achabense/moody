@@ -9,6 +9,7 @@
 
 using namespace std::chrono_literals;
 
+// TODO: it seems explicit u8 encoding guarantee is not strictly needed in this project?
 // - Assert that ordinary string literals are encoded with utf-8.
 // - u8"..." is not used in this project, as it becomes `char8_t[]` after C++20 (which is not usable).
 // - TODO: document ways to pass this check (/utf-8 etc; different compilers)...
@@ -31,7 +32,6 @@ inline std::string cpp17_u8string(const std::filesystem::path& p) {
 
 // Unlike ImGui::TextWrapped, doesn't take fmt str...
 // TODO: the name is awful...
-
 inline void imgui_str(std::string_view str) {
     ImGui::TextUnformatted(str.data(), str.data() + str.size());
 }
@@ -84,6 +84,7 @@ struct [[nodiscard]] imgui_childwindow {
     explicit operator bool() const { return visible; }
 };
 
+#if 0
 struct timeT {
     int year;
     int month; // [1,12]
@@ -110,13 +111,16 @@ struct timeT {
         return timeT{year, month, day, hour, min, sec, ms};
     }
 };
+#endif
 
 class logger {
+#if 0
     // TODO: maybe better if data(inheritance)-based?
     static inline std::deque<std::string> m_strs{};
     static constexpr int m_max = 40;
     // ~ "ith" must not be a static in log(), as it's a template...
     static inline int ith = 0;
+#endif
 
     // TODO: refine...
     using steady = std::chrono::steady_clock;
@@ -135,6 +139,7 @@ class logger {
 public:
     logger() = delete;
 
+#if 0
     // TODO: logfmt and logplain...
     // Also serve as error handler; must succeed.
     template <class... T>
@@ -149,6 +154,7 @@ public:
             m_strs.pop_front();
         }
     }
+#endif
 
     template <class... U>
     static void log_temp(std::chrono::milliseconds ms, std::format_string<const U&...> fmt, const U&... args) noexcept {
@@ -171,6 +177,7 @@ public:
         }
     }
 
+#if 0
     // TODO: layout is terrible...
     static void window(const char* id_str, bool* p_open) {
         if (auto window = imgui_window(id_str, p_open)) {
@@ -195,8 +202,10 @@ public:
             }
         }
     }
+#endif
 };
 
+// TODO: still, avoid using fstream if possible...
 // - Why using C++ at all: there seems no standard way to `fopen` a unicode C-string path.
 // (The only one being ignore(max)->gcount, which appears )
 inline std::vector<char> load_binary(const std::filesystem::path& path, int max_size) {

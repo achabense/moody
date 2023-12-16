@@ -709,7 +709,7 @@ int main(int argc, char** argv) {
         .rule = recorder.current(), .pergen = 1, .anti_flick = true, .start_from = 0, .gap_frame = 0, .pause = false};
 
     bool show_demo_window = false; // TODO: remove this in the future...
-    bool show_log_window = false;  // TODO: less useful than thought...
+    // bool show_log_window = false;  // TODO: less useful than thought...
     bool show_nav_window = true;
     file_navT nav;
 
@@ -728,7 +728,7 @@ int main(int argc, char** argv) {
 
         if (show_nav_window) {
             if (auto sel = nav.window("File Nav", &show_nav_window)) {
-                logger::log("Tried to open {}", cpp17_u8string(*sel));
+                // logger::log("Tried to open {}", cpp17_u8string(*sel));
                 auto result = read_rule_from_file(*sel);
                 if (!result.empty()) {
                     // TODO: "append" is a nasty feature...
@@ -863,8 +863,8 @@ int main(int argc, char** argv) {
         ImGui::SetNextWindowPos(viewport->WorkPos);
         ImGui::SetNextWindowSize(viewport->WorkSize);
         if (auto window = imgui_window("Tile", flags)) {
-            ImGui::Checkbox("Log window", &show_log_window);
-            ImGui::SameLine();
+            // ImGui::Checkbox("Log window", &show_log_window);
+            // ImGui::SameLine();
             ImGui::Checkbox("Nav window", &show_nav_window);
             ImGui::SameLine();
             ImGui::Checkbox("Demo window", &show_demo_window);
@@ -1002,9 +1002,9 @@ int main(int argc, char** argv) {
         if (show_demo_window) {
             ImGui::ShowDemoWindow(&show_demo_window);
         }
-        if (show_log_window) {
-            logger::window("Events", &show_log_window);
-        }
+        // if (show_log_window) {
+        //     // logger::window("Events", &show_log_window);
+        // }
         logger::tempwindow();
 
         // TODO: should this be put before begin-frame?

@@ -67,17 +67,24 @@ namespace legacy {
         return {q, w, e, a, s, d, z, x, c};
     }
 
+    // TODO: plan: add basic tests in debug mode.
+    // should these functions be guarded by NDEBUG, or a project-defined macro?
+#ifndef NDEBUG
+    inline void test_codeT() {
+        for_each_code(code) {
+            const envT e = decode(code);
+            if (encode(e) != code) {
+                abort();
+            }
+        }
+    }
+#endif
+
     // TODO: better names...
     // TODO: whether still useful after applying rule_pp header?
     constexpr bool decode_s(codeT code) {
         return (code >> 4) & 1;
     }
-
-#if 0
-    constexpr codeT flip_s(codeT code) {
-        return codeT{code ^ (1 << 4)};
-    }
-#endif
 
     constexpr codeT flip_all(codeT code) {
         return codeT{~code & 511};
@@ -191,10 +198,6 @@ namespace legacy {
     // TODO: rephrase...
     // Convert ruleT into text form. Specifically, in "MAP" format, so that the result can be pasted into Golly.
     // The correctness can be verified by checking the result of `to_MAP_str(game_of_life())`.
-    //
-    // Source: https://golly.sourceforge.io/Help/Algorithms/QuickLife.html
-    // > So, Conway's Life (B3/S23) encoded as a MAP rule is:
-    // > rule = MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA
     inline std::string to_MAP_str(const ruleT& rule) {
         // MAP rule uses a different coding scheme.
         bool reordered[512]{};
@@ -248,4 +251,25 @@ namespace legacy {
         }
         return rule;
     }
+
+#ifndef NDEBUG
+    // Source: https://golly.sourceforge.io/Help/Algorithms/QuickLife.html
+    // > So, Conway's Life (B3/S23) encoded as a MAP rule is:
+    // > rule = MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA
+    inline void test_MAP_str() {
+        const char* gol_str =
+            "MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA";
+        const ruleT gol = game_of_life();
+        if (!std::regex_match(gol_str, regex_MAP_str())) {
+            abort();
+        }
+        if (gol_str != to_MAP_str(gol)) {
+            abort();
+        }
+        if (from_MAP_str(gol_str) != gol) {
+            abort();
+        }
+    }
+#endif
+
 } // namespace legacy
