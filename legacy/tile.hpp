@@ -1,8 +1,6 @@
 #pragma once
 
-// TODO: only for accumulate...
-#include <numeric>
-// #include <span>
+#include <span>
 
 #include "rule.hpp"
 
@@ -11,13 +9,13 @@ namespace legacy {
 
     struct rectT {
         int width, height;
+        int area() const { return width * height; }
         friend bool operator==(const rectT&, const rectT&) = default;
     };
 
-    // TODO: add area() for rectT?
     // TODO: add basic noexcept annotation?
     // TODO: when is it needed to [return] a tile?
-    // TODO: explain layout... reorganize for better readibility...
+    // TODO: explain layout... reorganize for better readability...
     class tileT {
         rectT m_size; // observable width and height.
         bool* m_data; // layout: [height+2][width]|[height+2][2].
@@ -54,7 +52,7 @@ namespace legacy {
 
         int width() const { return m_size.width; }
         int height() const { return m_size.height; }
-        int area() const { return m_size.width * m_size.height; }
+        int area() const { return m_size.area(); }
 
     private:
         bool* _line(int _y) {
@@ -77,14 +75,15 @@ namespace legacy {
         }
 
         // TODO: ? whether to expose consecutive data?
-        // std::span<bool> data() { return {line(0), line(0) + area()}; }
-        // std::span<const bool> data() const { return {line(0), line(0) + area()}; }
-
         bool* begin() { return line(0); }
         const bool* begin() const { return line(0); }
 
         bool* end() { return begin() + area(); }
         const bool* end() const { return begin() + area(); }
+
+        // TODO: is data a proper name?
+        std::span<bool> data() { return {begin(), end()}; }
+        std::span<const bool> data() const { return {begin(), end()}; }
 
     private:
         void _set_lr(int _y, bool l, bool r) {
@@ -127,12 +126,11 @@ namespace legacy {
             return *this;
         }
 
-        // TODO: what's the preferred form of public interface?
-    public:
         // TODO: This could be used to support constraint gathering...
+        // TODO: go back to template when needed...
         // Relying on width > 1 (which is a reasonable requirement)
         // I hate this function, it is the payment for consecutive data...
-        void _apply(const auto& rulefn /*bool(codeT)*/, tileT& dest) const {
+        void apply(const ruleT& rule, tileT& dest) const {
             // pre: already gathered ???<TODO>, which is untestable.
             assert(this != &dest);
             dest.resize(m_size);
@@ -151,39 +149,55 @@ namespace legacy {
                 bool* _dest = dest._line(_y);
 
                 // clang-format off
-                _dest[0] = rulefn(encode(_q, _up[0], _up[1],
-                                         _a, _ct[0], _ct[1],
-                                         _z, _dw[0], _dw[1]));
+                _dest[0] = rule(encode(_q, _up[0], _up[1],
+                                       _a, _ct[0], _ct[1],
+                                       _z, _dw[0], _dw[1]));
                 for (int x = 1; x < width - 1; ++x) {
-                    _dest[x] = rulefn(encode(_up[x - 1], _up[x], _up[x + 1],
-                                             _ct[x - 1], _ct[x], _ct[x + 1],
-                                             _dw[x - 1], _dw[x], _dw[x + 1]));
+                    _dest[x] = rule(encode(_up[x - 1], _up[x], _up[x + 1],
+                                           _ct[x - 1], _ct[x], _ct[x + 1],
+                                           _dw[x - 1], _dw[x], _dw[x + 1]));
                 }
-                _dest[width - 1] = rulefn(encode(_up[width - 2], _up[width - 1], _e,
-                                                 _ct[width - 2], _ct[width - 1], _d,
-                                                 _dw[width - 2], _dw[width - 1], _c));
+                _dest[width - 1] = rule(encode(_up[width - 2], _up[width - 1], _e,
+                                               _ct[width - 2], _ct[width - 1], _d,
+                                               _dw[width - 2], _dw[width - 1], _c));
                 // clang-format on
             }
         }
 
-    public:
-        void apply(const ruleT& rule, tileT& dest) const { //
-            _apply(rule, dest);
-        }
-
-        int count() const { //
-            return std::accumulate(begin(), end(), 0);
+        friend bool operator==(const tileT& l, const tileT& r) { //
+            return l.m_size == r.m_size && std::ranges::equal(l.data(), r.data());
         }
     };
 
-    inline void copy(const tileT& source, int sx, int sy, int width, int height, tileT& dest, int dx, int dy) {
-        assert(&source != &dest);
-        // TODO: precondition...
-
-        for (int y = 0; y < height; ++y) {
-            std::copy_n(source.line(sy + y) + sx, width, dest.line(dy + y) + dx);
+    inline namespace tileT_utils {
+        inline int count(const tileT& tile) {
+            int c = 0;
+            for (bool b : tile.data()) {
+                c += b;
+            }
+            return c;
         }
-    }
+
+        inline int count_diff(const tileT& l, const tileT& r) {
+            assert(l.size() == r.size());
+            int c = 0;
+            const bool* l_data = l.begin();
+            for (bool b : r.data()) {
+                c += (b != *l_data++);
+            }
+            return c;
+        }
+
+        // TODO: or/xor...
+        inline void copy(const tileT& source, int sx, int sy, int width, int height, tileT& dest, int dx, int dy) {
+            assert(&source != &dest);
+            // TODO: precondition...
+
+            for (int y = 0; y < height; ++y) {
+                std::copy_n(source.line(sy + y) + sx, width, dest.line(dy + y) + dx);
+            }
+        }
+    } // namespace tileT_utils
 
     // TODO: experimental; refine...
     // TODO: together with to_MAP_str, shall be incorporated into a single header...

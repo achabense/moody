@@ -742,7 +742,7 @@ int main(int argc, char** argv) {
 
         const auto show_tile = [&] {
             ImGui::Text("Width:%d,Height:%d,Gen:%d,Density:%f", runner.tile().width(), runner.tile().height(),
-                        runner.gen(), float(runner.tile().count()) / runner.tile().area());
+                        runner.gen(), float(legacy::count(runner.tile())) / runner.tile().area());
 
             ImVec2 pos = ImGui::GetCursorScreenPos();
             ImVec2 size = ImGui::GetContentRegionAvail();
