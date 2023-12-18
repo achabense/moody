@@ -192,7 +192,7 @@ public:
         assert(succ && pitch == m_w * sizeof(Uint32));
 
         // Relying on both image and tile data being consecutive.
-        const bool* data = tile.begin();
+        const auto data = tile.data();
         for (int i = 0; i < tile.area(); ++i) {
             ((Uint32*)pixels)[i] = data[i] ? -1 /* white */ : 0;
         }

@@ -14,23 +14,6 @@
 // TODO: add the rationale...
 static std::mt19937 global_mt19937(time(0));
 
-// TODO: allow resizing the grid.
-
-// TODO: is the algo correct?
-// TODO: explain count's impl-specific behavior...
-inline void random_fill_density(bool* begin, bool* end, double density, std::mt19937& rand) {
-    const uint32_t c = std::mt19937::max() * std::clamp(density, 0.0, 1.0);
-    while (begin < end) {
-        *begin++ = rand() < c;
-    }
-}
-
-inline void random_fill_count(bool* begin, bool* end, int count, std::mt19937& rand) {
-    std::fill(begin, end, false);
-    std::fill(begin, begin + std::clamp(count, 0, int(end - begin)), true);
-    std::shuffle(begin, end, rand);
-}
-
 // TODO: better name...
 // TODO: explain why float (there is no instant ImGui::SliderDouble)
 // (std::optional<uint32_t> has proven to be very awkward)
@@ -41,11 +24,20 @@ struct tileT_fill_arg {
 };
 
 inline void random_fill(legacy::tileT& tile, const tileT_fill_arg& filler) {
+    // TODO: is the algo correct?
+    // TODO: explain why not using bernoulli_distribution
+    const auto fill_tile = [&tile](double density, std::mt19937& rand) {
+        const uint32_t c = std::mt19937::max() * std::clamp(density, 0.0, 1.0);
+        for (bool& b : tile.data()) {
+            b = rand() < c;
+        }
+    };
+
     if (filler.use_seed) {
         std::mt19937 rand(filler.seed);
-        random_fill_density(tile.begin(), tile.end(), filler.density, rand);
+        fill_tile(filler.density, rand);
     } else {
-        random_fill_density(tile.begin(), tile.end(), filler.density, global_mt19937);
+        fill_tile(filler.density, global_mt19937);
     }
 }
 

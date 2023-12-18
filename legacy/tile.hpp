@@ -75,15 +75,9 @@ namespace legacy {
         }
 
         // TODO: ? whether to expose consecutive data?
-        bool* begin() { return line(0); }
-        const bool* begin() const { return line(0); }
-
-        bool* end() { return begin() + area(); }
-        const bool* end() const { return begin() + area(); }
-
         // TODO: is data a proper name?
-        std::span<bool> data() { return {begin(), end()}; }
-        std::span<const bool> data() const { return {begin(), end()}; }
+        std::span<bool> data() { return {line(0), line(0) + area()}; }
+        std::span<const bool> data() const { return {line(0), line(0) + area()}; }
 
     private:
         void _set_lr(int _y, bool l, bool r) {
@@ -181,7 +175,7 @@ namespace legacy {
         inline int count_diff(const tileT& l, const tileT& r) {
             assert(l.size() == r.size());
             int c = 0;
-            const bool* l_data = l.begin();
+            const bool* l_data = l.line(0); // TODO: was begin()
             for (bool b : r.data()) {
                 c += (b != *l_data++);
             }
@@ -217,13 +211,11 @@ namespace legacy {
             c = 0;
         };
 
-        const bool* data = tile.begin();
         for (int y = 0; y < tile.height(); ++y) {
-            for (int x = 0; x < tile.width(); ++x) {
-                bool v2 = *data++;
-                if (v != v2) {
+            for (bool b : std::span(tile.line(y), tile.width())) {
+                if (v != b) {
                     flush();
-                    v = v2;
+                    v = b;
                 }
                 ++c;
             }

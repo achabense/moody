@@ -761,7 +761,6 @@ int main(int argc, char** argv) {
             static ImVec2 select_0{}, select_1{}; // tile index.
             // TODO: the range should be invalid if the selected area <= 1*1.
             drawlist.AddRectFilled(img_pos + select_0 * zoom, img_pos + select_1 * zoom, IM_COL32(0, 255, 0, 60));
-
             drawlist.PopClipRect();
 
             ImGui::InvisibleButton("Canvas", size);
