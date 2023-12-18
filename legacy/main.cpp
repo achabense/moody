@@ -744,8 +744,8 @@ int main(int argc, char** argv) {
             ImGui::Text("Width:%d,Height:%d,Gen:%d,Density:%f", runner.tile().width(), runner.tile().height(),
                         runner.gen(), float(legacy::count(runner.tile())) / runner.tile().area());
 
-            ImVec2 pos = ImGui::GetCursorScreenPos();
-            ImVec2 size = ImGui::GetContentRegionAvail();
+            const ImVec2 pos = ImGui::GetCursorScreenPos();
+            const ImVec2 size = ImGui::GetContentRegionAvail();
             ImDrawList& drawlist = *ImGui::GetWindowDrawList();
 
             drawlist.PushClipRect(pos, pos + size);
@@ -839,11 +839,31 @@ int main(int argc, char** argv) {
                     }
                     // TODO: rand-mode (whether reproducible...)
                     // TODO: clear mode (random/all-0,all-1/paste...) / (clear inner/outer)
+                    // TODO: horrible; redesign (including control) ...
                     if (imgui_keypressed(ImGuiKey_Backspace, false)) {
                         legacy::tileT& tile = const_cast<legacy::tileT&>(runner.tile());
                         for (int y = y1; y < y2; ++y) {
                             for (int x = x1; x < x2; ++x) {
                                 tile.line(y)[x] = 0;
+                            }
+                        }
+                    }
+                    if (imgui_keypressed(ImGuiKey_Equal, false)) {
+                        legacy::tileT& tile = const_cast<legacy::tileT&>(runner.tile());
+                        for (int y = y1; y < y2; ++y) {
+                            for (int x = x1; x < x2; ++x) {
+                                tile.line(y)[x] = 1;
+                            }
+                        }
+                    }
+                    // TODO: should be editable...
+                    // TODO: support agar?
+                    if (imgui_keypressed(ImGuiKey_5, false)) {
+                        legacy::tileT& tile = const_cast<legacy::tileT&>(runner.tile());
+                        constexpr uint32_t c = std::mt19937::max() * 0.5;
+                        for (int y = y1; y < y2; ++y) {
+                            for (int x = x1; x < x2; ++x) {
+                                tile.line(y)[x] = global_mt19937() < c;
                             }
                         }
                     }

@@ -31,6 +31,14 @@ inline void random_fill(legacy::tileT& tile, const tileT_fill_arg& filler) {
         for (bool& b : tile.data()) {
             b = rand() < c;
         }
+        // TODO: how to support texture?
+        // for (int y = 0; y < tile.height(); ++y) {
+        //     bool bx = y & 1;
+        //     for (bool& b : std::span(tile.line(y), tile.width())) {
+        //         b = bx;
+        //         bx = !bx;
+        //     }
+        // }
     };
 
     if (filler.use_seed) {
@@ -55,6 +63,7 @@ public:
     explicit torusT(legacy::rectT size) : m_tile(size), m_side(size), m_gen(0) {}
 
     const legacy::tileT& tile() const { return m_tile; }
+    // TODO: non-const overload?
     int gen() const { return m_gen; }
 
     // (&&rectT) by value or by cref? (also in tileT)
