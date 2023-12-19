@@ -182,15 +182,63 @@ namespace legacy {
             return c;
         }
 
-        // TODO: or/xor...
+        // TODO: is this copy or paste???
+        enum class copyE { Value, Or, Xor };
+        template <copyE mode = copyE::Value>
         inline void copy(const tileT& source, int sx, int sy, int width, int height, tileT& dest, int dx, int dy) {
             assert(&source != &dest);
             // TODO: precondition...
 
             for (int y = 0; y < height; ++y) {
-                std::copy_n(source.line(sy + y) + sx, width, dest.line(dy + y) + dx);
+                const bool* s = source.line(sy + y) + sx;
+                bool* d = dest.line(dy + y) + dx;
+                for (int x = 0; x < width; ++x) {
+                    if constexpr (mode == copyE::Value) {
+                        d[x] = s[x];
+                    } else if constexpr (mode == copyE::Or) {
+                        d[x] |= s[x];
+                    } else {
+                        static_assert(mode == copyE::Xor);
+                        d[x] ^= s[x];
+                    }
+                }
             }
         }
+
+        inline void clone(const tileT& source, tileT& dest) {
+            assert(&source != &dest);
+
+            dest.resize(source.size()); // <????
+            // ~ Why is there no ranges::copy(range,range) version?
+            std::ranges::copy(source.data(), dest.data().begin());
+        }
+
+        // TODO: is the name meaningful?
+        // Return smallest rectT ~ (>= target) && (% period == 0)
+        inline rectT upscale(rectT target, rectT period) {
+            const auto upscale = [](int target, int period) { //
+                return ((target + period - 1) / period) * period;
+            };
+
+            return {.width = upscale(target.width, period.width), //
+                    .height = upscale(target.height, period.height)};
+        }
+
+        inline void piece_up(const tileT& period, tileT& target) {
+            assert(target.width() >= period.width());
+            assert(target.height() >= period.height());
+            assert(target.width() % period.width() == 0);
+            assert(target.height() % period.height() == 0);
+
+            for (int y = 0; y < target.height(); y += period.height()) {
+                for (int x = 0; x < target.width(); x += period.width()) {
+                    copy(period, 0, 0, period.width(), period.height(), target, x, y);
+                }
+            }
+        }
+
+        // TODO: tileT_fill_arg / random_fill goes here...
+
     } // namespace tileT_utils
 
     // TODO: experimental; refine...
@@ -225,5 +273,4 @@ namespace legacy {
         // TODO: when is '!' needed?
         return str;
     }
-
 } // namespace legacy
