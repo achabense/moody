@@ -5,12 +5,6 @@
 
 #include "rule_pp.hpp"
 
-void debug_putavail() {
-    ImVec2 pos = ImGui::GetCursorScreenPos();
-    ImVec2 size = ImGui::GetContentRegionAvail();
-    ImGui::GetWindowDrawList()->AddRectFilled(pos, {pos.x + size.x, pos.y + size.y}, IM_COL32(255, 0, 255, 255));
-}
-
 namespace legacy {
     // TODO: proper name...
     inline ruleT mirror(const ruleT& rule) {
@@ -333,6 +327,14 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                 inter.custom = target;
             }
             tooltip(inter.Diff);
+        } else {
+            // TODO: demonstration-only (this function should be explicit). Redesign...
+            ImGui::SameLine();
+            if (ImGui::Button("?Click this?")) {
+                inter.tag = inter.Diff;
+                inter.custom = target;
+            }
+            // tooltip(inter.Diff);
         }
     }
 
@@ -365,6 +367,27 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         ImGui::SameLine();
         if (ImGui::Button("Randomize") || imgui_keypressed(ImGuiKey_Enter, false)) {
             recorder.take(random_flip(inter.get_viewer(), part, rcount, rcount, global_mt19937)); // TODO: range...
+        }
+
+        // TODO: temporal; todo: exceptions should be avoided; todo: allow mousewheel control...
+        try {
+            if (ImGui::Button("dec")) {
+                recorder.take(legacy::prev_v(inter, part, target));
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("inc")) {
+                recorder.take(legacy::next_v(inter, part, target));
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("<p")) {
+                recorder.take(legacy::prev_perm(inter, part, target));
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(">p")) {
+                recorder.take(legacy::next_perm(inter, part, target));
+            }
+        } catch (...) {
+            logger::log_temp(300ms, "X_X");
         }
     }
     // TODO: redesign...
@@ -591,9 +614,6 @@ public:
                 ImGui::InputText("Filter", buf_filter, std::size(buf_filter));
                 ImGui::Separator();
                 if (auto child = imgui_childwindow("Files")) {
-                    if (ImGui::GetIO().KeyCtrl) {
-                        debug_putavail();
-                    }
                     bool has = false;
                     for (const auto& entry : files) {
                         const auto str = cpp17_u8string(entry.path().filename());
@@ -695,8 +715,6 @@ int main(int argc, char** argv) {
     }
 
     tileT_fill_arg filler{.use_seed = true, .seed = 0, .density = 0.5};
-    // TODO: the canvas shall not be too small...
-    // TODO: should support in-screen zooming... (instead of relying on a window...)
     // TODO: should support basic-level pattern copy/pasting...
     torusT runner({.width = 480, .height = 360});
     runner.restart(filler);
@@ -756,7 +774,7 @@ int main(int argc, char** argv) {
             drawlist.AddImage(img.texture(), img_pos, img_pos_max);
             // Experimental: select:
             // TODO: this shall belong to the runner.
-            static ImVec2 select_0{}, select_1{}; // tile index.
+            static ImVec2 select_0{}, select_1{}; // tile index, not pixel.
             // TODO: shaky...
             // TODO: show selected size...
             // TODO: ctrl to move selected area?
@@ -794,21 +812,18 @@ int main(int argc, char** argv) {
             ctrl.pause2 = active;
             if (ImGui::IsItemHovered()) {
                 assert(ImGui::IsMousePosValid());
+                // It turned out that, this will work well even if outside of the image...
                 const ImVec2 mouse_pos = io.MousePos;
-                // TODO: <  or <=?
-                const bool within_img = mouse_pos.x >= img_pos.x && mouse_pos.x <= img_pos_max.x &&
-                                        mouse_pos.y >= img_pos.y && mouse_pos.y <= img_pos_max.y;
                 if (active) {
                     // TODO: whether to support shifting at all?
                     if (!io.KeyCtrl) {
                         img_off += io.MouseDelta;
-                    } else if (within_img) {
+                    } else {
                         // TODO: this approach is highly imprecise when zoom != 1, but does this matter?
                         runner.shift(io.MouseDelta.x / zoom, io.MouseDelta.y / zoom);
                     }
                 }
-                // TODO: drop within_img constraint?
-                if (io.MouseWheel != 0 && within_img) {
+                if (io.MouseWheel != 0) {
                     ImVec2 cellidx = (mouse_pos - img_pos) / zoom;
                     if (io.MouseWheel < 0 && zoom != 1) { // TODO: 0.5?
                         zoom /= 2;
@@ -845,7 +860,6 @@ int main(int argc, char** argv) {
             {
                 if (sel_info sel = get_select()) {
                     if (imgui_keypressed(ImGuiKey_C, false)) {
-                        // TODO: export-as-rle...
                         legacy::tileT t({.width = sel.width(), .height = sel.height()});
                         legacy::copy(runner.tile(), sel.x1, sel.y1, sel.width(), sel.height(), t, 0, 0);
                         std::string str = std::format("x = {}, y = {}, rule = {}\n{}", t.width(), t.height(),
@@ -864,7 +878,6 @@ int main(int argc, char** argv) {
                             }
                         }
                     }
-                    // TODO: should be editable...
                     if (imgui_keypressed(ImGuiKey_Equal, false)) {
                         legacy::tileT& tile = const_cast<legacy::tileT&>(runner.tile());
                         constexpr uint32_t c = std::mt19937::max() * 0.5;

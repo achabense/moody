@@ -434,6 +434,18 @@ namespace legacy {
         }
         // TODO: is refinement checking needed for partitionT?
         // TODO: refer to https://en.wikipedia.org/wiki/Partition_of_a_set#Refinement_of_partitions
+
+        // TODO: temporal; tightly dependent on on bool512 guarantee in next/prev(perm)...
+        void collect(const ruleT_data& r, std::span<bool> rep) const {
+            for (int j = 0; j < m_k; ++j) {
+                rep[j] = r[jth_group(j).front()];
+            }
+        }
+        void dispatch(std::span<const bool> rep, ruleT_data& r) const {
+            for_each_code(code) {
+                r[code] = rep[index_for(code)];
+            }
+        }
     };
 
     // TODO: refine "concept"...
@@ -518,10 +530,60 @@ namespace legacy {
         return r;
     }
 
-    // TODO: precondition: r satisfies {inter,par...}
-    inline ruleT next_v(const interT& inter, const partitionT& par, const ruleT& r) {}
-    inline ruleT prev_v(const interT& inter, const partitionT& par, const ruleT& r) {}
+    // TODO: temp name...
+    inline ruleT _iterate(const interT& inter, const partitionT& par, const ruleT& rule, void (*fn)(bool*, bool*)) {
+        // TODO: bool512 is temporal...
+
+        using bool512 = std::array<bool, 512>;
+        ruleT_data r = inter.from_rule(rule);
+        // TODO: should these functions really take this as precondition?
+        // TODO: throwing is awkward... try other ways...
+        // `can_next` etc. this can also be used when stop conditions are met)
+        if (!par.test(r)) {
+            throw(0);
+        }
+        bool512 bools{};
+        par.collect(r, bools);
+
+        fn(bools.data(), bools.data() + par.k());
+
+        par.dispatch(bools, r);
+        return inter.to_rule(r);
+    }
+
+    // TODO: add stop contidion...
+    inline ruleT next_v(const interT& inter, const partitionT& par, const ruleT& rule) {
+        return _iterate(inter, par, rule, [](bool* begin, bool* end) {
+            while (begin != end && *begin == 1) {
+                *begin++ = 0;
+            }
+            if (begin != end) {
+                *begin = 1;
+            }
+        });
+    }
+    inline ruleT prev_v(const interT& inter, const partitionT& par, const ruleT& rule) {
+        return _iterate(inter, par, rule, [](bool* begin, bool* end) {
+            while (begin != end && *begin == 0) {
+                *begin++ = 1;
+            }
+            if (begin != end) {
+                *begin = 0;
+            }
+        });
+    }
     // TODO: ++/--count when reaching end?
-    inline ruleT next_perm(const interT& inter, const partitionT& par, const ruleT& r) {}
-    inline ruleT prev_perm(const interT& inter, const partitionT& par, const ruleT& r) {}
+    // Intentionally using reverse_iterator... TODO: explain why...
+    // (TODO: rephrase) As to CTAD vs make_XXX..., here is pitfall for using std::reverse_iterator directly.
+    // https://quuxplusone.github.io/blog/2022/08/02/reverse-iterator-ctad/
+    inline ruleT next_perm(const interT& inter, const partitionT& par, const ruleT& rule) {
+        return _iterate(inter, par, rule, [](bool* begin, bool* end) {
+            std::next_permutation(std::make_reverse_iterator(end), std::make_reverse_iterator(begin));
+        });
+    }
+    inline ruleT prev_perm(const interT& inter, const partitionT& par, const ruleT& rule) {
+        return _iterate(inter, par, rule, [](bool* begin, bool* end) {
+            std::prev_permutation(std::make_reverse_iterator(end), std::make_reverse_iterator(begin));
+        });
+    }
 } // namespace legacy
