@@ -224,6 +224,7 @@ namespace legacy {
                     .height = upscale(target.height, period.height)};
         }
 
+        // TODO: special-case all0/1?
         inline void piece_up(const tileT& period, tileT& target) {
             assert(target.width() >= period.width());
             assert(target.height() >= period.height());

@@ -740,36 +740,65 @@ int main(int argc, char** argv) {
             ImGui::Text("Width:%d,Height:%d,Gen:%d,Density:%f", runner.tile().width(), runner.tile().height(),
                         runner.gen(), float(legacy::count(runner.tile())) / runner.tile().area());
 
-            const ImVec2 pos = ImGui::GetCursorScreenPos();
-            const ImVec2 size = ImGui::GetContentRegionAvail();
+            const ImVec2 screen_pos = ImGui::GetCursorScreenPos();
+            const ImVec2 screen_size = ImGui::GetContentRegionAvail();
             ImDrawList& drawlist = *ImGui::GetWindowDrawList();
 
-            drawlist.PushClipRect(pos, pos + size);
-            drawlist.AddRectFilled(pos, pos + size, IM_COL32(20, 20, 20, 255));
-            static float zoom = 1;
+            drawlist.PushClipRect(screen_pos, screen_pos + screen_size);
+            drawlist.AddRectFilled(screen_pos, screen_pos + screen_size, IM_COL32(20, 20, 20, 255));
+
+            static float zoom = 1; // TODO: mini window when zoom == 1?
+            // It has been proven that `img_off` works better than using `corner_idx` (cell idx in the corner)
             static ImVec2 img_off = {0, 0}; // TODO: supposed to be of integer-precision...
-            ImVec2 img_pos = pos + img_off;
-            ImVec2 img_posz = img_pos + ImVec2(img.width(), img.height()) * zoom;
+            ImVec2 img_pos = screen_pos + img_off;
+            ImVec2 img_pos_max = img_pos + ImVec2(img.width(), img.height()) * zoom;
             img.update(runner.tile());
-            drawlist.AddImage(img.texture(), img_pos, img_posz);
+            drawlist.AddImage(img.texture(), img_pos, img_pos_max);
             // Experimental: select:
             // TODO: this shall belong to the runner.
             static ImVec2 select_0{}, select_1{}; // tile index.
-            // TODO: the range should be invalid if the selected area <= 1*1.
-            drawlist.AddRectFilled(img_pos + select_0 * zoom, img_pos + select_1 * zoom, IM_COL32(0, 255, 0, 60));
+            // TODO: shaky...
+            // TODO: show selected size...
+            // TODO: ctrl to move selected area?
+            struct sel_info {
+                int x1, y1; // [
+                int x2, y2; // )
+
+                int width() const { return x2 - x1; }
+                int height() const { return y2 - y1; }
+                ImVec2 min() const { return ImVec2(x1, y1); }
+                ImVec2 max() const { return ImVec2(x2, y2); }
+                explicit operator bool() const { return width() > 1 || height() > 1; }
+            };
+            const auto get_select = []() -> sel_info {
+                // TODO: rephrase...
+                // select_0/1 denotes []; convert to [):
+                int x1 = select_0.x, x2 = select_1.x;
+                int y1 = select_0.y, y2 = select_1.y;
+                if (x1 > x2) {
+                    std::swap(x1, x2);
+                }
+                if (y1 > y2) {
+                    std::swap(y1, y2);
+                }
+                return {x1, y1, x2 + 1, y2 + 1};
+            };
+            // TODO: whether to limit this way? (maybe better to check click pos instead...)
+            if (sel_info sel = get_select()) {
+                drawlist.AddRectFilled(img_pos + sel.min() * zoom, img_pos + sel.max() * zoom, IM_COL32(0, 255, 0, 60));
+            }
             drawlist.PopClipRect();
 
-            ImGui::InvisibleButton("Canvas", size);
+            ImGui::InvisibleButton("Canvas", screen_size);
             const bool active = ImGui::IsItemActive();
             ctrl.pause2 = active;
             if (ImGui::IsItemHovered()) {
                 assert(ImGui::IsMousePosValid());
                 const ImVec2 mouse_pos = io.MousePos;
-                const bool within_img = mouse_pos.x >= img_pos.x && mouse_pos.x <= img_posz.x &&
-                                        mouse_pos.y >= img_pos.y && mouse_pos.y <= img_posz.y;
+                // TODO: <  or <=?
+                const bool within_img = mouse_pos.x >= img_pos.x && mouse_pos.x <= img_pos_max.x &&
+                                        mouse_pos.y >= img_pos.y && mouse_pos.y <= img_pos_max.y;
                 if (active) {
-                    // img_off += io.MouseDelta;
-#if 1
                     // TODO: whether to support shifting at all?
                     if (!io.KeyCtrl) {
                         img_off += io.MouseDelta;
@@ -777,7 +806,6 @@ int main(int argc, char** argv) {
                         // TODO: this approach is highly imprecise when zoom != 1, but does this matter?
                         runner.shift(io.MouseDelta.x / zoom, io.MouseDelta.y / zoom);
                     }
-#endif
                 }
                 // TODO: drop within_img constraint?
                 if (io.MouseWheel != 0 && within_img) {
@@ -788,47 +816,38 @@ int main(int argc, char** argv) {
                     if (io.MouseWheel > 0 && zoom != 8) {
                         zoom *= 2;
                     }
-                    img_off = (mouse_pos - cellidx * zoom) - pos;
+                    img_off = (mouse_pos - cellidx * zoom) - screen_pos;
                     img_off.x = round(img_off.x);
                     img_off.y = round(img_off.y); // TODO: is rounding correct?
                 }
 
                 // Experimental: select:
                 // TODO: this shall belong to the runner.
-                // TODO: move select area...
                 // TODO: precedence against left-clicking?
                 if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
                     // ctrl.pause = true;
-                    // TODO: is ceiling correct?
-                    if (within_img) {
-                        int celx = floor((mouse_pos.x - img_pos.x) / zoom);
-                        int cely = floor((mouse_pos.y - img_pos.y) / zoom);
-                        select_0 = ImVec2(celx, cely);
-                    }
+                    int celx = floor((mouse_pos.x - img_pos.x) / zoom);
+                    int cely = floor((mouse_pos.y - img_pos.y) / zoom);
+
+                    celx = std::clamp(celx, 0, img.width() - 1);
+                    cely = std::clamp(cely, 0, img.height() - 1); // TODO: shouldn't be img.xxx()...
+                    select_0 = ImVec2(celx, cely);
                 }
                 if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-                    if (within_img) {
-                        int celx = ceil((mouse_pos.x - img_pos.x) / zoom);
-                        int cely = ceil((mouse_pos.y - img_pos.y) / zoom);
-                        select_1 = ImVec2(celx, cely);
-                    }
+                    int celx = floor((mouse_pos.x - img_pos.x) / zoom);
+                    int cely = floor((mouse_pos.y - img_pos.y) / zoom);
+
+                    celx = std::clamp(celx, 0, img.width() - 1);
+                    cely = std::clamp(cely, 0, img.height() - 1); // TODO: shouldn't be img.xxx()...
+                    select_1 = ImVec2(celx, cely);
                 }
             }
             {
-                int x1 = select_0.x, x2 = select_1.x;
-                int y1 = select_0.y, y2 = select_1.y;
-                if (x1 != x2 && y1 != y2) {
-                    if (x1 > x2) {
-                        std::swap(x1, x2);
-                    }
-                    if (y1 > y2) {
-                        std::swap(y1, y2);
-                    }
-                    // (x1,x2) (y1,y2)
+                if (sel_info sel = get_select()) {
                     if (imgui_keypressed(ImGuiKey_C, false)) {
                         // TODO: export-as-rle...
-                        legacy::tileT t({.width = x2 - x1, .height = y2 - y1});
-                        legacy::copy(runner.tile(), x1, y1, x2 - x1, y2 - y1, t, 0, 0);
+                        legacy::tileT t({.width = sel.width(), .height = sel.height()});
+                        legacy::copy(runner.tile(), sel.x1, sel.y1, sel.width(), sel.height(), t, 0, 0);
                         std::string str = std::format("x = {}, y = {}, rule = {}\n{}", t.width(), t.height(),
                                                       legacy::to_MAP_str(ctrl.rule), legacy::to_rle_str(t));
                         ImGui::SetClipboardText(str.c_str());
@@ -836,29 +855,21 @@ int main(int argc, char** argv) {
                     // TODO: rand-mode (whether reproducible...)
                     // TODO: clear mode (random/all-0,all-1/paste...) / (clear inner/outer)
                     // TODO: horrible; redesign (including control) ...
+                    // TODO: 0/1/other textures are subject to agar settings...
                     if (imgui_keypressed(ImGuiKey_Backspace, false)) {
                         legacy::tileT& tile = const_cast<legacy::tileT&>(runner.tile());
-                        for (int y = y1; y < y2; ++y) {
-                            for (int x = x1; x < x2; ++x) {
+                        for (int y = sel.y1; y < sel.y2; ++y) {
+                            for (int x = sel.x1; x < sel.x2; ++x) {
                                 tile.line(y)[x] = 0;
                             }
                         }
                     }
+                    // TODO: should be editable...
                     if (imgui_keypressed(ImGuiKey_Equal, false)) {
                         legacy::tileT& tile = const_cast<legacy::tileT&>(runner.tile());
-                        for (int y = y1; y < y2; ++y) {
-                            for (int x = x1; x < x2; ++x) {
-                                tile.line(y)[x] = 1;
-                            }
-                        }
-                    }
-                    // TODO: should be editable...
-                    // TODO: support agar?
-                    if (imgui_keypressed(ImGuiKey_5, false)) {
-                        legacy::tileT& tile = const_cast<legacy::tileT&>(runner.tile());
                         constexpr uint32_t c = std::mt19937::max() * 0.5;
-                        for (int y = y1; y < y2; ++y) {
-                            for (int x = x1; x < x2; ++x) {
+                        for (int y = sel.y1; y < sel.y2; ++y) {
+                            for (int x = sel.x1; x < sel.x2; ++x) {
                                 tile.line(y)[x] = global_mt19937() < c;
                             }
                         }

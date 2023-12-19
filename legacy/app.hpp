@@ -31,14 +31,6 @@ inline void random_fill(legacy::tileT& tile, const tileT_fill_arg& filler) {
         for (bool& b : tile.data()) {
             b = rand() < c;
         }
-        // TODO: how to support texture?
-        // for (int y = 0; y < tile.height(); ++y) {
-        //     bool bx = y & 1;
-        //     for (bool& b : std::span(tile.line(y), tile.width())) {
-        //         b = bx;
-        //         bx = !bx;
-        //     }
-        // }
     };
 
     if (filler.use_seed) {
@@ -48,6 +40,28 @@ inline void random_fill(legacy::tileT& tile, const tileT_fill_arg& filler) {
         fill_tile(filler.density, global_mt19937);
     }
 }
+
+#if 0
+// Flip density...
+// TODO: regional fill...
+inline void random_fill_v2(legacy::tileT& tile, const legacy::tileT& period, const tileT_fill_arg& filler) {
+    legacy::piece_up(period, tile);
+
+    const auto fill_tile = [&tile](double density, std::mt19937& rand) {
+        const uint32_t c = std::mt19937::max() * std::clamp(density, 0.0, 1.0);
+        for (bool& b : tile.data()) {
+            b ^= (rand() < c);
+        }
+    };
+
+    if (filler.use_seed) {
+        std::mt19937 rand(filler.seed);
+        fill_tile(filler.density, rand);
+    } else {
+        fill_tile(filler.density, global_mt19937);
+    }
+}
+#endif
 
 class torusT {
     legacy::tileT m_tile, m_side;
