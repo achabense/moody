@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+// TODO: remove the `T` suffix? initially they were for things like `codeT code`...
 // TODO: bool might not be a good idea...
 // For example, bool is allowed to have padding bits, so memcmp may not apply...
 
@@ -17,9 +18,15 @@ namespace legacy {
         bool q, w, e;
         bool a, s, d;
         bool z, x, c;
+
+        // TODO: whether to support this?
+        // bool at(int index) const {
+        //     // ~ This is technically UB.
+        //     assert(index >= 0 && index < 9);
+        //     return (&q)[index];
+        // }
     };
 
-    // TODO: remove the `T` suffix? initially this was for things like `codeT code`...
     // TODO: remove remaining direct use of "512"...
     struct codeT {
         int v;
@@ -27,8 +34,6 @@ namespace legacy {
             assert(v >= 0 && v < 512);
             return v;
         }
-
-        // constexpr friend bool operator==(const codeT&, const codeT&) = default;
 
         // TODO: apply this in the future...
         template <class T>
@@ -67,17 +72,20 @@ namespace legacy {
         return {q, w, e, a, s, d, z, x, c};
     }
 
-    // TODO: plan: add basic tests in debug mode.
-    // should these functions be guarded by NDEBUG, or a project-defined macro?
 #ifndef NDEBUG
-    inline void test_codeT() {
-        for_each_code(code) {
-            const envT e = decode(code);
-            if (encode(e) != code) {
-                abort();
+    namespace tests {
+        // TODO: plan: add basic tests in debug mode.
+        // should these functions be guarded by NDEBUG, or a project-defined macro?
+        inline const bool test_codeT = [] {
+            for_each_code(code) {
+                const envT e = decode(code);
+                if (encode(e) != code) {
+                    abort();
+                }
             }
-        }
-    }
+            return true;
+        }();
+    } // namespace tests
 #endif
 
     // TODO: better names...
@@ -95,18 +103,13 @@ namespace legacy {
 
     // TODO: rephrase...
     // Unambiguously refer to the map from env-code to the new state.
-    struct ruleT {
-        ruleT_data map{};
+    class ruleT {
+        ruleT_data map{}; // TODO: change name...
+    public:
+        constexpr bool operator()(codeT code) const { return map[code]; }
+        constexpr void set(codeT code, bool b) { map[code] = b; }
 
-        bool operator()(codeT code) const { return map[code]; }
-        bool operator()(const envT& env) const { //
-            return map[encode(env)];
-        }
-        bool operator()(bool q, bool w, bool e, bool a, bool s, bool d, bool z, bool x, bool c) const { //
-            return map[encode(q, w, e, a, s, d, z, x, c)];
-        }
-
-        friend bool operator==(const ruleT&, const ruleT&) = default;
+        constexpr friend bool operator==(const ruleT&, const ruleT&) = default;
     };
 
     // "Convay's Game of Life" rule.
@@ -117,11 +120,11 @@ namespace legacy {
             auto [q, w, e, a, s, d, z, x, c] = decode(code);
             int count = q + w + e + a + d + z + x + c;
             if (count == 2) { // 2:s ~ 0->0, 1->1 ~ equal to "s".
-                rule.map[code] = s;
+                rule.set(code, s);
             } else if (count == 3) { // 3:bs ~ 0->1, 1->1 ~ always 1.
-                rule.map[code] = 1;
+                rule.set(code, 1);
             } else {
-                rule.map[code] = 0;
+                rule.set(code, 0);
             }
         }
         return rule;
@@ -140,7 +143,7 @@ namespace legacy {
         /*implicit*/ operator ruleT() const {
             ruleT rule{};
             for_each_code(code) {
-                rule.map[code] = (bits[code / 8] >> (code % 8)) & 1;
+                rule.set(code, (bits[code / 8] >> (code % 8)) & 1);
             }
             return rule;
         }
@@ -247,29 +250,32 @@ namespace legacy {
         ruleT rule{};
         for_each_code(code) {
             auto [q, w, e, a, s, d, z, x, c] = decode(code);
-            rule.map[code] = reordered[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1];
+            rule.set(code, reordered[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1]);
         }
         return rule;
     }
 
 #ifndef NDEBUG
-    // Source: https://golly.sourceforge.io/Help/Algorithms/QuickLife.html
-    // > So, Conway's Life (B3/S23) encoded as a MAP rule is:
-    // > rule = MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA
-    inline void test_MAP_str() {
-        const char* gol_str =
-            "MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA";
-        const ruleT gol = game_of_life();
-        if (!std::regex_match(gol_str, regex_MAP_str())) {
-            abort();
-        }
-        if (gol_str != to_MAP_str(gol)) {
-            abort();
-        }
-        if (from_MAP_str(gol_str) != gol) {
-            abort();
-        }
-    }
+    namespace tests {
+        // Source: https://golly.sourceforge.io/Help/Algorithms/QuickLife.html
+        // > So, Conway's Life (B3/S23) encoded as a MAP rule is:
+        // > rule = MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA
+        inline const bool test_MAP_str = [] {
+            const char* gol_str =
+                "MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA";
+            const ruleT gol = game_of_life();
+            if (!std::regex_match(gol_str, regex_MAP_str())) {
+                abort();
+            }
+            if (gol_str != to_MAP_str(gol)) {
+                abort();
+            }
+            if (from_MAP_str(gol_str) != gol) {
+                abort();
+            }
+            return true;
+        }();
+    } // namespace tests
 #endif
 
 } // namespace legacy

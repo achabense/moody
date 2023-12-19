@@ -58,7 +58,7 @@ namespace legacy {
             static constexpr ruleT identity = [] {
                 ruleT rule{};
                 for_each_code(code) {
-                    rule.map[code] = decode_s(code);
+                    rule.set(code, decode_s(code));
                 }
                 return rule;
             }();
@@ -86,7 +86,7 @@ namespace legacy {
             const ruleT& viewer = get_viewer();
             ruleT rule{};
             for_each_code(code) {
-                rule.map[code] = diff[code] ? !viewer(code) : viewer(code);
+                rule.set(code, diff[code] ? !viewer(code) : viewer(code));
             }
             return rule;
         }
@@ -490,7 +490,7 @@ namespace legacy {
 
     inline void flip(groupT group, ruleT& rule) {
         for (codeT c : group) {
-            rule.map[c] = !rule.map[c];
+            rule.set(c, !rule(c));
         }
     }
 
@@ -498,7 +498,7 @@ namespace legacy {
     // inline void set(groupT group, const interT& i, bool b, ruleT& dest);
     inline void copy(groupT group, const ruleT& source, ruleT& dest) {
         for (codeT c : group) {
-            dest.map[c] = source.map[c];
+            dest.set(c, source(c));
         }
     }
 

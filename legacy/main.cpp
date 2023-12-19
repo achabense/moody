@@ -17,12 +17,8 @@ namespace legacy {
         ruleT mir{};
         for_each_code(code) {
             codeT codex = flip_all(code);
-            bool flip = decode_s(codex) != rule(codex);
-            if (flip) {
-                mir.map[code] = !decode_s(code);
-            } else {
-                mir.map[code] = decode_s(code);
-            }
+            const bool flip = decode_s(codex) != rule(codex);
+            mir.set(code, flip ? !decode_s(code) : decode_s(code));
         }
         return mir;
     }
@@ -91,10 +87,10 @@ namespace legacy {
             terms_ignore.emplace_back("x", mk(mp_ignore_x));
             terms_ignore.emplace_back("c", mk(mp_ignore_c));
 
-            terms_native.emplace_back("|", mk(mp_wsx_refl));
-            terms_native.emplace_back("-", mk(mp_asd_refl));
-            terms_native.emplace_back("\\", mk(mp_qsc_refl));
-            terms_native.emplace_back("/", mk(mp_esz_refl));
+            terms_native.emplace_back("|", mk(mp_wsx_refl), true);
+            terms_native.emplace_back("-", mk(mp_asd_refl), true);
+            terms_native.emplace_back("\\", mk(mp_qsc_refl), true);
+            terms_native.emplace_back("/", mk(mp_esz_refl), true);
             terms_native.emplace_back("R180", mk(mp_ro_180));
             terms_native.emplace_back("R90", mk(mp_ro_90));
 
