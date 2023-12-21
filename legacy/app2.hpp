@@ -52,7 +52,18 @@ inline bool imgui_keypressed(ImGuiKey key, bool repeat) {
     return !ImGui::GetIO().WantCaptureKeyboard && ImGui::IsKeyPressed(key, repeat);
 };
 
-// TODO: mouse?
+// TODO: other mouse functions...
+inline bool imgui_scrolling() {
+    return ImGui::GetIO().MouseWheel != 0;
+}
+
+inline bool imgui_scrolldown() {
+    return ImGui::GetIO().MouseWheel < 0;
+}
+
+inline bool imgui_scrollup() {
+    return ImGui::GetIO().MouseWheel > 0;
+}
 
 struct [[nodiscard]] imgui_window {
     imgui_window(const imgui_window&) = delete;

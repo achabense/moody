@@ -34,6 +34,7 @@
 // Unfortunately, SDL2-renderer backend doesn't support docking features...
 // https://github.com/ocornut/imgui/issues/5835
 
+// TODO: app_context?
 class app_backend {
     struct [[nodiscard]] scope_guard {
         using F = void (*)();
@@ -148,7 +149,7 @@ public:
 
 private:
     // TODO: return unique_ptr instead?
-    static SDL_Texture* create_texture(Uint32 format, int access, int w, int h) {
+    static SDL_Texture* create_texture(SDL_PixelFormatEnum format, SDL_TextureAccess access, int w, int h) {
         assert(window && renderer);
 
         SDL_Texture* texture = SDL_CreateTexture(renderer, format, access, w, h);

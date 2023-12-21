@@ -6,6 +6,7 @@
 #include "rule_pp.hpp"
 
 namespace legacy {
+    // TODO: move elsewhere
     // TODO: proper name...
     inline ruleT mirror(const ruleT& rule) {
         ruleT mir{};
@@ -16,9 +17,7 @@ namespace legacy {
         }
         return mir;
     }
-} // namespace legacy
 
-namespace legacy {
     struct termT {
         const char* msg;
         mapperT_pair eq;
@@ -239,13 +238,11 @@ void show_target_rule(const legacy::ruleT& target, rule_recorder& recorder) {
             }
         }
     }
-    // TODO: re-implement file-saving
-    // TODO: add border...
-    imgui_strwrapped(rule_str);
 
     // TODO: +1 is clumsy. TODO: -> editor?
     // TODO: pos may not reflect runner's real pos, as recorder can be modified on the way... may not
     // matters
+    ImGui::SameLine();
     if (ImGui::Button("|<")) {
         recorder.set_pos(0);
     }
@@ -256,34 +253,36 @@ void show_target_rule(const legacy::ruleT& target, rule_recorder& recorder) {
     ImGui::SameLine();
     ImGui::Button(std::format("Total:{} At:{}###...", recorder.size(), recorder.pos() + 1).c_str());
     if (ImGui::IsItemHovered()) {
-        if (ImGui::GetIO().MouseWheel < 0) { // scroll down
+        if (imgui_scrolldown()) {
             recorder.next();
-        } else if (ImGui::GetIO().MouseWheel > 0) { // scroll up
+        } else if (imgui_scrollup()) {
             recorder.prev();
         }
     }
+#if 1
     // TODO: is random-access useful?
-#if 0
+    static char buf_pos[20]{};
+    const auto filter = [](ImGuiInputTextCallbackData* data) -> int {
+        return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
+    };
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(200);
+    if (ImGui::InputTextWithHint("##Goto", "GOTO e.g. 2->enter", buf_pos, 20,
+                                 ImGuiInputTextFlags_CallbackCharFilter | ImGuiInputTextFlags_EnterReturnsTrue,
+                                 filter)) {
+        int val{};
+        if (std::from_chars(buf_pos, buf_pos + strlen(buf_pos), val).ec == std::errc{}) {
+            recorder.set_pos(val - 1); // TODO: -1 is clumsy.
+        }
+        buf_pos[0] = '\0';
 
-                static char buf_pos[20]{};
-                const auto filter = [](ImGuiInputTextCallbackData* data) -> int {
-                    return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
-                };
-                ImGui::SameLine();
-                ImGui::SetNextItemWidth(200);
-                if (ImGui::InputTextWithHint(
-                        "##Goto", "GOTO e.g. 2->enter", buf_pos, 20,
-                        ImGuiInputTextFlags_CallbackCharFilter | ImGuiInputTextFlags_EnterReturnsTrue, filter)) {
-                    int val{};
-                    if (std::from_chars(buf_pos, buf_pos + strlen(buf_pos), val).ec == std::errc{}) {
-                        recorder.set_pos(val - 1); // TODO: -1 is clumsy.
-                    }
-                    buf_pos[0] = '\0';
-
-                    // Regain focus:
-                    ImGui::SetKeyboardFocusHere(-1);
-                }
+        // Regain focus:
+        ImGui::SetKeyboardFocusHere(-1);
+    }
 #endif
+
+    // TODO: re-implement file-saving
+    imgui_str(rule_str);
 }
 
 // TODO: should be a class... how to decouple? ...
@@ -291,13 +290,11 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
     // TODO: explain...
     // TODO: for "paired", support 4-step modification (_,S,B,BS)... add new color?
     // TODO: why does clang-format sort using clauses?
-    using legacy::interT;
-    using legacy::partitionT;
 
-    static interT inter = {};
+    static legacy::interT inter = {};
     {
         int itag = inter.tag;
-        const auto tooltip = [](interT::tagE tag, const char* msg = "View from:") {
+        const auto tooltip = [](legacy::interT::tagE tag, const char* msg = "View from:") {
             if (ImGui::BeginItemTooltip()) {
                 imgui_str(msg);
                 ImGui::PushTextWrapPos(250); // TODO: how to decide wrap pos properly?
@@ -320,21 +317,19 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         ImGui::RadioButton("Dif", &itag, inter.Diff);
         tooltip(inter.Diff);
 
-        inter.tag = interT::tagE{itag};
+        inter.tag = legacy::interT::tagE{itag};
         if (inter.tag == inter.Diff) {
             ImGui::SameLine();
-            if (ImGui::Button("Take current")) {
+            if (ImGui::Button("Take current rule")) {
                 inter.custom = target;
             }
             tooltip(inter.Diff);
         } else {
             // TODO: demonstration-only (this function should be explicit). Redesign...
             ImGui::SameLine();
-            if (ImGui::Button("?Click this?")) {
+            if (ImGui::Button("Try diff")) {
                 inter.tag = inter.Diff;
-                inter.custom = target;
             }
-            // tooltip(inter.Diff);
         }
     }
 
@@ -349,8 +344,9 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         static int rcount = 0.3 * k;
         rcount = std::clamp(rcount, 0, k);
 
+        ImGui::SetNextItemWidth(200); // TODO...
         ImGui::SliderInt("##Active", &rcount, 0, k, "%d", ImGuiSliderFlags_NoInput);
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 0));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 0)); // TODO: ?? ImGui::GetStyle().ItemInnerSpacing
         ImGui::PushButtonRepeat(true);
         const float r = ImGui::GetFrameHeight();
         ImGui::SameLine();
@@ -369,22 +365,44 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
             recorder.take(random_flip(inter.get_viewer(), part, rcount, rcount, global_mt19937)); // TODO: range...
         }
 
-        // TODO: temporal; todo: exceptions should be avoided; todo: allow mousewheel control...
+        // TODO: temporal; todo: exceptions should be avoided
+        // TODO: the mousewheel ctrl is horribly written...
         try {
+            bool group = false;
             if (ImGui::Button("dec")) {
                 recorder.take(legacy::prev_v(inter, part, target));
             }
+            group |= ImGui::IsItemHovered();
             ImGui::SameLine();
             if (ImGui::Button("inc")) {
                 recorder.take(legacy::next_v(inter, part, target));
             }
+            group |= ImGui::IsItemHovered();
+            if (group) {
+                if (imgui_scrollup()) {
+                    recorder.take(legacy::prev_v(inter, part, target));
+                } else if (imgui_scrolldown()) {
+                    recorder.take(legacy::next_v(inter, part, target));
+                }
+            }
+
+            group = false;
             ImGui::SameLine();
             if (ImGui::Button("<p")) {
                 recorder.take(legacy::prev_perm(inter, part, target));
             }
+            group |= ImGui::IsItemHovered();
             ImGui::SameLine();
             if (ImGui::Button(">p")) {
                 recorder.take(legacy::next_perm(inter, part, target));
+            }
+            group |= ImGui::IsItemHovered();
+            if (group) {
+                if (imgui_scrollup()) {
+                    recorder.take(legacy::prev_perm(inter, part, target));
+                } else if (imgui_scrolldown()) {
+                    recorder.take(legacy::next_perm(inter, part, target));
+                }
             }
         } catch (...) {
             logger::log_temp(300ms, "X_X");
@@ -734,8 +752,6 @@ int main(int argc, char** argv) {
     while (app_backend::process_events()) {
         const auto frame_guard = app_backend::new_frame();
 
-        ImGuiIO& io = ImGui::GetIO();
-
         // TODO: applying following logic; consider refining it.
         // recorder is modified during display, but will synchronize with runner's before next frame.
         assert(ctrl.rule == recorder.current());
@@ -811,6 +827,8 @@ int main(int argc, char** argv) {
             const bool active = ImGui::IsItemActive();
             ctrl.pause2 = active;
             if (ImGui::IsItemHovered()) {
+                const ImGuiIO& io = ImGui::GetIO();
+
                 assert(ImGui::IsMousePosValid());
                 // It turned out that, this will work well even if outside of the image...
                 const ImVec2 mouse_pos = io.MousePos;
@@ -823,12 +841,12 @@ int main(int argc, char** argv) {
                         runner.shift(io.MouseDelta.x / zoom, io.MouseDelta.y / zoom);
                     }
                 }
-                if (io.MouseWheel != 0) {
+                if (imgui_scrolling()) {
                     ImVec2 cellidx = (mouse_pos - img_pos) / zoom;
-                    if (io.MouseWheel < 0 && zoom != 1) { // TODO: 0.5?
+                    if (imgui_scrolldown() && zoom != 1) { // TODO: 0.5?
                         zoom /= 2;
                     }
-                    if (io.MouseWheel > 0 && zoom != 8) {
+                    if (imgui_scrollup() && zoom != 8) {
                         zoom *= 2;
                     }
                     img_off = (mouse_pos - cellidx * zoom) - screen_pos;
@@ -908,8 +926,9 @@ int main(int argc, char** argv) {
             ImGui::SameLine();
             ImGui::Checkbox("Demo window", &show_demo_window);
             ImGui::SameLine();
-            ImGui::Text("   (%.1f FPS) Frame:%d\n", io.Framerate, ImGui::GetFrameCount());
+            ImGui::Text("   (%.1f FPS) Frame:%d\n", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
 
+            show_target_rule(ctrl.rule, recorder);
             ImGui::Separator();
 
             // TODO: begin-table has return value...
@@ -917,10 +936,6 @@ int main(int argc, char** argv) {
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             if (auto child = imgui_childwindow("Rul")) {
-                if (auto child = imgui_childwindow(
-                        "ForBorder", {}, true | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysAutoResize)) {
-                    show_target_rule(ctrl.rule, recorder);
-                }
                 edit_rule(ctrl.rule, icons, recorder);
             }
             ImGui::TableNextColumn();
@@ -952,18 +967,17 @@ int main(int argc, char** argv) {
                         restart = true;
                     }
 
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::Text("(Actual pergen: %d)", ctrl.actual_pergen());
-                    ImGui::SameLine();
-                    ImGui::Checkbox("anti-flick", &ctrl.anti_flick);
-
-                    ImGui::SliderInt("Pergen [1-20]", &ctrl.pergen, ctrl.pergen_min, ctrl.pergen_max, "%d",
-                                     ImGuiSliderFlags_NoInput);
                     // TODO: Gap-frame shall be really timer-based...
                     ImGui::SliderInt("Gap Frame [0-20]", &ctrl.gap_frame, ctrl.gap_min, ctrl.gap_max, "%d",
                                      ImGuiSliderFlags_NoInput);
                     ImGui::SliderInt("Start gen [0-1000]", &ctrl.start_from, ctrl.start_min, ctrl.start_max, "%d",
                                      ImGuiSliderFlags_NoInput);
+                    ImGui::SliderInt("Pergen [1-20]", &ctrl.pergen, ctrl.pergen_min, ctrl.pergen_max, "%d",
+                                     ImGuiSliderFlags_NoInput);
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::Text("(Actual pergen: %d)", ctrl.actual_pergen());
+                    ImGui::SameLine();
+                    ImGui::Checkbox("anti-flick", &ctrl.anti_flick);
                 }
                 ImGui::EndGroup();
                 ImGui::SameLine();
