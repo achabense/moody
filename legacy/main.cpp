@@ -740,8 +740,6 @@ int main(int argc, char** argv) {
     runner_ctrl ctrl{
         .rule = recorder.current(), .pergen = 1, .anti_flick = true, .start_from = 0, .gap_frame = 0, .pause = false};
 
-    bool show_demo_window = false; // TODO: remove this in the future...
-    // bool show_log_window = false;  // TODO: less useful than thought...
     bool show_nav_window = true;
     file_navT nav;
 
@@ -924,8 +922,6 @@ int main(int argc, char** argv) {
             // ImGui::SameLine();
             ImGui::Checkbox("Nav window", &show_nav_window);
             ImGui::SameLine();
-            ImGui::Checkbox("Demo window", &show_demo_window);
-            ImGui::SameLine();
             ImGui::Text("   (%.1f FPS) Frame:%d\n", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
 
             show_target_rule(ctrl.rule, recorder);
@@ -1051,13 +1047,9 @@ int main(int argc, char** argv) {
             ImGui::EndTable();
         }
 
-        // TODO: remove this when all done...
-        if (show_demo_window) {
-            ImGui::ShowDemoWindow(&show_demo_window);
-        }
-        // if (show_log_window) {
-        //     // logger::window("Events", &show_log_window);
-        // }
+        // TODO: remove (or comment-out) this when all done...
+        ImGui::ShowDemoWindow();
+
         logger::tempwindow();
 
         // TODO: should this be put before begin-frame?

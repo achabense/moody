@@ -125,47 +125,22 @@ struct timeT {
 #endif
 
 class logger {
-#if 0
-    // TODO: maybe better if data(inheritance)-based?
-    static inline std::deque<std::string> m_strs{};
-    static constexpr int m_max = 40;
-    // ~ "ith" must not be a static in log(), as it's a template...
-    static inline int ith = 0;
-#endif
-
     // TODO: refine...
-    using steady = std::chrono::steady_clock;
     struct temp_str {
+        using clock = std::chrono::steady_clock;
         std::string str;
-        steady::time_point deadline;
+        clock::time_point deadline;
 
-        temp_str(std::string&& str, std::chrono::milliseconds ms) : str(std::move(str)), deadline(steady::now() + ms) {}
+        temp_str(std::string&& str, std::chrono::milliseconds ms) : str(std::move(str)), deadline(clock::now() + ms) {}
 
-        // TODO: better be expired(now=steady::now) return now>=deadline;
-        bool expired() const { return steady::now() >= deadline; }
+        // TODO: better be expired(now=clock::now) return now>=deadline;
+        bool expired() const { return clock::now() >= deadline; }
     };
 
     static inline std::vector<temp_str> m_tempstrs{};
 
 public:
     logger() = delete;
-
-#if 0
-    // TODO: logfmt and logplain...
-    // Also serve as error handler; must succeed.
-    template <class... T>
-    static void log(std::format_string<const T&...> fmt, const T&... args) noexcept {
-        auto now = timeT::now();
-        // TODO: the format should be refined...
-        char str[100];
-        snprintf(str, 100, "%02d:%02d:%02d [%d] ", now.hour, now.min, now.sec, ith++);
-
-        m_strs.push_back(str + std::format(fmt, args...));
-        if (m_strs.size() > m_max) {
-            m_strs.pop_front();
-        }
-    }
-#endif
 
     template <class... U>
     static void log_temp(std::chrono::milliseconds ms, std::format_string<const U&...> fmt, const U&... args) noexcept {
@@ -187,33 +162,6 @@ public:
             ImGui::EndTooltip();
         }
     }
-
-#if 0
-    // TODO: layout is terrible...
-    static void window(const char* id_str, bool* p_open) {
-        if (auto window = imgui_window(id_str, p_open)) {
-            if (ImGui::Button("Clear")) {
-                m_strs.clear();
-            }
-            ImGui::SameLine();
-            bool to_bottom = ImGui::Button("Bottom");
-            ImGui::Separator();
-
-            if (auto child = imgui_childwindow("Child")) {
-                // TODO: optimize...
-                std::string str;
-                for (const auto& s : m_strs) {
-                    str += s;
-                    str += '\n';
-                }
-                imgui_strwrapped(str);
-                if (to_bottom || ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) {
-                    ImGui::SetScrollHereY(1.0f);
-                }
-            }
-        }
-    }
-#endif
 };
 
 // TODO: still, avoid using fstream if possible...
