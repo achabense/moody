@@ -104,7 +104,7 @@ namespace legacy {
         }
 
         const partitionT& get_par() {
-            auto show_pair = [](const mapperT_pair& q) {
+            const auto show_pair = [](const mapperT_pair& q) {
                 std::string up, cn, dw;
                 // TODO: too clumsy...
                 static const char* const strs[]{" 0", " 1", " q", " w", " e", " a", " s", " d", " z", " x",
@@ -138,76 +138,71 @@ namespace legacy {
             };
 
             bool sel = false;
-            // TODO: tooo ugly...
-            auto table = [&](auto& terms) {
-                if (ImGui::BeginTable(".....", terms.size(), ImGuiTableFlags_BordersInner)) {
-                    ImGui::TableNextRow();
-                    for (auto& t : terms) {
-                        ImGui::TableNextColumn();
-                        if (ImGui::Selectable(t.msg, &t.selected)) {
-                            sel = true;
-                        }
-                        if (ImGui::BeginItemTooltip()) {
-                            show_pair(t.eq);
-                            ImGui::EndTooltip();
-                        }
-                    }
-                    ImGui::TableNextRow();
 
+            // TODO: recheck id & tid logic...
+            auto check = [&, id = 0, r = ImGui::GetFrameHeight()](termT& term) mutable {
+                // TODO: which come first? rendering or dummy button?
+                const ImVec2 pos = ImGui::GetCursorScreenPos();
+                const ImVec2 pos_max = pos + ImVec2{r, r};
+                // TODO: a bit ugly...
+                ImGui::GetWindowDrawList()->AddRectFilled(pos, pos_max,
+                                                          term.selected  ? ImGui::GetColorU32(ImGuiCol_ButtonHovered)
+                                                          : term.covered ? ImGui::GetColorU32(ImGuiCol_FrameBg)
+                                                                         : 0);
+                ImGui::GetWindowDrawList()->AddRect(pos, pos_max, ImGui::GetColorU32(ImGuiCol_Button));
+
+                ImGui::PushID(id++);
+                bool hit = ImGui::InvisibleButton("Check", ImVec2{r, r});
+                ImGui::PopID();
+                if (ImGui::BeginItemTooltip()) {
+                    show_pair(term.eq);
+                    ImGui::EndTooltip();
+                }
+                if (hit) {
+                    term.selected = !term.selected;
+                    sel = true;
+                }
+            };
+
+            // TODO: slightly confusing; light color should represent "take-into-account" instead of "ignore"
+            // Is this solvable by applying specific coloring scheme?
+            ImGui::BeginGroup();
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1, 1));
+            for (int l = 0; l < 3; ++l) {
+                check(terms_ignore[l * 3 + 0]);
+                ImGui::SameLine();
+                check(terms_ignore[l * 3 + 1]);
+                ImGui::SameLine();
+                check(terms_ignore[l * 3 + 2]);
+            }
+            ImGui::PopStyleVar();
+            ImGui::EndGroup();
+
+            auto table = [&check, tid = 0](auto& terms) mutable {
+                ImGui::PushID(tid++);
+                if (ImGui::BeginTable("Table", terms.size(), ImGuiTableFlags_BordersInner)) {
+                    ImGui::TableNextRow();
                     for (auto& t : terms) {
                         ImGui::TableNextColumn();
-                        ImGui::Text(t.covered ? "y" : "-");
+                        check(t);
+                        ImGui::SameLine();
+                        ImGui::AlignTextToFramePadding();
+                        imgui_str(t.msg);
                     }
                     ImGui::EndTable();
                 }
+                ImGui::PopID();
             };
-#if 1
-            // TODO: redesign... "√" is misleading...
-            ImGui::BeginGroup();
-            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1, 1));
-            static const char* const labels[]{"##q", "##w", "##e", "##a", "##s", "##d", "##z", "##x", "##c"};
-            for (int l = 0; l < 3; ++l) {
-                if (ImGui::Checkbox(labels[l * 3 + 0], &terms_ignore[l * 3 + 0].selected)) {
-                    sel = true;
-                }
-                ImGui::SameLine();
-                if (ImGui::Checkbox(labels[l * 3 + 1], &terms_ignore[l * 3 + 1].selected)) {
-                    sel = true;
-                }
-                ImGui::SameLine();
-                if (ImGui::Checkbox(labels[l * 3 + 2], &terms_ignore[l * 3 + 2].selected)) {
-                    sel = true;
-                }
-            }
-            ImGui::PopStyleVar();
-            ImGui::EndGroup();
-            ImGui::SameLine();
 
-            // TODO: how to avoid this?
-            ImGui::BeginGroup();
-            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1, 1));
-            ImGui::BeginDisabled();
-            for (int l = 0; l < 3; ++l) {
-                ImGui::Checkbox(labels[l * 3 + 0], &terms_ignore[l * 3 + 0].covered);
-                ImGui::SameLine();
-                ImGui::Checkbox(labels[l * 3 + 1], &terms_ignore[l * 3 + 1].covered);
-                ImGui::SameLine();
-                ImGui::Checkbox(labels[l * 3 + 2], &terms_ignore[l * 3 + 2].covered);
-            }
-            ImGui::EndDisabled();
-            ImGui::PopStyleVar();
-            ImGui::EndGroup();
-#else
-            table(terms_ignore); // ignore should be rendered differently...
-#endif
             table(terms_native);
+            ImGui::Separator();
             table(terms_misc);
+            ImGui::Separator();
             table(terms_hex);
 
             if (sel) {
                 reset_par();
             }
-
             return *par;
         }
     };
@@ -948,6 +943,7 @@ int main(int argc, char** argv) {
                     // ↑ TODO: better visual?
                     // ↓ TODO: imgui_repeatbutton?
                     ImGui::PushButtonRepeat(true);
+                    // TODO: should allow keyboard control...
                     if (ImGui::Button("+1")) {
                         extra = 1;
                         logger::log_temp(200ms, "+1");
@@ -1031,17 +1027,20 @@ int main(int argc, char** argv) {
                 if (imgui_keypressed(ImGuiKey_4, true)) {
                     ctrl.pergen = std::min(ctrl.pergen_max, ctrl.pergen + 1);
                 }
+                // TODO: want to allow setting hard pausing when dragging (soft locking)...
                 if (imgui_keypressed(ImGuiKey_Space, true)) {
-                    if (!ctrl.pause) {
-                        ctrl.pause = true;
-                    } else {
-                        // TODO: log too?
-                        extra = ctrl.actual_pergen();
-                    }
-                }
-                if (imgui_keypressed(ImGuiKey_M, false)) {
                     ctrl.pause = !ctrl.pause;
+                    // Bad (remove later)
+                    // if (!ctrl.pause) {
+                    //     ctrl.pause = true;
+                    // } else {
+                    //     // TODO: log too?
+                    //     extra = ctrl.actual_pergen();
+                    // }
                 }
+                // if (imgui_keypressed(ImGuiKey_M, false)) {
+                //     ctrl.pause = !ctrl.pause;
+                // }
                 show_tile();
             }
             ImGui::EndTable();
