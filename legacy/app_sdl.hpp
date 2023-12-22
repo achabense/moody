@@ -34,27 +34,17 @@
 // Unfortunately, SDL2-renderer backend doesn't support docking features...
 // https://github.com/ocornut/imgui/issues/5835
 
-// TODO: app_context?
+// TODO: static object? rename to app_context?
+// TODO: recheck error-handling...
+// (The previous approach (returning scope-guard) obfuscated logic by a lot.)
 class app_backend {
-    struct [[nodiscard]] scope_guard {
-        using F = void (*)();
-        F fn;
-        scope_guard(F f) : fn(f) {}
-        ~scope_guard() { fn(); }
-        scope_guard(const scope_guard&) = delete;
-        scope_guard& operator=(const scope_guard&) = delete;
-    };
-
     static inline SDL_Window* window = nullptr;
     static inline SDL_Renderer* renderer = nullptr;
 
 public:
     app_backend() = delete;
 
-    // ~ Guaranteed copy-elision is supported since C++17.
-    // TODO: describe effects...
-    // ... return scope-guard which must not be discarded...
-    [[nodiscard]] static scope_guard init() {
+    static void init() {
         assert(!window && !renderer);
 
         // Setup SDL
@@ -91,21 +81,24 @@ public:
         // Setup Platform/Renderer backends
         ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
         ImGui_ImplSDLRenderer2_Init(renderer);
-
-        return scope_guard(+[] {
-            ImGui_ImplSDLRenderer2_Shutdown();
-            ImGui_ImplSDL2_Shutdown();
-            ImGui::DestroyContext();
-
-            SDL_DestroyRenderer(renderer);
-            SDL_DestroyWindow(window);
-            SDL_Quit();
-        });
     }
 
-    // TODO: better name...
-    // TODO: while(process_events()) looks a bit strange?
-    [[nodiscard]] static bool process_events() {
+    static void clear() {
+        assert(window && renderer);
+
+        ImGui_ImplSDLRenderer2_Shutdown();
+        ImGui_ImplSDL2_Shutdown();
+        ImGui::DestroyContext();
+
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+
+        window = nullptr;
+        renderer = nullptr;
+    }
+
+    static bool new_frame() {
         assert(window && renderer);
 
         SDL_Event event;
@@ -120,31 +113,27 @@ public:
                 return false;
             }
         }
-        return true;
-    }
-
-    // Begin new frame; return scope-guard which must not be discarded...
-    [[nodiscard]] static scope_guard new_frame() {
-        assert(window && renderer);
 
         // Start the Dear ImGui frame
         ImGui_ImplSDLRenderer2_NewFrame();
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
+        return true;
+    }
 
-        return scope_guard(+[] {
-            // Rendering
-            ImGui::Render();
-            // TODO: is this necessary?
-            ImGuiIO& io = ImGui::GetIO();
-            SDL_RenderSetScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
-            // ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-            // SDL_SetRenderDrawColor(renderer, (Uint8)(clear_color.x * 255), (Uint8)(clear_color.y * 255),
-            //                        (Uint8)(clear_color.z * 255), (Uint8)(clear_color.w * 255));
-            SDL_RenderClear(renderer);
-            ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
-            SDL_RenderPresent(renderer);
-        });
+    static void render() {
+        assert(window && renderer);
+
+        ImGui::Render();
+        // TODO: is this necessary?
+        ImGuiIO& io = ImGui::GetIO();
+        SDL_RenderSetScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
+        // ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+        // SDL_SetRenderDrawColor(renderer, (Uint8)(clear_color.x * 255), (Uint8)(clear_color.y * 255),
+        //                        (Uint8)(clear_color.z * 255), (Uint8)(clear_color.w * 255));
+        // SDL_RenderClear(renderer); // TODO: really ignorable? (the app uses a full-screen window)
+        ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
+        SDL_RenderPresent(renderer);
     }
 
 private:
@@ -203,6 +192,7 @@ public:
     int width() const { return m_w; }
     int height() const { return m_h; }
 
+    // should be ImTextureID instead?
     SDL_Texture* texture() { return m_texture; }
 };
 
@@ -248,7 +238,7 @@ public:
         const ImVec2 uv0(0, code * (1.0f / 512));
         const ImVec2 uv1(1, (code + 1) * (1.0f / 512));
         ImGui::PushID(code);
-        bool ret = ImGui::ImageButton("", m_texture, size, uv0, uv1, bg_col, tint_col);
+        bool ret = ImGui::ImageButton("Code", m_texture, size, uv0, uv1, bg_col, tint_col);
         ImGui::PopID();
         return ret;
     }

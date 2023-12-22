@@ -139,9 +139,9 @@ namespace legacy {
 
             bool sel = false;
 
-            // TODO: recheck id & tid logic...
+            // TODO: recheck id & tid logic... (& imagebutton)
             auto check = [&, id = 0, r = ImGui::GetFrameHeight()](termT& term) mutable {
-                // TODO: which come first? rendering or dummy button?
+                // TODO: which should come first? rendering or dummy button?
                 const ImVec2 pos = ImGui::GetCursorScreenPos();
                 const ImVec2 pos_max = pos + ImVec2{r, r};
                 // TODO: a bit ugly...
@@ -702,8 +702,8 @@ int main(int argc, char** argv) {
     const auto ini = cpp17_u8string(cur / "imgui.ini");
     const auto log = cpp17_u8string(cur / "imgui_log.txt");
 
-    // TODO: static object? contextT?
-    const auto cleanup = app_backend::init();
+    app_backend::init();
+
     ImGui::GetIO().IniFilename = ini.c_str();
     ImGui::GetIO().LogFilename = log.c_str();
     std::filesystem::current_path(R"(C:\*redacted*\Desktop\rulelists_new)");
@@ -742,9 +742,7 @@ int main(int argc, char** argv) {
     tile_image img(runner.tile());
     code_image icons;
 
-    while (app_backend::process_events()) {
-        const auto frame_guard = app_backend::new_frame();
-
+    while (app_backend::new_frame()) {
         // TODO: applying following logic; consider refining it.
         // recorder is modified during display, but will synchronize with runner's before next frame.
         assert(ctrl.rule == recorder.current());
@@ -1046,12 +1044,10 @@ int main(int argc, char** argv) {
             ImGui::EndTable();
         }
 
-        // TODO: remove (or comment-out) this when all done...
-        ImGui::ShowDemoWindow();
-
+        ImGui::ShowDemoWindow(); // TODO: remove (or comment-out) this when all done...
         logger::tempwindow();
+        app_backend::render(); // !!! TODO: recheck
 
-        // TODO: should this be put before begin-frame?
         if (ctrl.rule != recorder.current()) {
             ctrl.rule = recorder.current();
             restart = true;
@@ -1062,5 +1058,6 @@ int main(int argc, char** argv) {
         ctrl.run(runner, extra);
     }
 
+    app_backend::clear();
     return 0;
 }
