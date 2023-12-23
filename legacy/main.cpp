@@ -679,21 +679,24 @@ struct runner_ctrl {
 };
 
 int main(int argc, char** argv) {
-    // As found in debug mode, these variables shall outlive the scope_guard to avoid UB... (c_str got invalidated...)
-    // (otherwise the program made mojibake-named ini file at rulelists_new on exit...)
-    // Avoid "imgui.ini" (and maybe also "imgui_log.txt") sprinking everywhere.
-    // TODO: maybe setting to SDL_GetBasePath / ...
-    const auto cur = std::filesystem::current_path();
-    const auto ini = cpp17_u8string(cur / "imgui.ini");
-    const auto log = cpp17_u8string(cur / "imgui_log.txt");
-
     app_backend::init();
 
-    ImGui::GetIO().IniFilename = ini.c_str();
-    ImGui::GetIO().LogFilename = log.c_str();
-    std::filesystem::current_path(R"(C:\*redacted*\Desktop\rulelists_new)");
+    {
+        // Avoid "imgui.ini" (and maybe also "imgui_log.txt") sprinking everywhere.
+        // TODO: As to "strdup": temporary; the leaks are negligible here.
+        // TODO: eh... strdup is not always available...
+        // https://en.cppreference.com/w/c/experimental/dynamic/strdup
+        // TODO: maybe setting to SDL_GetBasePath / ...
+        const auto cur = std::filesystem::current_path();
+        ImGui::GetIO().IniFilename = strdup(cpp17_u8string(cur / "imgui.ini").c_str());
+        ImGui::GetIO().LogFilename = strdup(cpp17_u8string(cur / "imgui_log.txt").c_str());
 
-    // Program logic:
+        // TODO: remove when finished...
+        std::filesystem::current_path(R"(C:\*redacted*\Desktop\rulelists_new)");
+    }
+
+    // TODO: the partition buttons works poorly with navigation... check native widgets for why...
+    // (??? RenderNavHighlight (internal function...))
     // ImGuiIO& io = ImGui::GetIO();
     // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
     // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
@@ -701,19 +704,23 @@ int main(int argc, char** argv) {
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
 
-    // TODO: ... works but blurry, and how to apply in project?
-    // const char* fnpath = R"(C:\*redacted*\Desktop\Deng.ttf)";
-    // io.Fonts->AddFontFromFileTTF(fnpath, 13, nullptr, io.Fonts->GetGlyphRangesChineseFull());
+    // TODO: works but blurry, and how to apply in project?
+    // {
+    //     const char* fnpath = R"(C:\*redacted*\Desktop\Deng.ttf)";
+    //     ImGui::GetIO().Fonts->AddFontFromFileTTF(fnpath, 13, nullptr,
+    //                                                ImGui::GetIO().Fonts->GetGlyphRangesChineseFull());
+    // }
 
     rule_recorder recorder;
     // TODO: what encoding?
     if (argc == 2) {
         recorder.replace(read_rule_from_file(argv[1]));
+        // TODO: set as working path when the path is valid?
         // TODO: what if the path is invalid?
     }
 
+    // TODO: redesign...
     tileT_fill_arg filler{.use_seed = true, .seed = 0, .density = 0.5};
-    // TODO: should support basic-level pattern copy/pasting...
     torusT runner({.width = 480, .height = 360});
     runner.restart(filler);
 
@@ -723,10 +730,8 @@ int main(int argc, char** argv) {
     bool show_nav_window = true;
     file_navT nav;
 
-    // Main loop
     tile_image img(runner.tile());
     code_image icons;
-
     while (app_backend::new_frame()) {
         // TODO: applying following logic; consider refining it.
         // recorder is modified during display, but will synchronize with runner's before next frame.
@@ -734,10 +739,9 @@ int main(int argc, char** argv) {
 
         if (show_nav_window) {
             if (auto sel = nav.window("File Nav", &show_nav_window)) {
-                // logger::log("Tried to open {}", cpp17_u8string(*sel));
+                // TODO: record filename?
                 auto result = read_rule_from_file(*sel);
                 if (!result.empty()) {
-                    // TODO: "append" is a nasty feature...
                     logger::log_temp(500ms, "found {} rules", result.size());
                     recorder.replace(std::move(result));
                 } else {
@@ -762,9 +766,8 @@ int main(int argc, char** argv) {
             // It has been proven that `img_off` works better than using `corner_idx` (cell idx in the corner)
             static ImVec2 img_off = {0, 0}; // TODO: supposed to be of integer-precision...
             ImVec2 img_pos = screen_pos + img_off;
-            ImVec2 img_pos_max = img_pos + ImVec2(img.width(), img.height()) * zoom;
             img.update(runner.tile());
-            drawlist.AddImage(img.texture(), img_pos, img_pos_max);
+            drawlist.AddImage(img.texture(), img_pos, img_pos + ImVec2(img.width(), img.height()) * zoom);
             // Experimental: select:
             // TODO: this shall belong to the runner.
             static ImVec2 select_0{}, select_1{}; // tile index, not pixel.
@@ -852,34 +855,32 @@ int main(int argc, char** argv) {
                     select_1 = ImVec2(celx, cely);
                 }
             }
-            {
-                if (sel_info sel = get_select()) {
-                    if (imgui_keypressed(ImGuiKey_C, false)) {
-                        legacy::tileT t({.width = sel.width(), .height = sel.height()});
-                        legacy::copy(runner.tile(), sel.x1, sel.y1, sel.width(), sel.height(), t, 0, 0);
-                        std::string str = std::format("x = {}, y = {}, rule = {}\n{}", t.width(), t.height(),
-                                                      legacy::to_MAP_str(ctrl.rule), legacy::to_rle_str(t));
-                        ImGui::SetClipboardText(str.c_str());
-                    }
-                    // TODO: rand-mode (whether reproducible...)
-                    // TODO: clear mode (random/all-0,all-1/paste...) / (clear inner/outer)
-                    // TODO: horrible; redesign (including control) ...
-                    // TODO: 0/1/other textures are subject to agar settings...
-                    if (imgui_keypressed(ImGuiKey_Backspace, false)) {
-                        legacy::tileT& tile = const_cast<legacy::tileT&>(runner.tile());
-                        for (int y = sel.y1; y < sel.y2; ++y) {
-                            for (int x = sel.x1; x < sel.x2; ++x) {
-                                tile.line(y)[x] = 0;
-                            }
+            if (sel_info sel = get_select()) {
+                if (imgui_keypressed(ImGuiKey_C, false)) {
+                    legacy::tileT t({.width = sel.width(), .height = sel.height()});
+                    legacy::copy(runner.tile(), sel.x1, sel.y1, sel.width(), sel.height(), t, 0, 0);
+                    std::string str = std::format("x = {}, y = {}, rule = {}\n{}", t.width(), t.height(),
+                                                  legacy::to_MAP_str(ctrl.rule), legacy::to_rle_str(t));
+                    ImGui::SetClipboardText(str.c_str());
+                }
+                // TODO: rand-mode (whether reproducible...)
+                // TODO: clear mode (random/all-0,all-1/paste...) / (clear inner/outer)
+                // TODO: horrible; redesign (including control) ...
+                // TODO: 0/1/other textures are subject to agar settings...
+                if (imgui_keypressed(ImGuiKey_Backspace, false)) {
+                    legacy::tileT& tile = const_cast<legacy::tileT&>(runner.tile());
+                    for (int y = sel.y1; y < sel.y2; ++y) {
+                        for (int x = sel.x1; x < sel.x2; ++x) {
+                            tile.line(y)[x] = 0;
                         }
                     }
-                    if (imgui_keypressed(ImGuiKey_Equal, false)) {
-                        legacy::tileT& tile = const_cast<legacy::tileT&>(runner.tile());
-                        constexpr uint32_t c = std::mt19937::max() * 0.5;
-                        for (int y = sel.y1; y < sel.y2; ++y) {
-                            for (int x = sel.x1; x < sel.x2; ++x) {
-                                tile.line(y)[x] = global_mt19937() < c;
-                            }
+                }
+                if (imgui_keypressed(ImGuiKey_Equal, false)) {
+                    legacy::tileT& tile = const_cast<legacy::tileT&>(runner.tile());
+                    constexpr uint32_t c = std::mt19937::max() * 0.5;
+                    for (int y = sel.y1; y < sel.y2; ++y) {
+                        for (int x = sel.x1; x < sel.x2; ++x) {
+                            tile.line(y)[x] = global_mt19937() < c;
                         }
                     }
                 }
@@ -906,128 +907,118 @@ int main(int argc, char** argv) {
             show_target_rule(ctrl.rule, recorder);
             ImGui::Separator();
 
-            // TODO: begin-table has return value...
-            ImGui::BeginTable("Layout", 2, ImGuiTableFlags_Resizable);
-            ImGui::TableNextRow();
-            ImGui::TableNextColumn();
-            if (auto child = imgui_childwindow("Rul")) {
-                edit_rule(ctrl.rule, icons, recorder);
-            }
-            ImGui::TableNextColumn();
-            if (auto child = imgui_childwindow("Til")) {
-                ImGui::PushItemWidth(200); // TODO: flexible...
-                ImGui::BeginGroup();
-                {
-                    ImGui::Checkbox("Pause", &ctrl.pause);
-                    ImGui::SameLine();
-                    ImGui::BeginDisabled();
-                    ImGui::Checkbox("Pause2", &ctrl.pause2);
-                    ImGui::EndDisabled();
-                    ImGui::SameLine();
-                    // ↑ TODO: better visual?
-                    // ↓ TODO: imgui_repeatbutton?
-                    ImGui::PushButtonRepeat(true);
-                    // TODO: should allow keyboard control...
-                    if (ImGui::Button("+1")) {
-                        extra = 1;
-                        logger::log_temp(200ms, "+1");
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::Button("+p")) {
-                        extra = ctrl.actual_pergen();
-                        logger::log_temp(200ms, "+p({})", ctrl.actual_pergen());
-                    }
-                    ImGui::PopButtonRepeat();
-                    ImGui::SameLine();
-                    if (ImGui::Button("Restart") || imgui_keypressed(ImGuiKey_R, false)) {
-                        restart = true;
-                    }
-
-                    // TODO: Gap-frame shall be really timer-based...
-                    ImGui::SliderInt("Gap Frame [0-20]", &ctrl.gap_frame, ctrl.gap_min, ctrl.gap_max, "%d",
-                                     ImGuiSliderFlags_NoInput);
-                    ImGui::SliderInt("Start gen [0-1000]", &ctrl.start_from, ctrl.start_min, ctrl.start_max, "%d",
-                                     ImGuiSliderFlags_NoInput);
-                    ImGui::SliderInt("Pergen [1-20]", &ctrl.pergen, ctrl.pergen_min, ctrl.pergen_max, "%d",
-                                     ImGuiSliderFlags_NoInput);
-                    ImGui::AlignTextToFramePadding();
-                    ImGui::Text("(Actual pergen: %d)", ctrl.actual_pergen());
-                    ImGui::SameLine();
-                    ImGui::Checkbox("anti-flick", &ctrl.anti_flick);
+            if (ImGui::BeginTable("Layout", 2, ImGuiTableFlags_Resizable)) {
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                if (auto child = imgui_childwindow("Rul")) {
+                    edit_rule(ctrl.rule, icons, recorder);
                 }
-                ImGui::EndGroup();
-                ImGui::SameLine();
-                ImGui::BeginGroup();
-                {
-                    // TODO: use radio instead...
-                    // TODO: imgui_binaryradio???
-                    if (ImGui::Checkbox("Use seed", &filler.use_seed)) {
-                        // TODO: unconditional?
-                        if (filler.use_seed) {
-                            restart = true;
-                        }
-                    }
-                    if (!filler.use_seed) {
+                ImGui::TableNextColumn();
+                if (auto child = imgui_childwindow("Til")) {
+                    ImGui::PushItemWidth(200); // TODO: flexible...
+                    ImGui::BeginGroup();
+                    {
+                        ImGui::Checkbox("Pause", &ctrl.pause);
+                        ImGui::SameLine();
                         ImGui::BeginDisabled();
+                        ImGui::Checkbox("Pause2", &ctrl.pause2);
+                        ImGui::EndDisabled();
+                        ImGui::SameLine();
+                        // ↑ TODO: better visual?
+                        // ↓ TODO: imgui_repeatbutton?
+                        ImGui::PushButtonRepeat(true);
+                        // TODO: should allow keyboard control...
+                        if (ImGui::Button("+1")) {
+                            extra = 1;
+                            logger::log_temp(200ms, "+1"); // TODO: useful?
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Button("+p")) { // TODO: Button("+p(...)")?
+                            extra = ctrl.actual_pergen();
+                            logger::log_temp(200ms, "+p({})", ctrl.actual_pergen());
+                        }
+                        ImGui::PopButtonRepeat();
+                        ImGui::SameLine();
+                        if (ImGui::Button("Restart") || imgui_keypressed(ImGuiKey_R, false)) {
+                            restart = true;
+                        }
+
+                        // TODO: Gap-frame shall be really timer-based...
+                        ImGui::SliderInt("Gap Frame [0-20]", &ctrl.gap_frame, ctrl.gap_min, ctrl.gap_max, "%d",
+                                         ImGuiSliderFlags_NoInput);
+                        ImGui::SliderInt("Start gen [0-1000]", &ctrl.start_from, ctrl.start_min, ctrl.start_max, "%d",
+                                         ImGuiSliderFlags_NoInput);
+                        ImGui::SliderInt("Pergen [1-20]", &ctrl.pergen, ctrl.pergen_min, ctrl.pergen_max, "%d",
+                                         ImGuiSliderFlags_NoInput);
+                        ImGui::AlignTextToFramePadding();
+                        ImGui::Text("(Actual pergen: %d)", ctrl.actual_pergen());
+                        ImGui::SameLine();
+                        ImGui::Checkbox("anti-flick", &ctrl.anti_flick);
                     }
-                    // TODO: uint32_t...
-                    // TODO: want resetting only when +/-/enter...
-                    int seed = filler.seed;
-                    // TODO: same as "rule_editor"'s... but don't want to affect Label...
-                    // ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(2, 0));
-                    if (ImGui::InputInt("Seed", &seed)) {
-                        seed = std::clamp(seed, 0, 9999);
-                        if (seed >= 0 && seed != filler.seed) {
-                            filler.seed = seed;
+                    ImGui::EndGroup();
+                    ImGui::SameLine();
+                    ImGui::BeginGroup();
+                    {
+                        // TODO: use radio instead...
+                        // TODO: imgui_binaryradio???
+                        if (ImGui::Checkbox("Use seed", &filler.use_seed)) {
+                            // TODO: unconditional?
+                            if (filler.use_seed) {
+                                restart = true;
+                            }
+                        }
+                        if (!filler.use_seed) {
+                            ImGui::BeginDisabled();
+                        }
+                        // TODO: uint32_t...
+                        // TODO: want resetting only when +/-/enter...
+                        int seed = filler.seed;
+                        // TODO: same as "rule_editor"'s... but don't want to affect Label...
+                        // ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(2, 0));
+                        if (ImGui::InputInt("Seed", &seed)) {
+                            seed = std::clamp(seed, 0, 9999);
+                            if (seed >= 0 && seed != filler.seed) {
+                                filler.seed = seed;
+                                restart = true;
+                            }
+                        }
+                        // ImGui::PopStyleVar();
+                        if (!filler.use_seed) {
+                            ImGui::EndDisabled();
+                        }
+
+                        // TODO: button <- set to 0.5?
+                        if (ImGui::SliderFloat("Init density [0-1]", &filler.density, 0.0f, 1.0f, "%.3f",
+                                               ImGuiSliderFlags_NoInput)) {
                             restart = true;
                         }
                     }
-                    // ImGui::PopStyleVar();
-                    if (!filler.use_seed) {
-                        ImGui::EndDisabled();
-                    }
+                    ImGui::EndGroup();
+                    ImGui::PopItemWidth();
 
-                    // TODO: button <- set to 0.5?
-                    if (ImGui::SliderFloat("Init density [0-1]", &filler.density, 0.0f, 1.0f, "%.3f",
-                                           ImGuiSliderFlags_NoInput)) {
-                        restart = true;
+                    // TODO: shall redesign...
+                    // TODO: enable/disable keyboard ctrl (enable by default)
+                    // TODO: redesign keyboard ctrl...
+                    if (imgui_keypressed(ImGuiKey_1, true)) {
+                        ctrl.gap_frame = std::max(ctrl.gap_min, ctrl.gap_frame - 1);
                     }
+                    if (imgui_keypressed(ImGuiKey_2, true)) {
+                        ctrl.gap_frame = std::min(ctrl.gap_max, ctrl.gap_frame + 1);
+                    }
+                    if (imgui_keypressed(ImGuiKey_3, true)) {
+                        ctrl.pergen = std::max(ctrl.pergen_min, ctrl.pergen - 1);
+                    }
+                    if (imgui_keypressed(ImGuiKey_4, true)) {
+                        ctrl.pergen = std::min(ctrl.pergen_max, ctrl.pergen + 1);
+                    }
+                    // TODO: want to allow setting hard pausing when dragging (soft locking)...
+                    if (imgui_keypressed(ImGuiKey_Space, true)) {
+                        ctrl.pause = !ctrl.pause;
+                    }
+                    show_tile();
                 }
-                ImGui::EndGroup();
-                ImGui::PopItemWidth();
-
-                // TODO: shall redesign...
-                // TODO: enable/disable keyboard ctrl (enable by default)
-                // TODO: redesign keyboard ctrl...
-                if (imgui_keypressed(ImGuiKey_1, true)) {
-                    ctrl.gap_frame = std::max(ctrl.gap_min, ctrl.gap_frame - 1);
-                }
-                if (imgui_keypressed(ImGuiKey_2, true)) {
-                    ctrl.gap_frame = std::min(ctrl.gap_max, ctrl.gap_frame + 1);
-                }
-                if (imgui_keypressed(ImGuiKey_3, true)) {
-                    ctrl.pergen = std::max(ctrl.pergen_min, ctrl.pergen - 1);
-                }
-                if (imgui_keypressed(ImGuiKey_4, true)) {
-                    ctrl.pergen = std::min(ctrl.pergen_max, ctrl.pergen + 1);
-                }
-                // TODO: want to allow setting hard pausing when dragging (soft locking)...
-                if (imgui_keypressed(ImGuiKey_Space, true)) {
-                    ctrl.pause = !ctrl.pause;
-                    // Bad (remove later)
-                    // if (!ctrl.pause) {
-                    //     ctrl.pause = true;
-                    // } else {
-                    //     // TODO: log too?
-                    //     extra = ctrl.actual_pergen();
-                    // }
-                }
-                // if (imgui_keypressed(ImGuiKey_M, false)) {
-                //     ctrl.pause = !ctrl.pause;
-                // }
-                show_tile();
+                ImGui::EndTable();
             }
-            ImGui::EndTable();
         }
 
         ImGui::ShowDemoWindow(); // TODO: remove (or comment-out) this when all done...
