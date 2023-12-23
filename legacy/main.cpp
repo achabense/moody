@@ -246,14 +246,16 @@ void show_target_rule(const legacy::ruleT& target, rule_recorder& recorder) {
         recorder.set_pos(recorder.size() - 1);
     }
     ImGui::SameLine();
-    ImGui::Button(std::format("Total:{} At:{}###...", recorder.size(), recorder.pos() + 1).c_str());
-    if (ImGui::IsItemHovered()) {
-        if (imgui_scrolldown()) {
-            recorder.next();
-        } else if (imgui_scrollup()) {
-            recorder.prev();
-        }
-    }
+    imgui_str(std::format("Total:{} At:{}", recorder.size(), recorder.pos() + 1));
+    // TODO: Moved near to other iter widgets...
+    // ImGui::Button(std::format("Total:{} At:{}###...", recorder.size(), recorder.pos() + 1).c_str());
+    // if (ImGui::IsItemHovered()) {
+    //     if (imgui_scrolldown()) {
+    //         recorder.next();
+    //     } else if (imgui_scrollup()) {
+    //         recorder.prev();
+    //     }
+    // }
 #if 1
     // TODO: is random-access useful?
     static char buf_pos[20]{};
@@ -360,84 +362,67 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
             recorder.take(random_flip(inter.get_viewer(), part, rcount, rcount, global_mt19937)); // TODO: range...
         }
 
-        // TODO: temporal; todo: exceptions should be avoided
-        // TODO: the mousewheel ctrl is horribly written...
-        try {
-            bool group = false;
-            if (ImGui::Button("dec")) {
-                recorder.take(legacy::prev_v(inter, part, target));
-            }
-            group |= ImGui::IsItemHovered();
-            ImGui::SameLine();
-            if (ImGui::Button("inc")) {
-                recorder.take(legacy::next_v(inter, part, target));
-            }
-            group |= ImGui::IsItemHovered();
-            if (group) {
-                if (imgui_scrollup()) {
-                    recorder.take(legacy::prev_v(inter, part, target));
-                } else if (imgui_scrolldown()) {
-                    recorder.take(legacy::next_v(inter, part, target));
+        // TODO: iteration should be the key concept...
+        // TODO: redesign...
+        {
+            auto iter_pair = [](const char* tag_prev, const char* tag_next, auto act_prev, auto act_next) {
+                // TODO: temporal; [[exceptions should be avoided]]
+                auto consume_exception = [](auto& act) {
+                    try {
+                        act();
+                    } catch (...) {
+                        logger::log_temp(300ms, "X_X");
+                    }
+                };
+
+                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 0) /*ImGui::GetStyle().ItemInnerSpacing*/);
+
+                bool group = false;
+                if (ImGui::Button(tag_prev)) {
+                    consume_exception(act_prev);
                 }
-            }
-
-            group = false;
-            ImGui::SameLine();
-            if (ImGui::Button("<p")) {
-                recorder.take(legacy::prev_perm(inter, part, target));
-            }
-            group |= ImGui::IsItemHovered();
-            ImGui::SameLine();
-            if (ImGui::Button(">p")) {
-                recorder.take(legacy::next_perm(inter, part, target));
-            }
-            group |= ImGui::IsItemHovered();
-            if (group) {
-                if (imgui_scrollup()) {
-                    recorder.take(legacy::prev_perm(inter, part, target));
-                } else if (imgui_scrolldown()) {
-                    recorder.take(legacy::next_perm(inter, part, target));
+                group |= ImGui::IsItemHovered();
+                ImGui::SameLine();
+                if (ImGui::Button(tag_next)) {
+                    consume_exception(act_next);
                 }
-            }
-        } catch (...) {
-            logger::log_temp(300ms, "X_X");
-        }
-    }
-    // TODO: redesign...
-    if (true && ImGui::TreeNode("Misc")) {
-        // TODO: should be redesigned...
+                group |= ImGui::IsItemHovered();
+                if (group) {
+                    if (imgui_scrollup()) {
+                        consume_exception(act_prev);
+                    } else if (imgui_scrolldown()) {
+                        consume_exception(act_next);
+                    }
+                }
+                ImGui::PopStyleVar();
+            };
 
-        // TODO: incorrect place...
-        // TODO: how to keep state-symmetry in Diff mode?
-        ImGui::AlignTextToFramePadding();
-        // ImGui::Text("State symmetry: %d", (int)legacy::state_symmetric(target));
-        // ImGui::SameLine();
-        // if (ImGui::Button("Details")) {
-        //     extr = partitionT::State;
-        //     inter.tag = inter.Flip;
-        // }
-        // ImGui::SameLine();
-        if (ImGui::Button("Mir")) {
-            recorder.take(legacy::mirror(target));
-        }
-
-        // TODO: experimental; not suitable place... should be totally redesigned...
-        // Flip each group; the result is actually independent of inter.
-        ImGui::SameLine();
-        if (ImGui::Button("Flip each group")) {
-            std::vector<legacy::compressT> vec;
-            vec.emplace_back(target);
-            for (int j = 0; j < part.k(); ++j) {
-                const auto& group = part.jth_group(j);
-                legacy::ruleT r = target;
-                legacy::flip(group, r);
-                vec.emplace_back(r);
+            iter_pair(
+                "prev", "next", [&] { recorder.prev(); }, [&] { recorder.next(); });
+            ImGui::SameLine();
+            if (ImGui::Button("00..")) {
+                legacy::ruleT_data r{};
+                recorder.take(inter.to_rule(r));
             }
-            recorder.replace(std::move(vec));
-            logger::log_temp(300ms, "...");
-            // TODO: the effect is still obscure...
+            ImGui::SameLine();
+            if (ImGui::Button("11..")) {
+                legacy::ruleT_data r{};
+                r.fill(1);
+                recorder.take(inter.to_rule(r));
+            }
+            ImGui::SameLine();
+            iter_pair(
+                "dec", "inc", [&] { recorder.take(legacy::prev_v(inter, part, target)); },
+                [&] { recorder.take(legacy::next_v(inter, part, target)); });
+            ImGui::SameLine();
+            iter_pair(
+                "<p", ">p", [&] { recorder.take(legacy::prev_perm(inter, part, target)); },
+                [&] { recorder.take(legacy::next_perm(inter, part, target)); });
+            ImGui::SameLine();
+            if (ImGui::Button("Mir")) {
+                recorder.take(legacy::mirror(target));
+            }
         }
-        ImGui::TreePop();
     }
     {
         static const char* const strss[3][3]{{"-0", "-1", "-x"}, //
@@ -762,6 +747,7 @@ int main(int argc, char** argv) {
         }
 
         const auto show_tile = [&] {
+            // TODO: lift "Width..." to before the ctrl widgets?
             ImGui::Text("Width:%d,Height:%d,Gen:%d,Density:%f", runner.tile().width(), runner.tile().height(),
                         runner.gen(), float(legacy::count(runner.tile())) / runner.tile().area());
 
@@ -1051,6 +1037,7 @@ int main(int argc, char** argv) {
         if (ctrl.rule != recorder.current()) {
             ctrl.rule = recorder.current();
             restart = true;
+            ctrl.pause = false; // TODO: this should be configurable...
         }
         if (restart) {
             runner.restart(filler);
