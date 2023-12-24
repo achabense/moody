@@ -5,6 +5,45 @@
 
 #include "rule_pp.hpp"
 
+#if 0
+//12/24 temporal; used to transform qc_emulation to ez_emulation...
+namespace legacy {
+    inline equivT make_equiv(const mapperT_pair& q) {
+        equivT eq{};
+        eq.add_eq(q);
+        return eq;
+    }
+
+    // what about
+    // 010
+    // 111
+    // 010 rule?
+    inline ruleT switch_hex(const ruleT& r) {
+        static equivT hex1 = make_equiv({mp_identity, mp_hex_ignore});  // ez
+        static equivT hex2 = make_equiv({mp_identity, mp_hex2_ignore}); // qc
+        constexpr interT inter{};
+        if (hex1.test(inter.from_rule(r))) {
+            // ez->qc
+            ruleT ret{};
+            for_each_code(code) {
+                auto [q, w, e, a, s, d, z, x, c] = decode(code);
+                ret.set(code, r(encode(w, e, 0, a, s, d, 0, z, x))); // ???
+            }
+            return ret;
+        } else if (hex2.test(inter.from_rule(r))) {
+            // qc->ez
+            ruleT ret{};
+            for_each_code(code) {
+                auto [q, w, e, a, s, d, z, x, c] = decode(code);
+                ret.set(code, r(encode(0, q, w, a, s, d, x, c, 0))); // ???
+            }
+            return ret;
+        }
+        return r;
+    }
+} // namespace legacy
+#endif
+
 namespace legacy {
     // TODO: move elsewhere
     // TODO: proper name...
@@ -80,12 +119,12 @@ namespace legacy {
             terms_ignore.emplace_back("x", mk(mp_ignore_x));
             terms_ignore.emplace_back("c", mk(mp_ignore_c));
 
-            terms_native.emplace_back("|", mk(mp_wsx_refl), true);
-            terms_native.emplace_back("-", mk(mp_asd_refl), true);
-            terms_native.emplace_back("\\", mk(mp_qsc_refl), true);
-            terms_native.emplace_back("/", mk(mp_esz_refl), true);
-            terms_native.emplace_back("R180", mk(mp_ro_180));
-            terms_native.emplace_back("R90", mk(mp_ro_90));
+            terms_native.emplace_back("|", mk(mp_refl_wsx), true);
+            terms_native.emplace_back("-", mk(mp_refl_asd), true);
+            terms_native.emplace_back("\\", mk(mp_refl_qsc), true);
+            terms_native.emplace_back("/", mk(mp_refl_esz), true);
+            terms_native.emplace_back("C2(180)", mk(mp_C2));
+            terms_native.emplace_back("C4(90)", mk(mp_C4));
 
             terms_misc.emplace_back("*R45", mk(mp_ro_45));
             terms_misc.emplace_back("*Tota", mk(mp_tot_a));
@@ -93,11 +132,11 @@ namespace legacy {
             terms_misc.emplace_back("Dual", mk(mp_dual));
 
             terms_hex.emplace_back("Hex", mk(mp_hex_ignore));
-            terms_hex.emplace_back("|", mk(mp_hex_wsx_refl));
-            terms_hex.emplace_back("-", mk(mp_hex_asd_refl));
-            terms_hex.emplace_back("HexR180", mk(mp_hex_ro_180));
-            terms_hex.emplace_back("HexR120", mk(mp_hex_ro_120));
-            terms_hex.emplace_back("HexR60", mk(mp_hex_ro_60));
+            terms_hex.emplace_back("|", mk(mp_hex_refl_wsx));
+            terms_hex.emplace_back("-", mk(mp_hex_refl_asd));
+            terms_hex.emplace_back("C2(180)", mk(mp_hex_C2));
+            terms_hex.emplace_back("C3(120)", mk(mp_hex_C3));
+            terms_hex.emplace_back("C6(60)", mk(mp_hex_C6));
             // TODO: more...
 
             reset_par();
@@ -226,7 +265,7 @@ void show_target_rule(const legacy::ruleT& target, rule_recorder& recorder) {
                 // TODO: redesign recorder... whether to accept multiple rules?
                 // TODO: target??
                 if (target != rules.front()) {
-                    recorder.take(rules.front());
+                    recorder.replace(std::move(rules));
                 } else {
                     logger::log_temp(300ms, "Same rule");
                 }
@@ -239,11 +278,11 @@ void show_target_rule(const legacy::ruleT& target, rule_recorder& recorder) {
     // matters
     ImGui::SameLine();
     if (ImGui::Button("|<")) {
-        recorder.set_pos(0);
+        recorder.set_first();
     }
     ImGui::SameLine();
     if (ImGui::Button(">|")) {
-        recorder.set_pos(recorder.size() - 1);
+        recorder.set_last();
     }
     ImGui::SameLine();
     imgui_str(std::format("Total:{} At:{}", recorder.size(), recorder.pos() + 1));
@@ -420,7 +459,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                 [&] { recorder.take(legacy::next_perm(inter, part, target)); });
             ImGui::SameLine();
             if (ImGui::Button("Mir")) {
-                recorder.take(legacy::mirror(target));
+                recorder.replace_current(legacy::mirror(target));
             }
         }
     }
@@ -492,7 +531,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                     } else {
                         legacy::flip(group, r);
                     }
-                    recorder.take(r);
+                    recorder.take(r); // replace_current?
                 }
             }
             ImGui::PopStyleVar(2);

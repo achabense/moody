@@ -149,6 +149,10 @@ public:
         }
     }
 
+    void replace_current(const legacy::ruleT& rule) { //
+        m_record[m_pos] = legacy::compressT(rule);
+    }
+
     legacy::ruleT current() const {
         assert(m_pos >= 0 && m_pos < size());
         return static_cast<legacy::ruleT>(m_record[m_pos]);
@@ -159,6 +163,8 @@ public:
     }
     void next() { set_pos(m_pos + 1); }
     void prev() { set_pos(m_pos - 1); }
+    void set_first() { set_pos(0); }
+    void set_last() { set_pos(size() - 1); }
 
     // TODO: reconsider m_pos logic...
     void append(const std::vector<legacy::compressT>& vec) { //

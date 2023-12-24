@@ -29,13 +29,23 @@ namespace legacy {
 
         // TODO: sometimes need to listen to selected area?
         auto bind(const ruleT& rule) {
-            return [this, rule](codeT code) /*const*/ {
+            return [this, &rule](codeT code) /*const*/ {
                 set(code, rule(code));
                 return rule(code);
             };
         }
 #endif
     };
+#if 0
+    // TODO: lock-based or inter-based?
+    using lockT = codeT::map_to<bool>;
+    inline auto bind(lockT& locked, const ruleT& rule) {
+        return [&](codeT code) {
+            locked[code] = true;
+            return rule(code);
+        };
+    }
+#endif
 
     // Interpretation of ruleT_data.
     // TODO: explain...
@@ -245,29 +255,41 @@ namespace legacy {
 } // namespace legacy
 
 namespace legacy::inline special_mappers {
-    // TODO: explain...
+    // TODO: explain... mapperT_pair{mp_identity,*}
     inline constexpr mapperT mp_identity("qweasdzxc");
 
+    // TODO: about ignore_s and interT...
+    inline constexpr mapperT mp_ignore_q("0weasdzxc");
+    inline constexpr mapperT mp_ignore_w("q0easdzxc");
+    inline constexpr mapperT mp_ignore_e("qw0asdzxc");
+    inline constexpr mapperT mp_ignore_a("qwe0sdzxc");
+    inline constexpr mapperT mp_ignore_s("qwea0dzxc");
+    inline constexpr mapperT mp_ignore_d("qweas0zxc");
+    inline constexpr mapperT mp_ignore_z("qweasd0xc");
+    inline constexpr mapperT mp_ignore_x("qweasdz0c");
+    inline constexpr mapperT mp_ignore_c("qweasdzx0");
+
+    // TODO: clarify the [exact] meaning (&&effects) of these mappers...
     // Native symmetry.
     // Combination of these requirements can lead to ... TODO: explain, and explain "requirements"...
-    inline constexpr mapperT mp_asd_refl("zxc"
+    inline constexpr mapperT mp_refl_asd("zxc"
                                          "asd"
                                          "qwe"); // '-'
-    inline constexpr mapperT mp_wsx_refl("ewq"
+    inline constexpr mapperT mp_refl_wsx("ewq"
                                          "dsa"
                                          "cxz"); // '|'
-    inline constexpr mapperT mp_qsc_refl("qaz"
+    inline constexpr mapperT mp_refl_qsc("qaz"
                                          "wsx"
                                          "edc"); // '\'
-    inline constexpr mapperT mp_esz_refl("cde"
+    inline constexpr mapperT mp_refl_esz("cde"
                                          "xsw"
                                          "zaq"); // '/'
-    inline constexpr mapperT mp_ro_180("cxz"
-                                       "dsa"
-                                       "ewq"); // 180
-    inline constexpr mapperT mp_ro_90("zaq"
-                                      "xsw"
-                                      "cde"); // 90 (clockwise)
+    inline constexpr mapperT mp_C2("cxz"
+                                   "dsa"
+                                   "ewq"); // 180
+    inline constexpr mapperT mp_C4("zaq"
+                                   "xsw"
+                                   "cde"); // 90 (clockwise)
     // TODO: does this imply 270 clockwise?
 
     // TODO: explain; actually irrelevant of symmetry...
@@ -283,6 +305,8 @@ namespace legacy::inline special_mappers {
     inline constexpr mapperT mp_tot_b("qse"
                                       "awd"
                                       "zxc");
+    // TODO: about concepts...
+    // TODO: for example, "totalistic" can only be expressed by equivT...
 
     // TODO: support that totalistic...
 
@@ -290,17 +314,6 @@ namespace legacy::inline special_mappers {
     inline constexpr mapperT mp_dual("!q!w!e"
                                      "!a!s!d"
                                      "!z!x!c");
-
-    // TODO: about ignore_s and interT...
-    inline constexpr mapperT mp_ignore_q("0weasdzxc");
-    inline constexpr mapperT mp_ignore_w("q0easdzxc");
-    inline constexpr mapperT mp_ignore_e("qw0asdzxc");
-    inline constexpr mapperT mp_ignore_a("qwe0sdzxc");
-    inline constexpr mapperT mp_ignore_s("qwea0dzxc");
-    inline constexpr mapperT mp_ignore_d("qweas0zxc");
-    inline constexpr mapperT mp_ignore_z("qweasd0xc");
-    inline constexpr mapperT mp_ignore_x("qweasdz0c");
-    inline constexpr mapperT mp_ignore_c("qweasdzx0");
 
     // Hexagonal emulation and emulated symmetry.
 
@@ -312,31 +325,31 @@ namespace legacy::inline special_mappers {
                                            "asd"
                                            "0xc"); // ignore_(e, z)
     // TODO: explain why 0 instead of e-z... ... is this really correct?
-    inline constexpr mapperT mp_hex_wsx_refl("dw0"
+    inline constexpr mapperT mp_hex_refl_wsx("dw0"
                                              "csq"
                                              "0xa"); // swap q-a and d-c
-    inline constexpr mapperT mp_hex_qsc_refl("qa0"
+    inline constexpr mapperT mp_hex_refl_qsc("qa0"
                                              "wsx"
                                              "0dc"); // swap ... TODO: complete...
-    inline constexpr mapperT mp_hex_asd_refl("xc0"
+    inline constexpr mapperT mp_hex_refl_asd("xc0"
                                              "asd"
                                              "0qw"); // swap (q,x) (w,c)
 
     // TODO: complete...
     // TODO: better name...
-    inline constexpr mapperT mp_hex_qwxc_refl("wq0"
+    inline constexpr mapperT mp_hex_refl_qwxc("wq0"
                                               "dsa"
                                               "0cx"); // swap(q,w), swap(a,d), swap(x,c)
 
-    inline constexpr mapperT mp_hex_ro_180("cx0"
-                                           "dsa"
-                                           "0wq"); // 180
-    inline constexpr mapperT mp_hex_ro_120("xa0"
-                                           "csq"
-                                           "0dw"); // 120 (clockwise)
-    inline constexpr mapperT mp_hex_ro_60("aq0"
-                                          "xsw"
-                                          "0cd"); // 60 (clockwise)
+    inline constexpr mapperT mp_hex_C2("cx0"
+                                       "dsa"
+                                       "0wq"); // 180
+    inline constexpr mapperT mp_hex_C3("xa0"
+                                       "csq"
+                                       "0dw"); // 120 (clockwise)
+    inline constexpr mapperT mp_hex_C6("aq0"
+                                       "xsw"
+                                       "0cd"); // 60 (clockwise)
 
     // -we     w e
     // asd -> a s d
@@ -344,10 +357,6 @@ namespace legacy::inline special_mappers {
     inline constexpr mapperT mp_hex2_ignore("0we"
                                             "asd"
                                             "zx0"); // ignore_(q, c)
-    inline constexpr mapperT mp_hex2_wsx_refl("0wa"
-                                              "esz"
-                                              "dx0"); // swap e-a and z-d
-    // TODO ...
 
 } // namespace legacy::inline special_mappers
 
@@ -531,7 +540,8 @@ namespace legacy {
     }
 
     // TODO: temp name...
-    inline ruleT _iterate(const interT& inter, const partitionT& par, const ruleT& rule, void (*fn)(bool*, bool*)) {
+    inline ruleT _iterate(const interT& inter, const partitionT& par, const ruleT& rule,
+                          void (*fn)(bool* /*begin*/, bool* /*end*/)) {
         // TODO: bool512 is temporal...
 
         using bool512 = std::array<bool, 512>;
