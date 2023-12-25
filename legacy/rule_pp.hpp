@@ -443,18 +443,6 @@ namespace legacy {
         }
         // TODO: is refinement checking needed for partitionT?
         // TODO: refer to https://en.wikipedia.org/wiki/Partition_of_a_set#Refinement_of_partitions
-
-        // TODO: temporal; tightly dependent on on bool512 guarantee in next/prev(perm)...
-        void collect(const ruleT_data& r, std::span<bool> rep) const {
-            for (int j = 0; j < m_k; ++j) {
-                rep[j] = r[jth_group(j).front()];
-            }
-        }
-        void dispatch(std::span<const bool> rep, ruleT_data& r) const {
-            for_each_code(code) {
-                r[code] = rep[index_for(code)];
-            }
-        }
     };
 
     // TODO: refine "concept"...
@@ -553,17 +541,26 @@ namespace legacy {
             throw(0);
         }
         bool512 bools{};
-        par.collect(r, bools);
+        for (int j = 0; j < par.k(); ++j) {
+            bools[j] = r[par.jth_group(j).front()];
+        }
 
         fn(bools.data(), bools.data() + par.k());
 
-        par.dispatch(bools, r);
+        for_each_code(code) {
+            r[code] = bools[par.index_for(code)];
+        }
         return inter.to_rule(r);
     }
 
-    // TODO: add stop contidion...
+    // TODO: add stop condition...
     inline ruleT next_v(const interT& inter, const partitionT& par, const ruleT& rule) {
         return _iterate(inter, par, rule, [](bool* begin, bool* end) {
+            // TODO: rewrite...
+            if (std::count(begin, end, 0) == 0) {
+                return;
+            }
+
             while (begin != end && *begin == 1) {
                 *begin++ = 0;
             }
@@ -574,6 +571,11 @@ namespace legacy {
     }
     inline ruleT prev_v(const interT& inter, const partitionT& par, const ruleT& rule) {
         return _iterate(inter, par, rule, [](bool* begin, bool* end) {
+            // TODO: rewrite...
+            if (std::count(begin, end, 1) == 0) {
+                return;
+            }
+
             while (begin != end && *begin == 0) {
                 *begin++ = 1;
             }

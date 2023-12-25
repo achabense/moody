@@ -2,6 +2,7 @@
 
 #include "app2.hpp"
 #include "app_sdl.hpp"
+#include "imgui_internal.h" // TODO: for `RenderNavHighlight`
 
 #include "rule_pp.hpp"
 
@@ -132,8 +133,11 @@ namespace legacy {
             terms_misc.emplace_back("Dual", mk(mp_dual));
 
             terms_hex.emplace_back("Hex", mk(mp_hex_ignore));
-            terms_hex.emplace_back("|", mk(mp_hex_refl_wsx));
+            terms_hex.emplace_back("/", mk(mp_hex_refl_wsx));
+            terms_hex.emplace_back("\\", mk(mp_hex_refl_qsc));
             terms_hex.emplace_back("-", mk(mp_hex_refl_asd));
+            // terms_hex.emplace_back("?", mk(mp_hex_refl_qwxc));
+
             terms_hex.emplace_back("C2(180)", mk(mp_hex_C2));
             terms_hex.emplace_back("C3(120)", mk(mp_hex_C3));
             terms_hex.emplace_back("C6(60)", mk(mp_hex_C6));
@@ -192,7 +196,12 @@ namespace legacy {
 
                 ImGui::PushID(id++);
                 bool hit = ImGui::InvisibleButton("Check", ImVec2{r, r});
+                // TODO: this is in imgui_internal.h...
+                // TODO: Ask is it intentional to make InvisibleButton highlight-less?
+                // TODO: use normal buttons instead?
+                ImGui::RenderNavHighlight({ImGui::GetItemRectMin(), ImGui::GetItemRectMax()}, ImGui::GetItemID());
                 ImGui::PopID();
+
                 if (ImGui::BeginItemTooltip()) {
                     show_pair(term.eq);
                     ImGui::EndTooltip();
@@ -323,10 +332,6 @@ void show_target_rule(const legacy::ruleT& target, rule_recorder& recorder) {
 
 // TODO: should be a class... how to decouple? ...
 void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_recorder& recorder) {
-    // TODO: explain...
-    // TODO: for "paired", support 4-step modification (_,S,B,BS)... add new color?
-    // TODO: why does clang-format sort using clauses?
-
     static legacy::interT inter = {};
     {
         int itag = inter.tag;
@@ -373,7 +378,6 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
     static legacy::partition_collection parcol;
     const auto& part = parcol.get_par();
     const int k = part.k();
-    const legacy::ruleT_data drule = inter.from_rule(target);
     {
         // TODO: unstable between base/extr switchs; ratio-based approach is on-trivial though... (double has
         // inaccessible values)
@@ -436,9 +440,13 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                 ImGui::PopStyleVar();
             };
 
+            ImGui::AlignTextToFramePadding();
+            imgui_str(std::format("Total:{} At:{}", recorder.size(), recorder.pos() + 1));
+            ImGui::SameLine();
             iter_pair(
                 "prev", "next", [&] { recorder.prev(); }, [&] { recorder.next(); });
-            ImGui::SameLine();
+            ImGui::Dummy({}); // TODO: why is line spacing affected (though )without this dummy widget?
+
             if (ImGui::Button("00..")) {
                 legacy::ruleT_data r{};
                 recorder.take(inter.to_rule(r));
@@ -470,6 +478,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         const auto strs = strss[inter.tag];
 
         // TODO: should be foldable; should be able to set max height...
+        const legacy::ruleT_data drule = inter.from_rule(target);
         const legacy::scanlistT scans(part, drule);
         ImGui::Text("Groups:%d [%c:%d] [%c:%d] [%c:%d]", k, strs[0][1], scans.count(scans.A0), strs[1][1],
                     scans.count(scans.A1), strs[2][1], scans.count(scans.Inconsistent));
@@ -734,11 +743,8 @@ int main(int argc, char** argv) {
         std::filesystem::current_path(R"(C:\*redacted*\Desktop\rulelists_new)");
     }
 
-    // TODO: the partition buttons works poorly with navigation... check native widgets for why...
-    // (??? RenderNavHighlight (internal function...))
-    // ImGuiIO& io = ImGui::GetIO();
-    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
-    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
+    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+    // ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
