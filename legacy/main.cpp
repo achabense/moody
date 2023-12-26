@@ -136,12 +136,16 @@ namespace legacy {
             terms_hex.emplace_back("/", mk(mp_hex_refl_wsx));
             terms_hex.emplace_back("\\", mk(mp_hex_refl_qsc));
             terms_hex.emplace_back("-", mk(mp_hex_refl_asd));
-            // terms_hex.emplace_back("?", mk(mp_hex_refl_qwxc));
+            terms_hex.emplace_back("aq", mk(mp_hex_refl_aq));
+            terms_hex.emplace_back("qw", mk(mp_hex_refl_qw));
+            terms_hex.emplace_back("wd", mk(mp_hex_refl_wd));
 
             terms_hex.emplace_back("C2(180)", mk(mp_hex_C2));
             terms_hex.emplace_back("C3(120)", mk(mp_hex_C3));
             terms_hex.emplace_back("C6(60)", mk(mp_hex_C6));
-            // TODO: more...
+
+            terms_hex.emplace_back("A", mk(mp_hex_tot_a));
+            terms_hex.emplace_back("B", mk(mp_hex_tot_b));
 
             reset_par();
         }
@@ -743,7 +747,7 @@ int main(int argc, char** argv) {
         std::filesystem::current_path(R"(C:\*redacted*\Desktop\rulelists_new)");
     }
 
-    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+    // ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
     // ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
 
     // Setup Dear ImGui style

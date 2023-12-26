@@ -290,7 +290,7 @@ namespace legacy::inline special_mappers {
     inline constexpr mapperT mp_C4("zaq"
                                    "xsw"
                                    "cde"); // 90 (clockwise)
-    // TODO: does this imply 270 clockwise?
+    // 90 has the same effects as 270... TODO: recheck...
 
     // TODO: explain; actually irrelevant of symmetry...
     // 1. I misunderstood "rotate" symmetry. "ro45" is never about symmetry (I've no idea what it is)
@@ -320,26 +320,30 @@ namespace legacy::inline special_mappers {
     // qw-     q w
     // asd -> a s d
     // -xc     x c
-    // TODO: super problematic, especially refl...
+    // TODO: explain why 0 instead of e-z... ... is this really correct?
+    // TODO: recheck...
     inline constexpr mapperT mp_hex_ignore("qw0"
                                            "asd"
                                            "0xc"); // ignore_(e, z)
-    // TODO: explain why 0 instead of e-z... ... is this really correct?
     inline constexpr mapperT mp_hex_refl_wsx("dw0"
                                              "csq"
-                                             "0xa"); // swap q-a and d-c
+                                             "0xa"); // swap(q,d), swap(a,c)
     inline constexpr mapperT mp_hex_refl_qsc("qa0"
                                              "wsx"
-                                             "0dc"); // swap ... TODO: complete...
+                                             "0dc"); // swap(a,w), swap(x,d)
     inline constexpr mapperT mp_hex_refl_asd("xc0"
                                              "asd"
-                                             "0qw"); // swap (q,x) (w,c)
+                                             "0qw"); // swap(q,x), swap(w,c)
 
-    // TODO: complete...
-    // TODO: better name...
-    inline constexpr mapperT mp_hex_refl_qwxc("wq0"
-                                              "dsa"
-                                              "0cx"); // swap(q,w), swap(a,d), swap(x,c)
+    inline constexpr mapperT mp_hex_refl_aq("ax0"
+                                            "qsc"
+                                            "0wd"); // swap(a,q), swap(x,w), swap(c,d)
+    inline constexpr mapperT mp_hex_refl_qw("wq0"
+                                            "dsa"
+                                            "0cx"); // swap(q,w), swap(a,d), swap(x,c)
+    inline constexpr mapperT mp_hex_refl_wd("cd0"
+                                            "xsw"
+                                            "0aq"); // swap(w,d), swap(q,c), swap(a,x)
 
     inline constexpr mapperT mp_hex_C2("cx0"
                                        "dsa"
@@ -350,6 +354,13 @@ namespace legacy::inline special_mappers {
     inline constexpr mapperT mp_hex_C6("aq0"
                                        "xsw"
                                        "0cd"); // 60 (clockwise)
+
+    inline constexpr mapperT mp_hex_tot_a("wq0"
+                                          "asd"
+                                          "0xc");
+    inline constexpr mapperT mp_hex_tot_b("qs0"
+                                          "awd"
+                                          "0xc");
 
     // -we     w e
     // asd -> a s d
@@ -556,8 +567,8 @@ namespace legacy {
     // TODO: add stop condition...
     inline ruleT next_v(const interT& inter, const partitionT& par, const ruleT& rule) {
         return _iterate(inter, par, rule, [](bool* begin, bool* end) {
-            // TODO: rewrite...
-            if (std::count(begin, end, 0) == 0) {
+            // End: 111...
+            if (std::find(begin, end, 0) == end) {
                 return;
             }
 
@@ -571,8 +582,8 @@ namespace legacy {
     }
     inline ruleT prev_v(const interT& inter, const partitionT& par, const ruleT& rule) {
         return _iterate(inter, par, rule, [](bool* begin, bool* end) {
-            // TODO: rewrite...
-            if (std::count(begin, end, 1) == 0) {
+            // Begin: 000...
+            if (std::find(begin, end, 1) == end) {
                 return;
             }
 
@@ -590,11 +601,21 @@ namespace legacy {
     // https://quuxplusone.github.io/blog/2022/08/02/reverse-iterator-ctad/
     inline ruleT next_perm(const interT& inter, const partitionT& par, const ruleT& rule) {
         return _iterate(inter, par, rule, [](bool* begin, bool* end) {
+            // End: 000...111
+            if (std::find(std::find(begin, end, 1), end, 0) == end) {
+                return;
+            }
+
             std::next_permutation(std::make_reverse_iterator(end), std::make_reverse_iterator(begin));
         });
     }
     inline ruleT prev_perm(const interT& inter, const partitionT& par, const ruleT& rule) {
         return _iterate(inter, par, rule, [](bool* begin, bool* end) {
+            // Begin: 111...000
+            if (std::find(std::find(begin, end, 0), end, 1) == end) {
+                return;
+            }
+
             std::prev_permutation(std::make_reverse_iterator(end), std::make_reverse_iterator(begin));
         });
     }
