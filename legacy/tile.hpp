@@ -7,10 +7,16 @@
 namespace legacy {
     static_assert(INT_MAX >= INT32_MAX);
 
+    // TODO: rename to sizeT? tileT::XXX?
     struct rectT {
         int width, height;
         int area() const { return width * height; }
         friend bool operator==(const rectT&, const rectT&) = default;
+    };
+
+    // TODO: better be long long...
+    struct posT {
+        int x, y;
     };
 
     // TODO: add basic noexcept annotation?
@@ -78,6 +84,15 @@ namespace legacy {
         // TODO: is data a proper name?
         std::span<bool> data() { return {line(0), line(0) + area()}; }
         std::span<const bool> data() const { return {line(0), line(0) + area()}; }
+
+        // bool check_pos(const posT& pos) const { //
+        //     return pos.x >= 0 && pos.y >= 0 && pos.x <= width() && pos.y <= height();
+        // }
+        // bool check_pos(const posT& begin, const posT& end) const { //
+        //     return begin.x <= end.x && begin.y <= end.y && check_pos(begin) && check_pos(end);
+        // }
+        posT begin_pos() const { return {0, 0}; }
+        posT end_pos() const { return {.x = width(), .y = height()}; }
 
     private:
         void _set_lr(int _y, bool l, bool r) {
@@ -205,6 +220,8 @@ namespace legacy {
             }
         }
 
+        inline void copy_v2(const tileT& source, posT begin, posT end, tileT& dest, posT dbegin);
+
         inline void clone(const tileT& source, tileT& dest) {
             assert(&source != &dest);
 
@@ -226,10 +243,11 @@ namespace legacy {
 
         // TODO: special-case all0/1?
         inline void piece_up(const tileT& period, tileT& target) {
-            assert(target.width() >= period.width());
-            assert(target.height() >= period.height());
-            assert(target.width() % period.width() == 0);
-            assert(target.height() % period.height() == 0);
+            target.resize(upscale(target.size(), period.size()));
+            // assert(target.width() >= period.width());
+            // assert(target.height() >= period.height());
+            // assert(target.width() % period.width() == 0);
+            // assert(target.height() % period.height() == 0);
 
             for (int y = 0; y < target.height(); y += period.height()) {
                 for (int x = 0; x < target.width(); x += period.width()) {
@@ -238,6 +256,19 @@ namespace legacy {
             }
         }
 
+        // TODO: will % be too slow?
+        inline void piece_up(const tileT& period, tileT& target, posT begin /*[*/, posT end /*)*/) {
+            // TODO assert...
+            for (int y = begin.y; y < end.y; ++y) {
+                for (int x = begin.x; x < end.x; ++x) {
+                    target.line(y)[x] = period.line(y % period.height())[x % period.width()];
+                }
+            }
+        }
+
+        inline void piece_up_v2(const tileT& period, tileT& target) {
+            piece_up(period, target, target.begin_pos(), target.end_pos());
+        }
         // TODO: tileT_fill_arg / random_fill goes here...
 
     } // namespace tileT_utils
@@ -274,4 +305,30 @@ namespace legacy {
         // TODO: when is '!' needed?
         return str;
     }
+
+#if 1
+    inline void mktile(tileT& tile, const char* str) {
+        std::vector<std::vector<bool>> lines;
+        lines.emplace_back();
+        while (*str) {
+            if (*str == '\n') {
+                lines.emplace_back();
+            } else {
+                lines.back().push_back(*str == '.' ? false : true);
+            }
+            ++str;
+        }
+        int max_width = 1;
+        for (auto& line : lines) {
+            max_width = std::max(max_width, (int)line.size());
+        }
+        tile.resize({.width = max_width, .height = (int)lines.size()});
+        for (int i = 0; i < lines.size(); ++i) {
+            for (int j = 0; j < lines[i].size(); ++j) {
+                tile.line(i)[j] = lines[i][j];
+            }
+        }
+    }
+#endif
+
 } // namespace legacy

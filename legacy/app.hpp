@@ -41,7 +41,7 @@ inline void random_fill(legacy::tileT& tile, const tileT_fill_arg& filler) {
     }
 }
 
-#if 0
+#if 1
 // Flip density...
 // TODO: regional fill...
 inline void random_fill_v2(legacy::tileT& tile, const legacy::tileT& period, const tileT_fill_arg& filler) {
@@ -82,11 +82,20 @@ public:
 
     // (&&rectT) by value or by cref? (also in tileT)
     void restart(tileT_fill_arg filler, std::optional<legacy::rectT> resize = {}) {
+#if 1
+        static std::optional<legacy::tileT> period;
+        if (!period) {
+            period.emplace(legacy::rectT{1, 1}); // TODO: dummy size; not actually used...
+            legacy::mktile(*period, "o.\n"
+                                    ".o");
+        }
+#endif
+
         if (resize) {
             m_tile.resize(*resize);
         }
 
-        random_fill(m_tile, filler);
+        random_fill_v2(m_tile, *period, filler);
         m_gen = 0;
     }
 

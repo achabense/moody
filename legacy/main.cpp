@@ -219,7 +219,7 @@ namespace legacy {
             // TODO: slightly confusing; light color should represent "take-into-account" instead of "ignore"
             // Is this solvable by applying specific coloring scheme?
             ImGui::BeginGroup();
-            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1, 1));
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
             for (int l = 0; l < 3; ++l) {
                 check(terms_ignore[l * 3 + 0]);
                 ImGui::SameLine();
@@ -234,12 +234,13 @@ namespace legacy {
                 ImGui::PushID(tid++);
                 if (ImGui::BeginTable("Table", terms.size(), ImGuiTableFlags_BordersInner)) {
                     ImGui::TableNextRow();
-                    for (auto& t : terms) {
+                    for (termT& t : terms) {
                         ImGui::TableNextColumn();
-                        check(t);
-                        ImGui::SameLine();
-                        ImGui::AlignTextToFramePadding();
                         imgui_str(t.msg);
+                        check(t);
+                        // ImGui::SameLine();
+                        // ImGui::AlignTextToFramePadding();
+                        // imgui_str(t.msg);
                     }
                     ImGui::EndTable();
                 }
