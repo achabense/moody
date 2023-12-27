@@ -60,12 +60,12 @@ namespace legacy {
 
     struct termT {
         const char* msg;
-        mapperT_pair eq;
+        equivT eq;
 
         bool selected = false;
         bool covered = false;
     };
-    // TODO: analyzer?
+    // TODO: refine analyzer...
     class partition_collection {
         using termT_vec = std::vector<termT>;
 
@@ -108,49 +108,57 @@ namespace legacy {
 
     public:
         partition_collection() {
-            auto mk = [](mapperT m) { return mapperT_pair{mp_identity, m}; };
+            auto mk = [](std::initializer_list<mapperT> ms) {
+                equivT eq{};
+                for (const mapperT& m : ms) {
+                    eq.add_eq({mp_identity, m}); // TODO: expose mp_identity?
+                }
+                return eq;
+            };
 
-            terms_ignore.emplace_back("q", mk(mp_ignore_q));
-            terms_ignore.emplace_back("w", mk(mp_ignore_w));
-            terms_ignore.emplace_back("e", mk(mp_ignore_e));
-            terms_ignore.emplace_back("a", mk(mp_ignore_a));
-            terms_ignore.emplace_back("s", mk(mp_ignore_s));
-            terms_ignore.emplace_back("d", mk(mp_ignore_d));
-            terms_ignore.emplace_back("z", mk(mp_ignore_z));
-            terms_ignore.emplace_back("x", mk(mp_ignore_x));
-            terms_ignore.emplace_back("c", mk(mp_ignore_c));
+            terms_ignore.emplace_back("q", mk({mp_ignore_q}));
+            terms_ignore.emplace_back("w", mk({mp_ignore_w}));
+            terms_ignore.emplace_back("e", mk({mp_ignore_e}));
+            terms_ignore.emplace_back("a", mk({mp_ignore_a}));
+            terms_ignore.emplace_back("s", mk({mp_ignore_s}));
+            terms_ignore.emplace_back("d", mk({mp_ignore_d}));
+            terms_ignore.emplace_back("z", mk({mp_ignore_z}));
+            terms_ignore.emplace_back("x", mk({mp_ignore_x}));
+            terms_ignore.emplace_back("c", mk({mp_ignore_c}));
 
-            terms_native.emplace_back("|", mk(mp_refl_wsx), true);
-            terms_native.emplace_back("-", mk(mp_refl_asd), true);
-            terms_native.emplace_back("\\", mk(mp_refl_qsc), true);
-            terms_native.emplace_back("/", mk(mp_refl_esz), true);
-            terms_native.emplace_back("C2(180)", mk(mp_C2));
-            terms_native.emplace_back("C4(90)", mk(mp_C4));
+            terms_native.emplace_back("|", mk({mp_refl_wsx}));
+            terms_native.emplace_back("-", mk({mp_refl_asd}));
+            terms_native.emplace_back("\\", mk({mp_refl_qsc}));
+            terms_native.emplace_back("/", mk({mp_refl_esz}));
+            terms_native.emplace_back("C2(180)", mk({mp_C2}));
+            terms_native.emplace_back("C4(90)", mk({mp_C4}));
 
-            terms_misc.emplace_back("*R45", mk(mp_ro_45));
-            terms_misc.emplace_back("*Tota", mk(mp_tot_a));
-            terms_misc.emplace_back("*Totb", mk(mp_tot_b));
-            terms_misc.emplace_back("Dual", mk(mp_dual));
+            terms_misc.emplace_back("*R45", mk({mp_ro_45}));
+            terms_misc.emplace_back("*Tota", mk({mp_ro_45, mp_tot_a}));
+            terms_misc.emplace_back("*Totb", mk({mp_ro_45, mp_tot_b}));
+            terms_misc.emplace_back("Dual", mk({mp_dual}));
 
-            terms_hex.emplace_back("Hex", mk(mp_hex_ignore));
-            terms_hex.emplace_back("/", mk(mp_hex_refl_wsx));
-            terms_hex.emplace_back("\\", mk(mp_hex_refl_qsc));
-            terms_hex.emplace_back("-", mk(mp_hex_refl_asd));
-            terms_hex.emplace_back("aq", mk(mp_hex_refl_aq));
-            terms_hex.emplace_back("qw", mk(mp_hex_refl_qw));
-            terms_hex.emplace_back("wd", mk(mp_hex_refl_wd));
+            terms_hex.emplace_back("Hex", mk({mp_hex_ignore}));
+            terms_hex.emplace_back("/", mk({mp_hex_refl_wsx}));
+            terms_hex.emplace_back("\\", mk({mp_hex_refl_qsc}));
+            terms_hex.emplace_back("-", mk({mp_hex_refl_asd}));
+            terms_hex.emplace_back("aq", mk({mp_hex_refl_aq}));
+            terms_hex.emplace_back("qw", mk({mp_hex_refl_qw}));
+            terms_hex.emplace_back("wd", mk({mp_hex_refl_wd}));
 
-            terms_hex.emplace_back("C2(180)", mk(mp_hex_C2));
-            terms_hex.emplace_back("C3(120)", mk(mp_hex_C3));
-            terms_hex.emplace_back("C6(60)", mk(mp_hex_C6));
+            terms_hex.emplace_back("C2(180)", mk({mp_hex_C2}));
+            terms_hex.emplace_back("C3(120)", mk({mp_hex_C3}));
+            terms_hex.emplace_back("C6(60)", mk({mp_hex_C6}));
 
-            terms_hex.emplace_back("A", mk(mp_hex_tot_a));
-            terms_hex.emplace_back("B", mk(mp_hex_tot_b));
+            terms_hex.emplace_back("*Tota", mk({mp_hex_C6, mp_hex_tot_a}));
+            terms_hex.emplace_back("*Totb", mk({mp_hex_C6, mp_hex_tot_b}));
 
             reset_par();
         }
 
-        const partitionT& get_par() {
+        const partitionT& get_par(const ruleT& target) {
+            // TODO: tooltip...
+            /*
             const auto show_pair = [](const mapperT_pair& q) {
                 std::string up, cn, dw;
                 // TODO: too clumsy...
@@ -183,7 +191,7 @@ namespace legacy {
 
                 imgui_str(up + " \n" + cn + " \n" + dw + " ");
             };
-
+            */
             bool sel = false;
 
             // TODO: recheck id & tid logic... (& imagebutton)
@@ -198,6 +206,11 @@ namespace legacy {
                                                                          : 0);
                 ImGui::GetWindowDrawList()->AddRect(pos, pos_max, ImGui::GetColorU32(ImGuiCol_Button));
 
+                // TODO: Flip...
+                if (satisfies(target, {}, term.eq)) {
+                    ImGui::GetWindowDrawList()->AddRect(pos, pos_max, ImGui::GetColorU32(ImVec4{0, 1, 0, 1}));
+                }
+
                 ImGui::PushID(id++);
                 bool hit = ImGui::InvisibleButton("Check", ImVec2{r, r});
                 // TODO: this is in imgui_internal.h...
@@ -206,10 +219,10 @@ namespace legacy {
                 ImGui::RenderNavHighlight({ImGui::GetItemRectMin(), ImGui::GetItemRectMax()}, ImGui::GetItemID());
                 ImGui::PopID();
 
-                if (ImGui::BeginItemTooltip()) {
-                    show_pair(term.eq);
-                    ImGui::EndTooltip();
-                }
+                // if (ImGui::BeginItemTooltip()) {
+                //     show_pair(term.eq);
+                //     ImGui::EndTooltip();
+                // }
                 if (hit) {
                     term.selected = !term.selected;
                     sel = true;
@@ -381,7 +394,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
 
     // TODO: rename...
     static legacy::partition_collection parcol;
-    const auto& part = parcol.get_par();
+    const auto& part = parcol.get_par(target);
     const int k = part.k();
     {
         // TODO: unstable between base/extr switchs; ratio-based approach is on-trivial though... (double has
@@ -1089,3 +1102,5 @@ int main(int argc, char** argv) {
     app_backend::clear();
     return 0;
 }
+
+// TODO: tile: rewind; fullscreen...

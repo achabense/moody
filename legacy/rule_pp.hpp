@@ -250,6 +250,7 @@ namespace legacy {
                     return false;
                 }
             }
+            return true;
         }
     };
 } // namespace legacy
