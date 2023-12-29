@@ -565,59 +565,90 @@ namespace legacy {
         return inter.to_rule(r);
     }
 
-    // TODO: add stop condition...
-    inline ruleT next_v(const interT& inter, const partitionT& par, const ruleT& rule) {
-        return _iterate(inter, par, rule, [](bool* begin, bool* end) {
-            // End: 111...
-            if (std::find(begin, end, 0) == end) {
-                return;
-            }
+    struct act_int {
+        static ruleT first(const interT& inter, const partitionT& par, const ruleT& rule) {
+            return _iterate(inter, par, rule, [](bool* begin, bool* end) { std::fill(begin, end, 0); });
+        }
 
-            while (begin != end && *begin == 1) {
-                *begin++ = 0;
-            }
-            if (begin != end) {
-                *begin = 1;
-            }
-        });
-    }
-    inline ruleT prev_v(const interT& inter, const partitionT& par, const ruleT& rule) {
-        return _iterate(inter, par, rule, [](bool* begin, bool* end) {
-            // Begin: 000...
-            if (std::find(begin, end, 1) == end) {
-                return;
-            }
+        static ruleT last(const interT& inter, const partitionT& par, const ruleT& rule) {
+            return _iterate(inter, par, rule, [](bool* begin, bool* end) { std::fill(begin, end, 1); });
+        }
 
-            while (begin != end && *begin == 0) {
-                *begin++ = 1;
-            }
-            if (begin != end) {
-                *begin = 0;
-            }
-        });
-    }
+        static ruleT next(const interT& inter, const partitionT& par, const ruleT& rule) {
+            return _iterate(inter, par, rule, [](bool* begin, bool* end) {
+                // End: 111...
+                if (std::find(begin, end, 0) == end) {
+                    return;
+                }
+
+                while (begin != end && *begin == 1) {
+                    *begin++ = 0;
+                }
+                if (begin != end) {
+                    *begin = 1;
+                }
+            });
+        }
+
+        static ruleT prev(const interT& inter, const partitionT& par, const ruleT& rule) {
+            return _iterate(inter, par, rule, [](bool* begin, bool* end) {
+                // Begin: 000...
+                if (std::find(begin, end, 1) == end) {
+                    return;
+                }
+
+                while (begin != end && *begin == 0) {
+                    *begin++ = 1;
+                }
+                if (begin != end) {
+                    *begin = 0;
+                }
+            });
+        }
+    };
+
     // TODO: ++/--count when reaching end?
     // Intentionally using reverse_iterator... TODO: explain why...
     // (TODO: rephrase) As to CTAD vs make_XXX..., here is pitfall for using std::reverse_iterator directly.
     // https://quuxplusone.github.io/blog/2022/08/02/reverse-iterator-ctad/
-    inline ruleT next_perm(const interT& inter, const partitionT& par, const ruleT& rule) {
-        return _iterate(inter, par, rule, [](bool* begin, bool* end) {
-            // End: 000...111
-            if (std::find(std::find(begin, end, 1), end, 0) == end) {
-                return;
-            }
+    struct act_perm {
+        static ruleT first(const interT& inter, const partitionT& par, const ruleT& rule) {
+            return _iterate(inter, par, rule, [](bool* begin, bool* end) {
+                int c = std::count(begin, end, 1);
+                std::fill(begin, end, 0);
+                std::fill_n(begin, c, 1);
+            });
+        }
 
-            std::next_permutation(std::make_reverse_iterator(end), std::make_reverse_iterator(begin));
-        });
-    }
-    inline ruleT prev_perm(const interT& inter, const partitionT& par, const ruleT& rule) {
-        return _iterate(inter, par, rule, [](bool* begin, bool* end) {
-            // Begin: 111...000
-            if (std::find(std::find(begin, end, 0), end, 1) == end) {
-                return;
-            }
+        static ruleT last(const interT& inter, const partitionT& par, const ruleT& rule) {
+            return _iterate(inter, par, rule, [](bool* begin, bool* end) {
+                int c = std::count(begin, end, 1);
+                std::fill(begin, end, 0);
+                std::fill_n(end - c, c, 1);
+            });
+        }
 
-            std::prev_permutation(std::make_reverse_iterator(end), std::make_reverse_iterator(begin));
-        });
-    }
+        static ruleT next(const interT& inter, const partitionT& par, const ruleT& rule) {
+            return _iterate(inter, par, rule, [](bool* begin, bool* end) {
+                // End: 000...111
+                if (std::find(std::find(begin, end, 1), end, 0) == end) {
+                    return;
+                }
+
+                std::next_permutation(std::make_reverse_iterator(end), std::make_reverse_iterator(begin));
+            });
+        }
+
+        static ruleT prev(const interT& inter, const partitionT& par, const ruleT& rule) {
+            return _iterate(inter, par, rule, [](bool* begin, bool* end) {
+                // Begin: 111...000
+                if (std::find(std::find(begin, end, 0), end, 1) == end) {
+                    return;
+                }
+
+                std::prev_permutation(std::make_reverse_iterator(end), std::make_reverse_iterator(begin));
+            });
+        }
+    };
+
 } // namespace legacy

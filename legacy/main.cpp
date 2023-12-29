@@ -303,16 +303,16 @@ void show_target_rule(const legacy::ruleT& target, rule_recorder& recorder) {
     // TODO: +1 is clumsy. TODO: -> editor?
     // TODO: pos may not reflect runner's real pos, as recorder can be modified on the way... may not
     // matters
-    ImGui::SameLine();
-    if (ImGui::Button("|<")) {
-        recorder.set_first();
-    }
-    ImGui::SameLine();
-    if (ImGui::Button(">|")) {
-        recorder.set_last();
-    }
-    ImGui::SameLine();
-    imgui_str(std::format("Total:{} At:{}", recorder.size(), recorder.pos() + 1));
+    // ImGui::SameLine();
+    // if (ImGui::Button("|<")) {
+    //     recorder.set_first();
+    // }
+    // ImGui::SameLine();
+    // if (ImGui::Button(">|")) {
+    //     recorder.set_last();
+    // }
+    // ImGui::SameLine();
+    // imgui_str(std::format("Total:{} At:{}", recorder.size(), recorder.pos() + 1));
     // TODO: Moved near to other iter widgets...
     // ImGui::Button(std::format("Total:{} At:{}###...", recorder.size(), recorder.pos() + 1).c_str());
     // if (ImGui::IsItemHovered()) {
@@ -322,7 +322,7 @@ void show_target_rule(const legacy::ruleT& target, rule_recorder& recorder) {
     //         recorder.prev();
     //     }
     // }
-#if 1
+#if 0
     // TODO: is random-access useful?
     static char buf_pos[20]{};
     const auto filter = [](ImGuiInputTextCallbackData* data) -> int {
@@ -426,7 +426,8 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         // TODO: iteration should be the key concept...
         // TODO: redesign...
         {
-            auto iter_pair = [](const char* tag_prev, const char* tag_next, auto act_prev, auto act_next) {
+            auto iter_pair = [](const char* tag_first, const char* tag_prev, const char* tag_next, const char* tag_last,
+                                auto act_first, auto act_prev, auto act_next, auto act_last) {
                 // TODO: temporal; [[exceptions should be avoided]]
                 auto consume_exception = [](auto& act) {
                     try {
@@ -436,53 +437,59 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                     }
                 };
 
-                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 0) /*ImGui::GetStyle().ItemInnerSpacing*/);
+                if (ImGui::Button(tag_first)) {
+                    consume_exception(act_first);
+                }
 
-                bool group = false;
+                ImGui::SameLine();
+                ImGui::BeginGroup();
                 if (ImGui::Button(tag_prev)) {
                     consume_exception(act_prev);
                 }
-                group |= ImGui::IsItemHovered();
+                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 0) /*ImGui::GetStyle().ItemInnerSpacing*/);
                 ImGui::SameLine();
                 if (ImGui::Button(tag_next)) {
                     consume_exception(act_next);
                 }
-                group |= ImGui::IsItemHovered();
-                if (group) {
+                ImGui::PopStyleVar();
+                ImGui::EndGroup();
+                if (ImGui::IsItemHovered()) {
                     if (imgui_scrollup()) {
                         consume_exception(act_prev);
                     } else if (imgui_scrolldown()) {
                         consume_exception(act_next);
                     }
                 }
-                ImGui::PopStyleVar();
+
+                ImGui::SameLine();
+                if (ImGui::Button(tag_last)) {
+                    consume_exception(act_last);
+                }
             };
 
             ImGui::AlignTextToFramePadding();
             imgui_str(std::format("Total:{} At:{}", recorder.size(), recorder.pos() + 1));
             ImGui::SameLine();
             iter_pair(
-                "prev", "next", [&] { recorder.prev(); }, [&] { recorder.next(); });
-            ImGui::Dummy({}); // TODO: why is line spacing affected (though )without this dummy widget?
+                "<|", "prev", "next", "|>", //
+                [&] { recorder.set_first(); }, [&] { recorder.prev(); }, [&] { recorder.next(); },
+                [&] { recorder.set_last(); });
 
-            if (ImGui::Button("00..")) {
-                legacy::ruleT_data r{};
-                recorder.take(inter.to_rule(r));
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("11..")) {
-                legacy::ruleT_data r{};
-                r.fill(1);
-                recorder.take(inter.to_rule(r));
-            }
+            iter_pair(
+                "<00..", "dec", "inc", "11..>", //
+                [&] { recorder.take(legacy::act_int::first(inter, part, target)); },
+                [&] { recorder.take(legacy::act_int::prev(inter, part, target)); },
+                [&] { recorder.take(legacy::act_int::next(inter, part, target)); },
+                [&] { recorder.take(legacy::act_int::last(inter, part, target)); });
+            ImGui::SameLine(), imgui_str("|");
             ImGui::SameLine();
             iter_pair(
-                "dec", "inc", [&] { recorder.take(legacy::prev_v(inter, part, target)); },
-                [&] { recorder.take(legacy::next_v(inter, part, target)); });
-            ImGui::SameLine();
-            iter_pair(
-                "<p", ">p", [&] { recorder.take(legacy::prev_perm(inter, part, target)); },
-                [&] { recorder.take(legacy::next_perm(inter, part, target)); });
+                "<1.0.", "pprev", "pnext", "0.1.>", //
+                [&] { recorder.take(legacy::act_perm::first(inter, part, target)); },
+                [&] { recorder.take(legacy::act_perm::prev(inter, part, target)); },
+                [&] { recorder.take(legacy::act_perm::next(inter, part, target)); },
+                [&] { recorder.take(legacy::act_perm::last(inter, part, target)); });
+            ImGui::SameLine(), imgui_str("|");
             ImGui::SameLine();
             if (ImGui::Button("Mir")) {
                 recorder.replace_current(legacy::mirror(target));
