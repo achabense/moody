@@ -396,12 +396,15 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
     static legacy::partition_collection parcol;
     const auto& part = parcol.get_par(target);
     const int k = part.k();
+
+    static legacy::lockT locked{};
     {
         // TODO: still unstable between partition switches...
+        // TODO: the range should be scoped by locks...
         static int rcount = 0.5 * k;
-        if (rcount < 0 || rcount > k) {
-            rcount = 0.5 * k;
-        }
+        const int freec = legacy::get_free_indexes(locked, part).size(); // TODO: wasteful...
+        // TODO: refine...
+        rcount = std::clamp(rcount, 0, freec);
 
         // ~ referred to InputScalar...
         // TODO: 200->global constant...
@@ -422,7 +425,8 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
 
         ImGui::SameLine();
         if (ImGui::Button("Randomize") || imgui_keypressed(ImGuiKey_Enter, false)) {
-            recorder.take(random_flip(inter.get_viewer(), part, rcount, rcount, global_mt19937)); // TODO: range...
+            recorder.take(random_flip_v2(inter.get_viewer(), part, locked, target, rcount, rcount,
+                                         global_mt19937)); // TODO: range...
         }
 
         // TODO: iteration should be the key concept...
@@ -430,39 +434,45 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         const auto iter_pair = [](const char* tag_first, const char* tag_prev, const char* tag_next,
                                   const char* tag_last, auto act_first, auto act_prev, auto act_next, auto act_last) {
             // TODO: temporal; [[exceptions should be avoided]]
-            auto consume_exception = [](auto& act) {
-                try {
-                    act();
-                } catch (...) {
-                    logger::log_temp(300ms, "X_X");
-                }
-            };
+            // auto consume_exception = [](auto& act) {
+            //     try {
+            //         act();
+            //     } catch (...) {
+            //         logger::log_temp(300ms, "X_X");
+            //     }
+            // };
 
             if (ImGui::Button(tag_first)) {
-                consume_exception(act_first);
+                // consume_exception(act_first);
+                act_first();
             }
 
             ImGui::SameLine();
             ImGui::BeginGroup();
             if (ImGui::Button(tag_prev)) {
-                consume_exception(act_prev);
+                // consume_exception(act_prev);
+                act_prev();
             }
             ImGui::SameLine(0, 2);
             if (ImGui::Button(tag_next)) {
-                consume_exception(act_next);
+                // consume_exception(act_next);
+                act_next();
             }
             ImGui::EndGroup();
             if (ImGui::IsItemHovered()) {
                 if (imgui_scrollup()) {
-                    consume_exception(act_prev);
+                    // consume_exception(act_prev);
+                    act_prev();
                 } else if (imgui_scrolldown()) {
-                    consume_exception(act_next);
+                    // consume_exception(act_next);
+                    act_next();
                 }
             }
 
             ImGui::SameLine();
             if (ImGui::Button(tag_last)) {
-                consume_exception(act_last);
+                // consume_exception(act_last);
+                act_last();
             }
         };
 
@@ -476,18 +486,18 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
 
         iter_pair(
             "<00..", "dec", "inc", "11..>", //
-            [&] { recorder.take(legacy::act_int::first(inter, part, target)); },
-            [&] { recorder.take(legacy::act_int::prev(inter, part, target)); },
-            [&] { recorder.take(legacy::act_int::next(inter, part, target)); },
-            [&] { recorder.take(legacy::act_int::last(inter, part, target)); });
+            [&] { recorder.take(legacy::act_int::first(inter, part, target, locked)); },
+            [&] { recorder.take(legacy::act_int::prev(inter, part, target, locked)); },
+            [&] { recorder.take(legacy::act_int::next(inter, part, target, locked)); },
+            [&] { recorder.take(legacy::act_int::last(inter, part, target, locked)); });
         ImGui::SameLine(), imgui_str("|");
         ImGui::SameLine();
         iter_pair(
             "<1.0.", "pprev", "pnext", "0.1.>", //
-            [&] { recorder.take(legacy::act_perm::first(inter, part, target)); },
-            [&] { recorder.take(legacy::act_perm::prev(inter, part, target)); },
-            [&] { recorder.take(legacy::act_perm::next(inter, part, target)); },
-            [&] { recorder.take(legacy::act_perm::last(inter, part, target)); });
+            [&] { recorder.take(legacy::act_perm::first(inter, part, target, locked)); },
+            [&] { recorder.take(legacy::act_perm::prev(inter, part, target, locked)); },
+            [&] { recorder.take(legacy::act_perm::next(inter, part, target, locked)); },
+            [&] { recorder.take(legacy::act_perm::last(inter, part, target, locked)); });
         ImGui::SameLine(), imgui_str("|");
         ImGui::SameLine();
         if (ImGui::Button("Mir")) {
@@ -500,7 +510,6 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                                              {"-.", "-d", "-x"}};
         const auto strs = strss[inter.tag];
 
-        // TODO: should be foldable; should be able to set max height...
         const legacy::ruleT_data drule = inter.from_rule(target);
         const legacy::scanlistT scans(part, drule);
         ImGui::Text("Groups:%d [%c:%d] [%c:%d] [%c:%d]", k, strs[0][1], scans.count(scans.A0), strs[1][1],
@@ -520,6 +529,8 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                 const bool inconsistent = scans[j] == scans.Inconsistent;
                 const auto& group = part.jth_group(j);
                 const legacy::codeT head = group[0];
+                const bool has_lock =
+                    std::any_of(group.begin(), group.end(), [](legacy::codeT code) { return locked[code]; });
 
                 if (inconsistent) {
                     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0, 0, 1));
@@ -527,16 +538,29 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.9f, 0, 0, 1));
                 }
                 const bool button = icons.button(head, zoom);
-                const bool hover = ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip);
+                const bool button_hover = ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip);
                 ImGui::SameLine();
                 ImGui::AlignTextToFramePadding();
                 ImGui::TextUnformatted(strs[drule[head]]);
+
+                if (has_lock) {
+                    // TODO: -> widget func... (addborder)
+                    ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() - ImVec2(2, 2),
+                                                        ImGui::GetItemRectMax() + ImVec2(2, 2), -1);
+                }
                 if (inconsistent) {
                     ImGui::PopStyleColor(3);
                 }
 
+                if (button_hover && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+                    for (auto code : group) {
+                        locked[code] = !has_lock;
+                    }
+                }
                 static bool show_group = true;
-                if (hover) {
+                ImGui::SameLine();
+                imgui_strdisabled("?");
+                if (ImGui::IsItemHovered()) {
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
                         show_group = !show_group;
                     }
@@ -551,6 +575,10 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                             ImGui::SameLine();
                             ImGui::AlignTextToFramePadding();
                             ImGui::TextUnformatted(strs[drule[code]]);
+                            if (locked[code]) {
+                                ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() - ImVec2(2, 2),
+                                                                    ImGui::GetItemRectMax() + ImVec2(2, 2), -1);
+                            }
                         }
                         ImGui::EndTooltip();
                     }

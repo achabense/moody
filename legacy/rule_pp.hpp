@@ -523,8 +523,42 @@ namespace legacy {
         }
     }
 
-    // TODO: preconditions...
-    // void random_flip(const interT& inter, const partitionT& par, const partialT& constraints, int count);
+    using lockT = codeT::map_to<bool>;
+    inline std::vector<int> get_free_indexes(const lockT& locked, const partitionT& par) {
+        std::vector<int> free_indexes;
+        for (int j = 0; j < par.k(); ++j) {
+            auto group = par.jth_group(j);
+            if (!std::any_of(group.begin(), group.end(), [&locked](codeT code) { return locked[code]; })) {
+                free_indexes.push_back(j);
+            }
+        }
+        return free_indexes;
+    }
+
+    inline ruleT random_flip_v2(ruleT r, const partitionT& par, const lockT& locked, const ruleT& lr, int count_min,
+                                int count_max, std::mt19937& rand) {
+        // TODO: precondition?
+        std::vector<int> free;
+        for (int j = 0; j < par.k(); ++j) {
+            auto group = par.jth_group(j);
+            if (!std::any_of(group.begin(), group.end(), [&locked](codeT code) { return locked[code]; })) {
+                free.push_back(j);
+            } else {
+                for (codeT code : group) {
+                    r.set(code, lr(code));
+                }
+            }
+        }
+
+        std::shuffle(free.begin(), free.end(), rand);
+        free.resize(std::clamp(count_min, 0, (int)free.size())); // TODO: count_max???
+        for (int idx : free) {
+            flip(par.jth_group(idx), r);
+        }
+        return r;
+    }
+
+#if 0
     inline ruleT random_flip(ruleT r, const partitionT& par, int count_min, int count_max, std::mt19937& rand) {
         // flip some...
         std::vector<groupT> gs;
@@ -538,45 +572,53 @@ namespace legacy {
         }
         return r;
     }
+#endif
 
     // TODO: temp name...
-    inline ruleT _iterate(const interT& inter, const partitionT& par, const ruleT& rule,
+    inline ruleT _iterate(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked,
                           void (*fn)(bool* /*begin*/, bool* /*end*/)) {
+        // TODO: precondition?
         // TODO: bool512 is temporal...
 
         using bool512 = std::array<bool, 512>;
         ruleT_data r = inter.from_rule(rule);
-        // TODO: should these functions really take this as precondition?
-        // TODO: throwing is awkward... try other ways...
-        // `can_next` etc. this can also be used when stop conditions are met)
-        if (!par.test(r)) {
-            throw(0);
-        }
+
+        std::vector<int> free_indexes = get_free_indexes(locked, par);
+
         bool512 bools{};
-        for (int j = 0; j < par.k(); ++j) {
-            bools[j] = r[par.jth_group(j).front()];
+        for (int j = 0; j < free_indexes.size(); ++j) {
+            bools[j] = r[par.jth_group(free_indexes[j]).front()];
         }
 
-        fn(bools.data(), bools.data() + par.k());
+        fn(bools.data(), bools.data() + free_indexes.size());
 
-        for_each_code(code) {
-            r[code] = bools[par.index_for(code)];
+        for (int j = 0; j < free_indexes.size(); ++j) {
+            // TODO: cannot suitably deal with inconsistent groups...
+            for (codeT code : par.jth_group(free_indexes[j])) {
+                r[code] = bools[j];
+            }
+            // TODO: cannot suitably deal with inconsistent groups when calling first()¡ý etc...
+            // if (bools[j] != r[par.jth_group(free_indexes[j]).front()]) {
+            //     for (codeT code : par.jth_group(free_indexes[j])) {
+            //         r[code] = !r[code];
+            //     }
+            // }
         }
         return inter.to_rule(r);
     }
 
     struct act_int {
         // TODO: disable !par.test(...) checks...
-        static ruleT first(const interT& inter, const partitionT& par, const ruleT& rule) {
-            return _iterate(inter, par, rule, [](bool* begin, bool* end) { std::fill(begin, end, 0); });
+        static ruleT first(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked) {
+            return _iterate(inter, par, rule, locked, [](bool* begin, bool* end) { std::fill(begin, end, 0); });
         }
 
-        static ruleT last(const interT& inter, const partitionT& par, const ruleT& rule) {
-            return _iterate(inter, par, rule, [](bool* begin, bool* end) { std::fill(begin, end, 1); });
+        static ruleT last(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked) {
+            return _iterate(inter, par, rule, locked, [](bool* begin, bool* end) { std::fill(begin, end, 1); });
         }
 
-        static ruleT next(const interT& inter, const partitionT& par, const ruleT& rule) {
-            return _iterate(inter, par, rule, [](bool* begin, bool* end) {
+        static ruleT next(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked) {
+            return _iterate(inter, par, rule, locked, [](bool* begin, bool* end) {
                 // End: 111...
                 if (std::find(begin, end, 0) == end) {
                     return;
@@ -591,8 +633,8 @@ namespace legacy {
             });
         }
 
-        static ruleT prev(const interT& inter, const partitionT& par, const ruleT& rule) {
-            return _iterate(inter, par, rule, [](bool* begin, bool* end) {
+        static ruleT prev(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked) {
+            return _iterate(inter, par, rule, locked, [](bool* begin, bool* end) {
                 // Begin: 000...
                 if (std::find(begin, end, 1) == end) {
                     return;
@@ -613,24 +655,24 @@ namespace legacy {
     // (TODO: rephrase) As to CTAD vs make_XXX..., here is pitfall for using std::reverse_iterator directly.
     // https://quuxplusone.github.io/blog/2022/08/02/reverse-iterator-ctad/
     struct act_perm {
-        static ruleT first(const interT& inter, const partitionT& par, const ruleT& rule) {
-            return _iterate(inter, par, rule, [](bool* begin, bool* end) {
+        static ruleT first(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked) {
+            return _iterate(inter, par, rule, locked, [](bool* begin, bool* end) {
                 int c = std::count(begin, end, 1);
                 std::fill(begin, end, 0);
                 std::fill_n(begin, c, 1);
             });
         }
 
-        static ruleT last(const interT& inter, const partitionT& par, const ruleT& rule) {
-            return _iterate(inter, par, rule, [](bool* begin, bool* end) {
+        static ruleT last(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked) {
+            return _iterate(inter, par, rule, locked, [](bool* begin, bool* end) {
                 int c = std::count(begin, end, 1);
                 std::fill(begin, end, 0);
                 std::fill_n(end - c, c, 1);
             });
         }
 
-        static ruleT next(const interT& inter, const partitionT& par, const ruleT& rule) {
-            return _iterate(inter, par, rule, [](bool* begin, bool* end) {
+        static ruleT next(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked) {
+            return _iterate(inter, par, rule, locked, [](bool* begin, bool* end) {
                 // End: 000...111
                 if (std::find(std::find(begin, end, 1), end, 0) == end) {
                     return;
@@ -640,8 +682,8 @@ namespace legacy {
             });
         }
 
-        static ruleT prev(const interT& inter, const partitionT& par, const ruleT& rule) {
-            return _iterate(inter, par, rule, [](bool* begin, bool* end) {
+        static ruleT prev(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked) {
+            return _iterate(inter, par, rule, locked, [](bool* begin, bool* end) {
                 // Begin: 111...000
                 if (std::find(std::find(begin, end, 0), end, 1) == end) {
                     return;
