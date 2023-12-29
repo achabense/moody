@@ -566,6 +566,7 @@ namespace legacy {
     }
 
     struct act_int {
+        // TODO: disable !par.test(...) checks...
         static ruleT first(const interT& inter, const partitionT& par, const ruleT& rule) {
             return _iterate(inter, par, rule, [](bool* begin, bool* end) { std::fill(begin, end, 0); });
         }

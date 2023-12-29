@@ -397,26 +397,28 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
     const auto& part = parcol.get_par(target);
     const int k = part.k();
     {
-        // TODO: unstable between base/extr switchs; ratio-based approach is on-trivial though... (double has
-        // inaccessible values)
-        static int rcount = 0.3 * k;
-        rcount = std::clamp(rcount, 0, k);
+        // TODO: still unstable between partition switches...
+        static int rcount = 0.5 * k;
+        if (rcount < 0 || rcount > k) {
+            rcount = 0.5 * k;
+        }
 
-        ImGui::SetNextItemWidth(200); // TODO...
-        ImGui::SliderInt("##Active", &rcount, 0, k, "%d", ImGuiSliderFlags_NoInput);
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 0)); // TODO: ?? ImGui::GetStyle().ItemInnerSpacing
-        ImGui::PushButtonRepeat(true);
+        // ~ referred to InputScalar...
+        // TODO: 200->global constant...
         const float r = ImGui::GetFrameHeight();
-        ImGui::SameLine();
+        const float s = ImGui::GetStyle().ItemInnerSpacing.x;
+        ImGui::SetNextItemWidth(200 - 2 * (r + s)); // TODO: underflow? (200 is a bit short...)
+        ImGui::SliderInt("##Slider", &rcount, 0, k, "%d", ImGuiSliderFlags_NoInput);
+        ImGui::PushButtonRepeat(true);
+        ImGui::SameLine(0, s);
         if (ImGui::Button("-", ImVec2(r, r))) {
             rcount = std::max(0, rcount - 1);
         }
-        ImGui::SameLine();
+        ImGui::SameLine(0, s);
         if (ImGui::Button("+", ImVec2(r, r))) {
             rcount = std::min(k, rcount + 1);
         }
         ImGui::PopButtonRepeat();
-        ImGui::PopStyleVar();
 
         ImGui::SameLine();
         if (ImGui::Button("Randomize") || imgui_keypressed(ImGuiKey_Enter, false)) {
@@ -425,75 +427,71 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
 
         // TODO: iteration should be the key concept...
         // TODO: redesign...
-        {
-            auto iter_pair = [](const char* tag_first, const char* tag_prev, const char* tag_next, const char* tag_last,
-                                auto act_first, auto act_prev, auto act_next, auto act_last) {
-                // TODO: temporal; [[exceptions should be avoided]]
-                auto consume_exception = [](auto& act) {
-                    try {
-                        act();
-                    } catch (...) {
-                        logger::log_temp(300ms, "X_X");
-                    }
-                };
-
-                if (ImGui::Button(tag_first)) {
-                    consume_exception(act_first);
-                }
-
-                ImGui::SameLine();
-                ImGui::BeginGroup();
-                if (ImGui::Button(tag_prev)) {
-                    consume_exception(act_prev);
-                }
-                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 0) /*ImGui::GetStyle().ItemInnerSpacing*/);
-                ImGui::SameLine();
-                if (ImGui::Button(tag_next)) {
-                    consume_exception(act_next);
-                }
-                ImGui::PopStyleVar();
-                ImGui::EndGroup();
-                if (ImGui::IsItemHovered()) {
-                    if (imgui_scrollup()) {
-                        consume_exception(act_prev);
-                    } else if (imgui_scrolldown()) {
-                        consume_exception(act_next);
-                    }
-                }
-
-                ImGui::SameLine();
-                if (ImGui::Button(tag_last)) {
-                    consume_exception(act_last);
+        const auto iter_pair = [](const char* tag_first, const char* tag_prev, const char* tag_next,
+                                  const char* tag_last, auto act_first, auto act_prev, auto act_next, auto act_last) {
+            // TODO: temporal; [[exceptions should be avoided]]
+            auto consume_exception = [](auto& act) {
+                try {
+                    act();
+                } catch (...) {
+                    logger::log_temp(300ms, "X_X");
                 }
             };
 
-            ImGui::AlignTextToFramePadding();
-            imgui_str(std::format("Total:{} At:{}", recorder.size(), recorder.pos() + 1));
-            ImGui::SameLine();
-            iter_pair(
-                "<|", "prev", "next", "|>", //
-                [&] { recorder.set_first(); }, [&] { recorder.prev(); }, [&] { recorder.next(); },
-                [&] { recorder.set_last(); });
-
-            iter_pair(
-                "<00..", "dec", "inc", "11..>", //
-                [&] { recorder.take(legacy::act_int::first(inter, part, target)); },
-                [&] { recorder.take(legacy::act_int::prev(inter, part, target)); },
-                [&] { recorder.take(legacy::act_int::next(inter, part, target)); },
-                [&] { recorder.take(legacy::act_int::last(inter, part, target)); });
-            ImGui::SameLine(), imgui_str("|");
-            ImGui::SameLine();
-            iter_pair(
-                "<1.0.", "pprev", "pnext", "0.1.>", //
-                [&] { recorder.take(legacy::act_perm::first(inter, part, target)); },
-                [&] { recorder.take(legacy::act_perm::prev(inter, part, target)); },
-                [&] { recorder.take(legacy::act_perm::next(inter, part, target)); },
-                [&] { recorder.take(legacy::act_perm::last(inter, part, target)); });
-            ImGui::SameLine(), imgui_str("|");
-            ImGui::SameLine();
-            if (ImGui::Button("Mir")) {
-                recorder.replace_current(legacy::mirror(target));
+            if (ImGui::Button(tag_first)) {
+                consume_exception(act_first);
             }
+
+            ImGui::SameLine();
+            ImGui::BeginGroup();
+            if (ImGui::Button(tag_prev)) {
+                consume_exception(act_prev);
+            }
+            ImGui::SameLine(0, 2);
+            if (ImGui::Button(tag_next)) {
+                consume_exception(act_next);
+            }
+            ImGui::EndGroup();
+            if (ImGui::IsItemHovered()) {
+                if (imgui_scrollup()) {
+                    consume_exception(act_prev);
+                } else if (imgui_scrolldown()) {
+                    consume_exception(act_next);
+                }
+            }
+
+            ImGui::SameLine();
+            if (ImGui::Button(tag_last)) {
+                consume_exception(act_last);
+            }
+        };
+
+        ImGui::AlignTextToFramePadding();
+        imgui_str(std::format("Total:{} At:{}", recorder.size(), recorder.pos() + 1));
+        ImGui::SameLine();
+        iter_pair(
+            "<|", "prev", "next", "|>", //
+            [&] { recorder.set_first(); }, [&] { recorder.prev(); }, [&] { recorder.next(); },
+            [&] { recorder.set_last(); });
+
+        iter_pair(
+            "<00..", "dec", "inc", "11..>", //
+            [&] { recorder.take(legacy::act_int::first(inter, part, target)); },
+            [&] { recorder.take(legacy::act_int::prev(inter, part, target)); },
+            [&] { recorder.take(legacy::act_int::next(inter, part, target)); },
+            [&] { recorder.take(legacy::act_int::last(inter, part, target)); });
+        ImGui::SameLine(), imgui_str("|");
+        ImGui::SameLine();
+        iter_pair(
+            "<1.0.", "pprev", "pnext", "0.1.>", //
+            [&] { recorder.take(legacy::act_perm::first(inter, part, target)); },
+            [&] { recorder.take(legacy::act_perm::prev(inter, part, target)); },
+            [&] { recorder.take(legacy::act_perm::next(inter, part, target)); },
+            [&] { recorder.take(legacy::act_perm::last(inter, part, target)); });
+        ImGui::SameLine(), imgui_str("|");
+        ImGui::SameLine();
+        if (ImGui::Button("Mir")) {
+            recorder.replace_current(legacy::mirror(target));
         }
     }
     {
@@ -1044,7 +1042,6 @@ int main(int argc, char** argv) {
                         // TODO: want resetting only when +/-/enter...
                         int seed = filler.seed;
                         // TODO: same as "rule_editor"'s... but don't want to affect Label...
-                        // ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(2, 0));
                         if (ImGui::InputInt("Seed", &seed)) {
                             seed = std::clamp(seed, 0, 9999);
                             if (seed >= 0 && seed != filler.seed) {
@@ -1052,12 +1049,11 @@ int main(int argc, char** argv) {
                                 restart = true;
                             }
                         }
-                        // ImGui::PopStyleVar();
                         if (!filler.use_seed) {
                             ImGui::EndDisabled();
                         }
 
-                        // TODO: button <- set to 0.5?
+                        // TODO: integer(ratio) density?
                         if (ImGui::SliderFloat("Init density [0-1]", &filler.density, 0.0f, 1.0f, "%.3f",
                                                ImGuiSliderFlags_NoInput)) {
                             restart = true;
