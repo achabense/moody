@@ -15,38 +15,6 @@ namespace legacy {
         return rule(codeT{0}) == 1 && rule(codeT{511}) == 0;
     }
 
-    // TODO: rename / explain...
-    struct partialT {
-        enum stateE : char { S0, S1, Unknown };
-        using data_type = codeT::map_to<stateE>;
-        data_type map;
-        void reset() { map.fill(Unknown); }
-        partialT() { reset(); }
-
-#if 0
-        // How to deal with map[code] != Unknown && != b?
-        void set(codeT code, bool b) { map[code] = stateE{b}; }
-
-        // TODO: sometimes need to listen to selected area?
-        auto bind(const ruleT& rule) {
-            return [this, &rule](codeT code) /*const*/ {
-                set(code, rule(code));
-                return rule(code);
-            };
-        }
-#endif
-    };
-#if 0
-    // TODO: lock-based or inter-based?
-    using lockT = codeT::map_to<bool>;
-    inline auto bind(lockT& locked, const ruleT& rule) {
-        return [&](codeT code) {
-            locked[code] = true;
-            return rule(code);
-        };
-    }
-#endif
-
     // Interpretation of ruleT_data.
     // TODO: explain...
     // The data in `ruleT` has fixed meaning - the value `s` is mapped to at next generation.
@@ -523,7 +491,9 @@ namespace legacy {
         }
     }
 
+    // TODO: support pattern capturing...
     using lockT = codeT::map_to<bool>;
+
     inline std::vector<int> get_free_indexes(const lockT& locked, const partitionT& par) {
         std::vector<int> free_indexes;
         for (int j = 0; j < par.k(); ++j) {
@@ -535,7 +505,7 @@ namespace legacy {
         return free_indexes;
     }
 
-    inline ruleT random_flip_v2(ruleT r, const partitionT& par, const lockT& locked, const ruleT& lr, int count_min,
+    inline ruleT random_flip(ruleT r, const partitionT& par, const lockT& locked, const ruleT& lr, int count_min,
                                 int count_max, std::mt19937& rand) {
         // TODO: precondition?
         std::vector<int> free;
@@ -557,22 +527,6 @@ namespace legacy {
         }
         return r;
     }
-
-#if 0
-    inline ruleT random_flip(ruleT r, const partitionT& par, int count_min, int count_max, std::mt19937& rand) {
-        // flip some...
-        std::vector<groupT> gs;
-        for (int j = 0; j < par.k(); ++j) {
-            gs.push_back(par.jth_group(j));
-        }
-        std::vector<groupT> ds;
-        std::sample(gs.begin(), gs.end(), std::back_inserter(ds), count_min, rand); // max is not supported...
-        for (auto group : ds) {
-            flip(group, r);
-        }
-        return r;
-    }
-#endif
 
     // TODO: temp name...
     inline ruleT _iterate(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked,

@@ -6,45 +6,6 @@
 
 #include "rule_pp.hpp"
 
-#if 0
-//12/24 temporal; used to transform qc_emulation to ez_emulation...
-namespace legacy {
-    inline equivT make_equiv(const mapperT_pair& q) {
-        equivT eq{};
-        eq.add_eq(q);
-        return eq;
-    }
-
-    // what about
-    // 010
-    // 111
-    // 010 rule?
-    inline ruleT switch_hex(const ruleT& r) {
-        static equivT hex1 = make_equiv({mp_identity, mp_hex_ignore});  // ez
-        static equivT hex2 = make_equiv({mp_identity, mp_hex2_ignore}); // qc
-        constexpr interT inter{};
-        if (hex1.test(inter.from_rule(r))) {
-            // ez->qc
-            ruleT ret{};
-            for_each_code(code) {
-                auto [q, w, e, a, s, d, z, x, c] = decode(code);
-                ret.set(code, r(encode(w, e, 0, a, s, d, 0, z, x))); // ???
-            }
-            return ret;
-        } else if (hex2.test(inter.from_rule(r))) {
-            // qc->ez
-            ruleT ret{};
-            for_each_code(code) {
-                auto [q, w, e, a, s, d, z, x, c] = decode(code);
-                ret.set(code, r(encode(0, q, w, a, s, d, x, c, 0))); // ???
-            }
-            return ret;
-        }
-        return r;
-    }
-} // namespace legacy
-#endif
-
 namespace legacy {
     // TODO: move elsewhere
     // TODO: proper name...
@@ -286,42 +247,12 @@ void show_target_rule(const legacy::ruleT& target, rule_recorder& recorder) {
     }
     ImGui::SameLine();
     if (ImGui::Button("Paste")) {
+        // TODO: redesign...
         if (const char* text = ImGui::GetClipboardText()) {
-            auto rules = extract_rules(text);
-            if (!rules.empty()) {
-                // TODO: redesign recorder... whether to accept multiple rules?
-                // TODO: target??
-                if (target != rules.front()) {
-                    recorder.replace(std::move(rules));
-                } else {
-                    logger::log_temp(300ms, "Same rule");
-                }
-            }
+            recorder.replace(extract_rules(text));
         }
     }
 
-    // TODO: +1 is clumsy. TODO: -> editor?
-    // TODO: pos may not reflect runner's real pos, as recorder can be modified on the way... may not
-    // matters
-    // ImGui::SameLine();
-    // if (ImGui::Button("|<")) {
-    //     recorder.set_first();
-    // }
-    // ImGui::SameLine();
-    // if (ImGui::Button(">|")) {
-    //     recorder.set_last();
-    // }
-    // ImGui::SameLine();
-    // imgui_str(std::format("Total:{} At:{}", recorder.size(), recorder.pos() + 1));
-    // TODO: Moved near to other iter widgets...
-    // ImGui::Button(std::format("Total:{} At:{}###...", recorder.size(), recorder.pos() + 1).c_str());
-    // if (ImGui::IsItemHovered()) {
-    //     if (imgui_scrolldown()) {
-    //         recorder.next();
-    //     } else if (imgui_scrollup()) {
-    //         recorder.prev();
-    //     }
-    // }
 #if 0
     // TODO: is random-access useful?
     static char buf_pos[20]{};
@@ -400,7 +331,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
     static legacy::lockT locked{};
     {
         // TODO: still unstable between partition switches...
-        // TODO: the range should be scoped by locks...
+        // TODO: the range should be scoped by locks... so, what should rcount be?
         static int rcount = 0.5 * k;
         const int freec = legacy::get_free_indexes(locked, part).size(); // TODO: wasteful...
         // TODO: refine...
@@ -419,63 +350,48 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         }
         ImGui::SameLine(0, s);
         if (ImGui::Button("+", ImVec2(r, r))) {
-            rcount = std::min(k, rcount + 1);
+            rcount = std::min(freec, rcount + 1);
         }
         ImGui::PopButtonRepeat();
 
         ImGui::SameLine();
         if (ImGui::Button("Randomize") || imgui_keypressed(ImGuiKey_Enter, false)) {
-            recorder.take(random_flip_v2(inter.get_viewer(), part, locked, target, rcount, rcount,
-                                         global_mt19937)); // TODO: range...
+            recorder.take(random_flip(inter.get_viewer(), part, locked, target, rcount, rcount,
+                                      global_mt19937)); // TODO: range...
         }
 
-        // TODO: iteration should be the key concept...
         // TODO: redesign...
         const auto iter_pair = [](const char* tag_first, const char* tag_prev, const char* tag_next,
                                   const char* tag_last, auto act_first, auto act_prev, auto act_next, auto act_last) {
-            // TODO: temporal; [[exceptions should be avoided]]
-            // auto consume_exception = [](auto& act) {
-            //     try {
-            //         act();
-            //     } catch (...) {
-            //         logger::log_temp(300ms, "X_X");
-            //     }
-            // };
-
             if (ImGui::Button(tag_first)) {
-                // consume_exception(act_first);
                 act_first();
             }
 
             ImGui::SameLine();
             ImGui::BeginGroup();
             if (ImGui::Button(tag_prev)) {
-                // consume_exception(act_prev);
                 act_prev();
             }
             ImGui::SameLine(0, 2);
             if (ImGui::Button(tag_next)) {
-                // consume_exception(act_next);
                 act_next();
             }
             ImGui::EndGroup();
             if (ImGui::IsItemHovered()) {
                 if (imgui_scrollup()) {
-                    // consume_exception(act_prev);
                     act_prev();
                 } else if (imgui_scrolldown()) {
-                    // consume_exception(act_next);
                     act_next();
                 }
             }
 
             ImGui::SameLine();
             if (ImGui::Button(tag_last)) {
-                // consume_exception(act_last);
                 act_last();
             }
         };
 
+        // TODO: +1 is clumsy
         ImGui::AlignTextToFramePadding();
         imgui_str(std::format("Total:{} At:{}", recorder.size(), recorder.pos() + 1));
         ImGui::SameLine();

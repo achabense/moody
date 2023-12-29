@@ -85,7 +85,7 @@ public:
 #if 1
         static std::optional<legacy::tileT> period;
         if (!period) {
-            period.emplace(legacy::rectT{1, 1}); // TODO: dummy size; not actually used...
+            period.emplace(legacy::rectT{2, 2}); // TODO: dummy size, not actually used; redesign
             legacy::mktile(*period, "o.\n"
                                     ".o");
         }

@@ -14,6 +14,7 @@
 namespace legacy {
     // The environment around "s".
     // TODO: how widespread is `qwerty` keyboard? without it this notation will pose no benefit...
+    // TODO: other layouts are possible: https://en.wikipedia.org/wiki/QWERTZ
     struct envT {
         bool q, w, e;
         bool a, s, d;
