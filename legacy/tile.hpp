@@ -111,7 +111,7 @@ namespace legacy {
     public:
         // TODO: This could be used to support boundless space.
         // TODO: const or not?
-        const tileT& gather( // clang-format off
+        void gather( // clang-format off
             const tileT& q, const tileT& w, const tileT& e,
             const tileT& a, /*   *this   */ const tileT& d,
             const tileT& z, const tileT& x, const tileT& c
@@ -131,15 +131,13 @@ namespace legacy {
             for (int _y = 1; _y <= height; ++_y) {
                 _set_lr(_y, a._line(_y)[width - 1], d._line(_y)[0]);
             }
-
-            return *this;
         }
 
         // TODO: This could be used to support constraint gathering...
         // TODO: go back to template when needed...
         // Relying on width > 1 (which is a reasonable requirement)
         // I hate this function, it is the payment for consecutive data...
-        void apply(const ruleT& rule, tileT& dest) const {
+        void apply(const auto& rule, tileT& dest) const {
             // pre: already gathered ???<TODO>, which is untestable.
             assert(this != &dest);
             dest.resize(m_size);

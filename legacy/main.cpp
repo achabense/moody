@@ -41,8 +41,8 @@ namespace legacy {
 
         void reset_par() {
             equivT q{};
-            auto set = [&q](auto& terms) {
-                for (auto& t : terms) {
+            auto set = [&q](termT_vec& terms) {
+                for (termT& t : terms) {
                     if (t.selected) {
                         q.add_eq(t.eq);
                     }
@@ -53,8 +53,8 @@ namespace legacy {
             set(terms_misc);
             set(terms_hex);
 
-            auto test = [&q](auto& terms) {
-                for (auto& t : terms) {
+            auto test = [&q](termT_vec& terms) {
+                for (termT& t : terms) {
                     t.covered = q.has_eq(t.eq);
                 }
             };
@@ -204,7 +204,7 @@ namespace legacy {
             ImGui::PopStyleVar();
             ImGui::EndGroup();
 
-            auto table = [&check, tid = 0](auto& terms) mutable {
+            auto table = [&check, tid = 0](termT_vec& terms) mutable {
                 ImGui::PushID(tid++);
                 if (ImGui::BeginTable("Table", terms.size(), ImGuiTableFlags_BordersInner)) {
                     ImGui::TableNextRow();
@@ -212,9 +212,6 @@ namespace legacy {
                         ImGui::TableNextColumn();
                         imgui_str(t.msg);
                         check(t);
-                        // ImGui::SameLine();
-                        // ImGui::AlignTextToFramePadding();
-                        // imgui_str(t.msg);
                     }
                     ImGui::EndTable();
                 }
@@ -249,6 +246,7 @@ void show_target_rule(const legacy::ruleT& target, rule_recorder& recorder) {
     if (ImGui::Button("Paste")) {
         // TODO: redesign...
         if (const char* text = ImGui::GetClipboardText()) {
+            // TODO: (regression) notify if not found...
             recorder.replace(extract_rules(text));
         }
     }
@@ -278,6 +276,9 @@ void show_target_rule(const legacy::ruleT& target, rule_recorder& recorder) {
     // TODO: re-implement file-saving
     imgui_str(rule_str);
 }
+
+// TODO: too shaky...
+std::optional<legacy::lockT> temp_lock{};
 
 // TODO: should be a class... how to decouple? ...
 void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_recorder& recorder) {
@@ -329,6 +330,10 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
     const int k = part.k();
 
     static legacy::lockT locked{};
+    if (temp_lock) {
+        locked = *temp_lock;
+        temp_lock.reset();
+    }
     {
         // TODO: still unstable between partition switches...
         // TODO: the range should be scoped by locks... so, what should rcount be?
@@ -421,6 +426,24 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         }
     }
     {
+        // TODO: statistics...
+        if (ImGui::Button("Enhance locks")) {
+            for (int j = 0; j < part.k(); ++j) {
+                const auto& group = part.jth_group(j);
+                if (legacy::any_locked(locked, group)) {
+                    for (auto code : group) {
+                        locked[code] = true;
+                    }
+                }
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Clear locks")) {
+            locked = {};
+        }
+    }
+
+    {
         static const char* const strss[3][3]{{"-0", "-1", "-x"}, //
                                              {"-.", "-f", "-x"},
                                              {"-.", "-d", "-x"}};
@@ -445,15 +468,14 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                 const bool inconsistent = scans[j] == scans.Inconsistent;
                 const auto& group = part.jth_group(j);
                 const legacy::codeT head = group[0];
-                const bool has_lock =
-                    std::any_of(group.begin(), group.end(), [](legacy::codeT code) { return locked[code]; });
+                const bool has_lock = legacy::any_locked(locked, group);
 
                 if (inconsistent) {
                     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0, 0, 1));
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0, 0, 1));
                     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.9f, 0, 0, 1));
                 }
-                const bool button = icons.button(head, zoom);
+                const bool button_hit = icons.button(head, zoom);
                 const bool button_hover = ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip);
                 ImGui::SameLine();
                 ImGui::AlignTextToFramePadding();
@@ -461,8 +483,9 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
 
                 if (has_lock) {
                     // TODO: -> widget func... (addborder)
+                    const ImU32 col = legacy::all_locked(locked, group) ? -1 : 0xaaaaaaaa;
                     ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() - ImVec2(2, 2),
-                                                        ImGui::GetItemRectMax() + ImVec2(2, 2), -1);
+                                                        ImGui::GetItemRectMax() + ImVec2(2, 2), col);
                 }
                 if (inconsistent) {
                     ImGui::PopStyleColor(3);
@@ -470,7 +493,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
 
                 if (button_hover && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
                     for (auto code : group) {
-                        locked[code] = !has_lock;
+                        locked[code] = !has_lock; // TODO: not reversible; is this ok?
                     }
                 }
                 static bool show_group = true;
@@ -499,7 +522,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                         ImGui::EndTooltip();
                     }
                 }
-                if (button) {
+                if (button_hit) {
                     // TODO: document this behavior... (keyctrl->resolve conflicts)
                     legacy::ruleT r = target;
                     if (ImGui::GetIO().KeyCtrl) {
@@ -774,6 +797,7 @@ int main(int argc, char** argv) {
             drawlist.PushClipRect(screen_pos, screen_pos + screen_size);
             drawlist.AddRectFilled(screen_pos, screen_pos + screen_size, IM_COL32(20, 20, 20, 255));
 
+            // TODO: int?
             static float zoom = 1; // TODO: mini window when zoom == 1?
             // It has been proven that `img_off` works better than using `corner_idx` (cell idx in the corner)
             static ImVec2 img_off = {0, 0}; // TODO: supposed to be of integer-precision...
@@ -833,6 +857,7 @@ int main(int argc, char** argv) {
                         runner.shift(io.MouseDelta.x / zoom, io.MouseDelta.y / zoom);
                     }
                 }
+                // TODO: rename to mouseXXX...
                 if (imgui_scrolling()) {
                     ImVec2 cellidx = (mouse_pos - img_pos) / zoom;
                     if (imgui_scrolldown() && zoom != 1) { // TODO: 0.5?
@@ -895,6 +920,28 @@ int main(int argc, char** argv) {
                             tile.line(y)[x] = global_mt19937() < c;
                         }
                     }
+                }
+                // TODO: refine capturing...
+                if (imgui_keypressed(ImGuiKey_P, false)) {
+                    // TODO: padding area...
+                    const legacy::rectT size = {.width = sel.width(), .height = sel.height()};
+                    legacy::tileT cap(size), cap2(size);
+                    for (int y = sel.y1; y < sel.y2; ++y) {
+                        for (int x = sel.x1; x < sel.x2; ++x) {
+                            cap.line(y - sel.y1)[x - sel.x1] = runner.tile().line(y)[x];
+                        }
+                    }
+                    legacy::lockT locked{};
+                    auto rulx = [&](legacy::codeT code) {
+                        locked[code] = true;
+                        return ctrl.rule(code);
+                    };
+                    for (int g = 0; g < 50; ++g) {
+                        cap.gather(cap, cap, cap, cap, cap, cap, cap, cap);
+                        cap.apply(rulx, cap2);
+                        cap.swap(cap2);
+                    }
+                    temp_lock.emplace(locked);
                 }
             }
         };

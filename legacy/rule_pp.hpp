@@ -491,14 +491,24 @@ namespace legacy {
         }
     }
 
-    // TODO: support pattern capturing...
     using lockT = codeT::map_to<bool>;
+
+    // TODO: purify?
+    // Suppose that in a group, all locked mappings has the same result...
+    // This can happen when the pattern is captured under a lower symmetry rule...
+
+    inline bool any_locked(const lockT& locked, groupT group) {
+        return std::any_of(group.begin(), group.end(), [&locked](codeT code) { return locked[code]; });
+    }
+
+    inline bool all_locked(const lockT& locked, groupT group) {
+        return std::all_of(group.begin(), group.end(), [&locked](codeT code) { return locked[code]; });
+    }
 
     inline std::vector<int> get_free_indexes(const lockT& locked, const partitionT& par) {
         std::vector<int> free_indexes;
         for (int j = 0; j < par.k(); ++j) {
-            auto group = par.jth_group(j);
-            if (!std::any_of(group.begin(), group.end(), [&locked](codeT code) { return locked[code]; })) {
+            if (!any_locked(locked, par.jth_group(j))) {
                 free_indexes.push_back(j);
             }
         }
@@ -506,12 +516,12 @@ namespace legacy {
     }
 
     inline ruleT random_flip(ruleT r, const partitionT& par, const lockT& locked, const ruleT& lr, int count_min,
-                                int count_max, std::mt19937& rand) {
+                             int count_max, std::mt19937& rand) {
         // TODO: precondition?
         std::vector<int> free;
         for (int j = 0; j < par.k(); ++j) {
             auto group = par.jth_group(j);
-            if (!std::any_of(group.begin(), group.end(), [&locked](codeT code) { return locked[code]; })) {
+            if (!any_locked(locked, group)) {
                 free.push_back(j);
             } else {
                 for (codeT code : group) {
@@ -529,6 +539,7 @@ namespace legacy {
     }
 
     // TODO: temp name...
+    // TODO: whether to skip inconsistent groups?
     inline ruleT _iterate(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked,
                           void (*fn)(bool* /*begin*/, bool* /*end*/)) {
         // TODO: precondition?
