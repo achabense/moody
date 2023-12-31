@@ -244,11 +244,18 @@ void show_target_rule(const legacy::ruleT& target, rule_recorder& recorder) {
     }
     ImGui::SameLine();
     if (ImGui::Button("Paste")) {
-        // TODO: redesign...
+        // TODO: redesign... (especially, should not replace directly?)
         if (const char* text = ImGui::GetClipboardText()) {
-            // TODO: (regression) notify if not found...
-            recorder.replace(extract_rules(text));
+            auto result = extract_rules(text);
+            // TODO: copied from the main function...
+            if (!result.empty()) {
+                logger::log_temp(500ms, "found {} rules", result.size());
+                recorder.replace(std::move(result));
+            } else {
+                logger::log_temp(300ms, "found nothing");
+            }
         }
+        // else...
     }
 
 #if 0
@@ -297,7 +304,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
 
         // TODO: better name (e.g. might be better named "direct")
         ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted("View"); // TODO: rename vars...
+        imgui_str("View"); // TODO: rename vars...
         ImGui::SameLine();
         ImGui::RadioButton("Val", &itag, inter.Value);
         tooltip(inter.Value);
@@ -396,6 +403,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
             }
         };
 
+        ImGui::Separator();
         // TODO: +1 is clumsy
         ImGui::AlignTextToFramePadding();
         imgui_str(std::format("Total:{} At:{}", recorder.size(), recorder.pos() + 1));
@@ -404,6 +412,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
             "<|", "prev", "next", "|>", //
             [&] { recorder.set_first(); }, [&] { recorder.prev(); }, [&] { recorder.next(); },
             [&] { recorder.set_last(); });
+        ImGui::Separator();
 
         iter_pair(
             "<00..", "dec", "inc", "11..>", //
@@ -479,7 +488,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                 const bool button_hover = ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip);
                 ImGui::SameLine();
                 ImGui::AlignTextToFramePadding();
-                ImGui::TextUnformatted(strs[drule[head]]);
+                imgui_str(strs[drule[head]]);
 
                 if (has_lock) {
                     // TODO: -> widget func... (addborder)
@@ -513,7 +522,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                             icons.image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
                             ImGui::SameLine();
                             ImGui::AlignTextToFramePadding();
-                            ImGui::TextUnformatted(strs[drule[code]]);
+                            imgui_str(strs[drule[code]]);
                             if (locked[code]) {
                                 ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() - ImVec2(2, 2),
                                                                     ImGui::GetItemRectMax() + ImVec2(2, 2), -1);
@@ -786,10 +795,19 @@ int main(int argc, char** argv) {
         }
 
         const auto show_tile = [&] {
-            // TODO: lift "Width..." to before the ctrl widgets?
-            ImGui::Text("Width:%d,Height:%d,Gen:%d,Density:%f", runner.tile().width(), runner.tile().height(),
+            // TODO: move elsewhere in the gui?
+            ImGui::Text("Width:%d,Height:%d,Gen:%d,Density:%.4f", runner.tile().width(), runner.tile().height(),
                         runner.gen(), float(legacy::count(runner.tile())) / runner.tile().area());
 
+            const bool corner = ImGui::Button("Corner"); // TODO: move elsewhere...
+            ImGui::SameLine();
+            const bool center = ImGui::Button("Center");
+            // TODO: resize-fullscreen...
+
+            const int tile_width = runner.tile().width();
+            const int tile_height = runner.tile().height();
+
+            // TODO: rename to canvas_pos/size?
             const ImVec2 screen_pos = ImGui::GetCursorScreenPos();
             const ImVec2 screen_size = ImGui::GetContentRegionAvail();
             ImDrawList& drawlist = *ImGui::GetWindowDrawList();
@@ -801,7 +819,16 @@ int main(int argc, char** argv) {
             static float zoom = 1; // TODO: mini window when zoom == 1?
             // It has been proven that `img_off` works better than using `corner_idx` (cell idx in the corner)
             static ImVec2 img_off = {0, 0}; // TODO: supposed to be of integer-precision...
-            ImVec2 img_pos = screen_pos + img_off;
+            if (corner) {
+                img_off = {0, 0};
+            }
+            if (center) {
+                img_off = screen_size / 2 - ImVec2(tile_width / 2, tile_height / 2) * zoom;
+                img_off.x = floor(img_off.x);
+                img_off.y = floor(img_off.y);
+            }
+
+            const ImVec2 img_pos = screen_pos + img_off;
             img.update(runner.tile());
             drawlist.AddImage(img.texture(), img_pos, img_pos + ImVec2(img.width(), img.height()) * zoom);
             // Experimental: select:
@@ -879,20 +906,21 @@ int main(int argc, char** argv) {
                     int celx = floor((mouse_pos.x - img_pos.x) / zoom);
                     int cely = floor((mouse_pos.y - img_pos.y) / zoom);
 
-                    celx = std::clamp(celx, 0, img.width() - 1);
-                    cely = std::clamp(cely, 0, img.height() - 1); // TODO: shouldn't be img.xxx()...
+                    celx = std::clamp(celx, 0, tile_width - 1);
+                    cely = std::clamp(cely, 0, tile_height - 1);
                     select_0 = ImVec2(celx, cely);
                 }
                 if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
                     int celx = floor((mouse_pos.x - img_pos.x) / zoom);
                     int cely = floor((mouse_pos.y - img_pos.y) / zoom);
 
-                    celx = std::clamp(celx, 0, img.width() - 1);
-                    cely = std::clamp(cely, 0, img.height() - 1); // TODO: shouldn't be img.xxx()...
+                    celx = std::clamp(celx, 0, tile_width - 1);
+                    cely = std::clamp(cely, 0, tile_height - 1);
                     select_1 = ImVec2(celx, cely);
                 }
             }
             if (sel_info sel = get_select()) {
+                // TODO: paste?
                 if (imgui_keypressed(ImGuiKey_C, false)) {
                     legacy::tileT t({.width = sel.width(), .height = sel.height()});
                     legacy::copy(runner.tile(), sel.x1, sel.y1, sel.width(), sel.height(), t, 0, 0);
@@ -989,12 +1017,13 @@ int main(int argc, char** argv) {
                         // TODO: should allow keyboard control...
                         if (ImGui::Button("+1")) {
                             extra = 1;
-                            logger::log_temp(200ms, "+1"); // TODO: useful?
+                            // logger::log_temp(200ms, "+1"); // TODO: useful?
                         }
                         ImGui::SameLine();
-                        if (ImGui::Button("+p")) { // TODO: Button("+p(...)")?
+                        // TODO: is this usage of ### correct?
+                        if (ImGui::Button(std::format("+p({})###+p", ctrl.actual_pergen()).c_str())) {
                             extra = ctrl.actual_pergen();
-                            logger::log_temp(200ms, "+p({})", ctrl.actual_pergen());
+                            // logger::log_temp(200ms, "+p({})", ctrl.actual_pergen());
                         }
                         ImGui::PopButtonRepeat();
                         ImGui::SameLine();
@@ -1018,8 +1047,7 @@ int main(int argc, char** argv) {
                     ImGui::SameLine();
                     ImGui::BeginGroup();
                     {
-                        // TODO: use radio instead...
-                        // TODO: imgui_binaryradio???
+                        // TODO: use radio instead?
                         if (ImGui::Checkbox("Use seed", &filler.use_seed)) {
                             // TODO: unconditional?
                             if (filler.use_seed) {
@@ -1035,7 +1063,7 @@ int main(int argc, char** argv) {
                         // TODO: same as "rule_editor"'s... but don't want to affect Label...
                         if (ImGui::InputInt("Seed", &seed)) {
                             seed = std::clamp(seed, 0, 9999);
-                            if (seed >= 0 && seed != filler.seed) {
+                            if (seed != filler.seed) {
                                 filler.seed = seed;
                                 restart = true;
                             }
@@ -1072,6 +1100,14 @@ int main(int argc, char** argv) {
                     if (imgui_keypressed(ImGuiKey_Space, true)) {
                         ctrl.pause = !ctrl.pause;
                     }
+                    // TODO: temp (this function turns out to be necessary...)
+                    if (imgui_keypressed(ImGuiKey_M, true)) {
+                        if (ctrl.pause) {
+                            extra = ctrl.actual_pergen();
+                        }
+                        ctrl.pause = true;
+                    }
+
                     show_tile();
                 }
                 ImGui::EndTable();
@@ -1096,5 +1132,3 @@ int main(int argc, char** argv) {
     app_backend::clear();
     return 0;
 }
-
-// TODO: tile: rewind; fullscreen...

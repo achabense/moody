@@ -131,6 +131,7 @@ namespace legacy {
         return rule;
     }
 
+#if 1
     // TODO: is this actually useful in the application? even if recorder is needed, is plain ruleT not affordable?
     class compressT {
         std::array<uint8_t, 64> bits; // as bitset.
@@ -159,6 +160,9 @@ namespace legacy {
             }
         };
     };
+#else
+    using compressT = ruleT;
+#endif
 } // namespace legacy
 
 // TODO: (together with pattern copy/pasting) move to a separate header...
