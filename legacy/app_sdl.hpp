@@ -156,30 +156,45 @@ private:
 
 // TODO: pixel format might be problematic...
 // TODO: in namespace or not? better name?
-// TODO: able to deal with resized tile...
 // TODO: should not update when paused...
 class tile_image {
     int m_w, m_h;
     SDL_Texture* m_texture; // owning.
 
 public:
-    tile_image(const legacy::tileT& tile) : m_w(tile.width()), m_h(tile.height()) {
-        m_texture = app_backend::create_texture(SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STREAMING, m_w, m_h);
-        update(tile);
+    tile_image() : m_w{}, m_h{}, m_texture{nullptr} {}
+    ~tile_image() {
+        if (m_texture) {
+            SDL_DestroyTexture(m_texture);
+        }
     }
-
-    ~tile_image() { SDL_DestroyTexture(m_texture); }
 
     tile_image(const tile_image&) = delete;
     tile_image& operator=(const tile_image&) = delete;
 
-    void update(const legacy::tileT& tile) {
-        assert(tile.width() == m_w && tile.height() == m_h);
+    // TODO: better name? imbue?
+    // TODO: explain why ImTextureID (instead of SDL_Texture*) here (for imgui only)
+    // TODO: explain why not exposing m_w and m_h (~ Post: m_w == tile.width() && m_h == tile.height())
+    ImTextureID update(const legacy::tileT& tile) {
+        if (!m_texture || m_w != tile.width() || m_h != tile.height()) {
+            if (m_texture) {
+                SDL_DestroyTexture(m_texture);
+            }
 
+            m_w = tile.width();
+            m_h = tile.height();
+            m_texture = app_backend::create_texture(SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STREAMING, m_w, m_h);
+        }
+
+        // TODO: is reinterpret_cast<void**>(&typed-ptr) valid by C++?
         void* pixels = nullptr;
-        [[maybe_unused]] int pitch = 0;
-        [[maybe_unused]] bool succ = SDL_LockTexture(m_texture, nullptr, &pixels, &pitch) == 0;
-        assert(succ && pitch == m_w * sizeof(Uint32));
+        int pitch = 0;
+        bool succ = SDL_LockTexture(m_texture, nullptr, &pixels, &pitch) == 0;
+        if (!succ || pitch != m_w * sizeof(Uint32)) {
+            // TODO: can pitch == m_w * sizeof(Uint32) be guaranteed?
+            printf("Error: %s", SDL_GetError());
+            exit(EXIT_FAILURE);
+        }
 
         // Relying on both image and tile data being consecutive.
         const auto data = tile.data();
@@ -187,13 +202,9 @@ public:
             ((Uint32*)pixels)[i] = data[i] ? -1 /* white */ : 0;
         }
         SDL_UnlockTexture(m_texture);
+
+        return m_texture;
     }
-
-    int width() const { return m_w; }
-    int height() const { return m_h; }
-
-    // should be ImTextureID instead?
-    SDL_Texture* texture() { return m_texture; }
 };
 
 // TODO: can be merged into app_backend...

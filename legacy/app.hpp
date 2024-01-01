@@ -82,7 +82,7 @@ public:
 
     // (&&rectT) by value or by cref? (also in tileT)
     void restart(tileT_fill_arg filler, std::optional<legacy::rectT> resize = {}) {
-#if 1
+#if 0
         static std::optional<legacy::tileT> period;
         if (!period) {
             period.emplace(legacy::rectT{2, 2}); // TODO: dummy size, not actually used; redesign
@@ -95,7 +95,8 @@ public:
             m_tile.resize(*resize);
         }
 
-        random_fill_v2(m_tile, *period, filler);
+        random_fill(m_tile, filler);
+        // random_fill_v2(m_tile, *period, filler);
         m_gen = 0;
     }
 

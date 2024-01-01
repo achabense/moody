@@ -774,7 +774,7 @@ int main(int argc, char** argv) {
     bool show_nav_window = true;
     file_navT nav;
 
-    tile_image img(runner.tile());
+    tile_image img;
     code_image icons;
     while (app_backend::new_frame()) {
         // TODO: applying following logic; consider refining it.
@@ -798,53 +798,77 @@ int main(int argc, char** argv) {
             // TODO: move elsewhere in the gui?
             ImGui::Text("Width:%d,Height:%d,Gen:%d,Density:%.4f", runner.tile().width(), runner.tile().height(),
                         runner.gen(), float(legacy::count(runner.tile())) / runner.tile().area());
+            // TODO: canvas size, tile size, selected size...
 
             const bool corner = ImGui::Button("Corner"); // TODO: move elsewhere...
             ImGui::SameLine();
             const bool center = ImGui::Button("Center");
-            // TODO: resize-fullscreen...
+            ImGui::SameLine();
+            const bool fit = ImGui::Button("Fit"); // TODO: take zoom into consideration?
+            ImGui::SameLine(), imgui_str("|");
+            ImGui::SameLine();
+            const bool select_all = ImGui::Button("Select all");
+            ImGui::SameLine();
+            const bool select_clear = ImGui::Button("Clear selection");
+            // TODO: input size...
 
-            const int tile_width = runner.tile().width();
-            const int tile_height = runner.tile().height();
+            const ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
+            const ImVec2 canvas_size = ImGui::GetContentRegionAvail();
 
-            // TODO: rename to canvas_pos/size?
-            const ImVec2 screen_pos = ImGui::GetCursorScreenPos();
-            const ImVec2 screen_size = ImGui::GetContentRegionAvail();
-            ImDrawList& drawlist = *ImGui::GetWindowDrawList();
+            // TODO: this can be negative wtf... investigate...
+            // TODO: (regression?) some key ctrls are skipped by this...
+            if (canvas_size.x <= 0 || canvas_size.y <= 0) {
+                // TODO: show something when fit/etc are hit?
+                ctrl.pause2 = true;
+                return;
+            }
 
-            drawlist.PushClipRect(screen_pos, screen_pos + screen_size);
-            drawlist.AddRectFilled(screen_pos, screen_pos + screen_size, IM_COL32(20, 20, 20, 255));
+            static int zoom = 1; // TODO: mini window when zoom == 1?
+            assert(zoom == 1 || zoom == 2 || zoom == 4 || zoom == 8);
 
-            // TODO: int?
-            static float zoom = 1; // TODO: mini window when zoom == 1?
             // It has been proven that `img_off` works better than using `corner_idx` (cell idx in the corner)
             static ImVec2 img_off = {0, 0}; // TODO: supposed to be of integer-precision...
+
+            if (fit) {
+                zoom = 1;
+                img_off = {0, 0};
+
+                const legacy::rectT fit_size{.width = (int)canvas_size.x, .height = (int)canvas_size.y};
+                if (runner.tile().size() != fit_size) {
+                    runner.restart(filler, fit_size);
+                    // TODO: how to support background period then?
+                    assert(runner.tile().size() == fit_size); // ???
+                }
+            }
+            // Size is fixed now:
+            const legacy::rectT tile_size = runner.tile().size();
+            const ImVec2 img_size(tile_size.width * zoom, tile_size.height * zoom);
+
             if (corner) {
                 img_off = {0, 0};
             }
             if (center) {
-                img_off = screen_size / 2 - ImVec2(tile_width / 2, tile_height / 2) * zoom;
+                img_off = canvas_size / 2 - img_size / 2;
                 img_off.x = floor(img_off.x);
-                img_off.y = floor(img_off.y);
+                img_off.y = floor(img_off.y); // TODO: is flooring correct?
             }
 
-            const ImVec2 img_pos = screen_pos + img_off;
-            img.update(runner.tile());
-            drawlist.AddImage(img.texture(), img_pos, img_pos + ImVec2(img.width(), img.height()) * zoom);
-            // Experimental: select:
-            // TODO: this shall belong to the runner.
-            static ImVec2 select_0{}, select_1{}; // tile index, not pixel.
-            // TODO: shaky...
-            // TODO: show selected size...
+            const ImVec2 img_pos = canvas_pos + img_off;
+
+            ImDrawList& drawlist = *ImGui::GetWindowDrawList();
+            drawlist.PushClipRect(canvas_pos, canvas_pos + canvas_size);
+            drawlist.AddRectFilled(canvas_pos, canvas_pos + canvas_size, IM_COL32(20, 20, 20, 255));
+            drawlist.AddImage(img.update(runner.tile()), img_pos, img_pos + img_size);
+
+            // TODO: shaky... this shall belong to the runner.
             // TODO: ctrl to move selected area?
+            static legacy::posT select_0{}, select_1{}; // cell index, not pixel.
             struct sel_info {
                 int x1, y1; // [
                 int x2, y2; // )
 
                 int width() const { return x2 - x1; }
                 int height() const { return y2 - y1; }
-                ImVec2 min() const { return ImVec2(x1, y1); }
-                ImVec2 max() const { return ImVec2(x2, y2); }
                 explicit operator bool() const { return width() > 1 || height() > 1; }
             };
             const auto get_select = []() -> sel_info {
@@ -860,13 +884,21 @@ int main(int argc, char** argv) {
                 }
                 return {x1, y1, x2 + 1, y2 + 1};
             };
-            // TODO: whether to limit this way? (maybe better to check click pos instead...)
+
+            if (select_all) {
+                select_0 = {0, 0};
+                select_1 = {.x = tile_size.width - 1, .y = tile_size.height - 1};
+            }
+            if (select_clear) {
+                select_0 = select_1 = {0, 0};
+            }
             if (sel_info sel = get_select()) {
-                drawlist.AddRectFilled(img_pos + sel.min() * zoom, img_pos + sel.max() * zoom, IM_COL32(0, 255, 0, 60));
+                drawlist.AddRectFilled(img_pos + ImVec2(sel.x1, sel.y1) * zoom, img_pos + ImVec2(sel.x2, sel.y2) * zoom,
+                                       IM_COL32(0, 255, 0, 60));
             }
             drawlist.PopClipRect();
 
-            ImGui::InvisibleButton("Canvas", screen_size);
+            ImGui::InvisibleButton("Canvas", canvas_size);
             const bool active = ImGui::IsItemActive();
             ctrl.pause2 = active;
             if (ImGui::IsItemHovered()) {
@@ -876,24 +908,24 @@ int main(int argc, char** argv) {
                 // It turned out that, this will work well even if outside of the image...
                 const ImVec2 mouse_pos = io.MousePos;
                 if (active) {
-                    // TODO: whether to support shifting at all?
                     if (!io.KeyCtrl) {
                         img_off += io.MouseDelta;
                     } else {
                         // TODO: this approach is highly imprecise when zoom != 1, but does this matter?
+                        // TODO: whether to support shifting at all?
                         runner.shift(io.MouseDelta.x / zoom, io.MouseDelta.y / zoom);
                     }
                 }
                 // TODO: rename to mouseXXX...
                 if (imgui_scrolling()) {
-                    ImVec2 cellidx = (mouse_pos - img_pos) / zoom;
-                    if (imgui_scrolldown() && zoom != 1) { // TODO: 0.5?
+                    const ImVec2 cellidx = (mouse_pos - img_pos) / zoom;
+                    if (imgui_scrolldown() && zoom != 1) {
                         zoom /= 2;
                     }
                     if (imgui_scrollup() && zoom != 8) {
                         zoom *= 2;
                     }
-                    img_off = (mouse_pos - cellidx * zoom) - screen_pos;
+                    img_off = (mouse_pos - cellidx * zoom) - canvas_pos;
                     img_off.x = round(img_off.x);
                     img_off.y = round(img_off.y); // TODO: is rounding correct?
                 }
@@ -906,17 +938,15 @@ int main(int argc, char** argv) {
                     int celx = floor((mouse_pos.x - img_pos.x) / zoom);
                     int cely = floor((mouse_pos.y - img_pos.y) / zoom);
 
-                    celx = std::clamp(celx, 0, tile_width - 1);
-                    cely = std::clamp(cely, 0, tile_height - 1);
-                    select_0 = ImVec2(celx, cely);
+                    select_0.x = std::clamp(celx, 0, tile_size.width - 1);
+                    select_0.y = std::clamp(cely, 0, tile_size.height - 1);
                 }
                 if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
                     int celx = floor((mouse_pos.x - img_pos.x) / zoom);
                     int cely = floor((mouse_pos.y - img_pos.y) / zoom);
 
-                    celx = std::clamp(celx, 0, tile_width - 1);
-                    cely = std::clamp(cely, 0, tile_height - 1);
-                    select_1 = ImVec2(celx, cely);
+                    select_1.x = std::clamp(celx, 0, tile_size.width - 1);
+                    select_1.y = std::clamp(cely, 0, tile_size.height - 1);
                 }
             }
             if (sel_info sel = get_select()) {
@@ -989,6 +1019,7 @@ int main(int argc, char** argv) {
             // ImGui::SameLine();
             ImGui::Checkbox("Nav window", &show_nav_window);
             ImGui::SameLine();
+            // TODO: change color when is too fps is too low...
             ImGui::Text("   (%.1f FPS) Frame:%d\n", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
 
             show_target_rule(ctrl.rule, recorder);
@@ -1126,7 +1157,7 @@ int main(int argc, char** argv) {
         if (restart) {
             runner.restart(filler);
         }
-        ctrl.run(runner, extra);
+        ctrl.run(runner, extra); // TODO: able to result in low fps...
     }
 
     app_backend::clear();
