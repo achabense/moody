@@ -2,17 +2,19 @@
 
 #include "app2.hpp"
 #include "app_sdl.hpp"
-#include "imgui_internal.h" // TODO: for `RenderNavHighlight`
+#include "imgui_internal.h" // TODO: only for `RenderNavHighlight`
 
 #include "rule_pp.hpp"
 
 namespace legacy {
+    // TODO: other actions... (lr/ud/diag/counter-diag/...)
+
     // TODO: move elsewhere
     // TODO: proper name...
     inline ruleT mirror(const ruleT& rule) {
         ruleT mir{};
         for_each_code(code) {
-            codeT codex = flip_all(code);
+            const codeT codex = flip_all(code);
             const bool flip = decode_s(codex) != rule(codex);
             mir.set(code, flip ? !decode_s(code) : decode_s(code));
         }
@@ -233,7 +235,7 @@ namespace legacy {
 } // namespace legacy
 
 void show_target_rule(const legacy::ruleT& target, rule_recorder& recorder) {
-    std::string rule_str = to_MAP_str(target);
+    const std::string rule_str = to_MAP_str(target);
 
     ImGui::AlignTextToFramePadding();
     imgui_str("[Current rule]");
@@ -373,8 +375,9 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         }
 
         // TODO: redesign...
-        const auto iter_pair = [](const char* tag_first, const char* tag_prev, const char* tag_next,
-                                  const char* tag_last, auto act_first, auto act_prev, auto act_next, auto act_last) {
+        // TODO: for lambdas, which is better? auto or const auto?
+        auto iter_pair = [](const char* tag_first, const char* tag_prev, const char* tag_next, const char* tag_last,
+                            auto act_first, auto act_prev, auto act_next, auto act_last) {
             if (ImGui::Button(tag_first)) {
                 act_first();
             }
@@ -549,7 +552,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
 
 // TODO: refine...
 // TODO: able to create/append/open file?
-class file_navT {
+class file_nav {
     using path = std::filesystem::path;
     using clock = std::chrono::steady_clock;
 
@@ -614,11 +617,9 @@ public:
             return std::nullopt;
         }
 
-        using namespace std;
-        using namespace std::filesystem;
-        optional<path> target = nullopt;
+        std::optional<path> target = std::nullopt;
 
-        imgui_strwrapped(cpp17_u8string(current_path()));
+        imgui_strwrapped(cpp17_u8string(std::filesystem::current_path()));
         ImGui::Separator();
 
         if (ImGui::BeginTable("##Table", 2, ImGuiTableFlags_Resizable)) {
@@ -772,7 +773,7 @@ int main(int argc, char** argv) {
         .rule = recorder.current(), .pergen = 1, .anti_flick = true, .start_from = 0, .gap_frame = 0, .pause = false};
 
     bool show_nav_window = true;
-    file_navT nav;
+    file_nav nav;
 
     tile_image img;
     code_image icons;
@@ -794,7 +795,7 @@ int main(int argc, char** argv) {
             }
         }
 
-        const auto show_tile = [&] {
+        auto show_tile = [&] {
             // TODO: move elsewhere in the gui?
             ImGui::Text("Width:%d,Height:%d,Gen:%d,Density:%.4f", runner.tile().width(), runner.tile().height(),
                         runner.gen(), float(legacy::count(runner.tile())) / runner.tile().area());
@@ -819,7 +820,13 @@ int main(int argc, char** argv) {
             static legacy::posT paste_pos{0, 0};
             ImGui::SameLine(), imgui_str("|");
             ImGui::SameLine();
+            if (!paste) {
+                ImGui::BeginDisabled();
+            }
             const bool drop_paste = ImGui::Button("Drop paste");
+            if (!paste) {
+                ImGui::EndDisabled();
+            }
 
             const ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
             const ImVec2 canvas_size = ImGui::GetContentRegionAvail();
@@ -880,7 +887,7 @@ int main(int argc, char** argv) {
                 int height() const { return y2 - y1; }
                 explicit operator bool() const { return width() > 1 || height() > 1; }
             };
-            const auto get_select = []() -> sel_info {
+            auto get_select = []() -> sel_info {
                 // TODO: rephrase...
                 // select_0/1 denotes []; convert to [):
                 int x1 = select_0.x, x2 = select_1.x;
@@ -992,6 +999,20 @@ int main(int argc, char** argv) {
                     }
                 }
             }
+
+            // TODO: (temp) shouldn't be scoped in sel block...
+            if (imgui_keypressed(ImGuiKey_V, false)) {
+                if (const char* text = ImGui::GetClipboardText()) {
+                    paste.emplace(legacy::rectT{2, 2});
+                    legacy::from_rle_str(*paste, text);
+                    paste_texture = paste_img.update(*paste);
+
+                    // TODO: otherwise, alpha doesn't work...
+                    // (solved by referring to ImGui_ImplSDLRenderer2_CreateFontsTexture...)
+                    // Ehh... TODO: this reinterpret_cast looks stupid...
+                    SDL_SetTextureBlendMode(reinterpret_cast<SDL_Texture*>(paste_texture), SDL_BLENDMODE_BLEND);
+                }
+            }
             if (sel_info sel = get_select()) {
                 if (imgui_keypressed(ImGuiKey_C, false) || imgui_keypressed(ImGuiKey_X, false)) {
                     legacy::tileT t({.width = sel.width(), .height = sel.height()});
@@ -1000,18 +1021,6 @@ int main(int argc, char** argv) {
                     //                               legacy::to_MAP_str(ctrl.rule), legacy::to_rle_str(t));
                     // ImGui::SetClipboardText(str.c_str());
                     ImGui::SetClipboardText(legacy::to_rle_str(t).c_str()); // TODO: Temp...
-                }
-                if (imgui_keypressed(ImGuiKey_V, false)) {
-                    if (const char* text = ImGui::GetClipboardText()) {
-                        paste.emplace(legacy::rectT{2, 2});
-                        legacy::from_rle_str(*paste, text);
-                        paste_texture = paste_img.update(*paste);
-
-                        // TODO: otherwise, alpha doesn't work...
-                        // (solved by referring to ImGui_ImplSDLRenderer2_CreateFontsTexture...)
-                        // Ehh... TODO: this reinterpret_cast looks stupid...
-                        SDL_SetTextureBlendMode(reinterpret_cast<SDL_Texture*>(paste_texture), SDL_BLENDMODE_BLEND);
-                    }
                 }
                 // TODO: rand-mode (whether reproducible...)
                 // TODO: clear mode (random/all-0,all-1/paste...) / (clear inner/outer)
@@ -1027,6 +1036,7 @@ int main(int argc, char** argv) {
                 }
                 if (imgui_keypressed(ImGuiKey_Equal, false)) {
                     legacy::tileT& tile = const_cast<legacy::tileT&>(runner.tile());
+                    // TODO: use tile_filler...
                     constexpr uint32_t c = std::mt19937::max() * 0.5;
                     for (int y = sel.y1; y < sel.y2; ++y) {
                         for (int x = sel.x1; x < sel.x2; ++x) {
@@ -1101,15 +1111,16 @@ int main(int argc, char** argv) {
                         // ↓ TODO: imgui_repeatbutton?
                         ImGui::PushButtonRepeat(true);
                         // TODO: should allow keyboard control...
+
+                        // TODO: visual feedback...
                         if (ImGui::Button("+1")) {
                             extra = 1;
-                            // logger::log_temp(200ms, "+1"); // TODO: useful?
                         }
                         ImGui::SameLine();
                         // TODO: is this usage of ### correct?
+                        // (Correct, but usage of format might be a bad idea here...)
                         if (ImGui::Button(std::format("+p({})###+p", ctrl.actual_pergen()).c_str())) {
                             extra = ctrl.actual_pergen();
-                            // logger::log_temp(200ms, "+p({})", ctrl.actual_pergen());
                         }
                         ImGui::PopButtonRepeat();
                         ImGui::SameLine();
@@ -1118,11 +1129,12 @@ int main(int argc, char** argv) {
                         }
 
                         // TODO: Gap-frame shall be really timer-based...
-                        ImGui::SliderInt("Gap Frame [0-20]", &ctrl.gap_frame, ctrl.gap_min, ctrl.gap_max, "%d",
+                        ImGui::SliderInt("Gap Frame (0~20)", &ctrl.gap_frame, ctrl.gap_min, ctrl.gap_max, "%d",
                                          ImGuiSliderFlags_NoInput);
-                        ImGui::SliderInt("Start gen [0-1000]", &ctrl.start_from, ctrl.start_min, ctrl.start_max, "%d",
+                        ImGui::SliderInt("Start gen (0~1000)", &ctrl.start_from, ctrl.start_min, ctrl.start_max, "%d",
                                          ImGuiSliderFlags_NoInput);
-                        ImGui::SliderInt("Pergen [1-20]", &ctrl.pergen, ctrl.pergen_min, ctrl.pergen_max, "%d",
+                        // TODO: better name? pace?
+                        ImGui::SliderInt("Pergen (1~20)", &ctrl.pergen, ctrl.pergen_min, ctrl.pergen_max, "%d",
                                          ImGuiSliderFlags_NoInput);
                         ImGui::AlignTextToFramePadding();
                         ImGui::Text("(Actual pergen: %d)", ctrl.actual_pergen());
@@ -1147,8 +1159,8 @@ int main(int argc, char** argv) {
                         // TODO: want resetting only when +/-/enter...
                         int seed = filler.seed;
                         // TODO: same as "rule_editor"'s... but don't want to affect Label...
-                        if (ImGui::InputInt("Seed", &seed)) {
-                            seed = std::clamp(seed, 0, 9999);
+                        if (ImGui::InputInt("Seed (0~99)", &seed)) {
+                            seed = std::clamp(seed, 0, 99);
                             if (seed != filler.seed) {
                                 filler.seed = seed;
                                 restart = true;
@@ -1159,7 +1171,7 @@ int main(int argc, char** argv) {
                         }
 
                         // TODO: integer(ratio) density?
-                        if (ImGui::SliderFloat("Init density [0-1]", &filler.density, 0.0f, 1.0f, "%.3f",
+                        if (ImGui::SliderFloat("Init density (0~1)", &filler.density, 0.0f, 1.0f, "%.3f",
                                                ImGuiSliderFlags_NoInput)) {
                             restart = true;
                         }
@@ -1167,7 +1179,6 @@ int main(int argc, char** argv) {
                     ImGui::EndGroup();
                     ImGui::PopItemWidth();
 
-                    // TODO: shall redesign...
                     // TODO: enable/disable keyboard ctrl (enable by default)
                     // TODO: redesign keyboard ctrl...
                     if (imgui_keypressed(ImGuiKey_1, true)) {
@@ -1182,8 +1193,9 @@ int main(int argc, char** argv) {
                     if (imgui_keypressed(ImGuiKey_4, true)) {
                         ctrl.pergen = std::min(ctrl.pergen_max, ctrl.pergen + 1);
                     }
-                    // TODO: want to allow setting hard pausing when dragging (soft locking)...
-                    if (imgui_keypressed(ImGuiKey_Space, true)) {
+                    // TODO: explain... apply to other ctrls?
+                    if ((ctrl.pause2 || !ImGui::GetIO().WantCaptureKeyboard) &&
+                        ImGui::IsKeyPressed(ImGuiKey_Space, false)) {
                         ctrl.pause = !ctrl.pause;
                     }
                     // TODO: temp (this function turns out to be necessary...)

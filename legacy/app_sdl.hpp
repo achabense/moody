@@ -26,11 +26,6 @@
 #include "rule.hpp"
 #include "tile.hpp"
 
-// TODO: remove; (imgui_impl_sdlrenderer2.cpp has exactly the same assertion)
-// #if !SDL_VERSION_ATLEAST(2, 0, 17)
-// #error This backend requires SDL 2.0.17+ because of SDL_RenderGeometry() function
-// #endif
-
 // Unfortunately, SDL2-renderer backend doesn't support docking features...
 // https://github.com/ocornut/imgui/issues/5835
 
@@ -121,6 +116,7 @@ public:
         return true;
     }
 
+    // TODO: rename...
     static void render() {
         assert(window && renderer);
 

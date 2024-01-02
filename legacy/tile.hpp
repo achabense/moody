@@ -15,6 +15,7 @@ namespace legacy {
         friend bool operator==(const rectT&, const rectT&) = default;
     };
 
+    // TODO: for posT/rectT, whether to pass by value or by reference?
     // TODO: better be long long...
     struct posT {
         int x, y;
@@ -29,6 +30,7 @@ namespace legacy {
 
     public:
         explicit tileT(rectT size) : m_size(size) {
+            // TODO: not suitable now... move to `apply`, or eliminate the constraint?
             assert(m_size.width > 1 && m_size.height > 1);
             m_data = new bool[(m_size.width + 2) * (m_size.height + 2)]{};
         }
@@ -351,7 +353,7 @@ namespace legacy {
         for (auto& line : lines) {
             max_width = std::max(max_width, (int)line.size());
         }
-        assert(lines.size() >= 1);
+        assert(!lines.empty());
         tile.resize({.width = max_width, .height = (int)lines.size()}); // TODO: reconsider tile's size constraints...
         for (int i = 0; i < lines.size(); ++i) {
             for (int j = 0; j < lines[i].size(); ++j) {

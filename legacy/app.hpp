@@ -80,7 +80,6 @@ public:
     // TODO: non-const overload?
     int gen() const { return m_gen; }
 
-    // (&&rectT) by value or by cref? (also in tileT)
     void restart(tileT_fill_arg filler, std::optional<legacy::rectT> resize = {}) {
         if (resize) {
             m_tile.resize(*resize);
