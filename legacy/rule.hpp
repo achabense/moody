@@ -41,6 +41,7 @@ namespace legacy {
         using map_to = std::array<T, 512>;
     };
 
+    // TODO: not safe: name is mutable inside the loop...
     // TODO: better name? for_each_situ?
     // ~ should be name.v < 512
     // This has been proven better than defining a bunch of code for range-for loop.

@@ -67,17 +67,12 @@ class torusT {
     legacy::tileT m_tile, m_side;
     int m_gen;
 
-    // TODO: proper name...
-    static int round_clip(int v, int r) {
-        assert(r > 0);
-        return ((v % r) + r) % r;
-    }
-
 public:
     explicit torusT(legacy::rectT size) : m_tile(size), m_side(size), m_gen(0) {}
 
+    // TODO: reconsider whether to expose non-const tile...
+    legacy::tileT& tile() { return m_tile; }
     const legacy::tileT& tile() const { return m_tile; }
-    // TODO: non-const overload?
     int gen() const { return m_gen; }
 
     void restart(tileT_fill_arg filler, std::optional<legacy::rectT> resize = {}) {
@@ -103,6 +98,8 @@ public:
     void shift(int dx, int dy) {
         const int width = m_tile.width(), height = m_tile.height();
 
+        // TODO: proper name...
+        const auto round_clip = [](int v, int r) { return ((v % r) + r) % r; };
         dx = round_clip(-dx, width);
         dy = round_clip(-dy, height);
         if (dx == 0 && dy == 0) {

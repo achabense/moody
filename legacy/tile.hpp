@@ -114,6 +114,8 @@ namespace legacy {
     public:
         // TODO: This could be used to support boundless space.
         // TODO: const or not?
+        // (The problem is that, t.gather(t,t,t,t,t,t,t,t) is intentionally a valid operation, so passing by const&
+        // seems an over-promise...)
         void gather( // clang-format off
             const tileT& q, const tileT& w, const tileT& e,
             const tileT& a, /*   *this   */ const tileT& d,

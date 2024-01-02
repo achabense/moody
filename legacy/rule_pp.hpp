@@ -497,6 +497,12 @@ namespace legacy {
     // Suppose that in a group, all locked mappings has the same result...
     // This can happen when the pattern is captured under a lower symmetry rule...
 
+    // TODO: find stone...
+
+    // TODO: the lockT will become meaningless on irrelevant rule switch (clipboard/file...)
+
+    // TODO: should (lr/up/)mirror conversions modify locks as well?
+
     inline bool any_locked(const lockT& locked, groupT group) {
         return std::any_of(group.begin(), group.end(), [&locked](codeT code) { return locked[code]; });
     }

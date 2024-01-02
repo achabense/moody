@@ -550,6 +550,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
     }
 }
 
+// TODO: move elsewhere...
 // TODO: refine...
 // TODO: able to create/append/open file?
 class file_nav {
@@ -682,9 +683,6 @@ public:
     }
 };
 
-// TODO: should enable guide-mode (with a switch...)
-// TODO: changes upon the same rule should be grouped together... how? (editor++)...
-// TODO: how to capture certain patterns? (editor++)...
 
 // TODO: reconsider: where should "current-rule" be located...
 struct runner_ctrl {
@@ -795,6 +793,7 @@ int main(int argc, char** argv) {
             }
         }
 
+        // TODO: support drawing?
         auto show_tile = [&] {
             // TODO: move elsewhere in the gui?
             ImGui::Text("Width:%d,Height:%d,Gen:%d,Density:%.4f", runner.tile().width(), runner.tile().height(),
@@ -991,8 +990,7 @@ int main(int argc, char** argv) {
                     paste_pos.y = std::clamp(cely, 0, tile_size.height - paste->height());
 
                     if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-                        legacy::tileT& tile = const_cast<legacy::tileT&>(runner.tile());
-                        legacy::copy<legacy::copyE::Or>(*paste, 0, 0, paste->width(), paste->height(), tile,
+                        legacy::copy<legacy::copyE::Or>(*paste, 0, 0, paste->width(), paste->height(), runner.tile(),
                                                         paste_pos.x, paste_pos.y);
 
                         paste.reset();
@@ -1027,7 +1025,7 @@ int main(int argc, char** argv) {
                 // TODO: horrible; redesign (including control) ...
                 // TODO: 0/1/other textures are subject to agar settings...
                 if (imgui_keypressed(ImGuiKey_Backspace, false) || imgui_keypressed(ImGuiKey_X, false)) {
-                    legacy::tileT& tile = const_cast<legacy::tileT&>(runner.tile());
+                    legacy::tileT& tile = runner.tile();
                     for (int y = sel.y1; y < sel.y2; ++y) {
                         for (int x = sel.x1; x < sel.x2; ++x) {
                             tile.line(y)[x] = 0;
@@ -1035,7 +1033,7 @@ int main(int argc, char** argv) {
                     }
                 }
                 if (imgui_keypressed(ImGuiKey_Equal, false)) {
-                    legacy::tileT& tile = const_cast<legacy::tileT&>(runner.tile());
+                    legacy::tileT& tile = runner.tile();
                     // TODO: use tile_filler...
                     constexpr uint32_t c = std::mt19937::max() * 0.5;
                     for (int y = sel.y1; y < sel.y2; ++y) {
@@ -1046,14 +1044,10 @@ int main(int argc, char** argv) {
                 }
                 // TODO: refine capturing...
                 if (imgui_keypressed(ImGuiKey_P, false)) {
-                    // TODO: padding area...
+                    // TODO: support specifying padding area...
                     const legacy::rectT size = {.width = sel.width(), .height = sel.height()};
                     legacy::tileT cap(size), cap2(size);
-                    for (int y = sel.y1; y < sel.y2; ++y) {
-                        for (int x = sel.x1; x < sel.x2; ++x) {
-                            cap.line(y - sel.y1)[x - sel.x1] = runner.tile().line(y)[x];
-                        }
-                    }
+                    legacy::copy(runner.tile(), sel.x1, sel.y1, sel.width(), sel.height(), cap, 0, 0);
                     legacy::lockT locked{};
                     auto rulx = [&](legacy::codeT code) {
                         locked[code] = true;
