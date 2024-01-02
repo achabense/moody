@@ -812,6 +812,15 @@ int main(int argc, char** argv) {
             const bool select_clear = ImGui::Button("Clear selection");
             // TODO: input size...
 
+            // TODO: move elsewhere
+            static std::optional<legacy::tileT> paste;
+            static tile_image paste_img;
+            static ImTextureID paste_texture;
+            static legacy::posT paste_pos{0, 0};
+            ImGui::SameLine(), imgui_str("|");
+            ImGui::SameLine();
+            const bool drop_paste = ImGui::Button("Drop paste");
+
             const ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
             const ImVec2 canvas_size = ImGui::GetContentRegionAvail();
 
@@ -892,6 +901,25 @@ int main(int argc, char** argv) {
             if (select_clear) {
                 select_0 = select_1 = {0, 0};
             }
+            if (drop_paste) {
+                paste.reset();
+            }
+            if (paste && (paste->width() > tile_size.width || paste->height() > tile_size.height)) {
+                paste.reset();
+            }
+            if (paste) {
+                ctrl.pause2 = true;
+                paste_pos.x = std::clamp(paste_pos.x, 0, tile_size.width - paste->width());
+                paste_pos.y = std::clamp(paste_pos.y, 0, tile_size.height - paste->height());
+
+                drawlist.AddImage(paste_texture, img_pos + ImVec2(paste_pos.x, paste_pos.y) * zoom,
+                                  img_pos + ImVec2(paste_pos.x + paste->width(), paste_pos.y + paste->height()) * zoom,
+                                  {0, 0}, {1, 1}, IM_COL32(255, 255, 255, 120));
+                drawlist.AddRectFilled(img_pos + ImVec2(paste_pos.x, paste_pos.y) * zoom,
+                                       img_pos +
+                                           ImVec2(paste_pos.x + paste->width(), paste_pos.y + paste->height()) * zoom,
+                                       IM_COL32(255, 0, 0, 60));
+            }
             if (sel_info sel = get_select()) {
                 drawlist.AddRectFilled(img_pos + ImVec2(sel.x1, sel.y1) * zoom, img_pos + ImVec2(sel.x2, sel.y2) * zoom,
                                        IM_COL32(0, 255, 0, 60));
@@ -900,7 +928,7 @@ int main(int argc, char** argv) {
 
             ImGui::InvisibleButton("Canvas", canvas_size);
             const bool active = ImGui::IsItemActive();
-            ctrl.pause2 = active;
+            ctrl.pause2 = paste || active; // TODO: won't work if |= active... should ctrl.run clear pause2?
             if (ImGui::IsItemHovered()) {
                 const ImGuiIO& io = ImGui::GetIO();
 
@@ -948,21 +976,48 @@ int main(int argc, char** argv) {
                     select_1.x = std::clamp(celx, 0, tile_size.width - 1);
                     select_1.y = std::clamp(cely, 0, tile_size.height - 1);
                 }
+                if (paste) {
+                    int celx = floor((mouse_pos.x - img_pos.x) / zoom);
+                    int cely = floor((mouse_pos.y - img_pos.y) / zoom);
+
+                    paste_pos.x = std::clamp(celx, 0, tile_size.width - paste->width());
+                    paste_pos.y = std::clamp(cely, 0, tile_size.height - paste->height());
+
+                    if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                        legacy::tileT& tile = const_cast<legacy::tileT&>(runner.tile());
+                        legacy::copy<legacy::copyE::Or>(*paste, 0, 0, paste->width(), paste->height(), tile,
+                                                        paste_pos.x, paste_pos.y);
+
+                        paste.reset();
+                    }
+                }
             }
             if (sel_info sel = get_select()) {
-                // TODO: paste?
-                if (imgui_keypressed(ImGuiKey_C, false)) {
+                if (imgui_keypressed(ImGuiKey_C, false) || imgui_keypressed(ImGuiKey_X, false)) {
                     legacy::tileT t({.width = sel.width(), .height = sel.height()});
                     legacy::copy(runner.tile(), sel.x1, sel.y1, sel.width(), sel.height(), t, 0, 0);
-                    std::string str = std::format("x = {}, y = {}, rule = {}\n{}", t.width(), t.height(),
-                                                  legacy::to_MAP_str(ctrl.rule), legacy::to_rle_str(t));
-                    ImGui::SetClipboardText(str.c_str());
+                    // std::string str = std::format("x = {}, y = {}, rule = {}\n{}!", t.width(), t.height(),
+                    //                               legacy::to_MAP_str(ctrl.rule), legacy::to_rle_str(t));
+                    // ImGui::SetClipboardText(str.c_str());
+                    ImGui::SetClipboardText(legacy::to_rle_str(t).c_str()); // TODO: Temp...
+                }
+                if (imgui_keypressed(ImGuiKey_V, false)) {
+                    if (const char* text = ImGui::GetClipboardText()) {
+                        paste.emplace(legacy::rectT{2, 2});
+                        legacy::from_rle_str(*paste, text);
+                        paste_texture = paste_img.update(*paste);
+
+                        // TODO: otherwise, alpha doesn't work...
+                        // (solved by referring to ImGui_ImplSDLRenderer2_CreateFontsTexture...)
+                        // Ehh... TODO: this reinterpret_cast looks stupid...
+                        SDL_SetTextureBlendMode(reinterpret_cast<SDL_Texture*>(paste_texture), SDL_BLENDMODE_BLEND);
+                    }
                 }
                 // TODO: rand-mode (whether reproducible...)
                 // TODO: clear mode (random/all-0,all-1/paste...) / (clear inner/outer)
                 // TODO: horrible; redesign (including control) ...
                 // TODO: 0/1/other textures are subject to agar settings...
-                if (imgui_keypressed(ImGuiKey_Backspace, false)) {
+                if (imgui_keypressed(ImGuiKey_Backspace, false) || imgui_keypressed(ImGuiKey_X, false)) {
                     legacy::tileT& tile = const_cast<legacy::tileT&>(runner.tile());
                     for (int y = sel.y1; y < sel.y2; ++y) {
                         for (int x = sel.x1; x < sel.x2; ++x) {

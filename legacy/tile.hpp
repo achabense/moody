@@ -1,5 +1,6 @@
 #pragma once
 
+#include <charconv>
 #include <span>
 
 #include "rule.hpp"
@@ -304,29 +305,58 @@ namespace legacy {
         return str;
     }
 
-#if 1
-    inline void mktile(tileT& tile, const char* str) {
+    // TODO: will result in an extra line...
+    // TODO: not robust...
+    inline void from_rle_str(tileT& tile, const char* str) {
+        // TODO: whitespace...
+        auto take = [&str, end = str + strlen(str)]() -> std::pair<int, char> {
+            int n = 1;
+            if (*str >= '0' && *str <= '9') {
+                auto [ptr, ec] = std::from_chars(str, end, n);
+                if (ec == std::errc{}) {
+                    str = ptr;
+                }
+            }
+            switch (*str++) {
+            case 'b': return {n, 'b'};
+            case 'o': return {n, 'o'};
+            case '$': return {n, '$'};
+            default: return {n, '!'};
+            }
+        };
+
         std::vector<std::vector<bool>> lines;
         lines.emplace_back();
-        while (*str) {
-            if (*str == '\n') {
-                lines.emplace_back();
-            } else {
-                lines.back().push_back(*str == '.' ? false : true);
+        for (;;) {
+            auto [n, c] = take();
+            if (c == '!') {
+                break;
             }
-            ++str;
+            switch (c) {
+            case 'b':
+            case 'o':
+                for (int i = 0; i < n; ++i) {
+                    lines.back().push_back(c == 'o');
+                }
+                break;
+            case '$':
+                for (int i = 0; i < n; ++i) {
+                    lines.emplace_back();
+                }
+                break;
+            }
         }
+
         int max_width = 1;
         for (auto& line : lines) {
             max_width = std::max(max_width, (int)line.size());
         }
-        tile.resize({.width = max_width, .height = (int)lines.size()});
+        assert(lines.size() >= 1);
+        tile.resize({.width = max_width, .height = (int)lines.size()}); // TODO: reconsider tile's size constraints...
         for (int i = 0; i < lines.size(); ++i) {
             for (int j = 0; j < lines[i].size(); ++j) {
                 tile.line(i)[j] = lines[i][j];
             }
         }
     }
-#endif
-
 } // namespace legacy
