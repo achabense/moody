@@ -175,7 +175,7 @@ namespace legacy {
                 }
 
                 ImGui::PushID(id++);
-                bool hit = ImGui::InvisibleButton("Check", ImVec2{r, r});
+                const bool hit = ImGui::InvisibleButton("Check", ImVec2{r, r});
                 // TODO: this is in imgui_internal.h...
                 // TODO: Ask is it intentional to make InvisibleButton highlight-less?
                 // TODO: use normal buttons instead?
@@ -289,8 +289,113 @@ void show_target_rule(const legacy::ruleT& target, rule_recorder& recorder) {
 // TODO: too shaky...
 std::optional<legacy::lockT> temp_lock{};
 
+// TODO: rename; redesign...
+void stone_constraints(rule_recorder& recorder) {
+    enum stateE { Any, F, T };
+    const int r = 9;
+    static stateE board[r][r]{/*Any...*/};
+
+    // modified from partition_collection check button
+    auto check = [id = 0, r = ImGui::GetFrameHeight()](stateE& state, bool enable) mutable {
+        const ImVec2 pos = ImGui::GetCursorScreenPos();
+        const ImVec2 pos_max = pos + ImVec2{r, r};
+
+        ImGui::GetWindowDrawList()->AddRectFilled(
+            pos, pos_max,
+            state == Any ? (enable ? IM_COL32(100, 100, 100, 255) : IM_COL32(80, 80, 80, 255))
+            : state == T ? IM_COL32(255, 255, 255, 255)
+                         : IM_COL32(0, 0, 0, 255));
+        ImGui::GetWindowDrawList()->AddRect(pos, pos_max, IM_COL32(200, 200, 200, 255));
+
+        ImGui::PushID(id++);
+        ImGui::InvisibleButton("Button", ImVec2{r, r});
+        if (enable && ImGui::IsItemHovered() && imgui_scrolling()) {
+            if (imgui_scrollup()) {
+                switch (state) {
+                case Any: state = F; break;
+                case F: state = T; break;
+                }
+            } else {
+                switch (state) {
+                case T: state = F; break;
+                case F: state = Any; break;
+                }
+            }
+        }
+        ImGui::PopID();
+    };
+
+    if (auto window = imgui_window("Constraints", ImGuiWindowFlags_AlwaysAutoResize)) {
+        const bool hit = ImGui::Button("Done");
+        ImGui::SameLine();
+        if (ImGui::Button("Clear")) {
+            for (auto& l : board) {
+                for (auto& s : l) {
+                    s = {};
+                }
+            }
+        }
+
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {0, 0});
+        for (int y = 0; y < r; ++y) {
+            bool f = true;
+            for (int x = 0; x < r; ++x) {
+                if (!f) {
+                    ImGui::SameLine();
+                }
+                f = false;
+                check(board[y][x], y >= 1 && y < r - 1 && x >= 1 && x < r - 1);
+            }
+        }
+        ImGui::PopStyleVar();
+
+        if (hit) {
+            legacy::ruleT rule{};
+            legacy::lockT locked{};
+            for (int y = 1; y < r - 1; ++y) {
+                for (int x = 1; x < r - 1; ++x) {
+                    if (board[y][x] == Any) {
+                        continue;
+                    }
+
+                    for_each_code(code) {
+                        // Eh, took a while to find the [...,x,...] error...
+                        auto [q, w, e, a, s, d, z, X, c] = decode(code);
+                        auto imbue = [](bool& b, stateE state) {
+                            if (state == F) {
+                                b = 0;
+                            }
+                            if (state == T) {
+                                b = 1;
+                            }
+                        };
+
+                        imbue(q, board[y - 1][x - 1]);
+                        imbue(w, board[y - 1][x]);
+                        imbue(e, board[y - 1][x + 1]);
+
+                        imbue(a, board[y][x - 1]);
+                        imbue(s, board[y][x]);
+                        imbue(d, board[y][x + 1]);
+
+                        imbue(z, board[y + 1][x - 1]);
+                        imbue(X, board[y + 1][x]);
+                        imbue(c, board[y + 1][x + 1]);
+                        rule.set(legacy::encode(q, w, e, a, s, d, z, X, c), board[y][x] == F ? 0 : 1);
+                        locked[legacy::encode(q, w, e, a, s, d, z, X, c)] = true;
+                    }
+                }
+            }
+            recorder.take(rule);
+            temp_lock = locked; // TODO: refactor...
+        }
+    }
+}
+
 // TODO: should be a class... how to decouple? ...
 void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_recorder& recorder) {
+    stone_constraints(recorder); // TODO: temp...
+
     static legacy::interT inter = {};
     {
         int itag = inter.tag;
@@ -453,6 +558,10 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         if (ImGui::Button("Clear locks")) {
             locked = {};
         }
+        ImGui::SameLine();
+        if (ImGui::Button("Purify")) {
+            recorder.take(legacy::purify(inter, part, target, locked));
+        }
     }
 
     {
@@ -492,6 +601,8 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                 ImGui::SameLine();
                 ImGui::AlignTextToFramePadding();
                 imgui_str(strs[drule[head]]);
+                // (wontfix) The vertical alignment is imprecise here. For precise alignment see:
+                // https://github.com/ocornut/imgui/issues/2064
 
                 if (has_lock) {
                     // TODO: -> widget func... (addborder)
@@ -508,10 +619,19 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                         locked[code] = !has_lock; // TODO: not reversible; is this ok?
                     }
                 }
-                static bool show_group = true;
+#if 0
+                // TODO: conflicts with window scrolling...
+                // TODO: e.g. down->0, up->1
+                if (button_hover && imgui_scrolling()) {
+                    legacy::ruleT r = target;
+                    legacy::flip(group, r);
+                    recorder.replace_current(r);
+                }
+#endif
                 ImGui::SameLine();
                 imgui_strdisabled("?");
                 if (ImGui::IsItemHovered()) {
+                    static bool show_group = true;
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
                         show_group = !show_group;
                     }
@@ -521,7 +641,6 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                                 ImGui::SameLine();
                             }
                             // TODO: change color?
-                            // TODO: what is tint_col?
                             icons.image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
                             ImGui::SameLine();
                             ImGui::AlignTextToFramePadding();
@@ -682,7 +801,6 @@ public:
         return target;
     }
 };
-
 
 // TODO: reconsider: where should "current-rule" be located...
 struct runner_ctrl {

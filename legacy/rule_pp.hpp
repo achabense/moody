@@ -493,11 +493,27 @@ namespace legacy {
 
     using lockT = codeT::map_to<bool>;
 
-    // TODO: purify?
+    // TODO: rephrase...
     // Suppose that in a group, all locked mappings has the same result...
     // This can happen when the pattern is captured under a lower symmetry rule...
-
-    // TODO: find stone...
+    // TODO: !! still under-specified... refine concept...
+    inline ruleT purify(const interT& inter, const partitionT& par, const ruleT& rule, lockT& locked) {
+        // TODO: for locked code A and B, what if r[A] != r[B]?
+        legacy::ruleT_data r = inter.from_rule(rule);
+        for (int j = 0; j < par.k(); ++j) {
+            const groupT group = par.jth_group(j);
+            const auto fnd =
+                std::find_if(group.begin(), group.end(), [&locked](legacy::codeT code) { return locked[code]; });
+            if (fnd != group.end()) {
+                const bool b = r[*fnd];
+                for (auto code : group) {
+                    r[code] = b;
+                    locked[code] = true;
+                }
+            }
+        }
+        return inter.to_rule(r);
+    }
 
     // TODO: the lockT will become meaningless on irrelevant rule switch (clipboard/file...)
 
