@@ -571,9 +571,30 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         const auto strs = strss[inter.tag];
 
         const legacy::ruleT_data drule = inter.from_rule(target);
-        const legacy::scanlistT scans(part, drule);
-        ImGui::Text("Groups:%d [%c:%d] [%c:%d] [%c:%d]", k, strs[0][1], scans.count(scans.A0), strs[1][1],
-                    scans.count(scans.A1), strs[2][1], scans.count(scans.Inconsistent));
+        const auto scanlist = legacy::scan(part, drule, locked);
+        {
+            // TODO: add more statistics... e.g. full vs partial lock...
+            const int c_group = k;
+            int c_locked = 0;
+            int c_0 = 0, c_1 = 0;
+            int c_inconsistent = 0;
+            for (const auto& scan : scanlist) {
+                if (scan.any_locked()) {
+                    ++c_locked;
+                }
+                if (scan.all_0()) {
+                    ++c_0;
+                }
+                if (scan.all_1()) {
+                    ++c_1;
+                }
+                if (scan.inconsistent()) {
+                    ++c_inconsistent;
+                }
+            }
+            ImGui::Text("Groups:%d (Locked:%d) [%c:%d] [%c:%d] [%c:%d]", c_group, c_locked, strs[0][1], c_0, strs[1][1],
+                        c_1, strs[2][1], c_inconsistent);
+        }
 
         const int zoom = 7;
         if (auto child = imgui_childwindow("Details")) {
@@ -586,7 +607,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                 if (j != 0 && j % 64 == 0) {
                     ImGui::Separator(); // TODO: refine...
                 }
-                const bool inconsistent = scans[j] == scans.Inconsistent;
+                const bool inconsistent = scanlist[j].inconsistent();
                 const auto& group = part.jth_group(j);
                 const legacy::codeT head = group[0];
                 const bool has_lock = legacy::any_locked(locked, group);

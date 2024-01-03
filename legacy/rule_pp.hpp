@@ -439,44 +439,6 @@ namespace legacy {
         return q.test(inter.from_rule(rule));
     }
 
-    class scanlistT {
-    public:
-        enum scanE : char { A0, A1, Inconsistent };
-
-    private:
-        // NOTICE: not a map-type. It's just that 512 will be always enough space.
-        // TODO: use vector instead?
-        std::array<scanE, 512> m_data;
-        int m_k;
-        int m_count[3];
-
-    public:
-        static scanE scan(groupT group, const ruleT_data& rule) {
-            bool has[2]{};
-            for (codeT code : group) {
-                if (has[!rule[code]]) {
-                    return Inconsistent;
-                }
-                has[rule[code]] = true;
-            }
-            return has[0] ? A0 : A1;
-        }
-
-        scanlistT(const partitionT& p, const ruleT_data& rule) : m_data{}, m_k{p.k()}, m_count{} {
-            for (int j = 0; j < m_k; ++j) {
-                m_data[j] = scan(p.jth_group(j), rule);
-                ++m_count[m_data[j]];
-            }
-        }
-
-        auto begin() const { return m_data.cbegin(); }
-        auto end() const { return m_data.cbegin() + m_k; }
-        const scanE& operator[](int j) const { return m_data[j]; }
-
-        int k() const { return m_k; }
-        int count(scanE s) const { return m_count[s]; }
-    };
-
     inline void flip(groupT group, ruleT& rule) {
         for (codeT c : group) {
             rule.set(c, !rule(c));
@@ -493,10 +455,37 @@ namespace legacy {
 
     using lockT = codeT::map_to<bool>;
 
+    auto scan(const partitionT& par, const ruleT_data& rule, const lockT& locked) {
+        struct counterT {
+            int free_0 = 0, free_1 = 0;
+            int locked_0 = 0, locked_1 = 0;
+
+            bool any_locked() const { return locked_0 || locked_1; }
+            bool none_locked() const { return !any_locked(); }
+            bool all_locked() const { return !free_0 && !free_1; }
+
+            bool all_0() const { return !free_1 && !locked_1; }
+            bool all_1() const { return !free_0 && !locked_0; }
+            bool inconsistent() const { return !all_0() && !all_1(); }
+        };
+
+        std::vector<counterT> vec(par.k());
+        for (int j = 0; j < par.k(); ++j) {
+            for (codeT code : par.jth_group(j)) {
+                if (locked[code]) {
+                    rule[code] ? ++vec[j].locked_1 : ++vec[j].locked_0;
+                } else {
+                    rule[code] ? ++vec[j].free_1 : ++vec[j].free_0;
+                }
+            }
+        }
+        return vec;
+    }
+
     // TODO: rephrase...
     // Suppose that in a group, all locked mappings has the same result...
     // This can happen when the pattern is captured under a lower symmetry rule...
-    // TODO: !! still under-specified... refine concept...
+    // TODO: purify based on scan results...
     inline ruleT purify(const interT& inter, const partitionT& par, const ruleT& rule, lockT& locked) {
         // TODO: for locked code A and B, what if r[A] != r[B]?
         legacy::ruleT_data r = inter.from_rule(rule);
@@ -508,7 +497,7 @@ namespace legacy {
                 const bool b = r[*fnd];
                 for (auto code : group) {
                     r[code] = b;
-                    locked[code] = true;
+                    locked[code] = true; // TODO: whether to enhance locks?
                 }
             }
         }
