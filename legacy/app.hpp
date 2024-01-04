@@ -157,8 +157,8 @@ public:
     void set_pos(int pos) { //
         m_pos = std::clamp(pos, 0, size() - 1);
     }
-    void next() { set_pos(m_pos + 1); }
-    void prev() { set_pos(m_pos - 1); }
+    void set_next() { set_pos(m_pos + 1); }
+    void set_prev() { set_pos(m_pos - 1); }
     void set_first() { set_pos(0); }
     void set_last() { set_pos(size() - 1); }
 

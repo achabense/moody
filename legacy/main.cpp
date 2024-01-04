@@ -6,6 +6,38 @@
 
 #include "rule_pp.hpp"
 
+// TODO: -> app2.hpp...
+// TODO: allow/disallow scrolling...
+inline void iter_pair(const char* tag_first, const char* tag_prev, const char* tag_next, const char* tag_last,
+                      auto act_first, auto act_prev, auto act_next, auto act_last) {
+    if (ImGui::Button(tag_first)) {
+        act_first();
+    }
+
+    ImGui::SameLine();
+    ImGui::BeginGroup();
+    if (ImGui::Button(tag_prev)) {
+        act_prev();
+    }
+    ImGui::SameLine(0, 2);
+    if (ImGui::Button(tag_next)) {
+        act_next();
+    }
+    ImGui::EndGroup();
+    if (ImGui::IsItemHovered()) {
+        if (imgui_scrollup()) {
+            act_prev();
+        } else if (imgui_scrolldown()) {
+            act_next();
+        }
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button(tag_last)) {
+        act_last();
+    }
+};
+
 namespace legacy {
     // TODO: other actions... (lr/ud/diag/counter-diag/...)
 
@@ -291,7 +323,7 @@ std::optional<legacy::lockT> temp_lock{};
 
 // TODO: rename; redesign...
 void stone_constraints(rule_recorder& recorder) {
-    enum stateE { Any, F, T };
+    enum stateE { Any, F, T, F_Cond, T_Cond }; // TODO: rename; explain
     const int r = 9;
     static stateE board[r][r]{/*Any...*/};
 
@@ -299,26 +331,31 @@ void stone_constraints(rule_recorder& recorder) {
     auto check = [id = 0, r = ImGui::GetFrameHeight()](stateE& state, bool enable) mutable {
         const ImVec2 pos = ImGui::GetCursorScreenPos();
         const ImVec2 pos_max = pos + ImVec2{r, r};
+        static const ImU32 cols[5]{IM_COL32(100, 100, 100, 255), //
+                                   IM_COL32(0, 0, 0, 255),       //
+                                   IM_COL32(255, 255, 255, 255), //
+                                   IM_COL32(80, 0, 80, 255),     //
+                                   IM_COL32(200, 0, 200, 255)};
 
-        ImGui::GetWindowDrawList()->AddRectFilled(
-            pos, pos_max,
-            state == Any ? (enable ? IM_COL32(100, 100, 100, 255) : IM_COL32(80, 80, 80, 255))
-            : state == T ? IM_COL32(255, 255, 255, 255)
-                         : IM_COL32(0, 0, 0, 255));
+        ImGui::GetWindowDrawList()->AddRectFilled(pos, pos_max, !enable ? IM_COL32(80, 80, 80, 255) : cols[state]);
         ImGui::GetWindowDrawList()->AddRect(pos, pos_max, IM_COL32(200, 200, 200, 255));
 
         ImGui::PushID(id++);
         ImGui::InvisibleButton("Button", ImVec2{r, r});
-        if (enable && ImGui::IsItemHovered() && imgui_scrolling()) {
+        if (enable && ImGui::IsItemHovered()) {
+            // TODO: the ctrl is awkward here...
             if (imgui_scrollup()) {
                 switch (state) {
                 case Any: state = F; break;
                 case F: state = T; break;
+                default: state = Any; break;
                 }
-            } else {
+            }
+            if (imgui_scrolldown()) {
                 switch (state) {
-                case T: state = F; break;
-                case F: state = Any; break;
+                case Any: state = F_Cond; break;
+                case F_Cond: state = T_Cond; break;
+                default: state = Any; break;
                 }
             }
         }
@@ -331,7 +368,7 @@ void stone_constraints(rule_recorder& recorder) {
         if (ImGui::Button("Clear")) {
             for (auto& l : board) {
                 for (auto& s : l) {
-                    s = {};
+                    s = Any;
                 }
             }
         }
@@ -354,7 +391,7 @@ void stone_constraints(rule_recorder& recorder) {
             legacy::lockT locked{};
             for (int y = 1; y < r - 1; ++y) {
                 for (int x = 1; x < r - 1; ++x) {
-                    if (board[y][x] == Any) {
+                    if (board[y][x] != F && board[y][x] != T) {
                         continue;
                     }
 
@@ -362,10 +399,10 @@ void stone_constraints(rule_recorder& recorder) {
                         // Eh, took a while to find the [...,x,...] error...
                         auto [q, w, e, a, s, d, z, X, c] = decode(code);
                         auto imbue = [](bool& b, stateE state) {
-                            if (state == F) {
+                            if (state == F || state == F_Cond) {
                                 b = 0;
                             }
-                            if (state == T) {
+                            if (state == T || state == T_Cond) {
                                 b = 1;
                             }
                         };
@@ -479,38 +516,6 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                                       global_mt19937)); // TODO: range...
         }
 
-        // TODO: redesign...
-        // TODO: for lambdas, which is better? auto or const auto?
-        auto iter_pair = [](const char* tag_first, const char* tag_prev, const char* tag_next, const char* tag_last,
-                            auto act_first, auto act_prev, auto act_next, auto act_last) {
-            if (ImGui::Button(tag_first)) {
-                act_first();
-            }
-
-            ImGui::SameLine();
-            ImGui::BeginGroup();
-            if (ImGui::Button(tag_prev)) {
-                act_prev();
-            }
-            ImGui::SameLine(0, 2);
-            if (ImGui::Button(tag_next)) {
-                act_next();
-            }
-            ImGui::EndGroup();
-            if (ImGui::IsItemHovered()) {
-                if (imgui_scrollup()) {
-                    act_prev();
-                } else if (imgui_scrolldown()) {
-                    act_next();
-                }
-            }
-
-            ImGui::SameLine();
-            if (ImGui::Button(tag_last)) {
-                act_last();
-            }
-        };
-
         ImGui::Separator();
         // TODO: +1 is clumsy
         ImGui::AlignTextToFramePadding();
@@ -518,7 +523,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         ImGui::SameLine();
         iter_pair(
             "<|", "prev", "next", "|>", //
-            [&] { recorder.set_first(); }, [&] { recorder.prev(); }, [&] { recorder.next(); },
+            [&] { recorder.set_first(); }, [&] { recorder.set_prev(); }, [&] { recorder.set_next(); },
             [&] { recorder.set_last(); });
         ImGui::Separator();
 
@@ -823,6 +828,97 @@ public:
     }
 };
 
+// TODO: "paste" should have a similar widget...
+class file_nav_with_recorder {
+    file_nav m_nav;
+    std::optional<std::filesystem::path> m_file;
+    rule_recorder m_recorder;
+
+public:
+
+    // draw() instead?
+    void window(const char* id_str, bool* p_open, rule_recorder& out) {
+        // TODO: refresh... / reset(clear)...
+        // TODO: set as current_path... ./ copy_path...
+        // TODO: notify that all the operations are [read-only...]
+        if (auto window = imgui_window(id_str, p_open)) {
+            if (!m_file) {
+                ImGui::BeginDisabled();
+            }
+            ImGui::BeginGroup();
+
+            if (m_file) {
+                assert(!m_recorder.empty());
+                imgui_str(cpp17_u8string(*m_file));
+            } else {
+                imgui_str("...");
+            }
+
+            // TODO: +1 is clumsy
+            ImGui::AlignTextToFramePadding();
+            imgui_str(std::format("Total:{} At:{}", m_recorder.size(), m_recorder.pos() + 1));
+            ImGui::SameLine();
+
+            bool hit = false;
+            iter_pair(
+                "<|", "prev", "next", "|>",
+                [&] {
+                    m_recorder.set_first();
+                    hit = true;
+                },
+                [&] {
+                    m_recorder.set_prev();
+                    hit = true;
+                },
+                [&] {
+                    m_recorder.set_next();
+                    hit = true;
+                },
+                [&] {
+                    m_recorder.set_last();
+                    hit = true;
+                });
+
+            ImGui::EndGroup();
+            if (!m_file) {
+                ImGui::EndDisabled();
+            }
+            if (ImGui::IsItemClicked()) {
+                hit = true;
+            }
+
+            {
+                // TODO: should be really focus-based...
+                const ImU32 col = (m_file && (hit || m_recorder.current() == out.current()))
+                                      ? IM_COL32_WHITE
+                                      : IM_COL32(100, 100, 100, 255);
+                ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() /*- ImVec2(2, 2)*/,
+                                                    ImGui::GetItemRectMax() /*+ ImVec2(2, 2)*/, col);
+            }
+
+            if (hit) {
+                out.take(m_recorder.current());
+            }
+
+            // ImGui::Separator();
+        }
+
+        // TODO: foldable...
+        if (auto sel = m_nav.window(id_str, p_open)) {
+            // TODO: record filename?
+            auto result = read_rule_from_file(*sel);
+            if (!result.empty()) {
+                logger::log_temp(500ms, "found {} rules", result.size());
+                m_recorder.replace(std::move(result));
+                out.take(m_recorder.current()); // <---
+                m_file = std::move(sel);
+            } else {
+                logger::log_temp(500ms, "found nothing");
+            }
+        }
+    }
+};
+
 // TODO: reconsider: where should "current-rule" be located...
 struct runner_ctrl {
     legacy::ruleT rule;
@@ -910,7 +1006,7 @@ int main(int argc, char** argv) {
         .rule = recorder.current(), .pergen = 1, .anti_flick = true, .start_from = 0, .gap_frame = 0, .pause = false};
 
     bool show_nav_window = true;
-    file_nav nav;
+    file_nav_with_recorder nav;
 
     tile_image img;
     code_image icons;
@@ -920,19 +1016,14 @@ int main(int argc, char** argv) {
         assert(ctrl.rule == recorder.current());
 
         if (show_nav_window) {
-            if (auto sel = nav.window("File Nav", &show_nav_window)) {
-                // TODO: record filename?
-                auto result = read_rule_from_file(*sel);
-                if (!result.empty()) {
-                    logger::log_temp(500ms, "found {} rules", result.size());
-                    recorder.replace(std::move(result));
-                } else {
-                    logger::log_temp(300ms, "found nothing");
-                }
-            }
+            nav.window("File nav", &show_nav_window, recorder);
         }
 
         // TODO: support drawing?
+        // TODO: clear outside...
+        // TODO: select all
+        // TODO: set as init-state...
+        // TODO: full-featured on-restart/new rule behavior...
         auto show_tile = [&] {
             // TODO: move elsewhere in the gui?
             ImGui::Text("Width:%d,Height:%d,Gen:%d,Density:%.4f", runner.tile().width(), runner.tile().height(),
