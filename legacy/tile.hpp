@@ -276,25 +276,35 @@ namespace legacy {
 
     } // namespace tileT_utils
 
-    // TODO: experimental; refine...
-    // TODO: together with to_MAP_str, shall be incorporated into a single header...
-    inline std::string to_rle_str(const tileT& tile /*bool add_exclamation = false*/) {
-        // TODO: problematic... (sub-optimal... / maybe has bugs...)
-        // TODO: empty lines should be neglected; and consecutive '$'s should be combined...
-        std::string str;
-        bool v = 0;
-        int c = 0;
-        auto flush = [&]() {
-            if (c != 0) {
-                if (c != 1) {
-                    str += std::to_string(c);
-                }
-                str += "bo"[v];
-            }
-            c = 0;
-        };
+    // TODO: As to pattern modification:
+    // clipboard-based copy/paste is wasteful... enable in-memory mode (tileT-based)...
 
+    // https://conwaylife.com/wiki/Run_Length_Encoded
+    inline std::string to_RLE_str(const tileT& tile) {
+        // (wontfix) consecutive '$'s are not combined.
+        std::string str;
+        int last_nl = 0;
         for (int y = 0; y < tile.height(); ++y) {
+            if (y != 0) {
+                str += '$';
+            }
+
+            int c = 0;
+            bool v = 0;
+            auto flush = [&] {
+                if (c != 0) {
+                    if (str.size() > last_nl + 60) {
+                        str += '\n';
+                        last_nl = str.size();
+                    }
+
+                    if (c != 1) {
+                        str += std::to_string(c);
+                    }
+                    str += "bo"[v];
+                    c = 0;
+                }
+            };
             for (bool b : std::span(tile.line(y), tile.width())) {
                 if (v != b) {
                     flush();
@@ -302,16 +312,29 @@ namespace legacy {
                 }
                 ++c;
             }
-            flush();
-            str += '$';
+            if (v != 0) {
+                flush();
+            }
         }
-        // TODO: when is '!' needed?
         return str;
     }
 
-    // TODO: will result in an extra line...
-    // TODO: not robust...
-    inline void from_rle_str(tileT& tile, const char* str) {
+    inline std::string to_RLE_str(const tileT& t, const ruleT& r) {
+        // std::format("x = {}, y = {}, rule = {}\n{}!", t.width(), t.height(), to_MAP_str(r), to_RLE_str(t));
+        return "x = " + std::to_string(t.width()) + ", y = " + std::to_string(t.height()) +
+               ", rule = " + to_MAP_str(r) + '\n' + to_RLE_str(t) + '!';
+    }
+
+    // TODO: re-implement...
+    inline void from_RLE_str(tileT& tile, const char* str) {
+        // TODO: temp; skip first line; test only...
+        if (*str == 'x') {
+            while (*str != '\n') {
+                ++str;
+            }
+            ++str;
+        }
+
         // TODO: whitespace...
         auto take = [&str, end = str + strlen(str)]() -> std::pair<int, char> {
             int n = 1;

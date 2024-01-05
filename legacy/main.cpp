@@ -1275,7 +1275,7 @@ int main(int argc, char** argv) {
             if (imgui_keypressed(ImGuiKey_V, false)) {
                 if (const char* text = ImGui::GetClipboardText()) {
                     paste.emplace(legacy::rectT{2, 2});
-                    legacy::from_rle_str(*paste, text);
+                    legacy::from_RLE_str(*paste, text);
                     paste_texture = paste_img.update(*paste);
 
                     // TODO: otherwise, alpha doesn't work...
@@ -1288,10 +1288,7 @@ int main(int argc, char** argv) {
                 if (imgui_keypressed(ImGuiKey_C, false) || imgui_keypressed(ImGuiKey_X, false)) {
                     legacy::tileT t(s.size());
                     legacy::copy(runner.tile(), s.min, s.max, t, {0, 0});
-                    // std::string str = std::format("x = {}, y = {}, rule = {}\n{}!", t.width(), t.height(),
-                    //                               legacy::to_MAP_str(ctrl.rule), legacy::to_rle_str(t));
-                    // ImGui::SetClipboardText(str.c_str());
-                    ImGui::SetClipboardText(legacy::to_rle_str(t).c_str()); // TODO: Temp...
+                    ImGui::SetClipboardText(legacy::to_RLE_str(t, ctrl.rule).c_str());
                 }
                 // TODO: rand-mode (whether reproducible...)
                 // TODO: clear mode (random/all-0,all-1/paste...) / (clear inner/outer)
