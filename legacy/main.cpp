@@ -1,4 +1,7 @@
+// TODO: is this necessary?
+#ifndef IMGUI_DEFINE_MATH_OPERATORS
 #define IMGUI_DEFINE_MATH_OPERATORS
+#endif
 
 #include "app2.hpp"
 #include "app_sdl.hpp"
@@ -238,8 +241,21 @@ namespace legacy {
             ImGui::PopStyleVar();
             ImGui::EndGroup();
 
-            auto table = [&check, tid = 0](termT_vec& terms) mutable {
+            auto table = [&sel, &check, tid = 0](termT_vec& terms) mutable {
+                // TODO: (gui) ugly...
+                // TODO: or, add isometric equivT?
+                // pro: iso is useful as detector... con: cannot disable all conveniently...
+                const float r = ImGui::GetFrameHeight();
+                const bool any_selected =
+                    std::any_of(terms.begin(), terms.end(), [](const termT& t) { return t.selected; });
                 ImGui::PushID(tid++);
+                if (ImGui::Button(any_selected ? "-" : "o", ImVec2{r, r})) {
+                    for (termT& t : terms) {
+                        t.selected = !any_selected;
+                    }
+                    sel = true;
+                }
+                ImGui::SameLine();
                 if (ImGui::BeginTable("Table", terms.size(), ImGuiTableFlags_BordersInner)) {
                     ImGui::TableNextRow();
                     for (termT& t : terms) {
@@ -835,7 +851,6 @@ class file_nav_with_recorder {
     rule_recorder m_recorder;
 
 public:
-
     // draw() instead?
     void window(const char* id_str, bool* p_open, rule_recorder& out) {
         // TODO: refresh... / reset(clear)...
@@ -1021,9 +1036,10 @@ int main(int argc, char** argv) {
 
         // TODO: support drawing?
         // TODO: clear outside...
-        // TODO: select all
         // TODO: set as init-state...
         // TODO: full-featured on-restart/new rule behavior...
+        // TODO: mini window seems necessary...
+        // TODO: min-size for tile?
         auto show_tile = [&] {
             // TODO: move elsewhere in the gui?
             ImGui::Text("Width:%d,Height:%d,Gen:%d,Density:%.4f", runner.tile().width(), runner.tile().height(),
@@ -1034,12 +1050,14 @@ int main(int argc, char** argv) {
             ImGui::SameLine();
             const bool center = ImGui::Button("Center");
             ImGui::SameLine();
-            const bool fit = ImGui::Button("Fit"); // TODO: take zoom into consideration?
+            const bool fit = ImGui::Button("Fit");
+            ImGui::SameLine();
+            const bool fit_zoom = ImGui::Button("Fit-zoom"); // TODO: combine with fit...
             ImGui::SameLine(), imgui_str("|");
             ImGui::SameLine();
             const bool select_all = ImGui::Button("Select all");
             ImGui::SameLine();
-            const bool select_clear = ImGui::Button("Clear selection");
+            const bool select_clear = ImGui::Button("Unselect");
             // TODO: input size...
 
             // TODO: move elsewhere
@@ -1078,6 +1096,7 @@ int main(int argc, char** argv) {
                 zoom = 1;
                 img_off = {0, 0};
 
+                // TODO: avoid being width/height being 1...
                 const legacy::rectT fit_size{.width = (int)canvas_size.x, .height = (int)canvas_size.y};
                 if (runner.tile().size() != fit_size) {
                     runner.restart(filler, fit_size);
@@ -1085,6 +1104,18 @@ int main(int argc, char** argv) {
                     assert(runner.tile().size() == fit_size); // ???
                 }
             }
+            if (fit_zoom) {
+                img_off = {0, 0};
+
+                // TODO: avoid being width/height being 1 [[or 0]]...
+                const legacy::rectT fit_size{.width = (int)canvas_size.x / zoom, .height = (int)canvas_size.y / zoom};
+                if (runner.tile().size() != fit_size) {
+                    runner.restart(filler, fit_size);
+                    // TODO: how to support background period then?
+                    assert(runner.tile().size() == fit_size); // ???
+                }
+            }
+
             // Size is fixed now:
             const legacy::rectT tile_size = runner.tile().size();
             const ImVec2 img_size(tile_size.width * zoom, tile_size.height * zoom);
@@ -1130,16 +1161,10 @@ int main(int argc, char** argv) {
                 return {x1, y1, x2 + 1, y2 + 1};
             };
 
-            if (select_all) {
-                select_0 = {0, 0};
-                select_1 = {.x = tile_size.width - 1, .y = tile_size.height - 1};
-            }
-            if (select_clear) {
-                select_0 = select_1 = {0, 0};
-            }
             if (drop_paste) {
                 paste.reset();
             }
+            // This can happen when e.g. paste && "fit-zoom" etc...
             if (paste && (paste->width() > tile_size.width || paste->height() > tile_size.height)) {
                 paste.reset();
             }
@@ -1194,7 +1219,6 @@ int main(int argc, char** argv) {
                     img_off.y = round(img_off.y); // TODO: is rounding correct?
                 }
 
-                // Experimental: select:
                 // TODO: this shall belong to the runner.
                 // TODO: precedence against left-clicking?
                 if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
@@ -1228,6 +1252,22 @@ int main(int argc, char** argv) {
                 }
             }
 
+            // TODO: is "select_all" misleading now?
+            // TODO: "shrink selection" utility?
+            if (select_all || imgui_keypressed(ImGuiKey_A, false)) {
+                // TODO: (coding) too ugly here...
+                const bool all_selected = select_0 == legacy::posT{0, 0} &&
+                                          select_1 == legacy::posT{.x = tile_size.width - 1, .y = tile_size.height - 1};
+                if (!all_selected) {
+                    select_0 = {0, 0};
+                    select_1 = {.x = tile_size.width - 1, .y = tile_size.height - 1};
+                } else {
+                    select_0 = select_1 = {0, 0};
+                }
+            }
+            if (select_clear) {
+                select_0 = select_1 = {0, 0};
+            }
             // TODO: (temp) shouldn't be scoped in sel block...
             if (imgui_keypressed(ImGuiKey_V, false)) {
                 if (const char* text = ImGui::GetClipboardText()) {

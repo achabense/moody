@@ -19,6 +19,7 @@ namespace legacy {
     // TODO: better be long long...
     struct posT {
         int x, y;
+        friend bool operator==(const posT&, const posT&) = default;
     };
 
     // TODO: add basic noexcept annotation?
