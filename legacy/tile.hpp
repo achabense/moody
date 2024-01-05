@@ -11,7 +11,6 @@ namespace legacy {
     // TODO: rename to sizeT? tileT::XXX?
     struct rectT {
         int width, height;
-        int area() const { return width * height; }
         friend bool operator==(const rectT&, const rectT&) = default;
     };
 
@@ -22,6 +21,10 @@ namespace legacy {
         friend bool operator==(const posT&, const posT&) = default;
     };
 
+    inline posT as_pos(const rectT& size) {
+        return {.x = size.width, .y = size.height};
+    }
+
     // TODO: add basic noexcept annotation?
     // TODO: when is it needed to [return] a tile?
     // TODO: explain layout... reorganize for better readability...
@@ -30,14 +33,14 @@ namespace legacy {
         bool* m_data; // layout: [height+2][width]|[height+2][2].
 
     public:
-        explicit tileT(rectT size) : m_size(size) {
+        explicit tileT(const rectT& size) : m_size(size) {
             // TODO: not suitable now... move to `apply`, or eliminate the constraint?
             assert(m_size.width > 1 && m_size.height > 1);
             m_data = new bool[(m_size.width + 2) * (m_size.height + 2)]{};
         }
 
         // conceptually write-only after this call...
-        void resize(rectT size) {
+        void resize(const rectT& size) {
             if (m_size != size) {
                 tileT resized(size);
                 swap(resized);
@@ -62,7 +65,7 @@ namespace legacy {
 
         int width() const { return m_size.width; }
         int height() const { return m_size.height; }
-        int area() const { return m_size.area(); }
+        int area() const { return m_size.width * m_size.height; }
 
     private:
         bool* _line(int _y) {
@@ -88,15 +91,6 @@ namespace legacy {
         // TODO: is data a proper name?
         std::span<bool> data() { return {line(0), line(0) + area()}; }
         std::span<const bool> data() const { return {line(0), line(0) + area()}; }
-
-        // bool check_pos(const posT& pos) const { //
-        //     return pos.x >= 0 && pos.y >= 0 && pos.x <= width() && pos.y <= height();
-        // }
-        // bool check_pos(const posT& begin, const posT& end) const { //
-        //     return begin.x <= end.x && begin.y <= end.y && check_pos(begin) && check_pos(end);
-        // }
-        posT begin_pos() const { return {0, 0}; }
-        posT end_pos() const { return {.x = width(), .y = height()}; }
 
     private:
         void _set_lr(int _y, bool l, bool r) {
@@ -204,28 +198,36 @@ namespace legacy {
         // TODO: is this copy or paste???
         enum class copyE { Value, Or, Xor };
         template <copyE mode = copyE::Value>
-        inline void copy(const tileT& source, int sx, int sy, int width, int height, tileT& dest, int dx, int dy) {
+        inline void copy(const tileT& source, posT begin, posT end, tileT& dest, posT dbegin) {
             assert(&source != &dest);
-            // TODO: precondition...
+            assert(0 <= begin.x && 0 <= begin.y);
+            assert(begin.x <= end.x && begin.y <= end.y);
+            assert(end.x <= source.width() && end.y <= source.height());
+            // TODO: dbegin...
 
-            for (int y = 0; y < height; ++y) {
-                const bool* s = source.line(sy + y) + sx;
-                bool* d = dest.line(dy + y) + dx;
-                for (int x = 0; x < width; ++x) {
+            const int width = end.x - begin.x, height = end.y - begin.y;
+            for (int dy = 0; dy < height; ++dy) {
+                const bool* const s = source.line(begin.y + dy) + begin.x;
+                bool* const d = dest.line(dbegin.y + dy) + dbegin.x;
+                for (int dx = 0; dx < width; ++dx) {
                     if constexpr (mode == copyE::Value) {
-                        d[x] = s[x];
+                        d[dx] = s[dx];
                     } else if constexpr (mode == copyE::Or) {
-                        d[x] |= s[x];
+                        d[dx] |= s[dx];
                     } else {
                         static_assert(mode == copyE::Xor);
-                        d[x] ^= s[x];
+                        d[dx] ^= s[dx];
                     }
                 }
             }
         }
 
-        inline void copy_v2(const tileT& source, posT begin, posT end, tileT& dest, posT dbegin);
+        template <copyE mode = copyE::Value>
+        inline void copy(const tileT& source, tileT& dest, posT dbegin) {
+            copy<mode>(source, {0, 0}, as_pos(source.size()), dest, dbegin);
+        }
 
+#if 0
         inline void clone(const tileT& source, tileT& dest) {
             assert(&source != &dest);
 
@@ -255,7 +257,7 @@ namespace legacy {
 
             for (int y = 0; y < target.height(); y += period.height()) {
                 for (int x = 0; x < target.width(); x += period.width()) {
-                    copy(period, 0, 0, period.width(), period.height(), target, x, y);
+                    copy(period, target, {x, y});
                 }
             }
         }
@@ -269,10 +271,7 @@ namespace legacy {
                 }
             }
         }
-
-        inline void piece_up_v2(const tileT& period, tileT& target) {
-            piece_up(period, target, target.begin_pos(), target.end_pos());
-        }
+#endif
         // TODO: tileT_fill_arg / random_fill goes here...
 
     } // namespace tileT_utils

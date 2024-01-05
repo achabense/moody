@@ -41,7 +41,7 @@ inline void random_fill(legacy::tileT& tile, const tileT_fill_arg& filler) {
     }
 }
 
-#if 1
+#if 0
 // Flip density...
 // TODO: regional fill...
 inline void random_fill_v2(legacy::tileT& tile, const legacy::tileT& period, const tileT_fill_arg& filler) {

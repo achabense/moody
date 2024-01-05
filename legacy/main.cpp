@@ -1053,11 +1053,11 @@ int main(int argc, char** argv) {
             const bool fit = ImGui::Button("Fit");
             ImGui::SameLine();
             const bool fit_zoom = ImGui::Button("Fit-zoom"); // TODO: combine with fit...
-            ImGui::SameLine(), imgui_str("|");
-            ImGui::SameLine();
-            const bool select_all = ImGui::Button("Select all");
-            ImGui::SameLine();
-            const bool select_clear = ImGui::Button("Unselect");
+            // ImGui::SameLine(), imgui_str("|");
+            // ImGui::SameLine();
+            // const bool select_all = ImGui::Button("Select all");
+            // ImGui::SameLine();
+            // const bool select_clear = ImGui::Button("Unselect");
             // TODO: input size...
 
             // TODO: move elsewhere
@@ -1136,30 +1136,43 @@ int main(int argc, char** argv) {
             drawlist.AddRectFilled(canvas_pos, canvas_pos + canvas_size, IM_COL32(20, 20, 20, 255));
             drawlist.AddImage(img.update(runner.tile()), img_pos, img_pos + img_size);
 
-            // TODO: shaky... this shall belong to the runner.
+            // TODO: rename; move elsewhere...
             // TODO: ctrl to move selected area?
-            static legacy::posT select_0{}, select_1{}; // cell index, not pixel.
-            struct sel_info {
-                int x1, y1; // [
-                int x2, y2; // )
+            struct selectT {
+                // []
+                legacy::posT select_0{0, 0}, select_1{0, 0}; // cell index, not pixel.
 
-                int width() const { return x2 - x1; }
-                int height() const { return y2 - y1; }
-                explicit operator bool() const { return width() > 1 || height() > 1; }
-            };
-            auto get_select = []() -> sel_info {
-                // TODO: rephrase...
-                // select_0/1 denotes []; convert to [):
-                int x1 = select_0.x, x2 = select_1.x;
-                int y1 = select_0.y, y2 = select_1.y;
-                if (x1 > x2) {
-                    std::swap(x1, x2);
+                void clear() { select_0 = select_1 = {0, 0}; }
+                bool all_selected(const legacy::rectT& size) const {
+                    const auto [min, max] = get();
+                    return min == legacy::posT{0, 0} && max == legacy::as_pos(size);
                 }
-                if (y1 > y2) {
-                    std::swap(y1, y2);
+                void select_all(const legacy::rectT& size) {
+                    select_0 = {0, 0};
+                    select_1 = {.x = size.width - 1, .y = size.height - 1};
                 }
-                return {x1, y1, x2 + 1, y2 + 1};
+
+                struct minmaxT {
+                    // [) ; (((min, max ~ imgui naming style...)))
+                    legacy::posT min, max;
+
+                    legacy::rectT size() const { return {.width = max.x - min.x, .height = max.y - min.y}; }
+                    explicit operator bool() const { return (max.x - min.x > 1) || (max.y - min.y > 1); }
+                };
+
+                minmaxT get() const {
+                    int x0 = select_0.x, x1 = select_1.x;
+                    int y0 = select_0.y, y1 = select_1.y;
+                    if (x0 > x1) {
+                        std::swap(x0, x1);
+                    }
+                    if (y0 > y1) {
+                        std::swap(y0, y1);
+                    }
+                    return {.min{x0, y0}, .max{x1 + 1, y1 + 1}};
+                }
             };
+            static selectT sel{};
 
             if (drop_paste) {
                 paste.reset();
@@ -1181,9 +1194,9 @@ int main(int argc, char** argv) {
                                            ImVec2(paste_pos.x + paste->width(), paste_pos.y + paste->height()) * zoom,
                                        IM_COL32(255, 0, 0, 60));
             }
-            if (sel_info sel = get_select()) {
-                drawlist.AddRectFilled(img_pos + ImVec2(sel.x1, sel.y1) * zoom, img_pos + ImVec2(sel.x2, sel.y2) * zoom,
-                                       IM_COL32(0, 255, 0, 60));
+            if (const auto s = sel.get()) {
+                drawlist.AddRectFilled(img_pos + ImVec2(s.min.x, s.min.y) * zoom,
+                                       img_pos + ImVec2(s.max.x, s.max.y) * zoom, IM_COL32(0, 255, 0, 60));
             }
             drawlist.PopClipRect();
 
@@ -1226,15 +1239,15 @@ int main(int argc, char** argv) {
                     int celx = floor((mouse_pos.x - img_pos.x) / zoom);
                     int cely = floor((mouse_pos.y - img_pos.y) / zoom);
 
-                    select_0.x = std::clamp(celx, 0, tile_size.width - 1);
-                    select_0.y = std::clamp(cely, 0, tile_size.height - 1);
+                    sel.select_0.x = std::clamp(celx, 0, tile_size.width - 1);
+                    sel.select_0.y = std::clamp(cely, 0, tile_size.height - 1);
                 }
                 if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
                     int celx = floor((mouse_pos.x - img_pos.x) / zoom);
                     int cely = floor((mouse_pos.y - img_pos.y) / zoom);
 
-                    select_1.x = std::clamp(celx, 0, tile_size.width - 1);
-                    select_1.y = std::clamp(cely, 0, tile_size.height - 1);
+                    sel.select_1.x = std::clamp(celx, 0, tile_size.width - 1);
+                    sel.select_1.y = std::clamp(cely, 0, tile_size.height - 1);
                 }
                 if (paste) {
                     int celx = floor((mouse_pos.x - img_pos.x) / zoom);
@@ -1244,29 +1257,19 @@ int main(int argc, char** argv) {
                     paste_pos.y = std::clamp(cely, 0, tile_size.height - paste->height());
 
                     if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-                        legacy::copy<legacy::copyE::Or>(*paste, 0, 0, paste->width(), paste->height(), runner.tile(),
-                                                        paste_pos.x, paste_pos.y);
-
+                        legacy::copy<legacy::copyE::Or>(*paste, runner.tile(), paste_pos);
                         paste.reset();
                     }
                 }
             }
 
-            // TODO: is "select_all" misleading now?
             // TODO: "shrink selection" utility?
-            if (select_all || imgui_keypressed(ImGuiKey_A, false)) {
-                // TODO: (coding) too ugly here...
-                const bool all_selected = select_0 == legacy::posT{0, 0} &&
-                                          select_1 == legacy::posT{.x = tile_size.width - 1, .y = tile_size.height - 1};
-                if (!all_selected) {
-                    select_0 = {0, 0};
-                    select_1 = {.x = tile_size.width - 1, .y = tile_size.height - 1};
+            if (imgui_keypressed(ImGuiKey_A, false)) {
+                if (!sel.all_selected(tile_size)) {
+                    sel.select_all(tile_size);
                 } else {
-                    select_0 = select_1 = {0, 0};
+                    sel.clear();
                 }
-            }
-            if (select_clear) {
-                select_0 = select_1 = {0, 0};
             }
             // TODO: (temp) shouldn't be scoped in sel block...
             if (imgui_keypressed(ImGuiKey_V, false)) {
@@ -1281,10 +1284,10 @@ int main(int argc, char** argv) {
                     SDL_SetTextureBlendMode(reinterpret_cast<SDL_Texture*>(paste_texture), SDL_BLENDMODE_BLEND);
                 }
             }
-            if (sel_info sel = get_select()) {
+            if (const auto s = sel.get()) {
                 if (imgui_keypressed(ImGuiKey_C, false) || imgui_keypressed(ImGuiKey_X, false)) {
-                    legacy::tileT t({.width = sel.width(), .height = sel.height()});
-                    legacy::copy(runner.tile(), sel.x1, sel.y1, sel.width(), sel.height(), t, 0, 0);
+                    legacy::tileT t(s.size());
+                    legacy::copy(runner.tile(), s.min, s.max, t, {0, 0});
                     // std::string str = std::format("x = {}, y = {}, rule = {}\n{}!", t.width(), t.height(),
                     //                               legacy::to_MAP_str(ctrl.rule), legacy::to_rle_str(t));
                     // ImGui::SetClipboardText(str.c_str());
@@ -1296,8 +1299,8 @@ int main(int argc, char** argv) {
                 // TODO: 0/1/other textures are subject to agar settings...
                 if (imgui_keypressed(ImGuiKey_Backspace, false) || imgui_keypressed(ImGuiKey_X, false)) {
                     legacy::tileT& tile = runner.tile();
-                    for (int y = sel.y1; y < sel.y2; ++y) {
-                        for (int x = sel.x1; x < sel.x2; ++x) {
+                    for (int y = s.min.y; y < s.max.y; ++y) {
+                        for (int x = s.min.x; x < s.max.x; ++x) {
                             tile.line(y)[x] = 0;
                         }
                     }
@@ -1306,8 +1309,8 @@ int main(int argc, char** argv) {
                     legacy::tileT& tile = runner.tile();
                     // TODO: use tile_filler...
                     constexpr uint32_t c = std::mt19937::max() * 0.5;
-                    for (int y = sel.y1; y < sel.y2; ++y) {
-                        for (int x = sel.x1; x < sel.x2; ++x) {
+                    for (int y = s.min.y; y < s.max.y; ++y) {
+                        for (int x = s.min.x; x < s.max.x; ++x) {
                             tile.line(y)[x] = global_mt19937() < c;
                         }
                     }
@@ -1315,9 +1318,8 @@ int main(int argc, char** argv) {
                 // TODO: refine capturing...
                 if (imgui_keypressed(ImGuiKey_P, false)) {
                     // TODO: support specifying padding area...
-                    const legacy::rectT size = {.width = sel.width(), .height = sel.height()};
-                    legacy::tileT cap(size), cap2(size);
-                    legacy::copy(runner.tile(), sel.x1, sel.y1, sel.width(), sel.height(), cap, 0, 0);
+                    legacy::tileT cap(s.size()), cap2(s.size());
+                    legacy::copy(runner.tile(), s.min, s.max, cap, {0, 0});
                     legacy::lockT locked{};
                     auto rulx = [&](legacy::codeT code) {
                         locked[code] = true;
