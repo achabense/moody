@@ -137,6 +137,7 @@ namespace legacy {
             terms_misc.emplace_back("Dual", mk({mp_dual}));
 
             terms_hex.emplace_back("Hex", mk({mp_hex_ignore}));
+            // TODO: obscure...
             terms_hex.emplace_back("/", mk({mp_hex_refl_wsx}));
             terms_hex.emplace_back("\\", mk({mp_hex_refl_qsc}));
             terms_hex.emplace_back("-", mk({mp_hex_refl_asd}));
@@ -863,7 +864,6 @@ public:
             ImGui::BeginGroup();
 
             if (m_file) {
-                assert(!m_recorder.empty());
                 imgui_str(cpp17_u8string(*m_file));
             } else {
                 imgui_str("...");
@@ -1046,13 +1046,27 @@ int main(int argc, char** argv) {
                         runner.gen(), float(legacy::count(runner.tile())) / runner.tile().area());
             // TODO: canvas size, tile size, selected size...
 
+            // It has been proven that `img_off` works better than using `corner_idx` (cell idx in the corner)
+            static ImVec2 img_off = {0, 0}; // TODO: supposed to be of integer-precision...
+
+            static int zoom = 1; // TODO: mini window when zoom == 1?
+            assert(zoom == 1 || zoom == 2 || zoom == 4 || zoom == 8);
+
             const bool corner = ImGui::Button("Corner"); // TODO: move elsewhere...
             ImGui::SameLine();
             const bool center = ImGui::Button("Center");
             ImGui::SameLine();
-            const bool fit = ImGui::Button("Fit");
+            ImGui::BeginDisabled();
+            imgui_str("Zoom");
+            for (const int z : {1, 2, 4, 8}) {
+                ImGui::SameLine();
+                // TODO: avoid usage of format...
+                ImGui::RadioButton(std::format("{}##Z{}", z, z).c_str(), zoom == z);
+            }
+            ImGui::EndDisabled();
+
             ImGui::SameLine();
-            const bool fit_zoom = ImGui::Button("Fit-zoom"); // TODO: combine with fit...
+            const bool fit = ImGui::Button("Fit");
             // ImGui::SameLine(), imgui_str("|");
             // ImGui::SameLine();
             // const bool select_all = ImGui::Button("Select all");
@@ -1070,7 +1084,9 @@ int main(int argc, char** argv) {
             if (!paste) {
                 ImGui::BeginDisabled();
             }
-            const bool drop_paste = ImGui::Button("Drop paste");
+            if (ImGui::Button("Drop paste")) {
+                paste.reset();
+            }
             if (!paste) {
                 ImGui::EndDisabled();
             }
@@ -1086,25 +1102,7 @@ int main(int argc, char** argv) {
                 return;
             }
 
-            static int zoom = 1; // TODO: mini window when zoom == 1?
-            assert(zoom == 1 || zoom == 2 || zoom == 4 || zoom == 8);
-
-            // It has been proven that `img_off` works better than using `corner_idx` (cell idx in the corner)
-            static ImVec2 img_off = {0, 0}; // TODO: supposed to be of integer-precision...
-
             if (fit) {
-                zoom = 1;
-                img_off = {0, 0};
-
-                // TODO: avoid being width/height being 1...
-                const legacy::rectT fit_size{.width = (int)canvas_size.x, .height = (int)canvas_size.y};
-                if (runner.tile().size() != fit_size) {
-                    runner.restart(filler, fit_size);
-                    // TODO: how to support background period then?
-                    assert(runner.tile().size() == fit_size); // ???
-                }
-            }
-            if (fit_zoom) {
                 img_off = {0, 0};
 
                 // TODO: avoid being width/height being 1 [[or 0]]...
@@ -1174,9 +1172,6 @@ int main(int argc, char** argv) {
             };
             static selectT sel{};
 
-            if (drop_paste) {
-                paste.reset();
-            }
             // This can happen when e.g. paste && "fit-zoom" etc...
             if (paste && (paste->width() > tile_size.width || paste->height() > tile_size.height)) {
                 paste.reset();
@@ -1212,10 +1207,8 @@ int main(int argc, char** argv) {
                 if (active) {
                     if (!io.KeyCtrl) {
                         img_off += io.MouseDelta;
-                    } else {
-                        // TODO: this approach is highly imprecise when zoom != 1, but does this matter?
-                        // TODO: whether to support shifting at all?
-                        runner.shift(io.MouseDelta.x / zoom, io.MouseDelta.y / zoom);
+                    } else if (zoom == 1) {
+                        runner.shift(io.MouseDelta.x, io.MouseDelta.y);
                     }
                 }
                 // TODO: rename to mouseXXX...
