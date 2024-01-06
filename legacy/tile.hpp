@@ -35,7 +35,7 @@ namespace legacy {
     public:
         explicit tileT(const rectT& size) : m_size(size) {
             // TODO: not suitable now... move to `apply`, or eliminate the constraint?
-            assert(m_size.width > 1 && m_size.height > 1);
+            assert(m_size.width > 0 && m_size.height > 0);
             m_data = new bool[(m_size.width + 2) * (m_size.height + 2)]{};
         }
 
@@ -86,9 +86,9 @@ namespace legacy {
             assert(y >= 0 && y < m_size.height);
             return _line(y + 1);
         }
+        // TODO: at(posT)?
 
         // TODO: ? whether to expose consecutive data?
-        // TODO: is data a proper name?
         std::span<bool> data() { return {line(0), line(0) + area()}; }
         std::span<const bool> data() const { return {line(0), line(0) + area()}; }
 
@@ -119,10 +119,6 @@ namespace legacy {
             // assert m_shape == *.m_shape.
             const int width = m_size.width, height = m_size.height;
 
-            // TODO: copy_line method? (std::copy_n is less clear than memcpy here)
-            // (why does memxxx take dest as first arg, while copy_n take dest as last?)
-            // memcpy(_line(0), w._line(height), width * sizeof(bool));
-            // memcpy(_line(height + 1), x._line(1), width * sizeof(bool));
             std::copy_n(w._line(height), width, _line(0));
             std::copy_n(x._line(1), width, _line(height + 1));
 
@@ -135,7 +131,6 @@ namespace legacy {
 
         // TODO: This could be used to support constraint gathering...
         // TODO: go back to template when needed...
-        // Relying on width > 1 (which is a reasonable requirement)
         // I hate this function, it is the payment for consecutive data...
         void apply(const auto& rule, tileT& dest) const {
             // pre: already gathered ???<TODO>, which is untestable.
@@ -143,6 +138,21 @@ namespace legacy {
             dest.resize(m_size);
 
             const int width = m_size.width, height = m_size.height;
+
+            if (width == 1) [[unlikely]] {
+                for (int _y = 1; _y <= height; ++_y) {
+                    const auto [_q, _e] = _get_lr(_y - 1);
+                    const auto [_a, _d] = _get_lr(_y);
+                    const auto [_z, _c] = _get_lr(_y + 1);
+                    const bool _w = _line(_y - 1)[0];
+                    const bool _s = _line(_y)[0];
+                    const bool _x = _line(_y + 1)[0];
+                    bool* _dest = dest._line(_y);
+
+                    _dest[0] = rule(encode(_q, _w, _e, _a, _s, _d, _z, _x, _c));
+                }
+                return;
+            }
 
             for (int _y = 1; _y <= height; ++_y) {
                 const auto [_q, _e] = _get_lr(_y - 1);
@@ -176,6 +186,33 @@ namespace legacy {
         }
     };
 
+#ifndef NDEBUG
+    namespace _misc {
+        // TODO: enhance this test?
+        inline const bool test_tileT = [] {
+            const rectT size{1, 1};
+            tileT t_q(size), t_w(size), t_e(size);
+            tileT t_a(size), t_s(size), t_d(size);
+            tileT t_z(size), t_x(size), t_c(size);
+
+            tileT dest(size);
+
+            const ruleT gol = game_of_life();
+            for_each_code(code) {
+                const auto [q, w, e, a, s, d, z, x, c] = decode(code);
+                t_q.line(0)[0] = q, t_w.line(0)[0] = w, t_e.line(0)[0] = e;
+                t_a.line(0)[0] = a, t_s.line(0)[0] = s, t_d.line(0)[0] = d;
+                t_z.line(0)[0] = z, t_x.line(0)[0] = x, t_c.line(0)[0] = c;
+
+                t_s.gather(t_q, t_w, t_e, t_a, t_d, t_z, t_x, t_c);
+                t_s.apply(gol, dest);
+                assert(dest.line(0)[0] == gol(code));
+            }
+            return true;
+        }();
+    } // namespace _misc
+#endif
+
     inline namespace tileT_utils {
         inline int count(const tileT& tile) {
             int c = 0;
@@ -188,7 +225,7 @@ namespace legacy {
         inline int count_diff(const tileT& l, const tileT& r) {
             assert(l.size() == r.size());
             int c = 0;
-            const bool* l_data = l.line(0); // TODO: was begin()
+            const bool* l_data = l.line(0);
             for (bool b : r.data()) {
                 c += (b != *l_data++);
             }
