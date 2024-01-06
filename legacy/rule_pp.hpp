@@ -9,9 +9,8 @@
 namespace legacy {
     // TODO: Document that this is not the only situation that flicking effect can occur...
     inline bool will_flick(const ruleT& rule) {
-        // TODO: still ugly...
-        static_assert(encode({0, 0, 0, 0, 0, 0, 0, 0, 0}) == 0);
-        static_assert(encode({1, 1, 1, 1, 1, 1, 1, 1, 1}) == 511);
+        static_assert(encode(0, 0, 0, 0, 0, 0, 0, 0, 0) == 0);
+        static_assert(encode(1, 1, 1, 1, 1, 1, 1, 1, 1) == 511);
         return rule(codeT{0}) == 1 && rule(codeT{511}) == 0;
     }
 
@@ -573,7 +572,7 @@ namespace legacy {
             for (codeT code : par.jth_group(free_indexes[j])) {
                 r[code] = bools[j];
             }
-            // TODO: cannot suitably deal with inconsistent groups when calling first()¡ý etc...
+            // TODO: cannot suitably deal with inconsistent groups when calling first()â†“ etc...
             // if (bools[j] != r[par.jth_group(free_indexes[j]).front()]) {
             //     for (codeT code : par.jth_group(free_indexes[j])) {
             //         r[code] = !r[code];

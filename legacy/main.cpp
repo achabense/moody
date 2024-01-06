@@ -49,7 +49,7 @@ namespace legacy {
     inline ruleT mirror(const ruleT& rule) {
         ruleT mir{};
         for_each_code(code) {
-            const codeT codex = flip_all(code);
+            const codeT codex = codeT(~code & 511);
             const bool flip = decode_s(codex) != rule(codex);
             mir.set(code, flip ? !decode_s(code) : decode_s(code));
         }

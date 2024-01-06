@@ -13,81 +13,65 @@
 
 namespace legacy {
     // The environment around "s".
-    // TODO: how widespread is `qwerty` keyboard? without it this notation will pose no benefit...
     // TODO: other layouts are possible: https://en.wikipedia.org/wiki/QWERTZ
     struct envT {
         bool q, w, e;
         bool a, s, d;
         bool z, x, c;
-
-        // TODO: whether to support this?
-        // bool at(int index) const {
-        //     // ~ This is technically UB.
-        //     assert(index >= 0 && index < 9);
-        //     return (&q)[index];
-        // }
     };
 
     // TODO: remove remaining direct use of "512"...
     struct codeT {
-        int v;
+        int val;
         constexpr /*implicit*/ operator int() const {
-            assert(v >= 0 && v < 512);
-            return v;
+            assert(val >= 0 && val < 512);
+            return val;
         }
 
-        // TODO: apply this in the future...
         template <class T>
         using map_to = std::array<T, 512>;
     };
 
-    // TODO: not safe: name is mutable inside the loop...
-    // TODO: better name? for_each_situ?
-    // ~ should be name.v < 512
-    // This has been proven better than defining a bunch of code for range-for loop.
-#define for_each_code(name) for (::legacy::codeT name{.v = 0}; name.v < 512; ++name.v)
+    // (`name` must not be modified within the loop body)
+#define for_each_code(name) for (::legacy::codeT name{.val = 0}; name.val < 512; ++name.val)
 
-    // TODO: `encode` and `decode` are strictly subutils for codeT...
     constexpr codeT encode(const envT& env) {
         // ~ bool is implicitly promoted to int.
         // clang-format off
-        int code = (env.q << 0) | (env.w << 1) | (env.e << 2) |
-                   (env.a << 3) | (env.s << 4) | (env.d << 5) |
-                   (env.z << 6) | (env.x << 7) | (env.c << 8);
+        const int code = (env.q << 0) | (env.w << 1) | (env.e << 2) |
+                         (env.a << 3) | (env.s << 4) | (env.d << 5) |
+                         (env.z << 6) | (env.x << 7) | (env.c << 8);
         // clang-format on
         assert(code >= 0 && code < 512);
         return codeT{code};
     }
 
-    // Equivalent to encode(envT(...)).
     constexpr codeT encode(bool q, bool w, bool e, bool a, bool s, bool d, bool z, bool x, bool c) {
-        int code = (q << 0) | (w << 1) | (e << 2) | (a << 3) | (s << 4) | (d << 5) | (z << 6) | (x << 7) | (c << 8);
+        const int code =
+            (q << 0) | (w << 1) | (e << 2) | (a << 3) | (s << 4) | (d << 5) | (z << 6) | (x << 7) | (c << 8);
         assert(code >= 0 && code < 512);
         return codeT{code};
     }
 
     constexpr envT decode(codeT code) {
         assert(code >= 0 && code < 512);
-        bool q = (code >> 0) & 1, w = (code >> 1) & 1, e = (code >> 2) & 1;
-        bool a = (code >> 3) & 1, s = (code >> 4) & 1, d = (code >> 5) & 1;
-        bool z = (code >> 6) & 1, x = (code >> 7) & 1, c = (code >> 8) & 1;
+        const bool q = (code >> 0) & 1, w = (code >> 1) & 1, e = (code >> 2) & 1;
+        const bool a = (code >> 3) & 1, s = (code >> 4) & 1, d = (code >> 5) & 1;
+        const bool z = (code >> 6) & 1, x = (code >> 7) & 1, c = (code >> 8) & 1;
         return {q, w, e, a, s, d, z, x, c};
     }
 
 #ifndef NDEBUG
-    namespace tests {
-        // TODO: plan: add basic tests in debug mode.
-        // should these functions be guarded by NDEBUG, or a project-defined macro?
+    namespace _misc {
+        // TODO: whether to add / keep these tests?
+        // (full tests covering the whole project is infeasible...)
         inline const bool test_codeT = [] {
             for_each_code(code) {
-                const envT e = decode(code);
-                if (encode(e) != code) {
-                    abort();
-                }
+                assert(encode(decode(code)) == code);
             }
             return true;
         }();
-    } // namespace tests
+    } // namespace _misc
 #endif
 
     // TODO: better names...
@@ -96,14 +80,11 @@ namespace legacy {
         return (code >> 4) & 1;
     }
 
-    constexpr codeT flip_all(codeT code) {
-        return codeT{~code & 511};
-    }
-
     // TODO: better rename to something independent of ruleT...
     using ruleT_data = codeT::map_to<bool>;
 
     // TODO: rephrase...
+    // TODO: explain why using operator() as getter...
     // Unambiguously refer to the map from env-code to the new state.
     class ruleT {
         ruleT_data map{}; // TODO: change name...
@@ -114,16 +95,15 @@ namespace legacy {
         constexpr friend bool operator==(const ruleT&, const ruleT&) = default;
     };
 
-    // "Convay's Game of Life" rule.
+    // "Convay's Game of Life" rule. (B3/S23)
     inline ruleT game_of_life() {
-        // b3 s23
         ruleT rule{};
         for_each_code(code) {
-            auto [q, w, e, a, s, d, z, x, c] = decode(code);
-            int count = q + w + e + a + d + z + x + c;
-            if (count == 2) { // 2:s ~ 0->0, 1->1 ~ equal to "s".
+            const auto [q, w, e, a, s, d, z, x, c] = decode(code);
+            const int count = q + w + e + a + d + z + x + c;
+            if (count == 2) { // 2:S ~ 0->0, 1->1 ~ equal to "s".
                 rule.set(code, s);
-            } else if (count == 3) { // 3:bs ~ 0->1, 1->1 ~ always 1.
+            } else if (count == 3) { // 3:BS ~ 0->1, 1->1 ~ always 1.
                 rule.set(code, 1);
             } else {
                 rule.set(code, 0);
@@ -164,12 +144,8 @@ namespace legacy {
 #else
     using compressT = ruleT;
 #endif
-} // namespace legacy
 
-// TODO: (together with pattern copy/pasting) move to a separate header...
-// TODO: talk about utf8 compatibility...
-namespace legacy {
-    namespace _impl_details {
+    namespace _misc {
         inline char to_base64(uint8_t b6) {
             if (b6 < 26) {
                 return 'A' + b6;
@@ -195,14 +171,11 @@ namespace legacy {
             } else if (ch == '+') {
                 return 62;
             } else {
-                if (ch != '/') {
-                    putchar(ch);
-                }
                 assert(ch == '/');
                 return 63;
             }
         }
-    } // namespace _impl_details
+    } // namespace _misc
 
     // TODO: rephrase...
     // Convert ruleT into text form. Specifically, in "MAP" format, so that the result can be pasted into Golly.
@@ -211,7 +184,7 @@ namespace legacy {
         // MAP rule uses a different coding scheme.
         bool reordered[512]{};
         for_each_code(code) {
-            auto [q, w, e, a, s, d, z, x, c] = decode(code);
+            const auto [q, w, e, a, s, d, z, x, c] = decode(code);
             reordered[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1] = rule(code);
         }
         auto get = [&reordered](int i) { return i < 512 ? reordered[i] : 0; };
@@ -220,7 +193,7 @@ namespace legacy {
         while (i < 512) {
             uint8_t b6 = (get(i + 5) << 0) | (get(i + 4) << 1) | (get(i + 3) << 2) | (get(i + 2) << 3) |
                          (get(i + 1) << 4) | (get(i + 0) << 5);
-            str += _impl_details::to_base64(b6);
+            str += _misc::to_base64(b6);
             i += 6;
         }
         return str;
@@ -228,7 +201,7 @@ namespace legacy {
 
     inline const std::regex& regex_MAP_str() {
         static_assert((512 + 5) / 6 == 86);
-        static std::regex reg{"MAP[a-zA-Z0-9+/]{86}", std::regex_constants::optimize};
+        static const std::regex reg{"MAP[a-zA-Z0-9+/]{86}", std::regex_constants::optimize};
         return reg;
     }
 
@@ -244,7 +217,7 @@ namespace legacy {
         int chp = 3; // skip "MAP"
         int i = 0;
         while (i < 512) {
-            uint8_t b6 = _impl_details::from_base64(map_str[chp++]);
+            const uint8_t b6 = _misc::from_base64(map_str[chp++]);
             put(i + 5, (b6 >> 0) & 1);
             put(i + 4, (b6 >> 1) & 1);
             put(i + 3, (b6 >> 2) & 1);
@@ -262,26 +235,20 @@ namespace legacy {
     }
 
 #ifndef NDEBUG
-    namespace tests {
-        // Source: https://golly.sourceforge.io/Help/Algorithms/QuickLife.html
+    namespace _misc {
+        // https://golly.sourceforge.io/Help/Algorithms/QuickLife.html
         // > So, Conway's Life (B3/S23) encoded as a MAP rule is:
         // > rule = MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA
         inline const bool test_MAP_str = [] {
             const char* gol_str =
                 "MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA";
             const ruleT gol = game_of_life();
-            if (!std::regex_match(gol_str, regex_MAP_str())) {
-                abort();
-            }
-            if (gol_str != to_MAP_str(gol)) {
-                abort();
-            }
-            if (from_MAP_str(gol_str) != gol) {
-                abort();
-            }
+            assert(std::regex_match(gol_str, regex_MAP_str()));
+            assert(gol_str == to_MAP_str(gol));
+            assert(from_MAP_str(gol_str) == gol);
             return true;
         }();
-    } // namespace tests
+    } // namespace _misc
 #endif
 
 } // namespace legacy
