@@ -31,7 +31,6 @@
 
 // TODO: static object? rename to app_context?
 // TODO: recheck error-handling...
-// (The previous approach (returning scope-guard) obfuscated logic by a lot.)
 class app_backend {
     static inline SDL_Window* window = nullptr;
     static inline SDL_Renderer* renderer = nullptr;
@@ -56,8 +55,8 @@ public:
 
         // Create window with SDL_Renderer graphics context
         const SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-        window = SDL_CreateWindow("Dear ImGui SDL2+SDL_Renderer example", SDL_WINDOWPOS_CENTERED,
-                                  SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
+        window =
+            SDL_CreateWindow("Rule editor", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
         if (!window) {
             printf("Error: %s", SDL_GetError());
             exit(EXIT_FAILURE);
@@ -93,7 +92,7 @@ public:
         renderer = nullptr;
     }
 
-    static bool new_frame() {
+    static bool begin_frame() {
         assert(window && renderer);
 
         SDL_Event event;
@@ -117,16 +116,13 @@ public:
     }
 
     // TODO: rename...
-    static void render() {
+    static void end_frame() {
         assert(window && renderer);
 
         ImGui::Render();
         // TODO: is this necessary?
         ImGuiIO& io = ImGui::GetIO();
         SDL_RenderSetScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
-        // ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-        // SDL_SetRenderDrawColor(renderer, (Uint8)(clear_color.x * 255), (Uint8)(clear_color.y * 255),
-        //                        (Uint8)(clear_color.z * 255), (Uint8)(clear_color.w * 255));
         // SDL_RenderClear(renderer); // TODO: really ignorable? (the app uses a full-screen window)
         ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
         SDL_RenderPresent(renderer);
@@ -150,23 +146,21 @@ private:
     // TODO: there is an extra use of sdl_basepath in main...
 };
 
-// TODO: pixel format might be problematic...
 // TODO: in namespace or not? better name?
-// TODO: should not update when paused...
 class tile_image {
     int m_w, m_h;
     SDL_Texture* m_texture; // owning.
 
 public:
+    tile_image(const tile_image&) = delete;
+    tile_image& operator=(const tile_image&) = delete;
+
     tile_image() : m_w{}, m_h{}, m_texture{nullptr} {}
     ~tile_image() {
         if (m_texture) {
             SDL_DestroyTexture(m_texture);
         }
     }
-
-    tile_image(const tile_image&) = delete;
-    tile_image& operator=(const tile_image&) = delete;
 
     // TODO: better name? imbue?
     // TODO: explain why ImTextureID (instead of SDL_Texture*) here (for imgui only)
@@ -179,23 +173,24 @@ public:
 
             m_w = tile.width();
             m_h = tile.height();
+            // TODO: pixel format might be problematic...
+            // ~ To make IM_COL32 work, what format should be specified?
             m_texture = app_backend::create_texture(SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STREAMING, m_w, m_h);
         }
 
-        // TODO: is reinterpret_cast<void**>(&typed-ptr) valid by C++?
         void* pixels = nullptr;
         int pitch = 0;
-        bool succ = SDL_LockTexture(m_texture, nullptr, &pixels, &pitch) == 0;
+        const bool succ = SDL_LockTexture(m_texture, nullptr, &pixels, &pitch) == 0;
         if (!succ || pitch != m_w * sizeof(Uint32)) {
             // TODO: can pitch == m_w * sizeof(Uint32) be guaranteed?
             printf("Error: %s", SDL_GetError());
             exit(EXIT_FAILURE);
         }
 
-        // Relying on both image and tile data being consecutive.
+        // TODO: Relying on both image and tile data being consecutive.
         const auto data = tile.data();
         for (int i = 0; i < tile.area(); ++i) {
-            ((Uint32*)pixels)[i] = data[i] ? -1 /* white */ : 0;
+            ((Uint32*)pixels)[i] = data[i] ? IM_COL32_WHITE : IM_COL32_BLACK;
         }
         SDL_UnlockTexture(m_texture);
 
@@ -208,17 +203,20 @@ class code_image {
     SDL_Texture* m_texture;
 
 public:
+    code_image(const code_image&) = delete;
+    code_image& operator=(const code_image&) = delete;
+
     code_image() {
         const int width = 3, height = 3 * 512;
         m_texture = app_backend::create_texture(SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, width, height);
-        // Uint32 pixels[512][3][3]; // TODO: explain why allocate...
+        // Uint32 pixels[512][3][3]; // "Function uses XXX bytes of stack"
         std::unique_ptr<Uint32[][3][3]> pixels(new Uint32[512][3][3]);
         for_each_code(code) {
-            auto [q, w, e, a, s, d, z, x, c] = legacy::decode(code);
-            bool fill[3][3] = {{q, w, e}, {a, s, d}, {z, x, c}};
+            const auto [q, w, e, a, s, d, z, x, c] = legacy::decode(code);
+            const bool fill[3][3] = {{q, w, e}, {a, s, d}, {z, x, c}};
             for (int y = 0; y < 3; ++y) {
                 for (int x = 0; x < 3; ++x) {
-                    pixels[code][y][x] = fill[y][x] ? -1 : 0;
+                    pixels[code][y][x] = fill[y][x] ? IM_COL32_WHITE : IM_COL32_BLACK;
                 }
             }
         }
@@ -227,9 +225,6 @@ public:
     }
 
     ~code_image() { SDL_DestroyTexture(m_texture); }
-
-    code_image(const code_image&) = delete;
-    code_image& operator=(const code_image&) = delete;
 
     void image(legacy::codeT code, int zoom, const ImVec4& tint_col = ImVec4(1, 1, 1, 1),
                const ImVec4 border_col = ImVec4(0, 0, 0, 0)) const {
@@ -245,8 +240,8 @@ public:
         const ImVec2 uv0(0, code * (1.0f / 512));
         const ImVec2 uv1(1, (code + 1) * (1.0f / 512));
         ImGui::PushID(code);
-        bool ret = ImGui::ImageButton("Code", m_texture, size, uv0, uv1, bg_col, tint_col);
+        const bool hit = ImGui::ImageButton("Code", m_texture, size, uv0, uv1, bg_col, tint_col);
         ImGui::PopID();
-        return ret;
+        return hit;
     }
 };

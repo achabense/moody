@@ -207,7 +207,7 @@ namespace legacy {
 
                 // TODO: Flip...
                 if (satisfies(target, {}, term.eq)) {
-                    ImGui::GetWindowDrawList()->AddRect(pos, pos_max, ImGui::GetColorU32(ImVec4{0, 1, 0, 1}));
+                    ImGui::GetWindowDrawList()->AddRect(pos, pos_max, IM_COL32(0, 255, 0, 255));
                 }
 
                 ImGui::PushID(id++);
@@ -1025,7 +1025,7 @@ int main(int argc, char** argv) {
 
     tile_image img;
     code_image icons;
-    while (app_backend::new_frame()) {
+    while (app_backend::begin_frame()) {
         // TODO: applying following logic; consider refining it.
         // recorder is modified during display, but will synchronize with runner's before next frame.
         assert(ctrl.rule == recorder.current());
@@ -1470,7 +1470,7 @@ int main(int argc, char** argv) {
 
         ImGui::ShowDemoWindow(); // TODO: remove (or comment-out) this when all done...
         logger::tempwindow();
-        app_backend::render(); // !!! TODO: recheck
+        app_backend::end_frame(); // !!! TODO: recheck
 
         if (ctrl.rule != recorder.current()) {
             ctrl.rule = recorder.current();
