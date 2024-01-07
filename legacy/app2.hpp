@@ -180,15 +180,12 @@ public:
 // - Why using C++ at all: there seems no standard way to `fopen` a unicode C-string path.
 // (The only one being ignore(max)->gcount, which appears )
 inline std::vector<char> load_binary(const std::filesystem::path& path, int max_size) {
-    using namespace std;
-    using namespace std::filesystem;
-
-    error_code ec{};
-    const auto size = file_size(path, ec);
+    std::error_code ec{};
+    const auto size = std::filesystem::file_size(path, ec);
     if (size != -1 && size < max_size) {
-        ifstream file(path, ios::in | ios::binary);
+        std::ifstream file(path, std::ios::in | std::ios::binary);
         if (file) {
-            vector<char> data(size);
+            std::vector<char> data(size);
             file.read(data.data(), size);
             if (file && file.gcount() == size) {
                 return data;

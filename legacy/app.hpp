@@ -118,7 +118,7 @@ public:
 };
 
 // Never empty.
-// TODO: should be able to tell different sources...
+// TODO: (gui) whether to support random-access mode?
 class rule_recorder {
     std::vector<legacy::compressT> m_record;
     int m_pos;

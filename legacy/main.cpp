@@ -9,6 +9,11 @@
 
 #include "rule_pp.hpp"
 
+// TODO: bind key-enter to any iterable widgets / randomize?
+// TODO: support rollbacking diff rules?
+// TODO: support rollbacking locks?
+// TODO: for editing opt, support in-lock and outof-lock mode?
+
 // TODO: -> app2.hpp...
 // TODO: allow/disallow scrolling...
 inline void iter_pair(const char* tag_first, const char* tag_prev, const char* tag_next, const char* tag_last,
@@ -56,15 +61,15 @@ namespace legacy {
         return mir;
     }
 
-    struct termT {
-        const char* msg;
-        equivT eq;
-
-        bool selected = false;
-        bool covered = false;
-    };
     // TODO: refine analyzer...
     class partition_collection {
+        struct termT {
+            const char* msg;
+            equivT eq;
+            bool selected = false;
+            bool covered = false;
+        };
+
         using termT_vec = std::vector<termT>;
 
         termT_vec terms_ignore;
@@ -95,7 +100,6 @@ namespace legacy {
                     t.covered = q.has_eq(t.eq);
                 }
             };
-
             test(terms_ignore);
             test(terms_native);
             test(terms_misc);
@@ -309,29 +313,7 @@ void show_target_rule(const legacy::ruleT& target, rule_recorder& recorder) {
         // else...
     }
 
-#if 0
-    // TODO: is random-access useful?
-    static char buf_pos[20]{};
-    const auto filter = [](ImGuiInputTextCallbackData* data) -> int {
-        return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
-    };
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(200);
-    if (ImGui::InputTextWithHint("##Goto", "GOTO e.g. 2->enter", buf_pos, 20,
-                                 ImGuiInputTextFlags_CallbackCharFilter | ImGuiInputTextFlags_EnterReturnsTrue,
-                                 filter)) {
-        int val{};
-        if (std::from_chars(buf_pos, buf_pos + strlen(buf_pos), val).ec == std::errc{}) {
-            recorder.set_pos(val - 1); // TODO: -1 is clumsy.
-        }
-        buf_pos[0] = '\0';
-
-        // Regain focus:
-        ImGui::SetKeyboardFocusHere(-1);
-    }
-#endif
-
-    // TODO: re-implement file-saving
+    // TODO: re-implement file-saving?
     imgui_str(rule_str);
 }
 
@@ -510,6 +492,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         // TODO: refine...
         rcount = std::clamp(rcount, 0, freec);
 
+        // TODO: allow / disallow scrolling ctrl...
         // ~ referred to InputScalar...
         // TODO: 200->global constant...
         const float r = ImGui::GetFrameHeight();
@@ -1034,13 +1017,30 @@ int main(int argc, char** argv) {
             nav.window("File nav", &show_nav_window, recorder);
         }
 
-        // TODO: support drawing?
-        // TODO: clear outside...
-        // TODO: set as init-state...
-        // TODO: full-featured on-restart/new rule behavior...
-        // TODO: mini window seems necessary...
-        // TODO: min-size for tile?
+        // TODO:
+        // whether to support drawing?
+        // [clear 0] [clear 1] [clear outside 0] [clear outside 1]
+        // [set as init-state] problem: what if size is already changed?
+        // [random fill] whether to use tileT_fill_arg? where to specify density?
+        // [min-width/height constraint]
+        // [mini-window when zoom==1]
+        // [on-restart / on new rule behavior]
+        // whether to support period?
+        // whether to consume "rule = ..."
         auto show_tile = [&] {
+            // TODO: refine "resize" gui and logic...
+            static char input_width[20]{}, input_height[20]{};
+            const auto filter = [](ImGuiInputTextCallbackData* data) -> int {
+                return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
+            };
+            ImGui::InputTextWithHint("##Width", "width", input_width, 20, ImGuiInputTextFlags_CallbackCharFilter,
+                                     filter);
+            ImGui::SameLine();
+            ImGui::InputTextWithHint("##Height", "height", input_height, 20, ImGuiInputTextFlags_CallbackCharFilter,
+                                     filter);
+            ImGui::SameLine();
+            const bool resize = ImGui::Button("Resize");
+
             // TODO: move elsewhere in the gui?
             ImGui::Text("Width:%d,Height:%d,Gen:%d,Density:%.4f", runner.tile().width(), runner.tile().height(),
                         runner.gen(), float(legacy::count(runner.tile())) / runner.tile().area());
@@ -1056,14 +1056,15 @@ int main(int argc, char** argv) {
             ImGui::SameLine();
             const bool center = ImGui::Button("Center");
             ImGui::SameLine();
-            ImGui::BeginDisabled();
             imgui_str("Zoom");
             for (const int z : {1, 2, 4, 8}) {
                 ImGui::SameLine();
                 // TODO: avoid usage of format...
-                ImGui::RadioButton(std::format("{}##Z{}", z, z).c_str(), zoom == z);
+                if (ImGui::RadioButton(std::format("{}##Z{}", z, z).c_str(), zoom == z)) {
+                    img_off = {8, 8}; // TODO: temporarily intentional...
+                    zoom = z;
+                }
             }
-            ImGui::EndDisabled();
 
             ImGui::SameLine();
             const bool fit = ImGui::Button("Fit");
@@ -1112,6 +1113,24 @@ int main(int argc, char** argv) {
                     // TODO: how to support background period then?
                     assert(runner.tile().size() == fit_size); // ???
                 }
+            }
+            if (resize) {
+                int iwidth = 0, iheight = 0;
+                auto [ptr, ec] = std::from_chars(input_width, input_width + 20, iwidth);
+                auto [ptr2, ec2] = std::from_chars(input_height, input_height + 20, iheight);
+                if (ec == std::errc{} && ec2 == std::errc{}) {
+                    if (iwidth > 10 && iwidth < 1000 && iheight > 10 && iheight < 1000) {
+                        img_off = {0, 0};
+                        zoom = 1; // <-- TODO: whether to reset zoom here?
+                        const legacy::rectT size{.width = iwidth, .height = iheight};
+                        if (runner.tile().size() != size) {
+                            runner.restart(filler, size);
+                        }
+                    }
+                }
+                // else ...
+                input_width[0] = '\0';
+                input_height[0] = '\0';
             }
 
             // Size is fixed now:
@@ -1433,6 +1452,8 @@ int main(int argc, char** argv) {
                         }
                     }
                     ImGui::EndGroup();
+
+                    show_tile();
                     ImGui::PopItemWidth();
 
                     // TODO: enable/disable keyboard ctrl (enable by default)
@@ -1461,8 +1482,6 @@ int main(int argc, char** argv) {
                         }
                         ctrl.pause = true;
                     }
-
-                    show_tile();
                 }
                 ImGui::EndTable();
             }
