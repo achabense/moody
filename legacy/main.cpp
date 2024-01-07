@@ -921,14 +921,15 @@ public:
 struct runner_ctrl {
     legacy::ruleT rule;
 
-    static constexpr int pergen_min = 1, pergen_max = 20;
-    int pergen = 1;
+    // TODO: better name?
+    static constexpr int pace_min = 1, pace_max = 20;
+    int pace = 1;
     bool anti_flick = true; // TODO: add explanation
-    int actual_pergen() const {
-        if (anti_flick && legacy::will_flick(rule) && pergen % 2) {
-            return pergen + 1;
+    int actual_pace() const {
+        if (anti_flick && legacy::will_flick(rule) && pace % 2) {
+            return pace + 1;
         }
-        return pergen;
+        return pace;
     }
 
     static constexpr int start_min = 0, start_max = 1000;
@@ -950,7 +951,7 @@ struct runner_ctrl {
             }
             if (!pause && !pause2) {
                 if (ImGui::GetFrameCount() % (gap_frame + 1) == 0) {
-                    runner.run(rule, actual_pergen());
+                    runner.run(rule, actual_pace());
                 }
             }
         }
@@ -1001,7 +1002,7 @@ int main(int argc, char** argv) {
     runner.restart(filler);
 
     runner_ctrl ctrl{
-        .rule = recorder.current(), .pergen = 1, .anti_flick = true, .start_from = 0, .gap_frame = 0, .pause = false};
+        .rule = recorder.current(), .pace = 1, .anti_flick = true, .start_from = 0, .gap_frame = 0, .pause = false};
 
     bool show_nav_window = true;
     file_nav_with_recorder nav;
@@ -1394,8 +1395,8 @@ int main(int argc, char** argv) {
                         ImGui::SameLine();
                         // TODO: is this usage of ### correct?
                         // (Correct, but usage of format might be a bad idea here...)
-                        if (ImGui::Button(std::format("+p({})###+p", ctrl.actual_pergen()).c_str())) {
-                            extra = ctrl.actual_pergen();
+                        if (ImGui::Button(std::format("+p({})###+p", ctrl.actual_pace()).c_str())) {
+                            extra = ctrl.actual_pace();
                         }
                         ImGui::PopButtonRepeat();
                         ImGui::SameLine();
@@ -1408,11 +1409,10 @@ int main(int argc, char** argv) {
                                          ImGuiSliderFlags_NoInput);
                         ImGui::SliderInt("Start gen (0~1000)", &ctrl.start_from, ctrl.start_min, ctrl.start_max, "%d",
                                          ImGuiSliderFlags_NoInput);
-                        // TODO: better name? pace?
-                        ImGui::SliderInt("Pergen (1~20)", &ctrl.pergen, ctrl.pergen_min, ctrl.pergen_max, "%d",
+                        ImGui::SliderInt("Pace (1~20)", &ctrl.pace, ctrl.pace_min, ctrl.pace_max, "%d",
                                          ImGuiSliderFlags_NoInput);
                         ImGui::AlignTextToFramePadding();
-                        ImGui::Text("(Actual pergen: %d)", ctrl.actual_pergen());
+                        ImGui::Text("(Actual pace: %d)", ctrl.actual_pace());
                         ImGui::SameLine();
                         ImGui::Checkbox("anti-flick", &ctrl.anti_flick);
                     }
@@ -1465,10 +1465,10 @@ int main(int argc, char** argv) {
                         ctrl.gap_frame = std::min(ctrl.gap_max, ctrl.gap_frame + 1);
                     }
                     if (imgui_keypressed(ImGuiKey_3, true)) {
-                        ctrl.pergen = std::max(ctrl.pergen_min, ctrl.pergen - 1);
+                        ctrl.pace = std::max(ctrl.pace_min, ctrl.pace - 1);
                     }
                     if (imgui_keypressed(ImGuiKey_4, true)) {
-                        ctrl.pergen = std::min(ctrl.pergen_max, ctrl.pergen + 1);
+                        ctrl.pace = std::min(ctrl.pace_max, ctrl.pace + 1);
                     }
                     // TODO: explain... apply to other ctrls?
                     if ((ctrl.pause2 || !ImGui::GetIO().WantCaptureKeyboard) &&
@@ -1478,7 +1478,7 @@ int main(int argc, char** argv) {
                     // TODO: temp (this function turns out to be necessary...)
                     if (imgui_keypressed(ImGuiKey_M, true)) {
                         if (ctrl.pause) {
-                            extra = ctrl.actual_pergen();
+                            extra = ctrl.actual_pace();
                         }
                         ctrl.pause = true;
                     }
