@@ -5,7 +5,6 @@
 
 #include "app2.hpp"
 #include "app_sdl.hpp"
-#include "imgui_internal.h" // TODO: only for `RenderNavHighlight`
 
 #include "rule_pp.hpp"
 
@@ -489,26 +488,11 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         // TODO: the range should be scoped by locks... so, what should rcount be?
         static int rcount = 0.5 * k;
         const int freec = legacy::get_free_indexes(locked, part).size(); // TODO: wasteful...
-        // TODO: refine...
-        rcount = std::clamp(rcount, 0, freec);
 
-        // TODO: allow / disallow scrolling ctrl...
-        // ~ referred to InputScalar...
         // TODO: 200->global constant...
-        const float r = ImGui::GetFrameHeight();
-        const float s = ImGui::GetStyle().ItemInnerSpacing.x;
-        ImGui::SetNextItemWidth(200 - 2 * (r + s)); // TODO: underflow? (200 is a bit short...)
-        ImGui::SliderInt("##Slider", &rcount, 0, k, "%d", ImGuiSliderFlags_NoInput);
-        ImGui::PushButtonRepeat(true);
-        ImGui::SameLine(0, s);
-        if (ImGui::Button("-", ImVec2(r, r))) {
-            rcount = std::max(0, rcount - 1);
-        }
-        ImGui::SameLine(0, s);
-        if (ImGui::Button("+", ImVec2(r, r))) {
-            rcount = std::min(freec, rcount + 1);
-        }
-        ImGui::PopButtonRepeat();
+        ImGui::SetNextItemWidth(200);
+        imgui_int_slider("##Quantity", &rcount, 0, k);
+        rcount = std::clamp(rcount, 0, freec);
 
         ImGui::SameLine();
         if (ImGui::Button("Randomize") || imgui_keypressed(ImGuiKey_Enter, false)) {
@@ -932,7 +916,8 @@ struct runner_ctrl {
         return pace;
     }
 
-    static constexpr int start_min = 0, start_max = 1000;
+    // TODO: remove this feature?
+    static constexpr int start_min = 0, start_max = 200;
     int start_from = 0;
 
     static constexpr int gap_min = 0, gap_max = 20;
@@ -1034,12 +1019,15 @@ int main(int argc, char** argv) {
             const auto filter = [](ImGuiInputTextCallbackData* data) -> int {
                 return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
             };
+            const float s = ImGui::GetStyle().ItemInnerSpacing.x;
+            ImGui::SetNextItemWidth((200 - s) / 2);
             ImGui::InputTextWithHint("##Width", "width", input_width, 20, ImGuiInputTextFlags_CallbackCharFilter,
                                      filter);
-            ImGui::SameLine();
+            ImGui::SameLine(0, s);
+            ImGui::SetNextItemWidth((200 - s) / 2);
             ImGui::InputTextWithHint("##Height", "height", input_height, 20, ImGuiInputTextFlags_CallbackCharFilter,
                                      filter);
-            ImGui::SameLine();
+            ImGui::SameLine(0, s);
             const bool resize = ImGui::Button("Resize");
 
             // TODO: move elsewhere in the gui?
@@ -1059,7 +1047,7 @@ int main(int argc, char** argv) {
             ImGui::SameLine();
             imgui_str("Zoom");
             for (const int z : {1, 2, 4, 8}) {
-                ImGui::SameLine();
+                ImGui::SameLine(0, s);
                 // TODO: avoid usage of format...
                 if (ImGui::RadioButton(std::format("{}##Z{}", z, z).c_str(), zoom == z)) {
                     img_off = {8, 8}; // TODO: temporarily intentional...
@@ -1068,7 +1056,7 @@ int main(int argc, char** argv) {
             }
 
             ImGui::SameLine();
-            const bool fit = ImGui::Button("Fit");
+            const bool fit = ImGui::Button("Fit"); // TODO: size preview?
             // ImGui::SameLine(), imgui_str("|");
             // ImGui::SameLine();
             // const bool select_all = ImGui::Button("Select all");
@@ -1407,10 +1395,8 @@ int main(int argc, char** argv) {
                         // TODO: Gap-frame shall be really timer-based...
                         ImGui::SliderInt("Gap Frame (0~20)", &ctrl.gap_frame, ctrl.gap_min, ctrl.gap_max, "%d",
                                          ImGuiSliderFlags_NoInput);
-                        ImGui::SliderInt("Start gen (0~1000)", &ctrl.start_from, ctrl.start_min, ctrl.start_max, "%d",
-                                         ImGuiSliderFlags_NoInput);
-                        ImGui::SliderInt("Pace (1~20)", &ctrl.pace, ctrl.pace_min, ctrl.pace_max, "%d",
-                                         ImGuiSliderFlags_NoInput);
+                        imgui_int_slider("Start gen (0~200)", &ctrl.start_from, ctrl.start_min, ctrl.start_max);
+                        imgui_int_slider("Pace (1~20)", &ctrl.pace, ctrl.pace_min, ctrl.pace_max);
                         ImGui::AlignTextToFramePadding();
                         ImGui::Text("(Actual pace: %d)", ctrl.actual_pace());
                         ImGui::SameLine();
@@ -1430,16 +1416,9 @@ int main(int argc, char** argv) {
                         if (!filler.use_seed) {
                             ImGui::BeginDisabled();
                         }
-                        // TODO: uint32_t...
-                        // TODO: want resetting only when +/-/enter...
-                        int seed = filler.seed;
-                        // TODO: same as "rule_editor"'s... but don't want to affect Label...
-                        if (ImGui::InputInt("Seed (0~99)", &seed)) {
-                            seed = std::clamp(seed, 0, 99);
-                            if (seed != filler.seed) {
-                                filler.seed = seed;
-                                restart = true;
-                            }
+                        if (int seed = filler.seed; imgui_int_slider("Seed (0~99)", &seed, 0, 99)) {
+                            filler.seed = seed;
+                            restart = true;
                         }
                         if (!filler.use_seed) {
                             ImGui::EndDisabled();

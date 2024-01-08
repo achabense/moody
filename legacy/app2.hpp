@@ -7,6 +7,8 @@
 #include "app.hpp"
 #include "imgui.h"
 
+#include "imgui_internal.h" // TODO: record dependency...
+
 using namespace std::chrono_literals;
 
 // Not necessary?
@@ -58,6 +60,47 @@ inline void imgui_strdisabled(std::string_view str) {
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
     imgui_str(str);
     ImGui::PopStyleColor();
+}
+
+// ~ referring to ImGui::InputScalar; recheck...
+// TODO: better name; allow/disallow ++/-- by mouse scrolling?
+inline bool imgui_int_slider(const char* label, int* v, int v_min, int v_max) {
+    if (ImGui::GetCurrentWindow()->SkipItems) {
+        return false;
+    }
+
+    int v2 = *v;
+
+    const float r = ImGui::GetFrameHeight();
+    const float s = ImGui::GetStyle().ItemInnerSpacing.x;
+    ImGui::BeginGroup();
+    ImGui::PushID(label);
+    ImGui::SetNextItemWidth(std::max(1.0f, ImGui::CalcItemWidth() - 2 * (r + s)));
+    ImGui::SliderInt("", &v2, v_min, v_max, "%d", ImGuiSliderFlags_NoInput);
+    ImGui::PushButtonRepeat(true);
+    ImGui::SameLine(0, s);
+    // TODO: whether to push&pop framepadding?
+    if (ImGui::Button("-", ImVec2(r, r))) {
+        --v2;
+    }
+    ImGui::SameLine(0, s);
+    if (ImGui::Button("+", ImVec2(r, r))) {
+        ++v2;
+    }
+    ImGui::PopButtonRepeat();
+    // TODO: FindRenderedTextEnd is a function in imgui_internal.h...
+    const char* label_end = ImGui::FindRenderedTextEnd(label);
+    if (label != label_end) {
+        ImGui::SameLine(0, s);
+        imgui_str(std::string_view(label, label_end));
+    }
+    ImGui::PopID();
+    ImGui::EndGroup();
+
+    v2 = std::clamp(v2, v_min, v_max);
+    const bool changed = *v != v2;
+    *v = v2;
+    return changed;
 }
 
 inline bool imgui_keypressed(ImGuiKey key, bool repeat) {
