@@ -1074,11 +1074,13 @@ int main(int argc, char** argv) {
             if (!paste) {
                 ImGui::BeginDisabled();
             }
-            if (ImGui::Button("Drop paste")) {
-                paste.reset();
-            }
+            // TODO: (temp) will forget to enddisabled if reset here
+            const bool drop_paste = ImGui::Button("Drop paste");
             if (!paste) {
                 ImGui::EndDisabled();
+            }
+            if (drop_paste) {
+                paste.reset();
             }
 
             const ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
@@ -1275,8 +1277,7 @@ int main(int argc, char** argv) {
             // TODO: (temp) shouldn't be scoped in sel block...
             if (imgui_keypressed(ImGuiKey_V, false)) {
                 if (const char* text = ImGui::GetClipboardText()) {
-                    paste.emplace(legacy::rectT{2, 2});
-                    legacy::from_RLE_str(*paste, text);
+                    paste = legacy::from_RLE_str(text);
                     paste_texture = paste_img.update(*paste);
 
                     // TODO: otherwise, alpha doesn't work...

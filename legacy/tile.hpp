@@ -8,14 +8,13 @@
 namespace legacy {
     static_assert(INT_MAX >= INT32_MAX);
 
-    // TODO: rename to sizeT? tileT::XXX?
+    // TODO: rename to sizeT? tileT::sizeT & tileT::posT?
+    // TODO: for posT/rectT, whether to pass by value or by reference?
     struct rectT {
         int width, height;
         friend bool operator==(const rectT&, const rectT&) = default;
     };
 
-    // TODO: for posT/rectT, whether to pass by value or by reference?
-    // TODO: better be long long...
     struct posT {
         int x, y;
         friend bool operator==(const posT&, const posT&) = default;
@@ -25,20 +24,33 @@ namespace legacy {
         return {.x = size.width, .y = size.height};
     }
 
-    // TODO: add basic noexcept annotation?
-    // TODO: when is it needed to [return] a tile?
     // TODO: explain layout... reorganize for better readability...
+    // TODO: add assertions, especially about empty tileT... (e.g. currently even operator== is invalid)
     class tileT {
         rectT m_size; // observable width and height.
         bool* m_data; // layout: [height+2][width]|[height+2][2].
 
     public:
-        explicit tileT(const rectT& size) : m_size(size) {
-            // TODO: not suitable now... move to `apply`, or eliminate the constraint?
-            assert(m_size.width > 0 && m_size.height > 0);
-            m_data = new bool[(m_size.width + 2) * (m_size.height + 2)]{};
+        void swap(tileT& other) noexcept {
+            std::swap(m_size, other.m_size);
+            std::swap(m_data, other.m_data);
+        }
+        tileT() noexcept : m_size{0, 0}, m_data{nullptr} {}
+        tileT(tileT&& other) noexcept : tileT() { swap(other); }
+        tileT& operator=(tileT&& other) noexcept {
+            swap(other);
+            return *this;
         }
 
+        explicit tileT(const rectT& size) : tileT() {
+            if (size.width > 0 && size.height > 0) {
+                m_size = size;
+                m_data = new bool[(m_size.width + 2) * (m_size.height + 2)]{};
+            }
+        }
+        ~tileT() { delete[] m_data; }
+
+        // TODO: rephrase...
         // conceptually write-only after this call...
         void resize(const rectT& size) {
             if (m_size != size) {
@@ -47,17 +59,19 @@ namespace legacy {
             }
         }
 
-        ~tileT() { delete[] m_data; }
-
-        // TODO: should empty state be supported?
-        // TODO: support copy when needed...
-        tileT() = delete;
-        tileT(const tileT&) = delete;
-        tileT& operator=(const tileT&) = delete;
-
-        void swap(tileT& other) {
-            std::swap(m_size, other.m_size);
-            std::swap(m_data, other.m_data);
+        tileT(const tileT& other) : tileT(other.m_size) {
+            if (other.m_data) {
+                std::copy_n(other.m_data, (m_size.width + 2) * (m_size.height + 2), m_data);
+            }
+        }
+        tileT& operator=(const tileT& other) {
+            if (this != &other) {
+                resize(other.m_size);
+                if (other.m_data) {
+                    std::copy_n(other.m_data, (m_size.width + 2) * (m_size.height + 2), m_data);
+                }
+            }
+            return *this;
         }
 
     public:
@@ -222,6 +236,7 @@ namespace legacy {
             return c;
         }
 
+#if 0
         inline int count_diff(const tileT& l, const tileT& r) {
             assert(l.size() == r.size());
             int c = 0;
@@ -231,6 +246,7 @@ namespace legacy {
             }
             return c;
         }
+#endif
 
         // TODO: is this copy or paste???
         enum class copyE { Value, Or, Xor };
@@ -265,17 +281,9 @@ namespace legacy {
         }
 
 #if 0
-        inline void clone(const tileT& source, tileT& dest) {
-            assert(&source != &dest);
-
-            dest.resize(source.size()); // <????
-            // ~ Why is there no ranges::copy(range,range) version?
-            std::ranges::copy(source.data(), dest.data().begin());
-        }
-
         // TODO: is the name meaningful?
         // Return smallest rectT ~ (>= target) && (% period == 0)
-        inline rectT upscale(rectT target, rectT period) {
+        inline rectT upscale(const rectT& target, const rectT& period) {
             const auto upscale = [](int target, int period) { //
                 return ((target + period - 1) / period) * period;
             };
@@ -284,30 +292,9 @@ namespace legacy {
                     .height = upscale(target.height, period.height)};
         }
 
-        // TODO: special-case all0/1?
-        inline void piece_up(const tileT& period, tileT& target) {
-            target.resize(upscale(target.size(), period.size()));
-            // assert(target.width() >= period.width());
-            // assert(target.height() >= period.height());
-            // assert(target.width() % period.width() == 0);
-            // assert(target.height() % period.height() == 0);
+        inline void piece_up(const tileT& period, tileT& target);
 
-            for (int y = 0; y < target.height(); y += period.height()) {
-                for (int x = 0; x < target.width(); x += period.width()) {
-                    copy(period, target, {x, y});
-                }
-            }
-        }
-
-        // TODO: will % be too slow?
-        inline void piece_up(const tileT& period, tileT& target, posT begin /*[*/, posT end /*)*/) {
-            // TODO assert...
-            for (int y = begin.y; y < end.y; ++y) {
-                for (int x = begin.x; x < end.x; ++x) {
-                    target.line(y)[x] = period.line(y % period.height())[x % period.width()];
-                }
-            }
-        }
+        inline void piece_up(const tileT& period, tileT& target, posT begin /*[*/, posT end /*)*/);
 #endif
         // TODO: tileT_fill_arg / random_fill goes here...
 
@@ -316,6 +303,7 @@ namespace legacy {
     // TODO: As to pattern modification:
     // clipboard-based copy/paste is wasteful... enable in-memory mode (tileT-based)...
 
+    // TODO: begin,end?
     // https://conwaylife.com/wiki/Run_Length_Encoded
     inline std::string to_RLE_str(const tileT& tile) {
         // (wontfix) consecutive '$'s are not combined.
@@ -363,19 +351,28 @@ namespace legacy {
     }
 
     // TODO: re-implement...
-    inline void from_RLE_str(tileT& tile, const char* str) {
+    // TODO: return optional<rule>?
+    inline tileT from_RLE_str(std::string_view text) {
+        const char *str = text.data(), *end = str + text.size();
+
         // TODO: temp; skip first line; test only...
         if (*str == 'x') {
-            while (*str != '\n') {
+            while (str != end && *str != '\n') {
                 ++str;
             }
             ++str;
         }
 
-        // TODO: whitespace...
-        auto take = [&str, end = str + strlen(str)]() -> std::pair<int, char> {
+        auto take = [&str, end]() -> std::pair<int, char> {
+            while (str != end && (*str == '\n' || *str == '\r' || *str == ' ')) {
+                ++str;
+            }
+            if (str == end) {
+                return {1, '!'};
+            }
+
             int n = 1;
-            if (*str >= '0' && *str <= '9') {
+            if (*str >= '1' && *str <= '9') {
                 auto [ptr, ec] = std::from_chars(str, end, n);
                 if (ec == std::errc{}) {
                     str = ptr;
@@ -416,11 +413,29 @@ namespace legacy {
             max_width = std::max(max_width, (int)line.size());
         }
         assert(!lines.empty());
-        tile.resize({.width = max_width, .height = (int)lines.size()}); // TODO: reconsider tile's size constraints...
+        tileT tile({.width = max_width, .height = (int)lines.size()});
         for (int i = 0; i < lines.size(); ++i) {
             for (int j = 0; j < lines[i].size(); ++j) {
                 tile.line(i)[j] = lines[i][j];
             }
         }
+        return tile;
     }
+
+#ifndef NDEBUG
+    // TODO: refine...
+    namespace _misc {
+        inline const bool test_RLE_str = [] {
+            tileT tile({.width = 32, .height = 32});
+            // TODO: use random_fill...
+            for (auto& b : tile.data()) {
+                b = rand() & 1;
+            }
+            const std::string str = to_RLE_str(tile);
+            const tileT tile2 = from_RLE_str(str);
+            assert(tile == tile2);
+            return true;
+        }();
+    } // namespace _misc
+#endif
 } // namespace legacy

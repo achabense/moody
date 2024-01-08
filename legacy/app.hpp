@@ -68,7 +68,7 @@ class torusT {
     int m_gen;
 
 public:
-    explicit torusT(legacy::rectT size) : m_tile(size), m_side(size), m_gen(0) {}
+    explicit torusT(const legacy::rectT& size) : m_tile(size), m_side(size), m_gen(0) {}
 
     // TODO: reconsider whether to expose non-const tile...
     legacy::tileT& tile() { return m_tile; }
