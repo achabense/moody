@@ -219,6 +219,133 @@ public:
     }
 };
 
+// TODO: refine...
+// TODO: able to create/append/open file?
+class file_nav {
+    using path = std::filesystem::path;
+    using clock = std::chrono::steady_clock;
+
+    char buf_path[200]{};
+    char buf_filter[20]{".txt"};
+
+    std::vector<std::filesystem::directory_entry> dirs;
+    std::vector<std::filesystem::directory_entry> files;
+
+    clock::time_point expired = {};
+
+    void set_current(const path& p) {
+        // (Catching eagerly to avoid some flickering...)
+        try {
+            std::filesystem::current_path(p);
+            expired = {};
+        } catch (const std::exception& what) {
+            // TODO: what encoding?
+            logger::log_temp(1000ms, "Exception:\n{}", what.what());
+        }
+    }
+    void refresh() {
+        // Setting outside of try-block to avoid too frequent failures...
+        // TODO: log_temp is global; can be problematic...
+        expired = std::chrono::steady_clock::now() + 3000ms; // TODO: this can be longer...
+        try {
+            dirs.clear();
+            files.clear();
+            for (const auto& entry : std::filesystem::directory_iterator(
+                     std::filesystem::current_path(), std::filesystem::directory_options::skip_permission_denied)) {
+                const auto status = entry.status();
+                if (is_regular_file(status)) {
+                    files.emplace_back(entry);
+                }
+                if (is_directory(status)) {
+                    dirs.emplace_back(entry);
+                }
+            }
+        } catch (const std::exception& what) {
+            // TODO: what encoding?
+            logger::log_temp(1000ms, "Exception:\n{}", what.what());
+        }
+    }
+
+public:
+    // TODO: refine...
+    inline static std::vector<std::pair<path, std::string>> additionals;
+    static void add_special_path(path&& path, const char* title) { //
+        additionals.emplace_back(std::move(path), title);
+    }
+
+    [[nodiscard]] std::optional<path> window(const char* id_str, bool* p_open) {
+        auto window = imgui_window(id_str, p_open);
+        if (!window) {
+            return std::nullopt;
+        }
+
+        std::optional<path> target = std::nullopt;
+
+        imgui_strwrapped(cpp17_u8string(std::filesystem::current_path()));
+        ImGui::Separator();
+
+        if (ImGui::BeginTable("##Table", 2, ImGuiTableFlags_Resizable)) {
+            if (clock::now() > expired) {
+                refresh();
+            }
+
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            {
+                if (ImGui::InputText("Path", buf_path, std::size(buf_path), ImGuiInputTextFlags_EnterReturnsTrue)) {
+                    set_current(std::filesystem::u8path(buf_path));
+                    buf_path[0] = '\0';
+                }
+                for (const auto& [path, title] : additionals) {
+                    if (ImGui::MenuItem(title.c_str())) {
+                        set_current(path);
+                    }
+                }
+                if (ImGui::MenuItem("..")) {
+                    set_current("..");
+                }
+                ImGui::Separator();
+                if (auto child = imgui_childwindow("Folders")) {
+                    if (dirs.empty()) {
+                        imgui_strdisabled("None");
+                    }
+                    for (const auto& entry : dirs) {
+                        // TODO: cache str?
+                        const auto str = cpp17_u8string(entry.path().filename());
+                        if (ImGui::Selectable(str.c_str())) {
+                            // Won't affect the loop at this frame.
+                            set_current(entry.path());
+                        }
+                    }
+                }
+            }
+            ImGui::TableNextColumn();
+            {
+                ImGui::InputText("Filter", buf_filter, std::size(buf_filter));
+                ImGui::Separator();
+                if (auto child = imgui_childwindow("Files")) {
+                    bool has = false;
+                    for (const auto& entry : files) {
+                        const auto str = cpp17_u8string(entry.path().filename());
+                        if (str.find(buf_filter) != str.npos) {
+                            has = true;
+                            if (ImGui::Selectable(str.c_str())) {
+                                target = entry.path();
+                            }
+                        }
+                    }
+                    if (!has) {
+                        imgui_strdisabled("None");
+                    }
+                }
+            }
+            ImGui::EndTable();
+        }
+
+        return target;
+    }
+};
+
 // TODO: still, avoid using fstream if possible...
 // - Why using C++ at all: there seems no standard way to `fopen` a unicode C-string path.
 // (The only one being ignore(max)->gcount, which appears )

@@ -679,139 +679,6 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
     }
 }
 
-// TODO: move elsewhere...
-// TODO: refine...
-// TODO: able to create/append/open file?
-class file_nav {
-    using path = std::filesystem::path;
-    using clock = std::chrono::steady_clock;
-
-    static path _u8path(const char* str) {
-        assert(str);
-        // TODO: silence the warning. The deprecation is very stupid.
-        // TODO: start_lifetime (new(...)) as char8_t?
-        return std::filesystem::u8path(str);
-    }
-
-    static path exe_path() {
-        const std::unique_ptr<char[], decltype(+SDL_free)> p(SDL_GetBasePath(), SDL_free);
-        assert(p); // TODO: what if this fails? what if exe path is invalid?
-        return _u8path(p.get());
-    }
-
-    char buf_path[200]{};
-    char buf_filter[20]{".txt"};
-
-    std::vector<std::filesystem::directory_entry> dirs;
-    std::vector<std::filesystem::directory_entry> files;
-
-    clock::time_point expired = {};
-
-    void set_current(const path& p) {
-        // (Catching eagerly to avoid some flickering...)
-        try {
-            std::filesystem::current_path(p);
-            expired = {};
-        } catch (const std::exception& what) {
-            // TODO: what encoding?
-            logger::log_temp(1000ms, "Exception:\n{}", what.what());
-        }
-    }
-    void refresh() {
-        // Setting outside of try-block to avoid too frequent failures...
-        // TODO: log_temp is global; can be problematic...
-        expired = std::chrono::steady_clock::now() + 3000ms;
-        try {
-            dirs.clear();
-            files.clear();
-            for (const auto& entry : std::filesystem::directory_iterator(
-                     std::filesystem::current_path(), std::filesystem::directory_options::skip_permission_denied)) {
-                const auto status = entry.status();
-                if (is_regular_file(status)) {
-                    files.emplace_back(entry);
-                }
-                if (is_directory(status)) {
-                    dirs.emplace_back(entry);
-                }
-            }
-        } catch (const std::exception& what) {
-            // TODO: what encoding?
-            logger::log_temp(1000ms, "Exception:\n{}", what.what());
-        }
-    }
-
-public:
-    [[nodiscard]] std::optional<path> window(const char* id_str, bool* p_open) {
-        auto window = imgui_window(id_str, p_open);
-        if (!window) {
-            return std::nullopt;
-        }
-
-        std::optional<path> target = std::nullopt;
-
-        imgui_strwrapped(cpp17_u8string(std::filesystem::current_path()));
-        ImGui::Separator();
-
-        if (ImGui::BeginTable("##Table", 2, ImGuiTableFlags_Resizable)) {
-            if (clock::now() > expired) {
-                refresh();
-            }
-
-            ImGui::TableNextRow();
-            ImGui::TableNextColumn();
-            {
-                if (ImGui::InputText("Path", buf_path, std::size(buf_path), ImGuiInputTextFlags_EnterReturnsTrue)) {
-                    set_current(_u8path(buf_path));
-                    buf_path[0] = '\0';
-                }
-                if (ImGui::MenuItem("-> Exe path")) {
-                    set_current(exe_path());
-                }
-                if (ImGui::MenuItem("-> ..")) {
-                    set_current("..");
-                }
-                ImGui::Separator();
-                if (auto child = imgui_childwindow("Folders")) {
-                    if (dirs.empty()) {
-                        imgui_strdisabled("None");
-                    }
-                    for (const auto& entry : dirs) {
-                        // TODO: cache str?
-                        const auto str = cpp17_u8string(entry.path().filename());
-                        if (ImGui::Selectable(str.c_str())) {
-                            // Won't affect the loop at this frame.
-                            set_current(entry.path());
-                        }
-                    }
-                }
-            }
-            ImGui::TableNextColumn();
-            {
-                ImGui::InputText("Filter", buf_filter, std::size(buf_filter));
-                ImGui::Separator();
-                if (auto child = imgui_childwindow("Files")) {
-                    bool has = false;
-                    for (const auto& entry : files) {
-                        const auto str = cpp17_u8string(entry.path().filename());
-                        if (str.find(buf_filter) != str.npos) {
-                            has = true;
-                            if (ImGui::Selectable(str.c_str())) {
-                                target = entry.path();
-                            }
-                        }
-                    }
-                    if (!has) {
-                        imgui_strdisabled("None");
-                    }
-                }
-            }
-            ImGui::EndTable();
-        }
-
-        return target;
-    }
-};
-
 // TODO: "paste" should have a similar widget...
 class file_nav_with_recorder {
     file_nav m_nav;
@@ -947,14 +814,27 @@ int main(int argc, char** argv) {
     app_backend::init();
 
     {
-        // Avoid "imgui.ini" (and maybe also "imgui_log.txt") sprinking everywhere.
-        // TODO: As to "strdup": temporary; the leaks are negligible here.
-        // TODO: eh... strdup is not always available...
-        // https://en.cppreference.com/w/c/experimental/dynamic/strdup
-        // TODO: maybe setting to SDL_GetBasePath / ...
-        const auto cur = std::filesystem::current_path();
-        ImGui::GetIO().IniFilename = strdup(cpp17_u8string(cur / "imgui.ini").c_str());
-        ImGui::GetIO().LogFilename = strdup(cpp17_u8string(cur / "imgui_log.txt").c_str());
+        // TODO: refine (names; logic)
+        char* base_path = SDL_GetBasePath();
+        if (base_path) {
+            const std::string path = base_path;
+            assert(path.ends_with('\\') || path.ends_with('/'));
+
+            const auto strdup = [](const std::string& str) {
+                char* buf = new char[str.size() + 1];
+                strcpy(buf, str.c_str());
+                return buf;
+            };
+
+            file_nav::add_special_path(std::filesystem::u8path(path), "Exe path");
+
+            // Avoid "imgui.ini" (and maybe also "imgui_log.txt") sprinkling everywhere.
+            // TODO: IniFilename and LogFilename should be unconditionally fixed (even if !base_path...)
+            // (wontfix) These memory leaks are negligible.
+            ImGui::GetIO().IniFilename = strdup(path + "imgui.ini");
+            ImGui::GetIO().LogFilename = strdup(path + "imgui_log.txt");
+            SDL_free(base_path);
+        }
 
         // TODO: remove when finished...
         std::filesystem::current_path(R"(C:\*redacted*\Desktop\rulelists_new)");
