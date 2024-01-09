@@ -48,7 +48,7 @@
     <ClInclude Include="app_sdl.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="rule_pp.hpp">
+    <ClInclude Include="rule_algo.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="app2.hpp">

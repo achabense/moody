@@ -3,10 +3,10 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #endif
 
-#include "app2.hpp"
+#include "app_imgui.hpp"
 #include "app_sdl.hpp"
 
-#include "rule_pp.hpp"
+#include "rule_algo.hpp"
 
 // TODO: bind key-enter to any iterable widgets / randomize?
 // TODO: support rollbacking diff rules?
