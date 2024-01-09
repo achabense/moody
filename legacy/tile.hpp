@@ -1,9 +1,18 @@
 #pragma once
 
 #include <charconv>
+#include <format> // TODO: utils...
+#include <random> // TODO: utils...
 #include <span>
 
 #include "rule.hpp"
+
+// TODO: together with tileT functions -> utils header...
+// TODO: explain...
+inline std::mt19937& global_mt19937() {
+    static std::mt19937 rand(time(0));
+    return rand;
+}
 
 namespace legacy {
     static_assert(INT_MAX >= INT32_MAX);
@@ -296,6 +305,10 @@ namespace legacy {
             }
         }
 
+        inline void random_fill(tileT& tile, std::mt19937& rand, double density) {
+            random_fill(tile, rand, density, {0, 0}, as_pos(tile.size()));
+        }
+
         inline void clear_inside(tileT& tile, posT begin, posT end, bool v) {
             assert(verify_pos(tile, begin, end));
 
@@ -328,14 +341,16 @@ namespace legacy {
     // TODO: As to pattern modification:
     // clipboard-based copy/paste is wasteful... enable in-memory mode (tileT-based)...
 
-    // TODO: begin,end?
     // https://conwaylife.com/wiki/Run_Length_Encoded
-    inline std::string to_RLE_str(const tileT& tile) {
+    inline std::string to_RLE_str(const tileT& tile, posT begin, posT end) {
+        assert(verify_pos(tile, begin, end));
+        const int width = end.x - begin.x;
+
         // (wontfix) consecutive '$'s are not combined.
         std::string str;
         int last_nl = 0;
-        for (int y = 0; y < tile.height(); ++y) {
-            if (y != 0) {
+        for (int y = begin.y; y < end.y; ++y) {
+            if (y != begin.y) {
                 str += '$';
             }
 
@@ -355,40 +370,49 @@ namespace legacy {
                     c = 0;
                 }
             };
-            for (bool b : std::span(tile.line(y), tile.width())) {
+            for (const bool b : std::span(tile.line(y) + begin.x, width)) {
                 if (v != b) {
                     flush();
                     v = b;
                 }
                 ++c;
             }
-            if (v != 0) {
-                flush();
-            }
+            flush(); // TODO: whether to ignore trailing zeros?
         }
         return str;
     }
 
-    inline std::string to_RLE_str(const tileT& t, const ruleT& r) {
-        // std::format("x = {}, y = {}, rule = {}\n{}!", t.width(), t.height(), to_MAP_str(r), to_RLE_str(t));
-        return "x = " + std::to_string(t.width()) + ", y = " + std::to_string(t.height()) +
-               ", rule = " + to_MAP_str(r) + '\n' + to_RLE_str(t) + '!';
+    inline std::string to_RLE_str(const tileT& tile) {
+        return to_RLE_str(tile, {0, 0}, as_pos(tile.size()));
     }
 
-    // TODO: re-implement...
-    // TODO: return optional<rule>?
-    inline tileT from_RLE_str(std::string_view text) {
-        const char *str = text.data(), *end = str + text.size();
+    inline std::string to_RLE_str(const ruleT& rule, const tileT& tile) {
+        return std::format("x = {}, y = {}, rule = {}\n{}!", tile.width(), tile.height(), to_MAP_str(rule),
+                           to_RLE_str(tile));
+    }
 
-        // TODO: temp; skip first line; test only...
-        if (*str == 'x') {
-            while (str != end && *str != '\n') {
+    inline std::string to_RLE_str(const ruleT& rule, const tileT& tile, posT begin, posT end) {
+        assert(verify_pos(tile, begin, end));
+        return std::format("x = {}, y = {}, rule = {}\n{}!", end.x - begin.x, end.y - begin.y, to_MAP_str(rule),
+                           to_RLE_str(tile, begin, end));
+    }
+
+    // TODO: parse leading line (x = ...)
+    // TODO: what if not matching? currently returning a 1x1 dot... should return nothing...
+    inline tileT from_RLE_str(std::string_view text, const rectT max_size = {.width = 2000, .height = 2000}) {
+        {
+            const char *str = text.data(), *end = str + text.size();
+            // TODO: temp; skip first line; test only...
+            if (*str == 'x') {
+                while (str != end && *str != '\n') {
+                    ++str;
+                }
                 ++str;
             }
-            ++str;
+            text = std::string_view(str, end);
         }
 
-        auto take = [&str, end]() -> std::pair<int, char> {
+        auto take = [end = text.data() + text.size()](const char*& str) -> std::pair<int, char> {
             while (str != end && (*str == '\n' || *str == '\r' || *str == ' ')) {
                 ++str;
             }
@@ -398,67 +422,74 @@ namespace legacy {
 
             int n = 1;
             if (*str >= '1' && *str <= '9') {
-                auto [ptr, ec] = std::from_chars(str, end, n);
-                if (ec == std::errc{}) {
-                    str = ptr;
+                const auto [ptr, ec] = std::from_chars(str, end, n);
+                if (ec != std::errc{} || ptr == end) {
+                    return {1, '!'};
                 }
+                str = ptr;
             }
+            assert(str != end);
             switch (*str++) {
             case 'b': return {n, 'b'};
             case 'o': return {n, 'o'};
             case '$': return {n, '$'};
-            default: return {n, '!'};
+            default: return {1, '!'};
             }
         };
 
-        std::vector<std::vector<bool>> lines;
-        lines.emplace_back();
-        for (;;) {
-            auto [n, c] = take();
+        long long width = 1, height = 1;
+        {
+            long long x = 0;
+            for (const char* str = text.data();;) {
+                const auto [n, c] = take(str);
+                assert(n >= 0);
+                if (c == '!') {
+                    break;
+                } else if (c == 'b' || c == 'o') {
+                    x += n;
+                } else {
+                    assert(c == '$');
+                    height += n;
+                    width = std::max(width, x);
+                    x = 0;
+                }
+            }
+            width = std::max(width, x);
+        }
+        if (width > max_size.width || height > max_size.height) {
+            throw std::runtime_error(std::format("Size too big: x = {}, y = {}\nLimit x <= {}, y <= {}", width, height,
+                                                 max_size.width, max_size.height));
+        }
+
+        tileT tile({.width = (int)width, .height = (int)height});
+        int x = 0, y = 0;
+        for (const char* str = text.data();;) {
+            const auto [n, c] = take(str);
             if (c == '!') {
                 break;
             }
             switch (c) {
             case 'b':
             case 'o':
-                for (int i = 0; i < n; ++i) {
-                    lines.back().push_back(c == 'o');
-                }
+                std::fill_n(tile.line(y) + x, n, c == 'o');
+                x += n;
                 break;
             case '$':
-                for (int i = 0; i < n; ++i) {
-                    lines.emplace_back();
-                }
+                y += n;
+                x = 0;
                 break;
-            }
-        }
-
-        int max_width = 1;
-        for (auto& line : lines) {
-            max_width = std::max(max_width, (int)line.size());
-        }
-        assert(!lines.empty());
-        tileT tile({.width = max_width, .height = (int)lines.size()});
-        for (int i = 0; i < lines.size(); ++i) {
-            for (int j = 0; j < lines[i].size(); ++j) {
-                tile.line(i)[j] = lines[i][j];
             }
         }
         return tile;
     }
 
 #ifndef NDEBUG
-    // TODO: refine...
+    // TODO: update when from_RLE_str accepts x = ... line...
     namespace _misc {
         inline const bool test_RLE_str = [] {
-            tileT tile({.width = 32, .height = 32});
-            // TODO: use random_fill...
-            for (auto& b : tile.data()) {
-                b = rand() & 1;
-            }
-            const std::string str = to_RLE_str(tile);
-            const tileT tile2 = from_RLE_str(str);
-            assert(tile == tile2);
+            tileT tile({.width = 32, .height = 60});
+            random_fill(tile, global_mt19937(), 0.5);
+            assert(tile == from_RLE_str(to_RLE_str(tile)));
             return true;
         }();
     } // namespace _misc

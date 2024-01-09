@@ -13,7 +13,6 @@
 // TODO: support rollbacking locks?
 // TODO: for editing opt, support in-lock and outof-lock mode?
 
-// TODO: -> app2.hpp...
 // TODO: allow/disallow scrolling...
 inline void iter_pair(const char* tag_first, const char* tag_prev, const char* tag_next, const char* tag_last,
                       auto act_first, auto act_prev, auto act_next, auto act_last) {
@@ -1157,22 +1156,23 @@ int main(int argc, char** argv) {
             // TODO: (temp) shouldn't be scoped in sel block...
             if (imgui_keypressed(ImGuiKey_V, false)) {
                 if (const char* text = ImGui::GetClipboardText()) {
-                    paste = legacy::from_RLE_str(text);
-                    paste_texture = paste_img.update(*paste);
+                    try {
+                        paste = legacy::from_RLE_str(text);
+                        paste_texture = paste_img.update(*paste);
 
-                    // TODO: otherwise, alpha doesn't work...
-                    // (solved by referring to ImGui_ImplSDLRenderer2_CreateFontsTexture...)
-                    // Ehh... TODO: this reinterpret_cast looks stupid...
-                    SDL_SetTextureBlendMode(reinterpret_cast<SDL_Texture*>(paste_texture), SDL_BLENDMODE_BLEND);
+                        // TODO: otherwise, alpha doesn't work...
+                        // (solved by referring to ImGui_ImplSDLRenderer2_CreateFontsTexture...)
+                        // Ehh... TODO: this reinterpret_cast looks stupid...
+                        SDL_SetTextureBlendMode(reinterpret_cast<SDL_Texture*>(paste_texture), SDL_BLENDMODE_BLEND);
+                    } catch (const std::exception& err) {
+                        logger::log_temp(2500ms, "{}", err.what());
+                    }
                 }
             }
             if (const auto s = sel.get()) {
                 if (imgui_keypressed(ImGuiKey_C, false) || imgui_keypressed(ImGuiKey_X, false)) {
-                    legacy::tileT t(s.size());
-                    legacy::copy(runner.tile(), s.min, s.max, t, {0, 0});
-                    ImGui::SetClipboardText(legacy::to_RLE_str(t, ctrl.rule).c_str());
+                    ImGui::SetClipboardText(legacy::to_RLE_str(ctrl.rule, runner.tile(), s.min, s.max).c_str());
                 }
-
                 if (imgui_keypressed(ImGuiKey_Backspace, false) || imgui_keypressed(ImGuiKey_X, false)) {
                     // TODO: outside/ 0/1.../ agar...
                     legacy::clear_inside(runner.tile(), s.min, s.max, 0);

@@ -11,12 +11,6 @@
 #include "rule.hpp"
 #include "tile.hpp"
 
-// TODO: explain...
-inline std::mt19937& global_mt19937() {
-    static std::mt19937 rand(time(0));
-    return rand;
-}
-
 // TODO: better name...
 // TODO: explain why float (there is no instant ImGui::SliderDouble)
 // (std::optional<uint32_t> has proven to be very awkward)
@@ -28,9 +22,9 @@ struct tileT_filler {
     void fill(legacy::tileT& tile) const {
         if (use_seed) {
             std::mt19937 rand(seed);
-            legacy::random_fill(tile, rand, density, {0, 0}, legacy::as_pos(tile.size()));
+            legacy::random_fill(tile, rand, density);
         } else {
-            legacy::random_fill(tile, global_mt19937(), density, {0, 0}, legacy::as_pos(tile.size()));
+            legacy::random_fill(tile, global_mt19937(), density);
         }
     }
 };
