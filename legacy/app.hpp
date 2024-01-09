@@ -11,57 +11,29 @@
 #include "rule.hpp"
 #include "tile.hpp"
 
-// TODO: add the rationale...
-static std::mt19937 global_mt19937(time(0));
+// TODO: explain...
+inline std::mt19937& global_mt19937() {
+    static std::mt19937 rand(time(0));
+    return rand;
+}
 
 // TODO: better name...
 // TODO: explain why float (there is no instant ImGui::SliderDouble)
 // (std::optional<uint32_t> has proven to be very awkward)
-struct tileT_fill_arg {
+struct tileT_filler {
     bool use_seed;
     uint32_t seed;
     float density; // ∈ [0.0f, 1.0f]
+
+    void fill(legacy::tileT& tile) const {
+        if (use_seed) {
+            std::mt19937 rand(seed);
+            legacy::random_fill(tile, rand, density, {0, 0}, legacy::as_pos(tile.size()));
+        } else {
+            legacy::random_fill(tile, global_mt19937(), density, {0, 0}, legacy::as_pos(tile.size()));
+        }
+    }
 };
-
-inline void random_fill(legacy::tileT& tile, const tileT_fill_arg& filler) {
-    // TODO: is the algo correct?
-    // TODO: explain why not using bernoulli_distribution
-    const auto fill_tile = [&tile](double density, std::mt19937& rand) {
-        const uint32_t c = std::mt19937::max() * std::clamp(density, 0.0, 1.0);
-        for (bool& b : tile.data()) {
-            b = rand() < c;
-        }
-    };
-
-    if (filler.use_seed) {
-        std::mt19937 rand(filler.seed);
-        fill_tile(filler.density, rand);
-    } else {
-        fill_tile(filler.density, global_mt19937);
-    }
-}
-
-#if 0
-// Flip density...
-// TODO: regional fill...
-inline void random_fill_v2(legacy::tileT& tile, const legacy::tileT& period, const tileT_fill_arg& filler) {
-    legacy::piece_up(period, tile);
-
-    const auto fill_tile = [&tile](double density, std::mt19937& rand) {
-        const uint32_t c = std::mt19937::max() * std::clamp(density, 0.0, 1.0);
-        for (bool& b : tile.data()) {
-            b ^= (rand() < c);
-        }
-    };
-
-    if (filler.use_seed) {
-        std::mt19937 rand(filler.seed);
-        fill_tile(filler.density, rand);
-    } else {
-        fill_tile(filler.density, global_mt19937);
-    }
-}
-#endif
 
 class torusT {
     legacy::tileT m_tile, m_side;
@@ -75,12 +47,12 @@ public:
     const legacy::tileT& tile() const { return m_tile; }
     int gen() const { return m_gen; }
 
-    void restart(tileT_fill_arg filler, std::optional<legacy::rectT> resize = {}) {
+    void restart(tileT_filler filler, std::optional<legacy::rectT> resize = {}) {
         if (resize) {
             m_tile.resize(*resize);
         }
 
-        random_fill(m_tile, filler);
+        filler.fill(m_tile);
         m_gen = 0;
     }
 

@@ -497,13 +497,13 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         ImGui::SameLine();
         if (ImGui::Button("Randomize") || imgui_keypressed(ImGuiKey_Enter, false)) {
             recorder.take(random_flip(inter.get_viewer(), part, locked, target, rcount, rcount,
-                                      global_mt19937)); // TODO: range...
+                                      global_mt19937())); // TODO: range...
         }
 
         ImGui::Separator();
         // TODO: +1 is clumsy
         ImGui::AlignTextToFramePadding();
-        imgui_str(std::format("Total:{} At:{}", recorder.size(), recorder.pos() + 1));
+        ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1);
         ImGui::SameLine();
         iter_pair(
             "<|", "prev", "next", "|>", //
@@ -838,7 +838,7 @@ public:
 
             // TODO: +1 is clumsy
             ImGui::AlignTextToFramePadding();
-            imgui_str(std::format("Total:{} At:{}", m_recorder.size(), m_recorder.pos() + 1));
+            ImGui::Text("Total:%d At:%d", m_recorder.size(), m_recorder.pos() + 1);
             ImGui::SameLine();
 
             bool hit = false;
@@ -982,7 +982,7 @@ int main(int argc, char** argv) {
     }
 
     // TODO: redesign...
-    tileT_fill_arg filler{.use_seed = true, .seed = 0, .density = 0.5};
+    tileT_filler filler{.use_seed = true, .seed = 0, .density = 0.5};
     torusT runner({.width = 480, .height = 360});
     runner.restart(filler);
 
@@ -1007,7 +1007,7 @@ int main(int argc, char** argv) {
         // whether to support drawing?
         // [clear 0] [clear 1] [clear outside 0] [clear outside 1]
         // [set as init-state] problem: what if size is already changed?
-        // [random fill] whether to use tileT_fill_arg? where to specify density?
+        // [random fill] whether to use tileT_filler? where to specify density?
         // [min-width/height constraint]
         // [mini-window when zoom==1]
         // [on-restart / on new rule behavior]
@@ -1292,27 +1292,14 @@ int main(int argc, char** argv) {
                     legacy::copy(runner.tile(), s.min, s.max, t, {0, 0});
                     ImGui::SetClipboardText(legacy::to_RLE_str(t, ctrl.rule).c_str());
                 }
-                // TODO: rand-mode (whether reproducible...)
-                // TODO: clear mode (random/all-0,all-1/paste...) / (clear inner/outer)
-                // TODO: horrible; redesign (including control) ...
-                // TODO: 0/1/other textures are subject to agar settings...
+
                 if (imgui_keypressed(ImGuiKey_Backspace, false) || imgui_keypressed(ImGuiKey_X, false)) {
-                    legacy::tileT& tile = runner.tile();
-                    for (int y = s.min.y; y < s.max.y; ++y) {
-                        for (int x = s.min.x; x < s.max.x; ++x) {
-                            tile.line(y)[x] = 0;
-                        }
-                    }
+                    // TODO: outside/ 0/1.../ agar...
+                    legacy::clear_inside(runner.tile(), s.min, s.max, 0);
                 }
                 if (imgui_keypressed(ImGuiKey_Equal, false)) {
-                    legacy::tileT& tile = runner.tile();
-                    // TODO: use tile_filler...
-                    constexpr uint32_t c = std::mt19937::max() * 0.5;
-                    for (int y = s.min.y; y < s.max.y; ++y) {
-                        for (int x = s.min.x; x < s.max.x; ++x) {
-                            tile.line(y)[x] = global_mt19937() < c;
-                        }
-                    }
+                    // TODO: specify density etc... or share with tileT_filler?
+                    legacy::random_fill(runner.tile(), global_mt19937(), 0.5, s.min, s.max);
                 }
                 // TODO: refine capturing...
                 if (imgui_keypressed(ImGuiKey_P, false)) {

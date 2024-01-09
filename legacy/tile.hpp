@@ -248,14 +248,17 @@ namespace legacy {
         }
 #endif
 
+        inline bool verify_pos(const tileT& tile, posT begin, posT end) {
+            return 0 <= begin.x && begin.x <= end.x && end.x <= tile.width() && //
+                   0 <= begin.y && begin.y <= end.y && end.y <= tile.height();
+        }
+
         // TODO: is this copy or paste???
         enum class copyE { Value, Or, Xor };
         template <copyE mode = copyE::Value>
         inline void copy(const tileT& source, posT begin, posT end, tileT& dest, posT dbegin) {
             assert(&source != &dest);
-            assert(0 <= begin.x && 0 <= begin.y);
-            assert(begin.x <= end.x && begin.y <= end.y);
-            assert(end.x <= source.width() && end.y <= source.height());
+            assert(verify_pos(source, begin, end));
             // TODO: dbegin...
 
             const int width = end.x - begin.x, height = end.y - begin.y;
@@ -280,6 +283,30 @@ namespace legacy {
             copy<mode>(source, {0, 0}, as_pos(source.size()), dest, dbegin);
         }
 
+        // TODO: add param const...
+        // TODO: is the algo correct?
+        // TODO: explain why not using bernoulli_distribution
+        inline void random_fill(tileT& tile, std::mt19937& rand, double density, posT begin, posT end) {
+            assert(verify_pos(tile, begin, end));
+
+            const uint32_t c = std::mt19937::max() * std::clamp(density, 0.0, 1.0);
+            for (int y = begin.y; y < end.y; ++y) {
+                bool* line = tile.line(y);
+                std::generate(line + begin.x, line + end.x, [&] { return rand() < c; });
+            }
+        }
+
+        inline void clear_inside(tileT& tile, posT begin, posT end, bool v) {
+            assert(verify_pos(tile, begin, end));
+
+            for (int y = begin.y; y < end.y; ++y) {
+                bool* line = tile.line(y);
+                std::fill(line + begin.x, line + end.x, v);
+            }
+        }
+
+        inline void clear_outside(tileT& tile, posT begin, posT end, bool v);
+
 #if 0
         // TODO: is the name meaningful?
         // Return smallest rectT ~ (>= target) && (% period == 0)
@@ -296,8 +323,6 @@ namespace legacy {
 
         inline void piece_up(const tileT& period, tileT& target, posT begin /*[*/, posT end /*)*/);
 #endif
-        // TODO: tileT_fill_arg / random_fill goes here...
-
     } // namespace tileT_utils
 
     // TODO: As to pattern modification:
