@@ -8,6 +8,14 @@
 
 #include "rule_algo.hpp"
 
+// TODO: rename...
+const int FixedItemWidth = 220;
+
+// TODO: remove optional<lockT>...
+// TODO: extract image-data class...
+// TODO: extract paste-info class...
+// TODO: extract ctrl.rule & recorder...
+
 // TODO: bind key-enter to any iterable widgets / randomize?
 // TODO: support rollbacking diff rules?
 // TODO: support rollbacking locks?
@@ -488,12 +496,12 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         static int rcount = 0.5 * k;
         const int freec = legacy::get_free_indexes(locked, part).size(); // TODO: wasteful...
 
-        // TODO: 200->global constant...
-        ImGui::SetNextItemWidth(200);
+        ImGui::SetNextItemWidth(FixedItemWidth);
         imgui_int_slider("##Quantity", &rcount, 0, k);
         rcount = std::clamp(rcount, 0, freec);
 
-        ImGui::SameLine();
+        // TODO: imgui_innerx...
+        ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
         if (ImGui::Button("Randomize") || imgui_keypressed(ImGuiKey_Enter, false)) {
             recorder.take(random_flip(inter.get_viewer(), part, locked, target, rcount, rcount,
                                       global_mt19937())); // TODO: range...
@@ -809,6 +817,7 @@ struct runner_ctrl {
     }
 };
 
+// TODO: are there portable ways to convert argv to a valid filesystem::path (without messing up encodings)?
 int main(int argc, char** argv) {
     app_backend::init();
 
@@ -853,12 +862,6 @@ int main(int argc, char** argv) {
     // }
 
     rule_recorder recorder;
-    // TODO: what encoding?
-    if (argc == 2) {
-        recorder.replace(read_rule_from_file(argv[1]));
-        // TODO: set as working path when the path is valid?
-        // TODO: what if the path is invalid?
-    }
 
     // TODO: redesign...
     tileT_filler filler{.use_seed = true, .seed = 0, .density = 0.5};
@@ -899,11 +902,12 @@ int main(int argc, char** argv) {
                 return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
             };
             const float s = ImGui::GetStyle().ItemInnerSpacing.x;
-            ImGui::SetNextItemWidth((200 - s) / 2);
+            const float w = ImGui::CalcItemWidth();
+            ImGui::SetNextItemWidth((w - s) / 2);
             ImGui::InputTextWithHint("##Width", "width", input_width, 20, ImGuiInputTextFlags_CallbackCharFilter,
                                      filter);
             ImGui::SameLine(0, s);
-            ImGui::SetNextItemWidth((200 - s) / 2);
+            ImGui::SetNextItemWidth((w - s) / 2);
             ImGui::InputTextWithHint("##Height", "height", input_height, 20, ImGuiInputTextFlags_CallbackCharFilter,
                                      filter);
             ImGui::SameLine(0, s);
@@ -912,7 +916,7 @@ int main(int argc, char** argv) {
             // TODO: move elsewhere in the gui?
             ImGui::Text("Width:%d,Height:%d,Gen:%d,Density:%.4f", runner.tile().width(), runner.tile().height(),
                         runner.gen(), float(legacy::count(runner.tile())) / runner.tile().area());
-            // TODO: canvas size, tile size, selected size...
+            // TODO: canvas size, tile size, selected size, paste size...
 
             // It has been proven that `img_off` works better than using `corner_idx` (cell idx in the corner)
             static ImVec2 img_off = {0, 0}; // TODO: supposed to be of integer-precision...
@@ -936,30 +940,20 @@ int main(int argc, char** argv) {
 
             ImGui::SameLine();
             const bool fit = ImGui::Button("Fit"); // TODO: size preview?
-            // ImGui::SameLine(), imgui_str("|");
-            // ImGui::SameLine();
-            // const bool select_all = ImGui::Button("Select all");
-            // ImGui::SameLine();
-            // const bool select_clear = ImGui::Button("Unselect");
-            // TODO: input size...
+            // TODO: select all, unselect button...
 
             // TODO: move elsewhere
             static std::optional<legacy::tileT> paste;
             static tile_image paste_img;
             static ImTextureID paste_texture;
             static legacy::posT paste_pos{0, 0};
-            ImGui::SameLine(), imgui_str("|");
-            ImGui::SameLine();
-            if (!paste) {
-                ImGui::BeginDisabled();
-            }
-            // TODO: (temp) will forget to enddisabled if reset here
-            const bool drop_paste = ImGui::Button("Drop paste");
-            if (!paste) {
-                ImGui::EndDisabled();
-            }
-            if (drop_paste) {
-                paste.reset();
+
+            if (paste) {
+                ImGui::SameLine(), imgui_str("|");
+                ImGui::SameLine();
+                if (ImGui::Button("Drop paste")) {
+                    paste.reset();
+                }
             }
 
             const ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
@@ -970,6 +964,7 @@ int main(int argc, char** argv) {
             if (canvas_size.x <= 0 || canvas_size.y <= 0) {
                 // TODO: show something when fit/etc are hit?
                 ctrl.pause2 = true;
+                // ImGui::Text("canvas: x=%f y=%f", canvas_size.x,canvas_size.y);
                 return;
             }
 
@@ -1030,13 +1025,15 @@ int main(int argc, char** argv) {
                 legacy::posT select_0{0, 0}, select_1{0, 0}; // cell index, not pixel.
 
                 void clear() { select_0 = select_1 = {0, 0}; }
-                bool all_selected(const legacy::rectT& size) const {
+                void toggle_select_all(const legacy::rectT& size) {
+                    // all-selected ? clear : select-all
                     const auto [min, max] = get();
-                    return min == legacy::posT{0, 0} && max == legacy::as_pos(size);
-                }
-                void select_all(const legacy::rectT& size) {
-                    select_0 = {0, 0};
-                    select_1 = {.x = size.width - 1, .y = size.height - 1};
+                    if (min == legacy::posT{0, 0} && max == legacy::as_pos(size)) {
+                        clear();
+                    } else {
+                        select_0 = {0, 0};
+                        select_1 = {.x = size.width - 1, .y = size.height - 1};
+                    }
                 }
 
                 struct minmaxT {
@@ -1147,11 +1144,7 @@ int main(int argc, char** argv) {
 
             // TODO: "shrink selection" utility?
             if (imgui_keypressed(ImGuiKey_A, false)) {
-                if (!sel.all_selected(tile_size)) {
-                    sel.select_all(tile_size);
-                } else {
-                    sel.clear();
-                }
+                sel.toggle_select_all(tile_size);
             }
             // TODO: (temp) shouldn't be scoped in sel block...
             if (imgui_keypressed(ImGuiKey_V, false)) {
@@ -1212,8 +1205,6 @@ int main(int argc, char** argv) {
         ImGui::SetNextWindowPos(viewport->WorkPos);
         ImGui::SetNextWindowSize(viewport->WorkSize);
         if (auto window = imgui_window("Tile", flags)) {
-            // ImGui::Checkbox("Log window", &show_log_window);
-            // ImGui::SameLine();
             ImGui::Checkbox("Nav window", &show_nav_window);
             ImGui::SameLine();
             // TODO: change color when is too fps is too low...
@@ -1230,7 +1221,7 @@ int main(int argc, char** argv) {
                 }
                 ImGui::TableNextColumn();
                 if (auto child = imgui_childwindow("Til")) {
-                    ImGui::PushItemWidth(200); // TODO: flexible...
+                    ImGui::PushItemWidth(FixedItemWidth);
                     ImGui::BeginGroup();
                     {
                         ImGui::Checkbox("Pause", &ctrl.pause);
@@ -1336,7 +1327,7 @@ int main(int argc, char** argv) {
 
         ImGui::ShowDemoWindow(); // TODO: remove (or comment-out) this when all done...
         logger::tempwindow();
-        app_backend::end_frame(); // !!! TODO: recheck
+        app_backend::end_frame();
 
         if (ctrl.rule != recorder.current()) {
             ctrl.rule = recorder.current();

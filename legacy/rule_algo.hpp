@@ -582,6 +582,7 @@ namespace legacy {
         return inter.to_rule(r);
     }
 
+    // TODO: rename to [set_]first / ...
     struct act_int {
         // TODO: disable !par.test(...) checks...
         static ruleT first(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked) {
