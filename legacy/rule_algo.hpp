@@ -263,16 +263,16 @@ namespace legacy::inline special_mappers {
     // TODO: explain; actually irrelevant of symmetry...
     // 1. I misunderstood "rotate" symmetry. "ro45" is never about symmetry (I've no idea what it is)
     // 2. As seemingly-senseless partition like ro45 can make non-trivial patterns, should support after all...
-    inline constexpr mapperT mp_ro_45("aqw"
-                                      "zse"
-                                      "xcd"); // "45" clockwise. TODO: explain...
-    // TODO: better name...
-    inline constexpr mapperT mp_tot_a("wqe"
-                                      "asd"
-                                      "zxc");
-    inline constexpr mapperT mp_tot_b("qse"
-                                      "awd"
-                                      "zxc");
+    // TODO: explain C8 (not related to static symmetry, but covers C4 and works with tot_xxc_s)
+    inline constexpr mapperT mp_C8("aqw"
+                                   "zse"
+                                   "xcd");
+    inline constexpr mapperT mp_tot_exc_s("wqe"
+                                          "asd"
+                                          "zxc"); // *C8 -> totalistic, excluding s
+    inline constexpr mapperT mp_tot_inc_s("qse"
+                                          "awd"
+                                          "zxc"); // *C8 -> totalistic, including s
     // TODO: about concepts...
     // TODO: for example, "totalistic" can only be expressed by equivT...
 
@@ -323,12 +323,12 @@ namespace legacy::inline special_mappers {
                                        "xsw"
                                        "0cd"); // 60 (clockwise)
 
-    inline constexpr mapperT mp_hex_tot_a("wq0"
-                                          "asd"
-                                          "0xc");
-    inline constexpr mapperT mp_hex_tot_b("qs0"
-                                          "awd"
-                                          "0xc");
+    inline constexpr mapperT mp_hex_tot_exc_s("wq0"
+                                              "asd"
+                                              "0xc"); // *C6 -> totalistic, excluding s
+    inline constexpr mapperT mp_hex_tot_inc_s("qs0"
+                                              "awd"
+                                              "0xc"); // *C6 -> totalistic, including s
 
     // -we     w e
     // asd -> a s d
@@ -454,7 +454,7 @@ namespace legacy {
 
     using lockT = codeT::map_to<bool>;
 
-    auto scan(const partitionT& par, const ruleT_data& rule, const lockT& locked) {
+    inline auto scan(const partitionT& par, const ruleT_data& rule, const lockT& locked) {
         struct counterT {
             int free_0 = 0, free_1 = 0;
             int locked_0 = 0, locked_1 = 0;
@@ -525,12 +525,14 @@ namespace legacy {
         return free_indexes;
     }
 
-    inline ruleT random_flip(ruleT r, const partitionT& par, const lockT& locked, const ruleT& lr, int count_min,
-                             int count_max, std::mt19937& rand) {
-        // TODO: precondition?
+    inline ruleT random_flip(ruleT r, const partitionT& par, const lockT& locked, const ruleT& lr, std::mt19937& rand,
+                             int count_min, int count_max /* not used, subject to future extension */) {
+        // TODO: precondition...
+        assert(count_max == count_min);
+
         std::vector<int> free;
         for (int j = 0; j < par.k(); ++j) {
-            auto group = par.jth_group(j);
+            const groupT group = par.jth_group(j);
             if (!any_locked(locked, group)) {
                 free.push_back(j);
             } else {
@@ -558,7 +560,7 @@ namespace legacy {
         using bool512 = std::array<bool, 512>;
         ruleT_data r = inter.from_rule(rule);
 
-        std::vector<int> free_indexes = get_free_indexes(locked, par);
+        const std::vector<int> free_indexes = get_free_indexes(locked, par);
 
         bool512 bools{};
         for (int j = 0; j < free_indexes.size(); ++j) {

@@ -4,7 +4,6 @@
 #include <filesystem>
 #include <fstream>
 
-#include "app.hpp"
 #include "imgui.h"
 
 #include "imgui_internal.h" // TODO: record dependency...
@@ -347,9 +346,8 @@ public:
     }
 };
 
-// TODO: still, avoid using fstream if possible...
-// - Why using C++ at all: there seems no standard way to `fopen` a unicode C-string path.
-// (The only one being ignore(max)->gcount, which appears )
+// TODO: move eleswhere?
+// TODO: explain why using filesystem::path...
 inline std::vector<char> load_binary(const std::filesystem::path& path, int max_size) {
     std::error_code ec{};
     const auto size = std::filesystem::file_size(path, ec);
@@ -366,8 +364,4 @@ inline std::vector<char> load_binary(const std::filesystem::path& path, int max_
     // TODO: refine msg?
     logger::log_temp(300ms, "Cannot load");
     return {};
-}
-
-inline std::vector<legacy::compressT> read_rule_from_file(const std::filesystem::path& path) {
-    return extract_rules(load_binary(path, 1'000'000));
 }

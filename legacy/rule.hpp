@@ -75,7 +75,6 @@ namespace legacy {
 #endif
 
     // TODO: better names...
-    // TODO: whether still useful after applying rule_pp header?
     constexpr bool decode_s(codeT code) {
         return (code >> 4) & 1;
     }
@@ -95,7 +94,7 @@ namespace legacy {
         constexpr friend bool operator==(const ruleT&, const ruleT&) = default;
     };
 
-    // "Convay's Game of Life" rule. (B3/S23)
+    // "Convay's Game of Life" (B3/S23)
     inline ruleT game_of_life() {
         ruleT rule{};
         for_each_code(code) {
@@ -112,8 +111,6 @@ namespace legacy {
         return rule;
     }
 
-#if 1
-    // TODO: is this actually useful in the application? even if recorder is needed, is plain ruleT not affordable?
     class compressT {
         std::array<uint8_t, 64> bits; // as bitset.
     public:
@@ -141,9 +138,6 @@ namespace legacy {
             }
         };
     };
-#else
-    using compressT = ruleT;
-#endif
 
     namespace _misc {
         inline char to_base64(uint8_t b6) {

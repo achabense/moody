@@ -3,6 +3,7 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #endif
 
+#include "app.hpp"
 #include "app_imgui.hpp"
 #include "app_sdl.hpp"
 
@@ -141,9 +142,9 @@ namespace legacy {
             terms_native.emplace_back("C2(180)", mk({mp_C2}));
             terms_native.emplace_back("C4(90)", mk({mp_C4}));
 
-            terms_misc.emplace_back("*R45", mk({mp_ro_45}));
-            terms_misc.emplace_back("*Tota", mk({mp_ro_45, mp_tot_a}));
-            terms_misc.emplace_back("*Totb", mk({mp_ro_45, mp_tot_b}));
+            terms_misc.emplace_back("'C8'", mk({mp_C8}));
+            terms_misc.emplace_back("Tot", mk({mp_C8, mp_tot_exc_s}));
+            terms_misc.emplace_back("Tot(+s)", mk({mp_C8, mp_tot_inc_s}));
             terms_misc.emplace_back("Dual", mk({mp_dual}));
 
             terms_hex.emplace_back("Hex", mk({mp_hex_ignore}));
@@ -159,8 +160,9 @@ namespace legacy {
             terms_hex.emplace_back("C3(120)", mk({mp_hex_C3}));
             terms_hex.emplace_back("C6(60)", mk({mp_hex_C6}));
 
-            terms_hex.emplace_back("*Tota", mk({mp_hex_C6, mp_hex_tot_a}));
-            terms_hex.emplace_back("*Totb", mk({mp_hex_C6, mp_hex_tot_b}));
+            // TODO: temp...
+            terms_misc.emplace_back("Hex_Tot", mk({mp_hex_C6, mp_hex_tot_exc_s}));
+            terms_misc.emplace_back("Hex_Tot(+s)", mk({mp_hex_C6, mp_hex_tot_inc_s}));
 
             reset_par();
         }
@@ -503,8 +505,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         // TODO: imgui_innerx...
         ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
         if (ImGui::Button("Randomize") || imgui_keypressed(ImGuiKey_Enter, false)) {
-            recorder.take(random_flip(inter.get_viewer(), part, locked, target, rcount, rcount,
-                                      global_mt19937())); // TODO: range...
+            recorder.take(random_flip(inter.get_viewer(), part, locked, target, global_mt19937(), rcount, rcount));
         }
 
         ImGui::Separator();
@@ -636,15 +637,6 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                         locked[code] = !has_lock; // TODO: not reversible; is this ok?
                     }
                 }
-#if 0
-                // TODO: conflicts with window scrolling...
-                // TODO: e.g. down->0, up->1
-                if (button_hover && imgui_scrolling()) {
-                    legacy::ruleT r = target;
-                    legacy::flip(group, r);
-                    recorder.replace_current(r);
-                }
-#endif
                 ImGui::SameLine();
                 imgui_strdisabled("?");
                 if (ImGui::IsItemHovered()) {
@@ -717,23 +709,9 @@ public:
 
             bool hit = false;
             iter_pair(
-                "<|", "prev", "next", "|>",
-                [&] {
-                    m_recorder.set_first();
-                    hit = true;
-                },
-                [&] {
-                    m_recorder.set_prev();
-                    hit = true;
-                },
-                [&] {
-                    m_recorder.set_next();
-                    hit = true;
-                },
-                [&] {
-                    m_recorder.set_last();
-                    hit = true;
-                });
+                "<|", "prev", "next", "|>", //
+                [&] { m_recorder.set_first(), hit = true; }, [&] { m_recorder.set_prev(), hit = true; },
+                [&] { m_recorder.set_next(), hit = true; }, [&] { m_recorder.set_last(), hit = true; });
 
             ImGui::EndGroup();
             if (!m_file) {
@@ -761,8 +739,7 @@ public:
 
         // TODO: foldable...
         if (auto sel = m_nav.window(id_str, p_open)) {
-            // TODO: record filename?
-            auto result = read_rule_from_file(*sel);
+            auto result = extract_rules(load_binary(*sel, 1'000'000));
             if (!result.empty()) {
                 logger::log_temp(500ms, "found {} rules", result.size());
                 m_recorder.replace(std::move(result));
@@ -1224,6 +1201,7 @@ int main(int argc, char** argv) {
                     edit_rule(ctrl.rule, icons, recorder);
                 }
                 ImGui::TableNextColumn();
+                // TODO: it seems this childwindow is not necessary?
                 if (auto child = imgui_childwindow("Til")) {
                     ImGui::PushItemWidth(FixedItemWidth);
                     ImGui::BeginGroup();
