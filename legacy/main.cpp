@@ -820,6 +820,7 @@ struct runner_ctrl {
 // TODO: are there portable ways to convert argv to a valid filesystem::path (without messing up encodings)?
 int main(int argc, char** argv) {
     app_backend::init();
+    code_image icons;
 
     {
         // TODO: refine (names; logic)
@@ -875,7 +876,68 @@ int main(int argc, char** argv) {
     file_nav_with_recorder nav;
 
     tile_image img;
-    code_image icons;
+    ImVec2 img_off = {0, 0}; // TODO: supposed to be of integer-precision...
+    int img_zoom = 1;        // TODO: mini window when zoom == 1?
+
+    // TODO: too awkward... refactor...
+    class pasteT : public std::optional<legacy::tileT> {
+        tile_image m_img{};
+
+    public:
+        legacy::posT pos{0, 0}; // dbegin for copy... (TODO: this is confusing...)
+
+        void update(legacy::tileT&& tile) {
+            emplace(std::move(tile));
+            m_img.update(**this);
+
+            // TODO: otherwise, alpha doesn't work...
+            // (solved by referring to ImGui_ImplSDLRenderer2_CreateFontsTexture...)
+            SDL_SetTextureBlendMode(m_img.texture(), SDL_BLENDMODE_BLEND);
+        }
+        ImTextureID texture() const { return m_img.texture(); }
+    };
+    pasteT paste;
+
+    // TODO: rename; move elsewhere...
+    // TODO: ctrl to move selected area?
+    struct selectT {
+        // []
+        legacy::posT select_0{0, 0}, select_1{0, 0}; // cell index, not pixel.
+
+        void clear() { select_0 = select_1 = {0, 0}; }
+        void toggle_select_all(const legacy::rectT& size) {
+            // all-selected ? clear : select-all
+            const auto [min, max] = get();
+            if (min == legacy::posT{0, 0} && max == legacy::as_pos(size)) {
+                clear();
+            } else {
+                select_0 = {0, 0};
+                select_1 = {.x = size.width - 1, .y = size.height - 1};
+            }
+        }
+
+        struct minmaxT {
+            // [) ; (((min, max ~ imgui naming style...)))
+            legacy::posT min, max;
+
+            legacy::rectT size() const { return {.width = max.x - min.x, .height = max.y - min.y}; }
+            explicit operator bool() const { return (max.x - min.x > 1) || (max.y - min.y > 1); }
+        };
+
+        minmaxT get() const {
+            int x0 = select_0.x, x1 = select_1.x;
+            int y0 = select_0.y, y1 = select_1.y;
+            if (x0 > x1) {
+                std::swap(x0, x1);
+            }
+            if (y0 > y1) {
+                std::swap(y0, y1);
+            }
+            return {.min{x0, y0}, .max{x1 + 1, y1 + 1}};
+        }
+    };
+    selectT sel{};
+
     while (app_backend::begin_frame()) {
         // TODO: applying following logic; consider refining it.
         // recorder is modified during display, but will synchronize with runner's before next frame.
@@ -918,35 +980,24 @@ int main(int argc, char** argv) {
                         runner.gen(), float(legacy::count(runner.tile())) / runner.tile().area());
             // TODO: canvas size, tile size, selected size, paste size...
 
-            // It has been proven that `img_off` works better than using `corner_idx` (cell idx in the corner)
-            static ImVec2 img_off = {0, 0}; // TODO: supposed to be of integer-precision...
-
-            static int zoom = 1; // TODO: mini window when zoom == 1?
-            assert(zoom == 1 || zoom == 2 || zoom == 4 || zoom == 8);
-
             const bool corner = ImGui::Button("Corner"); // TODO: move elsewhere...
             ImGui::SameLine();
             const bool center = ImGui::Button("Center");
             ImGui::SameLine();
             imgui_str("Zoom");
+            assert(img_zoom == 1 || img_zoom == 2 || img_zoom == 4 || img_zoom == 8);
             for (const int z : {1, 2, 4, 8}) {
                 ImGui::SameLine(0, s);
                 // TODO: avoid usage of format...
-                if (ImGui::RadioButton(std::format("{}##Z{}", z, z).c_str(), zoom == z)) {
+                if (ImGui::RadioButton(std::format("{}##Z{}", z, z).c_str(), img_zoom == z)) {
                     img_off = {8, 8}; // TODO: temporarily intentional...
-                    zoom = z;
+                    img_zoom = z;
                 }
             }
 
             ImGui::SameLine();
             const bool fit = ImGui::Button("Fit"); // TODO: size preview?
             // TODO: select all, unselect button...
-
-            // TODO: move elsewhere
-            static std::optional<legacy::tileT> paste;
-            static tile_image paste_img;
-            static ImTextureID paste_texture;
-            static legacy::posT paste_pos{0, 0};
 
             if (paste) {
                 ImGui::SameLine(), imgui_str("|");
@@ -972,7 +1023,8 @@ int main(int argc, char** argv) {
                 img_off = {0, 0};
 
                 // TODO: avoid being width/height being 1 [[or 0]]...
-                const legacy::rectT fit_size{.width = (int)canvas_size.x / zoom, .height = (int)canvas_size.y / zoom};
+                const legacy::rectT fit_size{.width = (int)canvas_size.x / img_zoom,
+                                             .height = (int)canvas_size.y / img_zoom};
                 if (runner.tile().size() != fit_size) {
                     runner.restart(filler, fit_size);
                     // TODO: how to support background period then?
@@ -986,7 +1038,7 @@ int main(int argc, char** argv) {
                 if (ec == std::errc{} && ec2 == std::errc{}) {
                     if (iwidth > 10 && iwidth < 1000 && iheight > 10 && iheight < 1000) {
                         img_off = {0, 0};
-                        zoom = 1; // <-- TODO: whether to reset zoom here?
+                        img_zoom = 1; // <-- TODO: whether to reset zoom here?
                         const legacy::rectT size{.width = iwidth, .height = iheight};
                         if (runner.tile().size() != size) {
                             runner.restart(filler, size);
@@ -1000,7 +1052,7 @@ int main(int argc, char** argv) {
 
             // Size is fixed now:
             const legacy::rectT tile_size = runner.tile().size();
-            const ImVec2 img_size(tile_size.width * zoom, tile_size.height * zoom);
+            const ImVec2 img_size(tile_size.width * img_zoom, tile_size.height * img_zoom);
 
             if (corner) {
                 img_off = {0, 0};
@@ -1018,66 +1070,24 @@ int main(int argc, char** argv) {
             drawlist.AddRectFilled(canvas_pos, canvas_pos + canvas_size, IM_COL32(20, 20, 20, 255));
             drawlist.AddImage(img.update(runner.tile()), img_pos, img_pos + img_size);
 
-            // TODO: rename; move elsewhere...
-            // TODO: ctrl to move selected area?
-            struct selectT {
-                // []
-                legacy::posT select_0{0, 0}, select_1{0, 0}; // cell index, not pixel.
-
-                void clear() { select_0 = select_1 = {0, 0}; }
-                void toggle_select_all(const legacy::rectT& size) {
-                    // all-selected ? clear : select-all
-                    const auto [min, max] = get();
-                    if (min == legacy::posT{0, 0} && max == legacy::as_pos(size)) {
-                        clear();
-                    } else {
-                        select_0 = {0, 0};
-                        select_1 = {.x = size.width - 1, .y = size.height - 1};
-                    }
-                }
-
-                struct minmaxT {
-                    // [) ; (((min, max ~ imgui naming style...)))
-                    legacy::posT min, max;
-
-                    legacy::rectT size() const { return {.width = max.x - min.x, .height = max.y - min.y}; }
-                    explicit operator bool() const { return (max.x - min.x > 1) || (max.y - min.y > 1); }
-                };
-
-                minmaxT get() const {
-                    int x0 = select_0.x, x1 = select_1.x;
-                    int y0 = select_0.y, y1 = select_1.y;
-                    if (x0 > x1) {
-                        std::swap(x0, x1);
-                    }
-                    if (y0 > y1) {
-                        std::swap(y0, y1);
-                    }
-                    return {.min{x0, y0}, .max{x1 + 1, y1 + 1}};
-                }
-            };
-            static selectT sel{};
-
             // This can happen when e.g. paste && "fit-zoom" etc...
             if (paste && (paste->width() > tile_size.width || paste->height() > tile_size.height)) {
                 paste.reset();
             }
             if (paste) {
                 ctrl.pause2 = true;
-                paste_pos.x = std::clamp(paste_pos.x, 0, tile_size.width - paste->width());
-                paste_pos.y = std::clamp(paste_pos.y, 0, tile_size.height - paste->height());
+                paste.pos.x = std::clamp(paste.pos.x, 0, tile_size.width - paste->width());
+                paste.pos.y = std::clamp(paste.pos.y, 0, tile_size.height - paste->height());
 
-                drawlist.AddImage(paste_texture, img_pos + ImVec2(paste_pos.x, paste_pos.y) * zoom,
-                                  img_pos + ImVec2(paste_pos.x + paste->width(), paste_pos.y + paste->height()) * zoom,
-                                  {0, 0}, {1, 1}, IM_COL32(255, 255, 255, 120));
-                drawlist.AddRectFilled(img_pos + ImVec2(paste_pos.x, paste_pos.y) * zoom,
-                                       img_pos +
-                                           ImVec2(paste_pos.x + paste->width(), paste_pos.y + paste->height()) * zoom,
-                                       IM_COL32(255, 0, 0, 60));
+                const ImVec2 min = img_pos + ImVec2(paste.pos.x, paste.pos.y) * img_zoom;
+                const ImVec2 max =
+                    img_pos + ImVec2(paste.pos.x + paste->width(), paste.pos.y + paste->height()) * img_zoom;
+                drawlist.AddImage(paste.texture(), min, max, {0, 0}, {1, 1}, IM_COL32(255, 255, 255, 120));
+                drawlist.AddRectFilled(min, max, IM_COL32(255, 0, 0, 60));
             }
             if (const auto s = sel.get()) {
-                drawlist.AddRectFilled(img_pos + ImVec2(s.min.x, s.min.y) * zoom,
-                                       img_pos + ImVec2(s.max.x, s.max.y) * zoom, IM_COL32(0, 255, 0, 60));
+                drawlist.AddRectFilled(img_pos + ImVec2(s.min.x, s.min.y) * img_zoom,
+                                       img_pos + ImVec2(s.max.x, s.max.y) * img_zoom, IM_COL32(0, 255, 0, 60));
             }
             drawlist.PopClipRect();
 
@@ -1093,20 +1103,20 @@ int main(int argc, char** argv) {
                 if (active) {
                     if (!io.KeyCtrl) {
                         img_off += io.MouseDelta;
-                    } else if (zoom == 1) {
+                    } else if (img_zoom == 1) {
                         runner.shift(io.MouseDelta.x, io.MouseDelta.y);
                     }
                 }
                 // TODO: rename to mouseXXX...
                 if (imgui_scrolling()) {
-                    const ImVec2 cellidx = (mouse_pos - img_pos) / zoom;
-                    if (imgui_scrolldown() && zoom != 1) {
-                        zoom /= 2;
+                    const ImVec2 cellidx = (mouse_pos - img_pos) / img_zoom;
+                    if (imgui_scrolldown() && img_zoom != 1) {
+                        img_zoom /= 2;
                     }
-                    if (imgui_scrollup() && zoom != 8) {
-                        zoom *= 2;
+                    if (imgui_scrollup() && img_zoom != 8) {
+                        img_zoom *= 2;
                     }
-                    img_off = (mouse_pos - cellidx * zoom) - canvas_pos;
+                    img_off = (mouse_pos - cellidx * img_zoom) - canvas_pos;
                     img_off.x = round(img_off.x);
                     img_off.y = round(img_off.y); // TODO: is rounding correct?
                 }
@@ -1115,28 +1125,28 @@ int main(int argc, char** argv) {
                 // TODO: precedence against left-clicking?
                 if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
                     // ctrl.pause = true;
-                    int celx = floor((mouse_pos.x - img_pos.x) / zoom);
-                    int cely = floor((mouse_pos.y - img_pos.y) / zoom);
+                    int celx = floor((mouse_pos.x - img_pos.x) / img_zoom);
+                    int cely = floor((mouse_pos.y - img_pos.y) / img_zoom);
 
                     sel.select_0.x = std::clamp(celx, 0, tile_size.width - 1);
                     sel.select_0.y = std::clamp(cely, 0, tile_size.height - 1);
                 }
                 if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-                    int celx = floor((mouse_pos.x - img_pos.x) / zoom);
-                    int cely = floor((mouse_pos.y - img_pos.y) / zoom);
+                    int celx = floor((mouse_pos.x - img_pos.x) / img_zoom);
+                    int cely = floor((mouse_pos.y - img_pos.y) / img_zoom);
 
                     sel.select_1.x = std::clamp(celx, 0, tile_size.width - 1);
                     sel.select_1.y = std::clamp(cely, 0, tile_size.height - 1);
                 }
                 if (paste) {
-                    int celx = floor((mouse_pos.x - img_pos.x) / zoom);
-                    int cely = floor((mouse_pos.y - img_pos.y) / zoom);
+                    int celx = floor((mouse_pos.x - img_pos.x) / img_zoom);
+                    int cely = floor((mouse_pos.y - img_pos.y) / img_zoom);
 
-                    paste_pos.x = std::clamp(celx, 0, tile_size.width - paste->width());
-                    paste_pos.y = std::clamp(cely, 0, tile_size.height - paste->height());
+                    paste.pos.x = std::clamp(celx, 0, tile_size.width - paste->width());
+                    paste.pos.y = std::clamp(cely, 0, tile_size.height - paste->height());
 
                     if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-                        legacy::copy<legacy::copyE::Or>(*paste, runner.tile(), paste_pos);
+                        legacy::copy<legacy::copyE::Or>(*paste, runner.tile(), paste.pos);
                         paste.reset();
                     }
                 }
@@ -1150,13 +1160,7 @@ int main(int argc, char** argv) {
             if (imgui_keypressed(ImGuiKey_V, false)) {
                 if (const char* text = ImGui::GetClipboardText()) {
                     try {
-                        paste = legacy::from_RLE_str(text);
-                        paste_texture = paste_img.update(*paste);
-
-                        // TODO: otherwise, alpha doesn't work...
-                        // (solved by referring to ImGui_ImplSDLRenderer2_CreateFontsTexture...)
-                        // Ehh... TODO: this reinterpret_cast looks stupid...
-                        SDL_SetTextureBlendMode(reinterpret_cast<SDL_Texture*>(paste_texture), SDL_BLENDMODE_BLEND);
+                        paste.update(legacy::from_RLE_str(text));
                     } catch (const std::exception& err) {
                         logger::log_temp(2500ms, "{}", err.what());
                     }

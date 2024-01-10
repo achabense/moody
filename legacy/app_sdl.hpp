@@ -196,6 +196,9 @@ public:
 
         return m_texture;
     }
+
+    // TODO (temp) awkward workaround for paste utils...
+    SDL_Texture* texture() const { return m_texture; }
 };
 
 // TODO: can be merged into app_backend...
