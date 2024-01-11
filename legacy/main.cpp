@@ -34,7 +34,7 @@ inline void iter_pair(const char* tag_first, const char* tag_prev, const char* t
     if (ImGui::Button(tag_prev)) {
         act_prev();
     }
-    ImGui::SameLine(0, 2);
+    ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
     if (ImGui::Button(tag_next)) {
         act_next();
     }
@@ -148,13 +148,12 @@ namespace legacy {
             terms_misc.emplace_back("Dual", mk({mp_dual}));
 
             terms_hex.emplace_back("Hex", mk({mp_hex_ignore}));
-            // TODO: obscure...
-            terms_hex.emplace_back("/", mk({mp_hex_refl_wsx}));
-            terms_hex.emplace_back("\\", mk({mp_hex_refl_qsc}));
-            terms_hex.emplace_back("-", mk({mp_hex_refl_asd}));
-            terms_hex.emplace_back("aq", mk({mp_hex_refl_aq}));
-            terms_hex.emplace_back("qw", mk({mp_hex_refl_qw}));
-            terms_hex.emplace_back("wd", mk({mp_hex_refl_wd}));
+            terms_hex.emplace_back("a-d", mk({mp_hex_refl_asd}));
+            terms_hex.emplace_back("q-c", mk({mp_hex_refl_qsc}));
+            terms_hex.emplace_back("w-x", mk({mp_hex_refl_wsx}));
+            terms_hex.emplace_back("a|q", mk({mp_hex_refl_aq}));
+            terms_hex.emplace_back("q|w", mk({mp_hex_refl_qw}));
+            terms_hex.emplace_back("w|d", mk({mp_hex_refl_wd}));
 
             terms_hex.emplace_back("C2(180)", mk({mp_hex_C2}));
             terms_hex.emplace_back("C3(120)", mk({mp_hex_C3}));
@@ -167,49 +166,17 @@ namespace legacy {
             reset_par();
         }
 
-        const partitionT& get_par(const ruleT& target) {
-            // TODO: tooltip...
-            /*
-            const auto show_pair = [](const mapperT_pair& q) {
-                std::string up, cn, dw;
-                // TODO: too clumsy...
-                static const char* const strs[]{" 0", " 1", " q", " w", " e", " a", " s", " d", " z", " x",
-                                                " c", "!q", "!w", "!e", "!a", "!s", "!d", "!z", "!x", "!c"};
-
-                up += strs[q.a.q2];
-                up += strs[q.a.w2];
-                up += strs[q.a.e2];
-                up += "  ";
-                up += strs[q.b.q2];
-                up += strs[q.b.w2];
-                up += strs[q.b.e2];
-
-                cn += strs[q.a.a2];
-                cn += strs[q.a.s2];
-                cn += strs[q.a.d2];
-                cn += " ~";
-                cn += strs[q.b.a2];
-                cn += strs[q.b.s2];
-                cn += strs[q.b.d2];
-
-                dw += strs[q.a.z2];
-                dw += strs[q.a.x2];
-                dw += strs[q.a.c2];
-                dw += "  ";
-                dw += strs[q.b.z2];
-                dw += strs[q.b.x2];
-                dw += strs[q.b.c2];
-
-                imgui_str(up + " \n" + cn + " \n" + dw + " ");
-            };
-            */
+        const partitionT& select_par(const ruleT& target) {
             bool sel = false;
+            const float r = ImGui::GetFrameHeight();
+            const ImVec2 sqr{r, r};
 
+            // TODO: tooltip...
             // TODO: recheck id & tid logic... (& imagebutton)
-            auto check = [&, id = 0, r = ImGui::GetFrameHeight()](termT& term) mutable {
+            auto check = [&, id = 0](termT& term) mutable {
                 // TODO: which should come first? rendering or dummy button?
                 const ImVec2 pos = ImGui::GetCursorScreenPos();
-                const ImVec2 pos_max = pos + ImVec2{r, r};
+                const ImVec2 pos_max = pos + sqr;
                 // TODO: a bit ugly...
                 ImGui::GetWindowDrawList()->AddRectFilled(pos, pos_max,
                                                           term.selected  ? ImGui::GetColorU32(ImGuiCol_ButtonHovered)
@@ -217,33 +184,37 @@ namespace legacy {
                                                                          : 0);
                 ImGui::GetWindowDrawList()->AddRect(pos, pos_max, ImGui::GetColorU32(ImGuiCol_Button));
 
-                // TODO: Flip...
                 if (satisfies(target, {}, term.eq)) {
                     ImGui::GetWindowDrawList()->AddRect(pos, pos_max, IM_COL32(0, 255, 0, 255));
                 }
 
                 ImGui::PushID(id++);
-                const bool hit = ImGui::InvisibleButton("Check", ImVec2{r, r});
+                const bool hit = ImGui::InvisibleButton("Check", sqr);
                 // TODO: this is in imgui_internal.h...
                 // TODO: Ask is it intentional to make InvisibleButton highlight-less?
                 // TODO: use normal buttons instead?
                 ImGui::RenderNavHighlight({ImGui::GetItemRectMin(), ImGui::GetItemRectMax()}, ImGui::GetItemID());
                 ImGui::PopID();
 
-                // if (ImGui::BeginItemTooltip()) {
-                //     show_pair(term.eq);
-                //     ImGui::EndTooltip();
-                // }
                 if (hit) {
                     term.selected = !term.selected;
                     sel = true;
                 }
             };
 
+            if (ImGui::Button("c", sqr)) {
+                for (termT& t : terms_ignore) {
+                    if (t.selected) {
+                        t.selected = false;
+                        sel = true;
+                    }
+                }
+            }
+            ImGui::SameLine();
             // TODO: slightly confusing; light color should represent "take-into-account" instead of "ignore"
             // Is this solvable by applying specific coloring scheme?
             ImGui::BeginGroup();
-            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1, 1)); // TODO: too tight...
             for (int l = 0; l < 3; ++l) {
                 check(terms_ignore[l * 3 + 0]);
                 ImGui::SameLine();
@@ -254,15 +225,14 @@ namespace legacy {
             ImGui::PopStyleVar();
             ImGui::EndGroup();
 
-            auto table = [&sel, &check, tid = 0](termT_vec& terms) mutable {
+            auto table = [&, tid = 0](termT_vec& terms) mutable {
                 // TODO: (gui) ugly...
                 // TODO: or, add isometric equivT?
                 // pro: iso is useful as detector... con: cannot disable all conveniently...
-                const float r = ImGui::GetFrameHeight();
                 const bool any_selected =
                     std::any_of(terms.begin(), terms.end(), [](const termT& t) { return t.selected; });
                 ImGui::PushID(tid++);
-                if (ImGui::Button(any_selected ? "-" : "o", ImVec2{r, r})) {
+                if (ImGui::Button("f", sqr)) {
                     for (termT& t : terms) {
                         t.selected = !any_selected;
                     }
@@ -285,6 +255,10 @@ namespace legacy {
             ImGui::Separator();
             table(terms_misc);
             ImGui::Separator();
+            // TODO: temp...
+            imgui_str("qw-     q w\n"
+                      "asd -> a s d\n"
+                      "-xc     x c");
             table(terms_hex);
 
             if (sel) {
@@ -484,8 +458,8 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
 
     // TODO: rename...
     static legacy::partition_collection parcol;
-    const auto& part = parcol.get_par(target);
-    const int k = part.k();
+    const auto& par = parcol.select_par(target);
+    const int k = par.k();
 
     static legacy::lockT locked{};
     if (temp_lock) {
@@ -496,7 +470,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         // TODO: still unstable between partition switches...
         // TODO: the range should be scoped by locks... so, what should rcount be?
         static int rcount = 0.5 * k;
-        const int freec = legacy::get_free_indexes(locked, part).size(); // TODO: wasteful...
+        const int freec = legacy::get_free_indexes(locked, par).size(); // TODO: wasteful...
 
         ImGui::SetNextItemWidth(FixedItemWidth);
         imgui_int_slider("##Quantity", &rcount, 0, k);
@@ -505,7 +479,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         // TODO: imgui_innerx...
         ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
         if (ImGui::Button("Randomize") || imgui_keypressed(ImGuiKey_Enter, false)) {
-            recorder.take(random_flip(inter.get_viewer(), part, locked, target, global_mt19937(), rcount, rcount));
+            recorder.take(random_flip(inter.get_viewer(), par, locked, target, global_mt19937(), rcount, rcount));
         }
 
         ImGui::Separator();
@@ -521,18 +495,18 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
 
         iter_pair(
             "<00..", "dec", "inc", "11..>", //
-            [&] { recorder.take(legacy::act_int::first(inter, part, target, locked)); },
-            [&] { recorder.take(legacy::act_int::prev(inter, part, target, locked)); },
-            [&] { recorder.take(legacy::act_int::next(inter, part, target, locked)); },
-            [&] { recorder.take(legacy::act_int::last(inter, part, target, locked)); });
+            [&] { recorder.take(legacy::act_int::first(inter, par, target, locked)); },
+            [&] { recorder.take(legacy::act_int::prev(inter, par, target, locked)); },
+            [&] { recorder.take(legacy::act_int::next(inter, par, target, locked)); },
+            [&] { recorder.take(legacy::act_int::last(inter, par, target, locked)); });
         ImGui::SameLine(), imgui_str("|");
         ImGui::SameLine();
         iter_pair(
             "<1.0.", "pprev", "pnext", "0.1.>", //
-            [&] { recorder.take(legacy::act_perm::first(inter, part, target, locked)); },
-            [&] { recorder.take(legacy::act_perm::prev(inter, part, target, locked)); },
-            [&] { recorder.take(legacy::act_perm::next(inter, part, target, locked)); },
-            [&] { recorder.take(legacy::act_perm::last(inter, part, target, locked)); });
+            [&] { recorder.take(legacy::act_perm::first(inter, par, target, locked)); },
+            [&] { recorder.take(legacy::act_perm::prev(inter, par, target, locked)); },
+            [&] { recorder.take(legacy::act_perm::next(inter, par, target, locked)); },
+            [&] { recorder.take(legacy::act_perm::last(inter, par, target, locked)); });
         ImGui::SameLine(), imgui_str("|");
         ImGui::SameLine();
         if (ImGui::Button("Mir")) {
@@ -546,17 +520,18 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         }
         ImGui::SameLine();
         if (ImGui::Button("Enhance locks")) {
-            legacy::enhance(part, locked);
+            legacy::enhance(par, locked);
         }
         ImGui::SameLine();
         if (ImGui::Button("Purify")) {
-            recorder.take(legacy::purify(inter, part, target, locked));
+            recorder.take(legacy::purify(inter, par, target, locked));
         }
-        // TODO: awkward?
+        // TODO: purify -> enhance != enhance -> purify...
+        // TODO: problematic: enhance can lead to more inconsistent groups...
         ImGui::SameLine();
-        if (ImGui::Button("Enhance & Purify")) {
-            legacy::enhance(part, locked);
-            recorder.take(legacy::purify(inter, part, target, locked));
+        if (ImGui::Button("Purify -> Enhance")) {
+            recorder.take(legacy::purify(inter, par, target, locked));
+            legacy::enhance(par, locked);
         }
     }
 
@@ -568,7 +543,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         const auto strs = strss[inter.tag];
 
         const legacy::ruleT_data drule = inter.from_rule(target);
-        const auto scanlist = legacy::scan(part, drule, locked);
+        const auto scanlist = legacy::scan(par, drule, locked);
         {
             // TODO: add more statistics... e.g. full vs partial lock...
             const int c_group = k;
@@ -605,7 +580,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                     ImGui::Separator(); // TODO: refine...
                 }
                 const bool inconsistent = scanlist[j].inconsistent();
-                const auto& group = part.jth_group(j);
+                const auto& group = par.jth_group(j);
                 const legacy::codeT head = group[0];
                 const bool has_lock = legacy::any_locked(locked, group);
 

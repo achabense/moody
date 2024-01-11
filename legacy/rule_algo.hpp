@@ -273,10 +273,6 @@ namespace legacy::inline special_mappers {
     inline constexpr mapperT mp_tot_inc_s("qse"
                                           "awd"
                                           "zxc"); // *C8 -> totalistic, including s
-    // TODO: about concepts...
-    // TODO: for example, "totalistic" can only be expressed by equivT...
-
-    // TODO: support that totalistic...
 
     // TODO: explain. TODO: better name...
     inline constexpr mapperT mp_dual("!q!w!e"
@@ -293,15 +289,16 @@ namespace legacy::inline special_mappers {
     inline constexpr mapperT mp_hex_ignore("qw0"
                                            "asd"
                                            "0xc"); // ignore_(e, z)
-    inline constexpr mapperT mp_hex_refl_wsx("dw0"
-                                             "csq"
-                                             "0xa"); // swap(q,d), swap(a,c)
-    inline constexpr mapperT mp_hex_refl_qsc("qa0"
-                                             "wsx"
-                                             "0dc"); // swap(a,w), swap(x,d)
+
     inline constexpr mapperT mp_hex_refl_asd("xc0"
                                              "asd"
                                              "0qw"); // swap(q,x), swap(w,c)
+    inline constexpr mapperT mp_hex_refl_qsc("qa0"
+                                             "wsx"
+                                             "0dc"); // swap(a,w), swap(x,d)
+    inline constexpr mapperT mp_hex_refl_wsx("dw0"
+                                             "csq"
+                                             "0xa"); // swap(q,d), swap(a,c)
 
     inline constexpr mapperT mp_hex_refl_aq("ax0"
                                             "qsc"
@@ -489,6 +486,7 @@ namespace legacy {
         return std::all_of(group.begin(), group.end(), [&locked](codeT code) { return locked[code]; });
     }
 
+    // TODO: blindly applying enhance can lead to more inconsistent locked groups...
     inline void enhance(const partitionT& par, lockT& locked) {
         for (int j = 0; j < par.k(); ++j) {
             const groupT group = par.jth_group(j);
@@ -500,16 +498,14 @@ namespace legacy {
         }
     }
 
-    // TODO: rephrase...
-    // Suppose that in a group, all locked mappings has the same result...
-    // This can happen when the pattern is captured under a lower symmetry rule...
-    // TODO: purify based on scan results...
+    // TODO: explain...
     // TODO: (temp) on second thought, locked should not be enhanced...
     inline ruleT purify(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked) {
         // TODO: for locked code A and B, what if r[A] != r[B]?
         ruleT_data r = inter.from_rule(rule);
         for (int j = 0; j < par.k(); ++j) {
             const groupT group = par.jth_group(j);
+            // TODO: should be scan-based... what if inconsistent?
             const auto fnd = std::find_if(group.begin(), group.end(), [&locked](codeT code) { return locked[code]; });
             if (fnd != group.end()) {
                 const bool b = r[*fnd];
