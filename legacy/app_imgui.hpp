@@ -53,12 +53,14 @@ inline void imgui_strwrapped(std::string_view str) {
     ImGui::PopTextWrapPos();
 }
 
-// TODO: imgui_strcolored?
-
-inline void imgui_strdisabled(std::string_view str) {
-    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
+inline void imgui_strcolored(const ImVec4& col, std::string_view str) {
+    ImGui::PushStyleColor(ImGuiCol_Text, col);
     imgui_str(str);
     ImGui::PopStyleColor();
+}
+
+inline void imgui_strdisabled(std::string_view str) {
+    imgui_strcolored(ImGui::GetStyle().Colors[ImGuiCol_TextDisabled], str);
 }
 
 // ~ referring to ImGui::InputScalar; recheck...

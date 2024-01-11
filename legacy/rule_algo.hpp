@@ -481,22 +481,40 @@ namespace legacy {
         return vec;
     }
 
+    inline bool any_locked(const lockT& locked, const groupT group) {
+        return std::any_of(group.begin(), group.end(), [&locked](codeT code) { return locked[code]; });
+    }
+
+    inline bool all_locked(const lockT& locked, const groupT group) {
+        return std::all_of(group.begin(), group.end(), [&locked](codeT code) { return locked[code]; });
+    }
+
+    inline void enhance(const partitionT& par, lockT& locked) {
+        for (int j = 0; j < par.k(); ++j) {
+            const groupT group = par.jth_group(j);
+            if (any_locked(locked, group)) {
+                for (const codeT code : group) {
+                    locked[code] = true;
+                }
+            }
+        }
+    }
+
     // TODO: rephrase...
     // Suppose that in a group, all locked mappings has the same result...
     // This can happen when the pattern is captured under a lower symmetry rule...
     // TODO: purify based on scan results...
-    inline ruleT purify(const interT& inter, const partitionT& par, const ruleT& rule, lockT& locked) {
+    // TODO: (temp) on second thought, locked should not be enhanced...
+    inline ruleT purify(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked) {
         // TODO: for locked code A and B, what if r[A] != r[B]?
-        legacy::ruleT_data r = inter.from_rule(rule);
+        ruleT_data r = inter.from_rule(rule);
         for (int j = 0; j < par.k(); ++j) {
             const groupT group = par.jth_group(j);
-            const auto fnd =
-                std::find_if(group.begin(), group.end(), [&locked](legacy::codeT code) { return locked[code]; });
+            const auto fnd = std::find_if(group.begin(), group.end(), [&locked](codeT code) { return locked[code]; });
             if (fnd != group.end()) {
                 const bool b = r[*fnd];
-                for (auto code : group) {
+                for (codeT code : group) {
                     r[code] = b;
-                    locked[code] = true; // TODO: whether to enhance locks?
                 }
             }
         }
@@ -506,14 +524,6 @@ namespace legacy {
     // TODO: the lockT will become meaningless on irrelevant rule switch (clipboard/file...)
 
     // TODO: should (lr/up/)mirror conversions modify locks as well?
-
-    inline bool any_locked(const lockT& locked, groupT group) {
-        return std::any_of(group.begin(), group.end(), [&locked](codeT code) { return locked[code]; });
-    }
-
-    inline bool all_locked(const lockT& locked, groupT group) {
-        return std::all_of(group.begin(), group.end(), [&locked](codeT code) { return locked[code]; });
-    }
 
     inline std::vector<int> get_free_indexes(const lockT& locked, const partitionT& par) {
         std::vector<int> free_indexes;

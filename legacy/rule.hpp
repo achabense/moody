@@ -181,14 +181,12 @@ namespace legacy {
             const auto [q, w, e, a, s, d, z, x, c] = decode(code);
             reordered[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1] = rule(code);
         }
-        auto get = [&reordered](int i) { return i < 512 ? reordered[i] : 0; };
+        const auto get = [&reordered](int i) { return i < 512 ? reordered[i] : 0; };
         std::string str = "MAP";
-        int i = 0;
-        while (i < 512) {
-            uint8_t b6 = (get(i + 5) << 0) | (get(i + 4) << 1) | (get(i + 3) << 2) | (get(i + 2) << 3) |
-                         (get(i + 1) << 4) | (get(i + 0) << 5);
+        for (int i = 0; i < 512; i += 6) {
+            const uint8_t b6 = (get(i + 5) << 0) | (get(i + 4) << 1) | (get(i + 3) << 2) | (get(i + 2) << 3) |
+                               (get(i + 1) << 4) | (get(i + 0) << 5);
             str += _misc::to_base64(b6);
-            i += 6;
         }
         return str;
     }
@@ -209,8 +207,7 @@ namespace legacy {
         };
 
         int chp = 3; // skip "MAP"
-        int i = 0;
-        while (i < 512) {
+        for (int i = 0; i < 512; i += 6) {
             const uint8_t b6 = _misc::from_base64(map_str[chp++]);
             put(i + 5, (b6 >> 0) & 1);
             put(i + 4, (b6 >> 1) & 1);
@@ -218,11 +215,10 @@ namespace legacy {
             put(i + 2, (b6 >> 3) & 1);
             put(i + 1, (b6 >> 4) & 1);
             put(i + 0, (b6 >> 5) & 1);
-            i += 6;
         }
         ruleT rule{};
         for_each_code(code) {
-            auto [q, w, e, a, s, d, z, x, c] = decode(code);
+            const auto [q, w, e, a, s, d, z, x, c] = decode(code);
             rule.set(code, reordered[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1]);
         }
         return rule;

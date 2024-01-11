@@ -541,30 +541,30 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
     }
     {
         // TODO: statistics...
-        if (ImGui::Button("Enhance locks")) {
-            for (int j = 0; j < part.k(); ++j) {
-                const auto& group = part.jth_group(j);
-                if (legacy::any_locked(locked, group)) {
-                    for (auto code : group) {
-                        locked[code] = true;
-                    }
-                }
-            }
-        }
-        ImGui::SameLine();
         if (ImGui::Button("Clear locks")) {
             locked = {};
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Enhance locks")) {
+            legacy::enhance(part, locked);
         }
         ImGui::SameLine();
         if (ImGui::Button("Purify")) {
             recorder.take(legacy::purify(inter, part, target, locked));
         }
+        // TODO: awkward?
+        ImGui::SameLine();
+        if (ImGui::Button("Enhance & Purify")) {
+            legacy::enhance(part, locked);
+            recorder.take(legacy::purify(inter, part, target, locked));
+        }
     }
 
     {
-        static const char* const strss[3][3]{{"-0", "-1", "-x"}, //
-                                             {"-.", "-f", "-x"},
-                                             {"-.", "-d", "-x"}};
+        static const char* const strss[3][2]{{"-0", "-1"}, //
+                                             {"-.", "-f"},
+                                             {"-.", "-d"}};
+        static const ImVec4 cols[2]{{1, 1, 1, 1}, {1, 1, 1, 1}}; // TODO: use different color for 0 and 1...
         const auto strs = strss[inter.tag];
 
         const legacy::ruleT_data drule = inter.from_rule(target);
@@ -590,7 +590,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                 }
             }
             ImGui::Text("Groups:%d (Locked:%d) [%c:%d] [%c:%d] [%c:%d]", c_group, c_locked, strs[0][1], c_0, strs[1][1],
-                        c_1, strs[2][1], c_inconsistent);
+                        c_1, 'x', c_inconsistent);
         }
 
         const int zoom = 7;
@@ -618,7 +618,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                 const bool button_hover = ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip);
                 ImGui::SameLine();
                 ImGui::AlignTextToFramePadding();
-                imgui_str(strs[drule[head]]);
+                imgui_strcolored(cols[drule[head]], strs[drule[head]]);
                 // (wontfix) The vertical alignment is imprecise here. For precise alignment see:
                 // https://github.com/ocornut/imgui/issues/2064
 
@@ -653,7 +653,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                             icons.image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
                             ImGui::SameLine();
                             ImGui::AlignTextToFramePadding();
-                            imgui_str(strs[drule[code]]);
+                            imgui_strcolored(cols[drule[head]], strs[drule[code]]);
                             if (locked[code]) {
                                 ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() - ImVec2(2, 2),
                                                                     ImGui::GetItemRectMax() + ImVec2(2, 2), -1);
