@@ -53,21 +53,8 @@ inline void iter_pair(const char* tag_first, const char* tag_prev, const char* t
     }
 };
 
+// TODO: should not belong to namespace legacy...
 namespace legacy {
-    // TODO: other actions... (lr/ud/diag/counter-diag/...)
-
-    // TODO: move elsewhere
-    // TODO: proper name...
-    inline ruleT mirror(const ruleT& rule) {
-        ruleT mir{};
-        for_each_code(code) {
-            const codeT codex = codeT(~code & 511);
-            const bool flip = decode_s(codex) != rule(codex);
-            mir.set(code, flip ? !decode_s(code) : decode_s(code));
-        }
-        return mir;
-    }
-
     // TODO: refine analyzer...
     class partition_collection {
         struct termT {
@@ -83,7 +70,6 @@ namespace legacy {
         termT_vec terms_native;
         termT_vec terms_misc;
         termT_vec terms_hex;
-
         // TODO: customized...
 
         std::optional<partitionT> par;
@@ -117,10 +103,10 @@ namespace legacy {
 
     public:
         partition_collection() {
-            auto mk = [](std::initializer_list<mapperT> ms) {
+            const auto mk = [](std::initializer_list<mapperT> ms) {
                 equivT eq{};
                 for (const mapperT& m : ms) {
-                    eq.add_eq({mp_identity, m}); // TODO: expose mp_identity?
+                    eq.add_eq({mp_identity, m});
                 }
                 return eq;
             };
@@ -166,13 +152,14 @@ namespace legacy {
             reset_par();
         }
 
-        const partitionT& select_par(const ruleT& target) {
+        const partitionT& select_par(const ruleT& target, const lockT& locked) {
             bool sel = false;
             const float r = ImGui::GetFrameHeight();
             const ImVec2 sqr{r, r};
 
             // TODO: tooltip...
             // TODO: recheck id & tid logic... (& imagebutton)
+            const bool has_lock = locked != lockT{}; // TODO: awkward...
             auto check = [&, id = 0](termT& term) mutable {
                 // TODO: which should come first? rendering or dummy button?
                 const ImVec2 pos = ImGui::GetCursorScreenPos();
@@ -186,6 +173,10 @@ namespace legacy {
 
                 if (satisfies(target, {}, term.eq)) {
                     ImGui::GetWindowDrawList()->AddRect(pos, pos_max, IM_COL32(0, 255, 0, 255));
+                } else if (has_lock && satisfies(target, locked, {}, term.eq)) {
+                    // TODO: inefficient...
+                    // TODO: blurry when selected... (- ImGuiCol_ButtonHovered)
+                    ImGui::GetWindowDrawList()->AddRect(pos, pos_max, IM_COL32(0, 100, 0, 255));
                 }
 
                 ImGui::PushID(id++);
@@ -229,10 +220,10 @@ namespace legacy {
                 // TODO: (gui) ugly...
                 // TODO: or, add isometric equivT?
                 // pro: iso is useful as detector... con: cannot disable all conveniently...
-                const bool any_selected =
-                    std::any_of(terms.begin(), terms.end(), [](const termT& t) { return t.selected; });
                 ImGui::PushID(tid++);
                 if (ImGui::Button("f", sqr)) {
+                    const bool any_selected =
+                        std::any_of(terms.begin(), terms.end(), [](const termT& t) { return t.selected; });
                     for (termT& t : terms) {
                         t.selected = !any_selected;
                     }
@@ -456,24 +447,24 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         }
     }
 
-    // TODO: rename...
-    static legacy::partition_collection parcol;
-    const auto& par = parcol.select_par(target);
-    const int k = par.k();
-
     static legacy::lockT locked{};
     if (temp_lock) {
         locked = *temp_lock;
         temp_lock.reset();
     }
+
+    // TODO: rename...
+    static legacy::partition_collection parcol;
+    const auto& par = parcol.select_par(target, locked);
+
     {
         // TODO: still unstable between partition switches...
         // TODO: the range should be scoped by locks... so, what should rcount be?
-        static int rcount = 0.5 * k;
+        static int rcount = 0.5 * par.k();
         const int freec = legacy::get_free_indexes(locked, par).size(); // TODO: wasteful...
 
         ImGui::SetNextItemWidth(FixedItemWidth);
-        imgui_int_slider("##Quantity", &rcount, 0, k);
+        imgui_int_slider("##Quantity", &rcount, 0, par.k());
         rcount = std::clamp(rcount, 0, freec);
 
         // TODO: imgui_innerx...
@@ -546,7 +537,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         const auto scanlist = legacy::scan(par, drule, locked);
         {
             // TODO: add more statistics... e.g. full vs partial lock...
-            const int c_group = k;
+            const int c_group = par.k();
             int c_locked = 0;
             int c_0 = 0, c_1 = 0;
             int c_inconsistent = 0;
@@ -572,7 +563,7 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         if (auto child = imgui_childwindow("Details")) {
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 4));
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
-            for (int j = 0; j < k; ++j) {
+            for (int j = 0; j < par.k(); ++j) {
                 if (j % 8 != 0) {
                     ImGui::SameLine();
                 }

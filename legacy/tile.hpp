@@ -456,6 +456,10 @@ namespace legacy {
             }
             width = std::max(width, x);
         }
+        
+        // TODO: if width, height==1, return {}?
+
+        // TODO: exceptions like this should be reported via popup?
         if (width > max_size.width || height > max_size.height) {
             throw std::runtime_error(std::format("Size too big: x = {}, y = {}\nLimit x <= {}, y <= {}", width, height,
                                                  max_size.width, max_size.height));

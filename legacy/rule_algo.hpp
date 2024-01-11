@@ -517,6 +517,9 @@ namespace legacy {
         return inter.to_rule(r);
     }
 
+    // TODO: replace with stricter version...
+    inline ruleT purify_v2(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked);
+
     // TODO: the lockT will become meaningless on irrelevant rule switch (clipboard/file...)
 
     // TODO: should (lr/up/)mirror conversions modify locks as well?
@@ -678,4 +681,45 @@ namespace legacy {
         }
     };
 
+} // namespace legacy
+
+// TODO: define xxxT = {rule, locked}?
+namespace legacy {
+    // TODO: other actions... (lr/ud/diag/counter-diag/...)
+
+    // TODO: proper name...
+    inline ruleT mirror(const ruleT& rule) {
+        ruleT mir{};
+        for_each_code(code) {
+            const codeT codex = codeT(~code & 511);
+            const bool flip = decode_s(codex) != rule(codex);
+            mir.set(code, flip ? !decode_s(code) : decode_s(code));
+        }
+        return mir;
+    }
+
+    inline bool satisfies(const ruleT& rule, const lockT& locked, const interT& inter, const equivT& e) {
+        const ruleT_data r = inter.from_rule(rule);
+        codeT::map_to<int> record;
+        record.fill(2);
+        for_each_code(code) {
+            if (locked[code]) {
+                int& rep = record[e.rootof(code)];
+                if (rep == 2) {
+                    rep = r[code];
+                } else if (rep != r[code]) {
+                    return false;
+                }
+            }
+        }
+        return true;
+
+        // Too luxurious:
+        // for (const auto& scn : scan(e, inter.from_rule(rule), locked)) {
+        //     if (scn.locked_0 && scn.locked_1) {
+        //         return false;
+        //     }
+        // }
+        // return true;
+    }
 } // namespace legacy
