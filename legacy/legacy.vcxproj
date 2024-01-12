@@ -175,11 +175,11 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="imgui_sdl2\imgui_impl_sdl2.cpp" />
     <ClCompile Include="imgui_sdl2\imgui_impl_sdlrenderer2.cpp" />
-    <ClCompile Include="TODOS.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />
     <None Include="README.md" />
+    <None Include="TODOS.md" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -1,5 +1,25 @@
+(Mess)
+The program (later called editor) is intended to be used ?v assistance ?prep a (arbitrary) text editor.
+
+Grouping: If a rule is ?? it satisfies the concept behind the partition...
+Predefined groups:
+Native ...
+Hex...
+...
+
+About state symmetry(?)
+
+Lock: Together with the ??? rule, a lock is a representation of what can happen / has happened ...
+
+Evolvement capture:
+It ... leave enough space for the ...
+(TODO: Detect invalid capture...)
+Still-life constraints: ...
+
+(TODO: program-specific data (lock-?partition...))
+
 #### About this program
-* This program enables easy ways to recognize ... which are representable with ???
+* This program enables easy ways to recognize and operate on ... which are representable with ??? (need explanation)
 
 #### What can be saved & how to save
 * Rules can be loaded and exported via MAP format strings. The program is unable to recognize rules in other formats. To compensate for this ...
