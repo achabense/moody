@@ -171,17 +171,16 @@ namespace legacy {
         }
     } // namespace _misc
 
-    // TODO: rephrase...
-    // Convert ruleT into text form. Specifically, in "MAP" format, so that the result can be pasted into Golly.
-    // The correctness can be verified by checking the result of `to_MAP_str(game_of_life())`.
+    // Convert ruleT to an "MAP rule" string.
+    // TODO: recheck... is `MAP_rule` a suitable name?
     inline std::string to_MAP_str(const ruleT& rule) {
         // MAP rule uses a different coding scheme.
-        bool reordered[512]{};
+        bool MAP_rule[512]{};
         for_each_code(code) {
             const auto [q, w, e, a, s, d, z, x, c] = decode(code);
-            reordered[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1] = rule(code);
+            MAP_rule[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1] = rule(code);
         }
-        const auto get = [&reordered](int i) { return i < 512 ? reordered[i] : 0; };
+        const auto get = [&MAP_rule](int i) { return i < 512 ? MAP_rule[i] : 0; };
         std::string str = "MAP";
         for (int i = 0; i < 512; i += 6) {
             const uint8_t b6 = (get(i + 5) << 0) | (get(i + 4) << 1) | (get(i + 3) << 2) | (get(i + 2) << 3) |
@@ -199,10 +198,10 @@ namespace legacy {
 
     inline ruleT from_MAP_str(const std::string& map_str) {
         assert(std::regex_match(map_str, regex_MAP_str()));
-        bool reordered[512]{};
-        auto put = [&reordered](int i, bool b) {
+        bool MAP_rule[512]{};
+        auto put = [&MAP_rule](int i, bool b) {
             if (i < 512) {
-                reordered[i] = b;
+                MAP_rule[i] = b;
             }
         };
 
@@ -219,7 +218,7 @@ namespace legacy {
         ruleT rule{};
         for_each_code(code) {
             const auto [q, w, e, a, s, d, z, x, c] = decode(code);
-            rule.set(code, reordered[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1]);
+            rule.set(code, MAP_rule[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1]);
         }
         return rule;
     }

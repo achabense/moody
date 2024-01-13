@@ -216,22 +216,23 @@ namespace legacy {
             ImGui::PopStyleVar();
             ImGui::EndGroup();
 
+            // TODO: (gui) ugly...
             auto table = [&, tid = 0](termT_vec& terms) mutable {
-                // TODO: (gui) ugly...
                 // TODO: or, add isometric equivT?
                 // pro: iso is useful as detector... con: cannot disable all conveniently...
                 ImGui::PushID(tid++);
-                if (ImGui::Button("f", sqr)) {
-                    const bool any_selected =
-                        std::any_of(terms.begin(), terms.end(), [](const termT& t) { return t.selected; });
-                    for (termT& t : terms) {
-                        t.selected = !any_selected;
-                    }
-                    sel = true;
-                }
-                ImGui::SameLine();
-                if (ImGui::BeginTable("Table", terms.size(), ImGuiTableFlags_BordersInner)) {
+                // TODO: better sizing...
+                if (ImGui::BeginTable("Table", terms.size() + 1, ImGuiTableFlags_Borders, {520, 0})) {
                     ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    if (ImGui::Button("f", sqr)) {
+                        const bool any_selected =
+                            std::any_of(terms.begin(), terms.end(), [](const termT& t) { return t.selected; });
+                        for (termT& t : terms) {
+                            t.selected = !any_selected;
+                        }
+                        sel = true;
+                    }
                     for (termT& t : terms) {
                         ImGui::TableNextColumn();
                         imgui_str(t.msg);
@@ -243,9 +244,9 @@ namespace legacy {
             };
 
             table(terms_native);
-            ImGui::Separator();
+            // ImGui::Separator();
             table(terms_misc);
-            ImGui::Separator();
+            // ImGui::Separator();
             // TODO: temp...
             imgui_str("qw-     q w\n"
                       "asd -> a s d\n"
@@ -368,8 +369,9 @@ void stone_constraints(rule_recorder& recorder) {
                     }
 
                     for_each_code(code) {
-                        // Eh, took a while to find the [...,x,...] error...
-                        auto [q, w, e, a, s, d, z, X, c] = decode(code);
+                        // TODO: (temp) Eh, took a while to find the [...,x,...] error...
+                        // auto [q, w, e, a, s, d, z, X, c] = decode(code);
+                        legacy::envT env = decode(code);
                         auto imbue = [](bool& b, stateE state) {
                             if (state == F || state == F_Cond) {
                                 b = 0;
@@ -379,19 +381,19 @@ void stone_constraints(rule_recorder& recorder) {
                             }
                         };
 
-                        imbue(q, board[y - 1][x - 1]);
-                        imbue(w, board[y - 1][x]);
-                        imbue(e, board[y - 1][x + 1]);
+                        imbue(env.q, board[y - 1][x - 1]);
+                        imbue(env.w, board[y - 1][x]);
+                        imbue(env.e, board[y - 1][x + 1]);
 
-                        imbue(a, board[y][x - 1]);
-                        imbue(s, board[y][x]);
-                        imbue(d, board[y][x + 1]);
+                        imbue(env.a, board[y][x - 1]);
+                        imbue(env.s, board[y][x]);
+                        imbue(env.d, board[y][x + 1]);
 
-                        imbue(z, board[y + 1][x - 1]);
-                        imbue(X, board[y + 1][x]);
-                        imbue(c, board[y + 1][x + 1]);
-                        rule.set(legacy::encode(q, w, e, a, s, d, z, X, c), board[y][x] == F ? 0 : 1);
-                        locked[legacy::encode(q, w, e, a, s, d, z, X, c)] = true;
+                        imbue(env.z, board[y + 1][x - 1]);
+                        imbue(env.x, board[y + 1][x]);
+                        imbue(env.c, board[y + 1][x + 1]);
+                        rule.set(legacy::encode(env), board[y][x] == F ? 0 : 1);
+                        locked[legacy::encode(env)] = true;
                     }
                 }
             }
@@ -559,8 +561,8 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                         c_1, 'x', c_inconsistent);
         }
 
-        const int zoom = 7;
         if (auto child = imgui_childwindow("Details")) {
+            const int zoom = 7;
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 4));
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
             for (int j = 0; j < par.k(); ++j) {
@@ -976,8 +978,8 @@ int main(int argc, char** argv) {
             }
             if (resize) {
                 int iwidth = 0, iheight = 0;
-                auto [ptr, ec] = std::from_chars(input_width, input_width + 20, iwidth);
-                auto [ptr2, ec2] = std::from_chars(input_height, input_height + 20, iheight);
+                const auto [ptr, ec] = std::from_chars(input_width, input_width + 20, iwidth);
+                const auto [ptr2, ec2] = std::from_chars(input_height, input_height + 20, iheight);
                 if (ec == std::errc{} && ec2 == std::errc{}) {
                     if (iwidth > 10 && iwidth < 1000 && iheight > 10 && iheight < 1000) {
                         img_off = {0, 0};
