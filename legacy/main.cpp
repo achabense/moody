@@ -359,7 +359,7 @@ void stone_constraints(rule_recorder& recorder) {
         ImGui::PopStyleVar();
 
         if (hit) {
-            legacy::ruleT rule{};
+            legacy::ruleT rule{}; // recorder::current?
             legacy::lockT locked{};
             for (int y = 1; y < r - 1; ++y) {
                 for (int x = 1; x < r - 1; ++x) {
@@ -651,60 +651,56 @@ class file_nav_with_recorder {
     rule_recorder m_recorder;
 
 public:
-    // draw() instead?
-    void window(const char* id_str, bool* p_open, rule_recorder& out) {
+    void display(rule_recorder& out) {
         // TODO: refresh... / reset(clear)...
         // TODO: set as current_path... ./ copy_path...
         // TODO: notify that all the operations are [read-only...]
-        if (auto window = imgui_window(id_str, p_open)) {
-            if (!m_file) {
-                ImGui::BeginDisabled();
-            }
-            ImGui::BeginGroup();
+        if (!m_file) {
+            ImGui::BeginDisabled();
+        }
+        ImGui::BeginGroup();
 
-            if (m_file) {
-                imgui_str(cpp17_u8string(*m_file));
-            } else {
-                imgui_str("...");
-            }
-
-            // TODO: +1 is clumsy
-            ImGui::AlignTextToFramePadding();
-            ImGui::Text("Total:%d At:%d", m_recorder.size(), m_recorder.pos() + 1);
-            ImGui::SameLine();
-
-            bool hit = false;
-            iter_pair(
-                "<|", "prev", "next", "|>", //
-                [&] { m_recorder.set_first(), hit = true; }, [&] { m_recorder.set_prev(), hit = true; },
-                [&] { m_recorder.set_next(), hit = true; }, [&] { m_recorder.set_last(), hit = true; });
-
-            ImGui::EndGroup();
-            if (!m_file) {
-                ImGui::EndDisabled();
-            }
-            if (ImGui::IsItemClicked()) {
-                hit = true;
-            }
-
-            {
-                // TODO: should be really focus-based...
-                const ImU32 col = (m_file && (hit || m_recorder.current() == out.current()))
-                                      ? IM_COL32_WHITE
-                                      : IM_COL32(100, 100, 100, 255);
-                ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() /*- ImVec2(2, 2)*/,
-                                                    ImGui::GetItemRectMax() /*+ ImVec2(2, 2)*/, col);
-            }
-
-            if (hit) {
-                out.take(m_recorder.current());
-            }
-
-            // ImGui::Separator();
+        if (m_file) {
+            imgui_str(cpp17_u8string(*m_file));
+        } else {
+            imgui_str("...");
         }
 
+        // TODO: +1 is clumsy
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Total:%d At:%d", m_recorder.size(), m_recorder.pos() + 1);
+        ImGui::SameLine();
+
+        bool hit = false;
+        iter_pair(
+            "<|", "prev", "next", "|>", //
+            [&] { m_recorder.set_first(), hit = true; }, [&] { m_recorder.set_prev(), hit = true; },
+            [&] { m_recorder.set_next(), hit = true; }, [&] { m_recorder.set_last(), hit = true; });
+
+        ImGui::EndGroup();
+        if (!m_file) {
+            ImGui::EndDisabled();
+        }
+        if (ImGui::IsItemClicked()) {
+            hit = true;
+        }
+
+        {
+            // TODO: should be really focus-based...
+            const ImU32 col = (m_file && (hit || m_recorder.current() == out.current())) ? IM_COL32_WHITE
+                                                                                         : IM_COL32(100, 100, 100, 255);
+            ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() /*- ImVec2(2, 2)*/,
+                                                ImGui::GetItemRectMax() /*+ ImVec2(2, 2)*/, col);
+        }
+
+        if (hit) {
+            out.take(m_recorder.current());
+        }
+
+        // ImGui::Separator();
+
         // TODO: foldable...
-        if (auto sel = m_nav.window(id_str, p_open)) {
+        if (auto sel = m_nav.display()) {
             auto result = extract_rules(load_binary(*sel, 1'000'000));
             if (!result.empty()) {
                 logger::log_temp(500ms, "found {} rules", result.size());
@@ -763,11 +759,11 @@ struct runner_ctrl {
 // TODO: are there portable ways to convert argv to a valid filesystem::path (without messing up encodings)?
 int main(int argc, char** argv) {
     app_backend::init();
-    code_image icons;
-
     {
         // TODO: refine (names; logic)
         char* base_path = SDL_GetBasePath();
+
+        // TODO: must succeed?
         if (base_path) {
             const std::string path = base_path;
             assert(path.ends_with('\\') || path.ends_with('/'));
@@ -789,7 +785,7 @@ int main(int argc, char** argv) {
         }
 
         // TODO: remove when finished...
-        std::filesystem::current_path(R"(C:\*redacted*\Desktop\rulelists_new)");
+        file_nav::add_special_path(R"(C:\*redacted*\Desktop\rulelists_new)", "Temp");
     }
 
     // ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
@@ -817,6 +813,8 @@ int main(int argc, char** argv) {
 
     bool show_nav_window = true;
     file_nav_with_recorder nav;
+
+    code_image icons;
 
     tile_image img;
     ImVec2 img_off = {0, 0}; // TODO: supposed to be of integer-precision...
@@ -887,7 +885,9 @@ int main(int argc, char** argv) {
         assert(ctrl.rule == recorder.current());
 
         if (show_nav_window) {
-            nav.window("File nav", &show_nav_window, recorder);
+            if (auto window = imgui_window("File nav", &show_nav_window)) {
+                nav.display(recorder);
+            }
         }
 
         // TODO:
@@ -1085,6 +1085,7 @@ int main(int argc, char** argv) {
                     int celx = floor((mouse_pos.x - img_pos.x) / img_zoom);
                     int cely = floor((mouse_pos.y - img_pos.y) / img_zoom);
 
+                    // TODO: can width<paste.width here?
                     paste.pos.x = std::clamp(celx, 0, tile_size.width - paste->width());
                     paste.pos.y = std::clamp(cely, 0, tile_size.height - paste->height());
 
@@ -1099,7 +1100,6 @@ int main(int argc, char** argv) {
             if (imgui_keypressed(ImGuiKey_A, false)) {
                 sel.toggle_select_all(tile_size);
             }
-            // TODO: (temp) shouldn't be scoped in sel block...
             if (imgui_keypressed(ImGuiKey_V, false)) {
                 if (const char* text = ImGui::GetClipboardText()) {
                     try {
@@ -1155,7 +1155,7 @@ int main(int argc, char** argv) {
             ImGui::Checkbox("Nav window", &show_nav_window);
             ImGui::SameLine();
             // TODO: change color when is too fps is too low...
-            ImGui::Text("   (%.1f FPS) Frame:%d\n", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
+            ImGui::Text("   (%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
 
             show_target_rule(ctrl.rule, recorder);
             ImGui::Separator();
@@ -1202,6 +1202,7 @@ int main(int argc, char** argv) {
                         // TODO: Gap-frame shall be really timer-based...
                         ImGui::SliderInt("Gap Frame (0~20)", &ctrl.gap_frame, ctrl.gap_min, ctrl.gap_max, "%d",
                                          ImGuiSliderFlags_NoInput);
+                        // TODO: move elsewhere...
                         imgui_int_slider("Start gen (0~200)", &ctrl.start_from, ctrl.start_min, ctrl.start_max);
                         imgui_int_slider("Pace (1~20)", &ctrl.pace, ctrl.pace_min, ctrl.pace_max);
                         ImGui::AlignTextToFramePadding();

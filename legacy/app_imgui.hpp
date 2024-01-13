@@ -248,7 +248,7 @@ class file_nav {
     void refresh() {
         // Setting outside of try-block to avoid too frequent failures...
         // TODO: log_temp is global; can be problematic...
-        expired = std::chrono::steady_clock::now() + 3000ms; // TODO: this can be longer...
+        expired = std::chrono::steady_clock::now() + 3000ms;
         try {
             dirs.clear();
             files.clear();
@@ -275,12 +275,7 @@ public:
         additionals.emplace_back(std::move(path), title);
     }
 
-    [[nodiscard]] std::optional<path> window(const char* id_str, bool* p_open) {
-        auto window = imgui_window(id_str, p_open);
-        if (!window) {
-            return std::nullopt;
-        }
-
+    [[nodiscard]] std::optional<path> display() {
         std::optional<path> target = std::nullopt;
 
         imgui_strwrapped(cpp17_u8string(std::filesystem::current_path()));
