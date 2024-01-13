@@ -182,10 +182,10 @@ namespace legacy {
             // TODO: tooltip...
             // TODO: recheck id & tid logic... (& imagebutton)
             const bool has_lock = locked != lockT{}; // TODO: awkward...
-            auto check = [&, id = 0](termT& term) mutable {
+            auto check = [&, id = 0](termT& term, const ImVec2& size) mutable {
                 // TODO: which should come first? rendering or dummy button?
                 const ImVec2 pos = ImGui::GetCursorScreenPos();
-                const ImVec2 pos_max = pos + sqr;
+                const ImVec2 pos_max = pos + size;
                 // TODO: a bit ugly...
                 ImGui::GetWindowDrawList()->AddRectFilled(pos, pos_max,
                                                           term.selected  ? ImGui::GetColorU32(ImGuiCol_ButtonHovered)
@@ -202,7 +202,7 @@ namespace legacy {
                 }
 
                 ImGui::PushID(id++);
-                const bool hit = ImGui::InvisibleButton("Check", sqr);
+                const bool hit = ImGui::InvisibleButton("Check", size);
                 // TODO: this is in imgui_internal.h...
                 // TODO: Ask is it intentional to make InvisibleButton highlight-less?
                 // TODO: use normal buttons instead?
@@ -215,36 +215,45 @@ namespace legacy {
                 }
             };
 
-            if (ImGui::Button("c", sqr)) {
-                for (termT& t : terms_ignore) {
-                    if (t.selected) {
-                        t.selected = false;
-                        sel = true;
+            const ImGuiTableFlags table_flags =
+                ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoHostExtendX;
+
+            if (ImGui::BeginTable("Ignore", 2, table_flags)) {
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                if (ImGui::Button("c", sqr)) {
+                    for (termT& t : terms_ignore) {
+                        if (t.selected) {
+                            t.selected = false;
+                            sel = true;
+                        }
                     }
                 }
-            }
-            ImGui::SameLine();
-            // TODO: slightly confusing; light color should represent "take-into-account" instead of "ignore"
-            // Is this solvable by applying specific coloring scheme?
-            ImGui::BeginGroup();
-            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1, 1)); // TODO: too tight...
-            for (int l = 0; l < 3; ++l) {
-                check(terms_ignore[l * 3 + 0]);
-                ImGui::SameLine();
-                check(terms_ignore[l * 3 + 1]);
-                ImGui::SameLine();
-                check(terms_ignore[l * 3 + 2]);
-            }
-            ImGui::PopStyleVar();
-            ImGui::EndGroup();
 
+                // TODO: for terms_ignore, use smaller button instead?
+                // const ImVec2 sqr_small{floor(r * 0.9f), floor(r * 0.9f)};
+
+                // TODO: slightly confusing; light color should represent "take-into-account" instead of "ignore"
+                // Is this solvable by applying specific coloring scheme?
+                ImGui::TableNextColumn();
+                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1, 1)); // TODO: too tight...
+                for (int l = 0; l < 3; ++l) {
+                    check(terms_ignore[l * 3 + 0], sqr);
+                    ImGui::SameLine();
+                    check(terms_ignore[l * 3 + 1], sqr);
+                    ImGui::SameLine();
+                    check(terms_ignore[l * 3 + 2], sqr);
+                }
+                ImGui::PopStyleVar();
+                ImGui::EndTable();
+            }
             // TODO: (gui) ugly...
             auto table = [&, tid = 0](termT_vec& terms) mutable {
                 // TODO: or, add isometric equivT?
                 // pro: iso is useful as detector... con: cannot disable all conveniently...
                 ImGui::PushID(tid++);
                 // TODO: better sizing...
-                if (ImGui::BeginTable("Table", terms.size() + 1, ImGuiTableFlags_Borders, {520, 0})) {
+                if (ImGui::BeginTable("Other", terms.size() + 1, table_flags)) {
                     ImGui::TableNextRow();
                     ImGui::TableNextColumn();
                     if (ImGui::Button("f", sqr)) {
@@ -258,7 +267,7 @@ namespace legacy {
                     for (termT& t : terms) {
                         ImGui::TableNextColumn();
                         imgui_str(t.msg);
-                        check(t);
+                        check(t, sqr);
                     }
                     ImGui::EndTable();
                 }
@@ -266,13 +275,13 @@ namespace legacy {
             };
 
             table(terms_native);
-            // ImGui::Separator();
+            // TODO: flipping is meaningless for terms_misc...
             table(terms_misc);
-            // ImGui::Separator();
             // TODO: temp...
             imgui_str("qw-     q w\n"
                       "asd -> a s d\n"
                       "-xc     x c");
+            ImGui::SameLine();
             table(terms_hex);
 
             if (sel) {
