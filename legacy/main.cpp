@@ -12,12 +12,31 @@
 // TODO: rename...
 const int FixedItemWidth = 220;
 
+// TODO: awkward... consider other approaches (native nav etc) of possible...
+class imgui_enter {
+    inline static ImGuiID m_bind = 0;
+
+public:
+    static bool test() {
+        if (ImGui::GetItemID() == m_bind) {
+            const bool pressed = imgui_keypressed(ImGuiKey_Enter, false);
+            const ImU32 col = pressed ? IM_COL32_WHITE : IM_COL32(160, 160, 160, 255);
+            ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() - ImVec2(2, 2),
+                                                ImGui::GetItemRectMax() + ImVec2(2, 2), col);
+            return pressed;
+        }
+        return false;
+    }
+
+    static void clear_bind() { m_bind = 0; }
+    static void bind_here() { m_bind = ImGui::GetItemID(); }
+};
+
 // TODO: remove optional<lockT>...
 // TODO: extract image-data class...
 // TODO: extract paste-info class...
 // TODO: extract ctrl.rule & recorder...
 
-// TODO: bind key-enter to any iterable widgets / randomize?
 // TODO: support rollbacking diff rules?
 // TODO: support rollbacking locks?
 // TODO: for editing opt, support in-lock and outof-lock mode?
@@ -31,11 +50,14 @@ inline void iter_pair(const char* tag_first, const char* tag_prev, const char* t
 
     ImGui::SameLine();
     ImGui::BeginGroup();
-    if (ImGui::Button(tag_prev)) {
+    // TODO: _Left, _Right to toggle?
+    if (ImGui::Button(tag_prev) || imgui_enter::test()) {
+        imgui_enter::bind_here();
         act_prev();
     }
     ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
-    if (ImGui::Button(tag_next)) {
+    if (ImGui::Button(tag_next) || imgui_enter::test()) {
+        imgui_enter::bind_here();
         act_next();
     }
     ImGui::EndGroup();
@@ -471,7 +493,8 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
 
         // TODO: imgui_innerx...
         ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
-        if (ImGui::Button("Randomize") || imgui_keypressed(ImGuiKey_Enter, false)) {
+        if (ImGui::Button("Randomize") || imgui_enter::test()) {
+            imgui_enter::bind_here();
             recorder.take(random_flip(inter.get_viewer(), par, locked, target, global_mt19937(), rcount, rcount));
         }
 
