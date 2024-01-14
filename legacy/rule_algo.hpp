@@ -534,6 +534,8 @@ namespace legacy {
         return free_indexes;
     }
 
+    // TODO: shuffle (without specifying count)?
+
     inline ruleT random_flip(ruleT r, const partitionT& par, const lockT& locked, const ruleT& lr, std::mt19937& rand,
                              int count_min, int count_max /* not used, subject to future extension */) {
         // TODO: precondition...

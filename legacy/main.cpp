@@ -186,19 +186,21 @@ namespace legacy {
                 // TODO: which should come first? rendering or dummy button?
                 const ImVec2 pos = ImGui::GetCursorScreenPos();
                 const ImVec2 pos_max = pos + size;
-                // TODO: a bit ugly...
-                ImGui::GetWindowDrawList()->AddRectFilled(pos, pos_max,
-                                                          term.selected  ? ImGui::GetColorU32(ImGuiCol_ButtonHovered)
-                                                          : term.covered ? ImGui::GetColorU32(ImGuiCol_FrameBg)
-                                                                         : 0);
-                ImGui::GetWindowDrawList()->AddRect(pos, pos_max, ImGui::GetColorU32(ImGuiCol_Button));
+                // TODO: add size assertion? (size>8 etc)
+                // TODO: redesign colors...
+                ImDrawList* const drawlist = ImGui::GetWindowDrawList();
+                drawlist->AddRectFilled(pos + ImVec2(4, 4), pos_max - ImVec2(4, 4),
+                                        term.selected  ? ImGui::GetColorU32(ImGuiCol_ButtonHovered)
+                                        : term.covered ? ImGui::GetColorU32(ImGuiCol_FrameBg)
+                                                       : 0);
+                drawlist->AddRect(pos, pos_max, ImGui::GetColorU32(ImGuiCol_Button));
 
                 if (satisfies(target, {}, term.eq)) {
-                    ImGui::GetWindowDrawList()->AddRect(pos, pos_max, IM_COL32(0, 255, 0, 255));
+                    drawlist->AddRect(pos, pos_max, IM_COL32(0, 255, 0, 255));
                 } else if (has_lock && satisfies(target, locked, {}, term.eq)) {
                     // TODO: inefficient...
                     // TODO: blurry when selected... (- ImGuiCol_ButtonHovered)
-                    ImGui::GetWindowDrawList()->AddRect(pos, pos_max, IM_COL32(0, 100, 0, 255));
+                    drawlist->AddRect(pos, pos_max, IM_COL32(0, 100, 0, 255));
                 }
 
                 ImGui::PushID(id++);
@@ -278,9 +280,9 @@ namespace legacy {
             // TODO: flipping is meaningless for terms_misc...
             table(terms_misc);
             // TODO: temp...
-            imgui_str("qw-     q w\n"
-                      "asd -> a s d\n"
-                      "-xc     x c");
+            imgui_str("qw-    q w\n"
+                      "asd ~ a s d\n"
+                      "-xc    x c");
             ImGui::SameLine();
             table(terms_hex);
 
@@ -690,47 +692,49 @@ public:
         // TODO: refresh... / reset(clear)...
         // TODO: set as current_path... ./ copy_path...
         // TODO: notify that all the operations are [read-only...]
+        bool hit = false;
+
         if (!m_file) {
             ImGui::BeginDisabled();
         }
-        ImGui::BeginGroup();
+        // TODO: using childwindow only for padding...
+        if (auto child = imgui_childwindow("Recorder", {},
+                                           ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_AutoResizeY)) {
+            if (m_file) {
+                // TODO: or wrapped full path?
+                imgui_str(cpp17_u8string(m_file->filename()));
+            } else {
+                imgui_str("...");
+            }
 
-        if (m_file) {
-            // TODO: or just filename?
-            imgui_strwrapped(cpp17_u8string(*m_file));
-        } else {
-            imgui_str("...");
+            // TODO: +1 is clumsy
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("Total:%d At:%d", m_recorder.size(), m_recorder.pos() + 1);
+            ImGui::SameLine();
+
+            iter_pair(
+                "<|", "prev", "next", "|>", //
+                [&] { m_recorder.set_first(), hit = true; }, [&] { m_recorder.set_prev(), hit = true; },
+                [&] { m_recorder.set_next(), hit = true; }, [&] { m_recorder.set_last(), hit = true; });
         }
-
-        // TODO: +1 is clumsy
-        ImGui::AlignTextToFramePadding();
-        ImGui::Text("Total:%d At:%d", m_recorder.size(), m_recorder.pos() + 1);
-        ImGui::SameLine();
-
-        bool hit = false;
-        iter_pair(
-            "<|", "prev", "next", "|>", //
-            [&] { m_recorder.set_first(), hit = true; }, [&] { m_recorder.set_prev(), hit = true; },
-            [&] { m_recorder.set_next(), hit = true; }, [&] { m_recorder.set_last(), hit = true; });
-
-        ImGui::EndGroup();
         if (!m_file) {
             ImGui::EndDisabled();
         }
         if (ImGui::IsItemClicked()) {
+            assert(m_file);
             hit = true;
         }
 
-        {
-            // TODO: should be really focus-based...
-            const ImU32 col = (m_file && (hit || m_recorder.current() == out.current())) ? IM_COL32_WHITE
-                                                                                         : IM_COL32(100, 100, 100, 255);
-            ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() /*- ImVec2(2, 2)*/,
-                                                ImGui::GetItemRectMax() /*+ ImVec2(2, 2)*/, col);
+        if (hit) {
+            assert(m_file);
+            out.take(m_recorder.current());
         }
 
-        if (hit) {
-            out.take(m_recorder.current());
+        {
+            // TODO: find better ways to show sync...
+            const bool sync = m_file && (m_recorder.current() == out.current());
+            const ImU32 col = sync ? IM_COL32_WHITE : ImGui::GetColorU32(ImGuiCol_Separator);
+            ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), col);
         }
 
         // TODO: foldable...
@@ -1044,10 +1048,10 @@ int main(int argc, char** argv) {
 
             const ImVec2 img_pos = canvas_pos + img_off;
 
-            ImDrawList& drawlist = *ImGui::GetWindowDrawList();
-            drawlist.PushClipRect(canvas_pos, canvas_pos + canvas_size);
-            drawlist.AddRectFilled(canvas_pos, canvas_pos + canvas_size, IM_COL32(20, 20, 20, 255));
-            drawlist.AddImage(img.update(runner.tile()), img_pos, img_pos + img_size);
+            ImDrawList* const drawlist = ImGui::GetWindowDrawList();
+            drawlist->PushClipRect(canvas_pos, canvas_pos + canvas_size);
+            drawlist->AddRectFilled(canvas_pos, canvas_pos + canvas_size, IM_COL32(20, 20, 20, 255));
+            drawlist->AddImage(img.update(runner.tile()), img_pos, img_pos + img_size);
 
             // This can happen when e.g. paste -> resize...
             if (paste && (paste->width() > tile_size.width || paste->height() > tile_size.height)) {
@@ -1061,14 +1065,14 @@ int main(int argc, char** argv) {
                 const ImVec2 min = img_pos + ImVec2(paste.pos.x, paste.pos.y) * img_zoom;
                 const ImVec2 max =
                     img_pos + ImVec2(paste.pos.x + paste->width(), paste.pos.y + paste->height()) * img_zoom;
-                drawlist.AddImage(paste.texture(), min, max, {0, 0}, {1, 1}, IM_COL32(255, 255, 255, 120));
-                drawlist.AddRectFilled(min, max, IM_COL32(255, 0, 0, 60));
+                drawlist->AddImage(paste.texture(), min, max, {0, 0}, {1, 1}, IM_COL32(255, 255, 255, 120));
+                drawlist->AddRectFilled(min, max, IM_COL32(255, 0, 0, 60));
             }
             if (const auto s = sel.get()) {
-                drawlist.AddRectFilled(img_pos + ImVec2(s.min.x, s.min.y) * img_zoom,
-                                       img_pos + ImVec2(s.max.x, s.max.y) * img_zoom, IM_COL32(0, 255, 0, 60));
+                drawlist->AddRectFilled(img_pos + ImVec2(s.min.x, s.min.y) * img_zoom,
+                                        img_pos + ImVec2(s.max.x, s.max.y) * img_zoom, IM_COL32(0, 255, 0, 60));
             }
-            drawlist.PopClipRect();
+            drawlist->PopClipRect();
 
             ImGui::InvisibleButton("Canvas", canvas_size);
             const bool active = ImGui::IsItemActive();
