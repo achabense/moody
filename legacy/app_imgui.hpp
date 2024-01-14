@@ -109,6 +109,7 @@ inline bool imgui_keypressed(ImGuiKey key, bool repeat) {
 };
 
 // TODO: other mouse functions...
+// TODO: rename to _mouse_XXX?
 inline bool imgui_scrolling() {
     return ImGui::GetIO().MouseWheel != 0;
 }

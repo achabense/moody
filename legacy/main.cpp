@@ -12,7 +12,7 @@
 // TODO: rename...
 const int FixedItemWidth = 220;
 
-// TODO: awkward... consider other approaches (native nav etc) of possible...
+// TODO: redesign... consider other approaches (native nav etc) if possible...
 class imgui_enter {
     inline static ImGuiID m_bind = 0;
 
@@ -639,7 +639,8 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                 }
                 ImGui::SameLine();
                 imgui_strdisabled("?");
-                if (ImGui::IsItemHovered()) {
+                // TODO: recheck other IsItemHovered usages...
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
                     static bool show_group = true;
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
                         show_group = !show_group;
@@ -695,7 +696,8 @@ public:
         ImGui::BeginGroup();
 
         if (m_file) {
-            imgui_str(cpp17_u8string(*m_file));
+            // TODO: or just filename?
+            imgui_strwrapped(cpp17_u8string(*m_file));
         } else {
             imgui_str("...");
         }
@@ -730,8 +732,6 @@ public:
         if (hit) {
             out.take(m_recorder.current());
         }
-
-        // ImGui::Separator();
 
         // TODO: foldable...
         if (auto sel = m_nav.display()) {
@@ -926,7 +926,7 @@ int main(int argc, char** argv) {
 
         // TODO:
         // whether to support drawing?
-        // [clear 0] [clear 1] [clear outside 0] [clear outside 1]
+        // [clear 1] [clear outside 1]
         // [set as init-state] problem: what if size is already changed?
         // [random fill] whether to use tileT_filler? where to specify density?
         // [min-width/height constraint]
@@ -937,19 +937,21 @@ int main(int argc, char** argv) {
         auto show_tile = [&] {
             // TODO: refine "resize" gui and logic...
             static char input_width[20]{}, input_height[20]{};
-            const auto filter = [](ImGuiInputTextCallbackData* data) -> int {
-                return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
-            };
             const float s = ImGui::GetStyle().ItemInnerSpacing.x;
-            const float w = ImGui::CalcItemWidth();
-            ImGui::SetNextItemWidth((w - s) / 2);
-            ImGui::InputTextWithHint("##Width", "width", input_width, 20, ImGuiInputTextFlags_CallbackCharFilter,
-                                     filter);
-            ImGui::SameLine(0, s);
-            ImGui::SetNextItemWidth((w - s) / 2);
-            ImGui::InputTextWithHint("##Height", "height", input_height, 20, ImGuiInputTextFlags_CallbackCharFilter,
-                                     filter);
-            ImGui::SameLine(0, s);
+            {
+                const auto filter = [](ImGuiInputTextCallbackData* data) -> int {
+                    return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
+                };
+                const float w = (ImGui::CalcItemWidth() - s) / 2;
+                ImGui::SetNextItemWidth(w);
+                ImGui::InputTextWithHint("##Width", "width", input_width, 20, ImGuiInputTextFlags_CallbackCharFilter,
+                                         filter);
+                ImGui::SameLine(0, s);
+                ImGui::SetNextItemWidth(w);
+                ImGui::InputTextWithHint("##Height", "height", input_height, 20, ImGuiInputTextFlags_CallbackCharFilter,
+                                         filter);
+                ImGui::SameLine(0, s);
+            }
             const bool resize = ImGui::Button("Resize");
 
             // TODO: move elsewhere in the gui?
@@ -996,30 +998,30 @@ int main(int argc, char** argv) {
                 return;
             }
 
+            const auto clamp_size = [](int width, int height) {
+                return legacy::rectT{.width = std::clamp(width, 10, 1200), .height = std::clamp(height, 10, 1200)};
+            };
             if (fit) {
                 img_off = {0, 0};
 
-                // TODO: avoid being width/height being 1 [[or 0]]...
-                const legacy::rectT fit_size{.width = (int)canvas_size.x / img_zoom,
-                                             .height = (int)canvas_size.y / img_zoom};
-                if (runner.tile().size() != fit_size) {
-                    runner.restart(filler, fit_size);
+                const legacy::rectT size = clamp_size((int)canvas_size.x / img_zoom, (int)canvas_size.y / img_zoom);
+                if (runner.tile().size() != size) {
+                    runner.restart(filler, size);
                     // TODO: how to support background period then?
-                    assert(runner.tile().size() == fit_size); // ???
+                    assert(runner.tile().size() == size); // ???
                 }
             }
             if (resize) {
+                // TODO: support using current screen/tilesize/zoom?
                 int iwidth = 0, iheight = 0;
                 const auto [ptr, ec] = std::from_chars(input_width, input_width + 20, iwidth);
                 const auto [ptr2, ec2] = std::from_chars(input_height, input_height + 20, iheight);
                 if (ec == std::errc{} && ec2 == std::errc{}) {
-                    if (iwidth > 10 && iwidth < 1000 && iheight > 10 && iheight < 1000) {
-                        img_off = {0, 0};
-                        img_zoom = 1; // <-- TODO: whether to reset zoom here?
-                        const legacy::rectT size{.width = iwidth, .height = iheight};
-                        if (runner.tile().size() != size) {
-                            runner.restart(filler, size);
-                        }
+                    img_off = {0, 0};
+                    img_zoom = 1; // <-- TODO: whether to reset zoom here?
+                    const legacy::rectT size = clamp_size(iwidth, iheight);
+                    if (runner.tile().size() != size) {
+                        runner.restart(filler, size);
                     }
                 }
                 // else ...
@@ -1047,7 +1049,7 @@ int main(int argc, char** argv) {
             drawlist.AddRectFilled(canvas_pos, canvas_pos + canvas_size, IM_COL32(20, 20, 20, 255));
             drawlist.AddImage(img.update(runner.tile()), img_pos, img_pos + img_size);
 
-            // This can happen when e.g. paste && "fit-zoom" etc...
+            // This can happen when e.g. paste -> resize...
             if (paste && (paste->width() > tile_size.width || paste->height() > tile_size.height)) {
                 paste.reset();
             }
@@ -1084,7 +1086,6 @@ int main(int argc, char** argv) {
                         runner.shift(io.MouseDelta.x, io.MouseDelta.y);
                     }
                 }
-                // TODO: rename to mouseXXX...
                 if (imgui_scrolling()) {
                     const ImVec2 cellidx = (mouse_pos - img_pos) / img_zoom;
                     if (imgui_scrolldown() && img_zoom != 1) {
@@ -1137,7 +1138,8 @@ int main(int argc, char** argv) {
             if (imgui_keypressed(ImGuiKey_V, false)) {
                 if (const char* text = ImGui::GetClipboardText()) {
                     try {
-                        paste.update(legacy::from_RLE_str(text));
+                        // TODO: or ask whether to resize runner.tile?
+                        paste.update(legacy::from_RLE_str(text, tile_size));
                     } catch (const std::exception& err) {
                         logger::log_temp(2500ms, "{}", err.what());
                     }
@@ -1148,13 +1150,18 @@ int main(int argc, char** argv) {
                     ImGui::SetClipboardText(legacy::to_RLE_str(ctrl.rule, runner.tile(), s.min, s.max).c_str());
                 }
                 if (imgui_keypressed(ImGuiKey_Backspace, false) || imgui_keypressed(ImGuiKey_X, false)) {
-                    // TODO: outside/ 0/1.../ agar...
+                    // TODO: 0/1.../ agar...
                     legacy::clear_inside(runner.tile(), s.min, s.max, 0);
                 }
                 if (imgui_keypressed(ImGuiKey_Equal, false)) {
                     // TODO: specify density etc... or share with tileT_filler?
                     legacy::random_fill(runner.tile(), global_mt19937(), 0.5, s.min, s.max);
                 }
+                // TODO: redesign keyboard ctrl...
+                if (imgui_keypressed(ImGuiKey_0, false)) {
+                    legacy::clear_outside(runner.tile(), s.min, s.max, 0);
+                }
+
                 // TODO: refine capturing...
                 if (imgui_keypressed(ImGuiKey_P, false)) {
                     // TODO: support specifying padding area...
@@ -1165,6 +1172,7 @@ int main(int argc, char** argv) {
                         locked[code] = true;
                         return ctrl.rule(code);
                     };
+                    // TODO: how to decide generation?
                     for (int g = 0; g < 50; ++g) {
                         cap.gather(cap, cap, cap, cap, cap, cap, cap, cap);
                         cap.apply(rulx, cap2);

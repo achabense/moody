@@ -109,6 +109,8 @@ namespace legacy {
             assert(y >= 0 && y < m_size.height);
             return _line(y + 1);
         }
+
+        // TODO: line(y,xbeg,xend)?
         // TODO: at(posT)?
 
         // TODO: ? whether to expose consecutive data?
@@ -318,7 +320,21 @@ namespace legacy {
             }
         }
 
-        inline void clear_outside(tileT& tile, posT begin, posT end, bool v);
+        inline void clear_outside(tileT& tile, posT begin, posT end, bool v) {
+            assert(verify_pos(tile, begin, end));
+
+            const int width = tile.width(), height = tile.height();
+            for (int y = 0; y < height; ++y) {
+                bool* line = tile.line(y);
+                for (int x = 0; x < width; ++x) {
+                    if (y < begin.y || y >= end.y || x < begin.x || x >= end.x) {
+                        line[x] = v;
+                    }
+                }
+            }
+        }
+
+        void shrink(const tileT& tile, posT& begin, posT& end, bool v);
 
 #if 0
         // TODO: is the name meaningful?
@@ -399,7 +415,7 @@ namespace legacy {
 
     // TODO: parse leading line (x = ...)
     // TODO: what if not matching? currently returning a 1x1 dot... should return nothing...
-    inline tileT from_RLE_str(std::string_view text, const rectT max_size = {.width = 2000, .height = 2000}) {
+    inline tileT from_RLE_str(std::string_view text, const rectT max_size) {
         {
             const char *str = text.data(), *end = str + text.size();
             // TODO: temp; skip first line; test only...
@@ -456,12 +472,12 @@ namespace legacy {
             }
             width = std::max(width, x);
         }
-        
+
         // TODO: if width, height==1, return {}?
 
         // TODO: exceptions like this should be reported via popup?
         if (width > max_size.width || height > max_size.height) {
-            throw std::runtime_error(std::format("Size too big: x = {}, y = {}\nLimit x <= {}, y <= {}", width, height,
+            throw std::runtime_error(std::format("Size too big: x = {}, y = {}\nLimit: x <= {}, y <= {}", width, height,
                                                  max_size.width, max_size.height));
         }
 
@@ -493,7 +509,7 @@ namespace legacy {
         inline const bool test_RLE_str = [] {
             tileT tile({.width = 32, .height = 60});
             random_fill(tile, global_mt19937(), 0.5);
-            assert(tile == from_RLE_str(to_RLE_str(tile)));
+            assert(tile == from_RLE_str(to_RLE_str(tile), tile.size()));
             return true;
         }();
     } // namespace _misc
