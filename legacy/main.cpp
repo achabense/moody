@@ -12,25 +12,25 @@
 // TODO: rename...
 const int FixedItemWidth = 220;
 
-// TODO: redesign... consider other approaches (native nav etc) if possible...
-class imgui_enter {
-    inline static ImGuiID m_bind = 0;
-
-public:
-    static bool test() {
-        if (ImGui::GetItemID() == m_bind) {
-            const bool pressed = imgui_keypressed(ImGuiKey_Enter, false);
-            const ImU32 col = pressed ? IM_COL32_WHITE : IM_COL32(160, 160, 160, 255);
-            ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() - ImVec2(2, 2),
-                                                ImGui::GetItemRectMax() + ImVec2(2, 2), col);
-            return pressed;
-        }
-        return false;
+// TODO: consider other approaches (native nav etc) if possible...
+// TODO: e.g. toggle between buttons by left/right... / clear binding...
+inline bool imgui_enterbutton(const char* label) {
+    static ImGuiID bind_id = 0;
+    bool ret = ImGui::Button(label);
+    const ImGuiID button_id = ImGui::GetItemID();
+    if (ret) {
+        bind_id = button_id;
     }
-
-    static void clear_bind() { m_bind = 0; }
-    static void bind_here() { m_bind = ImGui::GetItemID(); }
-};
+    if (bind_id == button_id) {
+        if (imgui_keypressed(ImGuiKey_Enter, false)) {
+            ret = true;
+        }
+        const ImU32 col = ret ? IM_COL32_WHITE : IM_COL32(160, 160, 160, 255);
+        ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() - ImVec2(2, 2),
+                                            ImGui::GetItemRectMax() + ImVec2(2, 2), col);
+    }
+    return ret;
+}
 
 // TODO: remove optional<lockT>...
 // TODO: extract image-data class...
@@ -51,13 +51,11 @@ inline void iter_pair(const char* tag_first, const char* tag_prev, const char* t
     ImGui::SameLine();
     ImGui::BeginGroup();
     // TODO: _Left, _Right to toggle?
-    if (ImGui::Button(tag_prev) || imgui_enter::test()) {
-        imgui_enter::bind_here();
+    if (imgui_enterbutton(tag_prev)) {
         act_prev();
     }
     ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
-    if (ImGui::Button(tag_next) || imgui_enter::test()) {
-        imgui_enter::bind_here();
+    if (imgui_enterbutton(tag_next)) {
         act_next();
     }
     ImGui::EndGroup();
@@ -512,13 +510,11 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
         // TODO: imgui_innerx...
         ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
         // TODO: better to have a prev button for randomize...
-        if (ImGui::Button("Randomize") || imgui_enter::test()) {
-            imgui_enter::bind_here();
+        if (imgui_enterbutton("Randomize")) {
             out = legacy::randomize(inter, par, target, locked, global_mt19937(), rcount, rcount);
         }
         ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
-        if (ImGui::Button("Shuffle") || imgui_enter::test()) {
-            imgui_enter::bind_here();
+        if (imgui_enterbutton("Shuffle")) {
             out = legacy::shuffle(inter, par, target, locked, global_mt19937());
         }
 
