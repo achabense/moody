@@ -503,7 +503,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
         // TODO: still unstable between partition switches...
         // TODO: the range should be scoped by locks... so, what should rcount be?
         static int rcount = 0.5 * par.k();
-        const int freec = legacy::get_free_indexes(locked, par).size(); // TODO: wasteful...
+        const int freec = legacy::count_free(par, locked); // TODO: still wasteful...
 
         ImGui::SetNextItemWidth(FixedItemWidth);
         imgui_int_slider("##Quantity", &rcount, 0, par.k());
@@ -514,7 +514,12 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
         // TODO: better to have a prev button for randomize...
         if (ImGui::Button("Randomize") || imgui_enter::test()) {
             imgui_enter::bind_here();
-            out = random_flip(inter.get_viewer(), par, locked, target, global_mt19937(), rcount, rcount);
+            out = legacy::randomize(inter, par, target, locked, global_mt19937(), rcount, rcount);
+        }
+        ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
+        if (ImGui::Button("Shuffle") || imgui_enter::test()) {
+            imgui_enter::bind_here();
+            out = legacy::shuffle(inter, par, target, locked, global_mt19937());
         }
 
         iter_pair(
@@ -523,16 +528,14 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
             [&] { out = legacy::act_int::prev(inter, par, target, locked); },
             [&] { out = legacy::act_int::next(inter, par, target, locked); },
             [&] { out = legacy::act_int::last(inter, par, target, locked); });
-        ImGui::SameLine(), imgui_str("|");
-        ImGui::SameLine();
+        ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
         iter_pair(
             "<1.0.", "pprev", "pnext", "0.1.>", //
             [&] { out = legacy::act_perm::first(inter, par, target, locked); },
             [&] { out = legacy::act_perm::prev(inter, par, target, locked); },
             [&] { out = legacy::act_perm::next(inter, par, target, locked); },
             [&] { out = legacy::act_perm::last(inter, par, target, locked); });
-        ImGui::SameLine(), imgui_str("|");
-        ImGui::SameLine();
+        ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
         // TODO: should mirror also relocate locks?
         if (ImGui::Button("Mir")) {
             out = legacy::mirror(target);
@@ -984,8 +987,7 @@ int main(int argc, char** argv) {
             // TODO: select all, unselect button...
 
             if (paste) {
-                ImGui::SameLine(), imgui_str("|");
-                ImGui::SameLine();
+                ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
                 if (ImGui::Button("Drop paste")) {
                     paste.reset();
                 }
