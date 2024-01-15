@@ -181,27 +181,21 @@ namespace legacy {
 
             // TODO: tooltip...
             // TODO: recheck id & tid logic... (& imagebutton)
-            const bool has_lock = locked != lockT{}; // TODO: awkward...
             auto check = [&, id = 0](termT& term, const ImVec2& size) mutable {
                 // TODO: which should come first? rendering or dummy button?
                 const ImVec2 pos = ImGui::GetCursorScreenPos();
                 const ImVec2 pos_max = pos + size;
                 // TODO: add size assertion? (size>8 etc)
-                // TODO: redesign colors...
-                ImDrawList* const drawlist = ImGui::GetWindowDrawList();
-                drawlist->AddRectFilled(pos + ImVec2(4, 4), pos_max - ImVec2(4, 4),
-                                        term.selected  ? ImGui::GetColorU32(ImGuiCol_ButtonHovered)
-                                        : term.covered ? ImGui::GetColorU32(ImGuiCol_FrameBg)
-                                                       : 0);
-                drawlist->AddRect(pos, pos_max, ImGui::GetColorU32(ImGuiCol_Button));
+                // TODO: explain coloring scheme; redesign if necessary (especially ring col)
+                const ImU32 cen_col = term.selected  ? ImGui::GetColorU32(ImGuiCol_ButtonHovered)
+                                      : term.covered ? ImGui::GetColorU32(ImGuiCol_FrameBg)
+                                                     : IM_COL32_BLACK;
+                const ImU32 ring_col = satisfies(target, {}, term.eq)           ? IM_COL32(0, 255, 0, 255)
+                                       : satisfies(target, locked, {}, term.eq) ? IM_COL32(0, 100, 0, 255)
+                                                                                : ImGui::GetColorU32(ImGuiCol_Button);
 
-                if (satisfies(target, {}, term.eq)) {
-                    drawlist->AddRect(pos, pos_max, IM_COL32(0, 255, 0, 255));
-                } else if (has_lock && satisfies(target, locked, {}, term.eq)) {
-                    // TODO: inefficient...
-                    // TODO: blurry when selected... (- ImGuiCol_ButtonHovered)
-                    drawlist->AddRect(pos, pos_max, IM_COL32(0, 100, 0, 255));
-                }
+                ImGui::GetWindowDrawList()->AddRectFilled(pos + ImVec2(4, 4), pos_max - ImVec2(4, 4), cen_col);
+                ImGui::GetWindowDrawList()->AddRect(pos, pos_max, ring_col);
 
                 ImGui::PushID(id++);
                 const bool hit = ImGui::InvisibleButton("Check", size);
@@ -209,6 +203,7 @@ namespace legacy {
                 // TODO: Ask is it intentional to make InvisibleButton highlight-less?
                 // TODO: use normal buttons instead?
                 ImGui::RenderNavHighlight({ImGui::GetItemRectMin(), ImGui::GetItemRectMax()}, ImGui::GetItemID());
+                // ImGui::RenderNavHighlight({pos, pos_max}, ImGui::GetItemID()); TODO: is this correct?
                 ImGui::PopID();
 
                 if (hit) {
@@ -322,6 +317,17 @@ void show_target_rule(const legacy::ruleT& target, rule_recorder& recorder) {
 
     // TODO: re-implement file-saving?
     imgui_str(rule_str);
+
+    // TODO: better layout...
+    ImGui::Separator();
+    // TODO: +1 is clumsy
+    ImGui::AlignTextToFramePadding();
+    ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1);
+    ImGui::SameLine();
+    iter_pair(
+        "<|", "prev", "next", "|>", //
+        [&] { recorder.set_first(); }, [&] { recorder.set_prev(); }, [&] { recorder.set_next(); },
+        [&] { recorder.set_last(); });
 }
 
 // TODO: too shaky...
@@ -436,9 +442,10 @@ void stone_constraints(rule_recorder& recorder) {
     }
 }
 
+// TODO: ideally, `locked` doesn't belong to editor...
 // TODO: should be a class... how to decouple? ...
-void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_recorder& recorder) {
-    stone_constraints(recorder); // TODO: temp...
+std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_image& icons) {
+    std::optional<legacy::ruleT> out;
 
     static legacy::interT inter = {};
     {
@@ -504,40 +511,31 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
 
         // TODO: imgui_innerx...
         ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+        // TODO: better to have a prev button for randomize...
         if (ImGui::Button("Randomize") || imgui_enter::test()) {
             imgui_enter::bind_here();
-            recorder.take(random_flip(inter.get_viewer(), par, locked, target, global_mt19937(), rcount, rcount));
+            out = random_flip(inter.get_viewer(), par, locked, target, global_mt19937(), rcount, rcount);
         }
-
-        ImGui::Separator();
-        // TODO: +1 is clumsy
-        ImGui::AlignTextToFramePadding();
-        ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1);
-        ImGui::SameLine();
-        iter_pair(
-            "<|", "prev", "next", "|>", //
-            [&] { recorder.set_first(); }, [&] { recorder.set_prev(); }, [&] { recorder.set_next(); },
-            [&] { recorder.set_last(); });
-        ImGui::Separator();
 
         iter_pair(
             "<00..", "dec", "inc", "11..>", //
-            [&] { recorder.take(legacy::act_int::first(inter, par, target, locked)); },
-            [&] { recorder.take(legacy::act_int::prev(inter, par, target, locked)); },
-            [&] { recorder.take(legacy::act_int::next(inter, par, target, locked)); },
-            [&] { recorder.take(legacy::act_int::last(inter, par, target, locked)); });
+            [&] { out = legacy::act_int::first(inter, par, target, locked); },
+            [&] { out = legacy::act_int::prev(inter, par, target, locked); },
+            [&] { out = legacy::act_int::next(inter, par, target, locked); },
+            [&] { out = legacy::act_int::last(inter, par, target, locked); });
         ImGui::SameLine(), imgui_str("|");
         ImGui::SameLine();
         iter_pair(
             "<1.0.", "pprev", "pnext", "0.1.>", //
-            [&] { recorder.take(legacy::act_perm::first(inter, par, target, locked)); },
-            [&] { recorder.take(legacy::act_perm::prev(inter, par, target, locked)); },
-            [&] { recorder.take(legacy::act_perm::next(inter, par, target, locked)); },
-            [&] { recorder.take(legacy::act_perm::last(inter, par, target, locked)); });
+            [&] { out = legacy::act_perm::first(inter, par, target, locked); },
+            [&] { out = legacy::act_perm::prev(inter, par, target, locked); },
+            [&] { out = legacy::act_perm::next(inter, par, target, locked); },
+            [&] { out = legacy::act_perm::last(inter, par, target, locked); });
         ImGui::SameLine(), imgui_str("|");
         ImGui::SameLine();
+        // TODO: should mirror also relocate locks?
         if (ImGui::Button("Mir")) {
-            recorder.replace_current(legacy::mirror(target));
+            out = legacy::mirror(target);
         }
     }
     {
@@ -551,13 +549,13 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
         }
         ImGui::SameLine();
         if (ImGui::Button("Purify")) {
-            recorder.take(legacy::purify(inter, par, target, locked));
+            out = legacy::purify(inter, par, target, locked);
         }
         // TODO: purify -> enhance != enhance -> purify...
         // TODO: problematic: enhance can lead to more inconsistent groups...
         ImGui::SameLine();
         if (ImGui::Button("Purify -> Enhance")) {
-            recorder.take(legacy::purify(inter, par, target, locked));
+            out = legacy::purify(inter, par, target, locked);
             legacy::enhance(par, locked);
         }
     }
@@ -667,18 +665,21 @@ void edit_rule(const legacy::ruleT& target, const code_image& icons, rule_record
                 }
                 if (button_hit) {
                     // TODO: document this behavior... (keyctrl->resolve conflicts)
+                    // TODO: reconsider how to deal with conflicts... (especially via masking rule...)
                     legacy::ruleT r = target;
                     if (ImGui::GetIO().KeyCtrl) {
                         legacy::copy(group, inter.get_viewer(), r);
                     } else {
                         legacy::flip(group, r);
                     }
-                    recorder.take(r); // replace_current?
+                    out = r;
                 }
             }
             ImGui::PopStyleVar(2);
         }
     }
+
+    return out;
 }
 
 // TODO: "paste" should have a similar widget...
@@ -737,13 +738,13 @@ public:
             ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), col);
         }
 
-        // TODO: foldable...
+        // TODO: better layout...
         if (auto sel = m_nav.display()) {
             auto result = extract_rules(load_binary(*sel, 1'000'000));
             if (!result.empty()) {
                 logger::log_temp(500ms, "found {} rules", result.size());
                 m_recorder.replace(std::move(result));
-                out.take(m_recorder.current()); // <---
+                out.take(m_recorder.current()); // Sync with `out`.
                 m_file = std::move(sel);
             } else {
                 logger::log_temp(500ms, "found nothing");
@@ -1210,7 +1211,10 @@ int main(int argc, char** argv) {
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
                 if (auto child = imgui_childwindow("Rul")) {
-                    edit_rule(ctrl.rule, icons, recorder);
+                    stone_constraints(recorder); // TODO: temp...
+                    if (auto out = edit_rule(ctrl.rule, icons)) {
+                        recorder.take(*out);
+                    }
                 }
                 ImGui::TableNextColumn();
                 // TODO: it seems this childwindow is not necessary?

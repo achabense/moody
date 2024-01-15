@@ -243,6 +243,7 @@ class file_nav {
             expired = {};
         } catch (const std::exception& what) {
             // TODO: what encoding?
+            // TODO: treat exceptions specially... (btw, 1000ms is too short)
             logger::log_temp(1000ms, "Exception:\n{}", what.what());
         }
     }
@@ -290,7 +291,9 @@ public:
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             {
-                if (ImGui::InputText("Path", buf_path, std::size(buf_path), ImGuiInputTextFlags_EnterReturnsTrue)) {
+                // TODO: better hint...
+                if (ImGui::InputTextWithHint("Path", "-> enter", buf_path, std::size(buf_path),
+                                             ImGuiInputTextFlags_EnterReturnsTrue)) {
                     set_current(std::filesystem::u8path(buf_path));
                     buf_path[0] = '\0';
                 }

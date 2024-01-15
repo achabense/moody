@@ -393,7 +393,7 @@ namespace legacy {
                 }
                 ++c;
             }
-            flush(); // TODO: whether to ignore trailing zeros?
+            flush(); // (wontfix) trailing 0s are not omitted.
         }
         return str;
     }
@@ -413,9 +413,10 @@ namespace legacy {
                            to_RLE_str(tile, begin, end));
     }
 
+    // TODO: skip lines leading with #
     // TODO: parse leading line (x = ...)
     // TODO: what if not matching? currently returning a 1x1 dot... should return nothing...
-    inline tileT from_RLE_str(std::string_view text, const rectT max_size) {
+    inline tileT from_RLE_str(std::string_view text, const rectT& max_size) {
         {
             const char *str = text.data(), *end = str + text.size();
             // TODO: temp; skip first line; test only...
@@ -473,9 +474,10 @@ namespace legacy {
             width = std::max(width, x);
         }
 
-        // TODO: if width, height==1, return {}?
-
         // TODO: exceptions like this should be reported via popup?
+        if (width == 1 && height == 1) {
+            throw std::runtime_error("TODO... what msg? whether to throw at all?");
+        }
         if (width > max_size.width || height > max_size.height) {
             throw std::runtime_error(std::format("Size too big: x = {}, y = {}\nLimit: x <= {}, y <= {}", width, height,
                                                  max_size.width, max_size.height));

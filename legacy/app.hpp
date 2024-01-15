@@ -102,7 +102,6 @@ public:
 
     // TODO: look for better names...
     // TODO: reconsider what should be done when already exists in the whole vec...
-    // TODO: next/prev work still poorly with editor...
     void take(const legacy::ruleT& rule) {
         legacy::compressT cmpr(rule);
         if (cmpr != m_record[m_pos]) {
@@ -111,9 +110,9 @@ public:
         }
     }
 
-    void replace_current(const legacy::ruleT& rule) { //
-        m_record[m_pos] = legacy::compressT(rule);
-    }
+    // void replace_current(const legacy::ruleT& rule) { //
+    //     m_record[m_pos] = legacy::compressT(rule);
+    // }
 
     legacy::ruleT current() const {
         assert(m_pos >= 0 && m_pos < size());
@@ -129,9 +128,9 @@ public:
     void set_last() { set_pos(size() - 1); }
 
     // TODO: reconsider m_pos logic...
-    void append(const std::vector<legacy::compressT>& vec) { //
-        m_record.insert(m_record.end(), vec.begin(), vec.end());
-    }
+    // void append(const std::vector<legacy::compressT>& vec) { //
+    //     m_record.insert(m_record.end(), vec.begin(), vec.end());
+    // }
 
     void replace(std::vector<legacy::compressT>&& vec) {
         if (!vec.empty()) {
