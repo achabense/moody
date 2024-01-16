@@ -214,48 +214,26 @@ namespace legacy {
                 }
             };
 
-            const ImGuiTableFlags table_flags =
-                ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoHostExtendX;
+            // TODO: the layout is still horrible...
+            const ImGuiTableFlags flags_outer = ImGuiTableFlags_BordersH | ImGuiTableFlags_BordersInnerV |
+                                                ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoHostExtendX;
+            const ImGuiTableFlags flags_inner =
+                ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoHostExtendX;
 
-            if (ImGui::BeginTable("Ignore", 2, table_flags)) {
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                if (ImGui::Button("c", sqr)) {
-                    for (termT& t : terms_ignore) {
-                        if (t.selected) {
-                            t.selected = false;
-                            sel = true;
+            if (ImGui::BeginTable("Checklists", 2, flags_outer)) {
+                auto clear_select = [&](termT_vec& terms, const char* label) {
+                    if (ImGui::Button(label, sqr)) {
+                        for (termT& t : terms) {
+                            if (t.selected) {
+                                t.selected = false;
+                                sel = true;
+                            }
                         }
                     }
-                }
+                };
 
-                // TODO: for terms_ignore, use smaller button instead?
-                // const ImVec2 sqr_small{floor(r * 0.9f), floor(r * 0.9f)};
-
-                // TODO: slightly confusing; light color should represent "take-into-account" instead of "ignore"
-                // Is this solvable by applying specific coloring scheme?
-                ImGui::TableNextColumn();
-                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1, 1)); // TODO: too tight...
-                for (int l = 0; l < 3; ++l) {
-                    check(terms_ignore[l * 3 + 0], sqr);
-                    ImGui::SameLine();
-                    check(terms_ignore[l * 3 + 1], sqr);
-                    ImGui::SameLine();
-                    check(terms_ignore[l * 3 + 2], sqr);
-                }
-                ImGui::PopStyleVar();
-                ImGui::EndTable();
-            }
-            // TODO: (gui) ugly...
-            auto table = [&, tid = 0](termT_vec& terms) mutable {
-                // TODO: or, add isometric equivT?
-                // pro: iso is useful as detector... con: cannot disable all conveniently...
-                ImGui::PushID(tid++);
-                // TODO: better sizing...
-                if (ImGui::BeginTable("Other", terms.size() + 1, table_flags)) {
-                    ImGui::TableNextRow();
-                    ImGui::TableNextColumn();
-                    if (ImGui::Button("f", sqr)) {
+                auto toggle_select = [&](termT_vec& terms, const char* label) {
+                    if (ImGui::Button(label, sqr)) {
                         const bool any_selected =
                             std::any_of(terms.begin(), terms.end(), [](const termT& t) { return t.selected; });
                         for (termT& t : terms) {
@@ -263,25 +241,86 @@ namespace legacy {
                         }
                         sel = true;
                     }
-                    for (termT& t : terms) {
-                        ImGui::TableNextColumn();
-                        imgui_str(t.msg);
-                        check(t, sqr);
-                    }
-                    ImGui::EndTable();
-                }
-                ImGui::PopID();
-            };
+                };
 
-            table(terms_native);
-            // TODO: flipping is meaningless for terms_misc...
-            table(terms_misc);
-            // TODO: temp...
-            imgui_str("qw-    q w\n"
-                      "asd ~ a s d\n"
-                      "-xc    x c");
-            ImGui::SameLine();
-            table(terms_hex);
+                auto checklist = [&](termT_vec& terms, const char* label) {
+                    if (ImGui::BeginTable(label, terms.size(), flags_inner)) {
+                        ImGui::TableNextRow();
+                        for (termT& t : terms) {
+                            ImGui::TableNextColumn();
+                            imgui_str(t.msg);
+                            check(t, sqr);
+                        }
+                        ImGui::EndTable();
+                    }
+                };
+
+                {
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    imgui_str("Ignore");
+                    ImGui::SameLine();
+                    clear_select(terms_ignore, "c##Ignore");
+
+                    ImGui::TableNextColumn();
+                    if (ImGui::BeginTable("Checklist##Ignore", 1, flags_inner)) {
+                        ImGui::TableNextRow();
+                        // TODO: for terms_ignore, use smaller button instead?
+                        // const ImVec2 sqr_small{floor(r * 0.9f), floor(r * 0.9f)};
+
+                        // TODO: slightly confusing; light color should represent "take-into-account" instead of
+                        // "ignore" Is this solvable by applying specific coloring scheme?
+                        ImGui::TableNextColumn();
+                        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1, 1)); // TODO: too tight...
+                        for (int l = 0; l < 3; ++l) {
+                            check(terms_ignore[l * 3 + 0], sqr);
+                            ImGui::SameLine();
+                            check(terms_ignore[l * 3 + 1], sqr);
+                            ImGui::SameLine();
+                            check(terms_ignore[l * 3 + 2], sqr);
+                        }
+                        ImGui::PopStyleVar();
+                        ImGui::EndTable();
+                    }
+                }
+
+                {
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    imgui_str("Native");
+                    ImGui::SameLine();
+                    toggle_select(terms_native, "f##Native");
+
+                    ImGui::TableNextColumn();
+                    checklist(terms_native, "Checklist##Native");
+                }
+
+                {
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    imgui_str("Misc");
+                    ImGui::SameLine();
+                    clear_select(terms_misc, "c##Misc");
+
+                    ImGui::TableNextColumn();
+                    checklist(terms_misc, "Checklist##Misc");
+                }
+
+                {
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    imgui_str("qw-    q w\n"
+                              "asd ~ a s d\n"
+                              "-xc    x c");
+                    ImGui::SameLine();
+                    toggle_select(terms_hex, "f##Hex");
+
+                    ImGui::TableNextColumn();
+                    checklist(terms_hex, "Checklist##Hex");
+                }
+
+                ImGui::EndTable();
+            }
 
             if (sel) {
                 reset_par();
