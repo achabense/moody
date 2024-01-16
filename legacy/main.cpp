@@ -188,9 +188,10 @@ namespace legacy {
                 const ImU32 cen_col = term.selected  ? ImGui::GetColorU32(ImGuiCol_ButtonHovered)
                                       : term.covered ? ImGui::GetColorU32(ImGuiCol_FrameBg)
                                                      : IM_COL32_BLACK;
-                const ImU32 ring_col = satisfies(target, {}, term.eq)           ? IM_COL32(0, 255, 0, 255)
-                                       : satisfies(target, locked, {}, term.eq) ? IM_COL32(0, 100, 0, 255)
-                                                                                : ImGui::GetColorU32(ImGuiCol_Button);
+                const ImU32 ring_col = satisfies(target, mask_zero, term.eq) ? IM_COL32(0, 255, 0, 255)
+                                       : satisfies(target, locked, mask_zero, term.eq)
+                                           ? IM_COL32(0, 100, 0, 255)
+                                           : ImGui::GetColorU32(ImGuiCol_Button);
 
                 ImGui::GetWindowDrawList()->AddRectFilled(pos + ImVec2(4, 4), pos_max - ImVec2(4, 4), cen_col);
                 ImGui::GetWindowDrawList()->AddRect(pos, pos_max, ring_col);
@@ -445,47 +446,48 @@ void stone_constraints(rule_recorder& recorder) {
 std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_image& icons) {
     std::optional<legacy::ruleT> out;
 
-    static legacy::interT inter = {};
+    static legacy::maskT mask_custom{{}};
+    static const legacy::maskT* mask_ptr = &legacy::mask_zero;
     {
-        int itag = inter.tag;
-        const auto tooltip = [](legacy::interT::tagE tag, const char* msg = "View from:") {
+        const auto tooltip = [](const legacy::maskT& mask) {
             if (ImGui::BeginItemTooltip()) {
-                imgui_str(msg);
                 ImGui::PushTextWrapPos(250); // TODO: how to decide wrap pos properly?
-                imgui_str(to_MAP_str(inter.get_viewer(tag)));
+                imgui_str(to_MAP_str(mask.viewer));
                 ImGui::PopTextWrapPos();
                 ImGui::EndTooltip();
             }
         };
 
-        // TODO: better name (e.g. might be better named "direct")
-        ImGui::AlignTextToFramePadding();
-        imgui_str("View"); // TODO: rename vars...
-        ImGui::SameLine();
-        ImGui::RadioButton("Val", &itag, inter.Value);
-        tooltip(inter.Value);
-        ImGui::SameLine();
-        ImGui::RadioButton("Flp", &itag, inter.Flip);
-        tooltip(inter.Flip);
-        ImGui::SameLine();
-        ImGui::RadioButton("Dif", &itag, inter.Diff);
-        tooltip(inter.Diff);
+        static const char* const mask_labels[]{"Zero", "Identity", "Custom"};
+        static const legacy::maskT* const mask_ptrs[]{&legacy::mask_zero, &legacy::mask_identity, &mask_custom};
 
-        inter.tag = legacy::interT::tagE{itag};
-        if (inter.tag == inter.Diff) {
+        // TODO: add explanations in the tooltip...
+        ImGui::AlignTextToFramePadding();
+        imgui_str("Mask");
+        for (int i = 0; i < 3; i++) {
+        ImGui::SameLine();
+            if (ImGui::RadioButton(mask_labels[i], mask_ptr == mask_ptrs[i])) {
+                mask_ptr = mask_ptrs[i];
+        }
+            tooltip(*mask_ptrs[i]);
+        }
+
+        if (mask_ptr == &mask_custom) {
             ImGui::SameLine();
             if (ImGui::Button("Take current rule")) {
-                inter.custom = target;
+                mask_custom.viewer = target;
             }
-            tooltip(inter.Diff);
+            tooltip(mask_custom);
         } else {
             // TODO: demonstration-only (this function should be explicit). Redesign...
             ImGui::SameLine();
-            if (ImGui::Button("Try diff")) {
-                inter.tag = inter.Diff;
+            if (ImGui::Button("Try custom")) {
+                mask_ptr = &mask_custom;
             }
         }
     }
+
+    const legacy::maskT& mask = *mask_ptr;
 
     static legacy::lockT locked{};
     if (temp_lock) {
@@ -511,26 +513,26 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
         ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
         // TODO: better to have a prev button for randomize...
         if (imgui_enterbutton("Randomize")) {
-            out = legacy::randomize(inter, par, target, locked, global_mt19937(), rcount, rcount);
+            out = legacy::randomize(mask, par, target, locked, global_mt19937(), rcount, rcount);
         }
         ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
         if (imgui_enterbutton("Shuffle")) {
-            out = legacy::shuffle(inter, par, target, locked, global_mt19937());
+            out = legacy::shuffle(mask, par, target, locked, global_mt19937());
         }
 
         iter_pair(
             "<00..", "dec", "inc", "11..>", //
-            [&] { out = legacy::act_int::first(inter, par, target, locked); },
-            [&] { out = legacy::act_int::prev(inter, par, target, locked); },
-            [&] { out = legacy::act_int::next(inter, par, target, locked); },
-            [&] { out = legacy::act_int::last(inter, par, target, locked); });
+            [&] { out = legacy::act_int::first(mask, par, target, locked); },
+            [&] { out = legacy::act_int::prev(mask, par, target, locked); },
+            [&] { out = legacy::act_int::next(mask, par, target, locked); },
+            [&] { out = legacy::act_int::last(mask, par, target, locked); });
         ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
         iter_pair(
             "<1.0.", "pprev", "pnext", "0.1.>", //
-            [&] { out = legacy::act_perm::first(inter, par, target, locked); },
-            [&] { out = legacy::act_perm::prev(inter, par, target, locked); },
-            [&] { out = legacy::act_perm::next(inter, par, target, locked); },
-            [&] { out = legacy::act_perm::last(inter, par, target, locked); });
+            [&] { out = legacy::act_perm::first(mask, par, target, locked); },
+            [&] { out = legacy::act_perm::prev(mask, par, target, locked); },
+            [&] { out = legacy::act_perm::next(mask, par, target, locked); },
+            [&] { out = legacy::act_perm::last(mask, par, target, locked); });
         ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
         // TODO: should mirror also relocate locks?
         if (ImGui::Button("Mir")) {
@@ -548,13 +550,13 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
         }
         ImGui::SameLine();
         if (ImGui::Button("Purify")) {
-            out = legacy::purify(inter, par, target, locked);
+            out = legacy::purify(mask, par, target, locked);
         }
         // TODO: purify -> enhance != enhance -> purify...
         // TODO: problematic: enhance can lead to more inconsistent groups...
         ImGui::SameLine();
         if (ImGui::Button("Purify -> Enhance")) {
-            out = legacy::purify(inter, par, target, locked);
+            out = legacy::purify(mask, par, target, locked);
             legacy::enhance(par, locked);
         }
     }
@@ -564,9 +566,9 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
                                              {"-.", "-f"},
                                              {"-.", "-d"}};
         static const ImVec4 cols[2]{{1, 1, 1, 1}, {1, 1, 1, 1}}; // TODO: use different color for 0 and 1...
-        const auto strs = strss[inter.tag];
+        const auto strs = strss[&mask == &legacy::mask_zero ? 0 : &mask == &legacy::mask_identity ? 1 : 2];
 
-        const legacy::ruleT_data drule = inter.from_rule(target);
+        const legacy::ruleT_data drule = mask.from_rule(target);
         const auto scanlist = legacy::scan(par, drule, locked);
         {
             // TODO: add more statistics... e.g. full vs partial lock...
@@ -667,7 +669,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
                     // TODO: reconsider how to deal with conflicts... (especially via masking rule...)
                     legacy::ruleT r = target;
                     if (ImGui::GetIO().KeyCtrl) {
-                        legacy::copy(group, inter.get_viewer(), r);
+                        legacy::copy(group, mask.viewer, r);
                     } else {
                         legacy::flip(group, r);
                     }

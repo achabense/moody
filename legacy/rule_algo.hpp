@@ -14,44 +14,14 @@ namespace legacy {
         return rule(codeT{0}) == 1 && rule(codeT{511}) == 0;
     }
 
-    // Interpretation of ruleT_data.
-    // TODO: explain...
-    // The data in `ruleT` has fixed meaning - the value `s` is mapped to at next generation.
-    // However, this is not the only meaningful way to interpret the data...
-    // ...
-    struct interT {
-        enum tagE : int {
-            Value, // The value s is mapped to (the same as in ruleT).
-            Flip,  // Is s flipped.
-            Diff   // Is the result the same as that of a custom rule.
-        };
-        tagE tag = Value;
-        ruleT custom{};
-
-        const ruleT& get_viewer() const { return get_viewer(tag); }
-
-        const ruleT& get_viewer(tagE tag) const {
-            static constexpr ruleT zero{};
-            static constexpr ruleT identity = [] {
-                ruleT rule{};
-                for_each_code(code) {
-                    rule.set(code, decode_s(code));
-                }
-                return rule;
-            }();
-
-            switch (tag) {
-            case Value: return zero;
-            case Flip: return identity;
-            case Diff: return custom;
-            default: abort();
-            }
-        }
+    // XOR mask for ruleT.
+    // TODO: rename ruleT_data (based on maskT)?
+    struct maskT {
+        ruleT viewer;
 
         // both methods are actually XOR...
-        // TODO: better name...
+        // TODO: better name... operator^ ?
         ruleT_data from_rule(const ruleT& rule) const {
-            const ruleT& viewer = get_viewer();
             ruleT_data diff{};
             for_each_code(code) {
                 diff[code] = rule(code) == viewer(code) ? 0 : 1;
@@ -60,7 +30,6 @@ namespace legacy {
         }
 
         ruleT to_rule(const ruleT_data& diff) const {
-            const ruleT& viewer = get_viewer();
             ruleT rule{};
             for_each_code(code) {
                 rule.set(code, diff[code] ? !viewer(code) : viewer(code));
@@ -68,6 +37,18 @@ namespace legacy {
             return rule;
         }
     };
+
+    // TODO: explain the effects of these mask...
+    // rule ^ mask_zero -> TODO
+    inline constexpr maskT mask_zero{{}};
+    // rule ^ mask_identity -> TODO
+    inline constexpr maskT mask_identity{[] {
+        ruleT rule{};
+        for_each_code(code) {
+            rule.set(code, decode_s(code));
+        }
+        return rule;
+    }()};
 
 } // namespace legacy
 
@@ -424,15 +405,14 @@ namespace legacy {
     // TODO: refine "concept"...
     // 1. Does a rule satisfy the concept.
     // 2. How to generate all possible rules that satisfy some concepts...
-    // TODO: but where does inter come from?
-    inline bool satisfies(const ruleT& rule, const interT& inter, const mapperT_pair& q) {
-        return q.test(inter.from_rule(rule));
+    inline bool satisfies(const ruleT& rule, const maskT& mask, const mapperT_pair& q) {
+        return q.test(mask.from_rule(rule));
     }
-    inline bool satisfies(const ruleT& rule, const interT& inter, const equivT& q) {
-        return q.test(inter.from_rule(rule));
+    inline bool satisfies(const ruleT& rule, const maskT& mask, const equivT& q) {
+        return q.test(mask.from_rule(rule));
     }
-    inline bool satisfies(const ruleT& rule, const interT& inter, const partitionT& q) {
-        return q.test(inter.from_rule(rule));
+    inline bool satisfies(const ruleT& rule, const maskT& mask, const partitionT& q) {
+        return q.test(mask.from_rule(rule));
     }
 
     inline void flip(groupT group, ruleT& rule) {
@@ -442,7 +422,6 @@ namespace legacy {
     }
 
     // TODO: obscure???
-    // inline void set(groupT group, const interT& i, bool b, ruleT& dest);
     inline void copy(groupT group, const ruleT& source, ruleT& dest) {
         for (codeT c : group) {
             dest.set(c, source(c));
@@ -500,9 +479,9 @@ namespace legacy {
 
     // TODO: explain...
     // TODO: (temp) on second thought, locked should not be enhanced...
-    inline ruleT purify(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked) {
+    inline ruleT purify(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked) {
         // TODO: for locked code A and B, what if r[A] != r[B]?
-        ruleT_data r = inter.from_rule(rule);
+        ruleT_data r = mask.from_rule(rule);
         for (int j = 0; j < par.k(); ++j) {
             const groupT group = par.jth_group(j);
             // TODO: should be scan-based... what if inconsistent?
@@ -514,11 +493,11 @@ namespace legacy {
                 }
             }
         }
-        return inter.to_rule(r);
+        return mask.to_rule(r);
     }
 
     // TODO: replace with stricter version...
-    inline ruleT purify_v2(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked);
+    inline ruleT purify_v2(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked);
 
     // TODO: the lockT will become meaningless on irrelevant rule switch (clipboard/file...)
 
@@ -537,11 +516,11 @@ namespace legacy {
     // TODO: what's the best way to pass fn?
     // TODO: is `redispatch` a suitable name?
     // TODO: whether to skip/allow inconsistent groups?
-    inline ruleT redispatch(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked,
+    inline ruleT redispatch(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked,
                             auto fn /*void(bool* begin, bool* end)*/) {
         // TODO: precondition?
 
-        ruleT_data r = inter.from_rule(rule);
+        ruleT_data r = mask.from_rule(rule);
 
         std::vector<int> free_indexes;
         for (int j = 0; j < par.k(); ++j) {
@@ -572,15 +551,15 @@ namespace legacy {
             //     }
             // }
         }
-        return inter.to_rule(r);
+        return mask.to_rule(r);
     }
 
     // TODO: count_min denotes free groups now; whether to switch to total groups (at least in the gui part)?
-    inline ruleT randomize(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked,
+    inline ruleT randomize(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked,
                            std::mt19937& rand, int count_min,
                            int count_max /* not used, subject to future extension */) {
         assert(count_max == count_min);
-        return redispatch(inter, par, rule, locked, [&rand, count_min](bool* begin, bool* end) {
+        return redispatch(mask, par, rule, locked, [&rand, count_min](bool* begin, bool* end) {
             int c = std::clamp(count_min, 0, int(end - begin));
             std::fill(begin, end, 0);
             std::fill_n(begin, c, 1);
@@ -588,25 +567,24 @@ namespace legacy {
         });
     }
 
-    inline ruleT shuffle(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked,
+    inline ruleT shuffle(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked,
                          std::mt19937& rand) {
-        return redispatch(inter, par, rule, locked,
-                          [&rand](bool* begin, bool* end) { std::shuffle(begin, end, rand); });
+        return redispatch(mask, par, rule, locked, [&rand](bool* begin, bool* end) { std::shuffle(begin, end, rand); });
     }
 
     // TODO: rename to [set_]first / ...
     struct act_int {
         // TODO: disable !par.test(...) checks...
-        static ruleT first(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked) {
-            return redispatch(inter, par, rule, locked, [](bool* begin, bool* end) { std::fill(begin, end, 0); });
+        static ruleT first(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked) {
+            return redispatch(mask, par, rule, locked, [](bool* begin, bool* end) { std::fill(begin, end, 0); });
         }
 
-        static ruleT last(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked) {
-            return redispatch(inter, par, rule, locked, [](bool* begin, bool* end) { std::fill(begin, end, 1); });
+        static ruleT last(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked) {
+            return redispatch(mask, par, rule, locked, [](bool* begin, bool* end) { std::fill(begin, end, 1); });
         }
 
-        static ruleT next(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked) {
-            return redispatch(inter, par, rule, locked, [](bool* begin, bool* end) {
+        static ruleT next(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked) {
+            return redispatch(mask, par, rule, locked, [](bool* begin, bool* end) {
                 // 11...0 -> 00...1; stop at 111...1 (last())
                 bool* first_0 = std::find(begin, end, 0);
                 if (first_0 != end) {
@@ -616,8 +594,8 @@ namespace legacy {
             });
         }
 
-        static ruleT prev(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked) {
-            return redispatch(inter, par, rule, locked, [](bool* begin, bool* end) {
+        static ruleT prev(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked) {
+            return redispatch(mask, par, rule, locked, [](bool* begin, bool* end) {
                 // 00...1 -> 11...0; stop at 000...0 (first())
                 bool* first_1 = std::find(begin, end, 1);
                 if (first_1 != end) {
@@ -633,24 +611,24 @@ namespace legacy {
     // (TODO: rephrase) As to CTAD vs make_XXX..., here is pitfall for using std::reverse_iterator directly.
     // https://quuxplusone.github.io/blog/2022/08/02/reverse-iterator-ctad/
     struct act_perm {
-        static ruleT first(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked) {
-            return redispatch(inter, par, rule, locked, [](bool* begin, bool* end) {
+        static ruleT first(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked) {
+            return redispatch(mask, par, rule, locked, [](bool* begin, bool* end) {
                 int c = std::count(begin, end, 1);
                 std::fill(begin, end, 0);
                 std::fill_n(begin, c, 1);
             });
         }
 
-        static ruleT last(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked) {
-            return redispatch(inter, par, rule, locked, [](bool* begin, bool* end) {
+        static ruleT last(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked) {
+            return redispatch(mask, par, rule, locked, [](bool* begin, bool* end) {
                 int c = std::count(begin, end, 1);
                 std::fill(begin, end, 0);
                 std::fill_n(end - c, c, 1);
             });
         }
 
-        static ruleT next(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked) {
-            return redispatch(inter, par, rule, locked, [](bool* begin, bool* end) {
+        static ruleT next(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked) {
+            return redispatch(mask, par, rule, locked, [](bool* begin, bool* end) {
                 // End: 000...111
                 if (std::find(std::find(begin, end, 1), end, 0) == end) {
                     return;
@@ -660,8 +638,8 @@ namespace legacy {
             });
         }
 
-        static ruleT prev(const interT& inter, const partitionT& par, const ruleT& rule, const lockT& locked) {
-            return redispatch(inter, par, rule, locked, [](bool* begin, bool* end) {
+        static ruleT prev(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked) {
+            return redispatch(mask, par, rule, locked, [](bool* begin, bool* end) {
                 // Begin: 111...000
                 if (std::find(std::find(begin, end, 0), end, 1) == end) {
                     return;
@@ -689,8 +667,8 @@ namespace legacy {
         return mir;
     }
 
-    inline bool satisfies(const ruleT& rule, const lockT& locked, const interT& inter, const equivT& e) {
-        const ruleT_data r = inter.from_rule(rule);
+    inline bool satisfies(const ruleT& rule, const lockT& locked, const maskT& mask, const equivT& e) {
+        const ruleT_data r = mask.from_rule(rule);
         codeT::map_to<int> record;
         record.fill(2);
         for_each_code(code) {
@@ -704,13 +682,5 @@ namespace legacy {
             }
         }
         return true;
-
-        // Too luxurious:
-        // for (const auto& scn : scan(e, inter.from_rule(rule), locked)) {
-        //     if (scn.locked_0 && scn.locked_1) {
-        //         return false;
-        //     }
-        // }
-        // return true;
     }
 } // namespace legacy
