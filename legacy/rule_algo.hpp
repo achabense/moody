@@ -16,6 +16,7 @@ namespace legacy {
 
     // XOR mask for ruleT.
     // TODO: rename ruleT_data (based on maskT)?
+    // TODO: operator const ruleT&()?
     struct maskT {
         ruleT viewer;
 
@@ -38,21 +39,20 @@ namespace legacy {
         }
     };
 
-    // TODO: explain the effects of these mask...
-    // rule ^ mask_zero -> TODO
-    inline constexpr maskT mask_zero{{}};
-    // rule ^ mask_identity -> TODO
-    inline constexpr maskT mask_identity{[] {
-        ruleT rule{};
-        for_each_code(code) {
-            rule.set(code, decode_s(code));
-        }
-        return rule;
-    }()};
+    inline namespace constants {
+        // TODO: explain the effects of these mask...
+        // rule ^ mask_zero -> TODO
+        inline constexpr maskT mask_zero{{}};
+        // rule ^ mask_identity -> TODO
+        inline constexpr maskT mask_identity{[] {
+            ruleT rule{};
+            for_each_code(code) {
+                rule.set(code, decode_s(code));
+            }
+            return rule;
+        }()};
+    } // namespace constants
 
-} // namespace legacy
-
-namespace legacy {
     // A mapperT defines a rule that maps each codeT to another codeT.
     // Specifically, mapperT{q2=q,w2=w,...} maps any codeT to the same value.
     struct mapperT {
@@ -120,10 +120,6 @@ namespace legacy {
     };
 
     // A pair of mapperT defines an equivalence relation.
-    // TODO: explain... how to transfer to rule-concepts?
-    // TODO: is this correct(enough)?
-    // Conceptual:
-    // Efficient rule-checking doesn't actually need intermediate types:
     struct mapperT_pair {
         mapperT a, b;
         bool test(const ruleT_data& rule) const {
@@ -138,7 +134,6 @@ namespace legacy {
 
     // Partition of all codeT ({0}~{511}), in the form of union-find set.
     // (Lacks the ability to efficiently list groups)
-    // TODO: explain: a collection of equivalences denoted by mapperT pairs.
     class equivT {
         mutable codeT::map_to<codeT> parof;
 
@@ -201,123 +196,125 @@ namespace legacy {
             return true;
         }
     };
-} // namespace legacy
 
-namespace legacy::inline special_mappers {
-    // TODO: explain... mapperT_pair{mp_identity,*}
-    inline constexpr mapperT mp_identity("qweasdzxc");
+    inline namespace constants {
+        // TODO: recheck these mappers...
 
-    // TODO: about ignore_s and interT...
-    inline constexpr mapperT mp_ignore_q("0weasdzxc");
-    inline constexpr mapperT mp_ignore_w("q0easdzxc");
-    inline constexpr mapperT mp_ignore_e("qw0asdzxc");
-    inline constexpr mapperT mp_ignore_a("qwe0sdzxc");
-    inline constexpr mapperT mp_ignore_s("qwea0dzxc");
-    inline constexpr mapperT mp_ignore_d("qweas0zxc");
-    inline constexpr mapperT mp_ignore_z("qweasd0xc");
-    inline constexpr mapperT mp_ignore_x("qweasdz0c");
-    inline constexpr mapperT mp_ignore_c("qweasdzx0");
+        // mp_identity(any code) -> the same code
+        inline constexpr mapperT mp_identity("qweasdzxc");
 
-    // TODO: clarify the [exact] meaning (&&effects) of these mappers...
-    // Native symmetry.
-    // Combination of these requirements can lead to ... TODO: explain, and explain "requirements"...
-    inline constexpr mapperT mp_refl_asd("zxc"
-                                         "asd"
-                                         "qwe"); // '-'
-    inline constexpr mapperT mp_refl_wsx("ewq"
-                                         "dsa"
-                                         "cxz"); // '|'
-    inline constexpr mapperT mp_refl_qsc("qaz"
-                                         "wsx"
-                                         "edc"); // '\'
-    inline constexpr mapperT mp_refl_esz("cde"
-                                         "xsw"
-                                         "zaq"); // '/'
-    inline constexpr mapperT mp_C2("cxz"
-                                   "dsa"
-                                   "ewq"); // 180
-    inline constexpr mapperT mp_C4("zaq"
-                                   "xsw"
-                                   "cde"); // 90 (clockwise)
-    // 90 has the same effects as 270... TODO: recheck...
+        // The following mappers are defined relative to mp_identity.
+        // That is, the effects actually means the effects of mapperT_pair{mp_identity, mp_*}.
 
-    // TODO: explain; actually irrelevant of symmetry...
-    // 1. I misunderstood "rotate" symmetry. "ro45" is never about symmetry (I've no idea what it is)
-    // 2. As seemingly-senseless partition like ro45 can make non-trivial patterns, should support after all...
-    // TODO: explain C8 (not related to static symmetry, but covers C4 and works with tot_xxc_s)
-    inline constexpr mapperT mp_C8("aqw"
-                                   "zse"
-                                   "xcd");
-    inline constexpr mapperT mp_tot_exc_s("wqe"
-                                          "asd"
-                                          "zxc"); // *C8 -> totalistic, excluding s
-    inline constexpr mapperT mp_tot_inc_s("qse"
-                                          "awd"
-                                          "zxc"); // *C8 -> totalistic, including s
+        // TODO: add descriptions...
+        // TODO: about ignore_s and maskT...
+        inline constexpr mapperT mp_ignore_q("0weasdzxc");
+        inline constexpr mapperT mp_ignore_w("q0easdzxc");
+        inline constexpr mapperT mp_ignore_e("qw0asdzxc");
+        inline constexpr mapperT mp_ignore_a("qwe0sdzxc");
+        inline constexpr mapperT mp_ignore_s("qwea0dzxc");
+        inline constexpr mapperT mp_ignore_d("qweas0zxc");
+        inline constexpr mapperT mp_ignore_z("qweasd0xc");
+        inline constexpr mapperT mp_ignore_x("qweasdz0c");
+        inline constexpr mapperT mp_ignore_c("qweasdzx0");
 
-    // TODO: explain. TODO: better name...
-    inline constexpr mapperT mp_dual("!q!w!e"
-                                     "!a!s!d"
-                                     "!z!x!c");
-
-    // Hexagonal emulation and emulated symmetry.
-
-    // qw-     q w
-    // asd -> a s d
-    // -xc     x c
-    // TODO: explain why 0 instead of e-z... ... is this really correct?
-    // TODO: recheck...
-    inline constexpr mapperT mp_hex_ignore("qw0"
-                                           "asd"
-                                           "0xc"); // ignore_(e, z)
-
-    inline constexpr mapperT mp_hex_refl_asd("xc0"
+        // TODO: clarify the [exact] meaning (&&effects) of these mappers...
+        // Native symmetry.
+        // Combination of these requirements can lead to ... TODO: explain, and explain "requirements"...
+        inline constexpr mapperT mp_refl_asd("zxc"
                                              "asd"
-                                             "0qw"); // swap(q,x), swap(w,c)
-    inline constexpr mapperT mp_hex_refl_qsc("qa0"
+                                             "qwe"); // '-'
+        inline constexpr mapperT mp_refl_wsx("ewq"
+                                             "dsa"
+                                             "cxz"); // '|'
+        inline constexpr mapperT mp_refl_qsc("qaz"
                                              "wsx"
-                                             "0dc"); // swap(a,w), swap(x,d)
-    inline constexpr mapperT mp_hex_refl_wsx("dw0"
-                                             "csq"
-                                             "0xa"); // swap(q,d), swap(a,c)
-
-    inline constexpr mapperT mp_hex_refl_aq("ax0"
-                                            "qsc"
-                                            "0wd"); // swap(a,q), swap(x,w), swap(c,d)
-    inline constexpr mapperT mp_hex_refl_qw("wq0"
-                                            "dsa"
-                                            "0cx"); // swap(q,w), swap(a,d), swap(x,c)
-    inline constexpr mapperT mp_hex_refl_wd("cd0"
-                                            "xsw"
-                                            "0aq"); // swap(w,d), swap(q,c), swap(a,x)
-
-    inline constexpr mapperT mp_hex_C2("cx0"
+                                             "edc"); // '\'
+        inline constexpr mapperT mp_refl_esz("cde"
+                                             "xsw"
+                                             "zaq"); // '/'
+        inline constexpr mapperT mp_C2("cxz"
                                        "dsa"
-                                       "0wq"); // 180
-    inline constexpr mapperT mp_hex_C3("xa0"
-                                       "csq"
-                                       "0dw"); // 120 (clockwise)
-    inline constexpr mapperT mp_hex_C6("aq0"
+                                       "ewq"); // 180
+        inline constexpr mapperT mp_C4("zaq"
                                        "xsw"
-                                       "0cd"); // 60 (clockwise)
+                                       "cde"); // 90 (clockwise)
+        // 90 has the same effects as 270... TODO: recheck...
 
-    inline constexpr mapperT mp_hex_tot_exc_s("wq0"
+        // TODO: explain; actually irrelevant of symmetry...
+        // 1. I misunderstood "rotate" symmetry. "ro45" is never about symmetry (I've no idea what it is)
+        // 2. As seemingly-senseless partition like ro45 can make non-trivial patterns, should support after all...
+        // TODO: explain C8 (not related to static symmetry, but covers C4 and works with tot_xxc_s)
+        inline constexpr mapperT mp_C8("aqw"
+                                       "zse"
+                                       "xcd");
+        inline constexpr mapperT mp_tot_exc_s("wqe"
                                               "asd"
-                                              "0xc"); // *C6 -> totalistic, excluding s
-    inline constexpr mapperT mp_hex_tot_inc_s("qs0"
+                                              "zxc"); // *C8 -> totalistic, excluding s
+        inline constexpr mapperT mp_tot_inc_s("qse"
                                               "awd"
-                                              "0xc"); // *C6 -> totalistic, including s
+                                              "zxc"); // *C8 -> totalistic, including s
 
-    // -we     w e
-    // asd -> a s d
-    // zx-     z x
-    inline constexpr mapperT mp_hex2_ignore("0we"
-                                            "asd"
-                                            "zx0"); // ignore_(q, c)
+        // TODO: explain. TODO: better name...
+        inline constexpr mapperT mp_dual("!q!w!e"
+                                         "!a!s!d"
+                                         "!z!x!c");
 
-} // namespace legacy::inline special_mappers
+        // Hexagonal emulation and emulated symmetry.
 
-namespace legacy {
+        // qw-     q w
+        // asd -> a s d
+        // -xc     x c
+        // TODO: explain why 0 instead of e-z... ... is this really correct?
+        inline constexpr mapperT mp_hex_ignore("qw0"
+                                               "asd"
+                                               "0xc"); // ignore_(e, z)
+
+        inline constexpr mapperT mp_hex_refl_asd("xc0"
+                                                 "asd"
+                                                 "0qw"); // swap(q,x), swap(w,c)
+        inline constexpr mapperT mp_hex_refl_qsc("qa0"
+                                                 "wsx"
+                                                 "0dc"); // swap(a,w), swap(x,d)
+        inline constexpr mapperT mp_hex_refl_wsx("dw0"
+                                                 "csq"
+                                                 "0xa"); // swap(q,d), swap(a,c)
+
+        inline constexpr mapperT mp_hex_refl_aq("ax0"
+                                                "qsc"
+                                                "0wd"); // swap(a,q), swap(x,w), swap(c,d)
+        inline constexpr mapperT mp_hex_refl_qw("wq0"
+                                                "dsa"
+                                                "0cx"); // swap(q,w), swap(a,d), swap(x,c)
+        inline constexpr mapperT mp_hex_refl_wd("cd0"
+                                                "xsw"
+                                                "0aq"); // swap(w,d), swap(q,c), swap(a,x)
+
+        inline constexpr mapperT mp_hex_C2("cx0"
+                                           "dsa"
+                                           "0wq"); // 180
+        inline constexpr mapperT mp_hex_C3("xa0"
+                                           "csq"
+                                           "0dw"); // 120 (clockwise)
+        inline constexpr mapperT mp_hex_C6("aq0"
+                                           "xsw"
+                                           "0cd"); // 60 (clockwise)
+
+        inline constexpr mapperT mp_hex_tot_exc_s("wq0"
+                                                  "asd"
+                                                  "0xc"); // *C6 -> totalistic, excluding s
+        inline constexpr mapperT mp_hex_tot_inc_s("qs0"
+                                                  "awd"
+                                                  "0xc"); // *C6 -> totalistic, including s
+
+        // -we     w e
+        // asd -> a s d
+        // zx-     z x
+        inline constexpr mapperT mp_hex2_ignore("0we"
+                                                "asd"
+                                                "zx0"); // ignore_(q, c)
+
+    } // namespace constants
 
     using groupT = std::span<const codeT>;
 
@@ -356,7 +353,7 @@ namespace legacy {
             return m_data[m_groups[index_for(code)].pos];
         }
 
-        /*implicit*/ partitionT(const equivT& u) {
+        explicit partitionT(const equivT& u) {
             std::map<codeT, indexT> m;
             indexT i = 0;
             for_each_code(code) {
@@ -478,7 +475,6 @@ namespace legacy {
     }
 
     // TODO: explain...
-    // TODO: (temp) on second thought, locked should not be enhanced...
     inline ruleT purify(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked) {
         // TODO: for locked code A and B, what if r[A] != r[B]?
         ruleT_data r = mask.from_rule(rule);
@@ -544,12 +540,6 @@ namespace legacy {
             for (codeT code : par.jth_group(free_indexes[j])) {
                 r[code] = bools[j];
             }
-            // TODO: cannot suitably deal with inconsistent groups when calling first()↓ etc...
-            // if (bools[j] != r[par.jth_group(free_indexes[j]).front()]) {
-            //     for (codeT code : par.jth_group(free_indexes[j])) {
-            //         r[code] = !r[code];
-            //     }
-            // }
         }
         return mask.to_rule(r);
     }
@@ -629,7 +619,7 @@ namespace legacy {
 
         static ruleT next(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked) {
             return redispatch(mask, par, rule, locked, [](bool* begin, bool* end) {
-                // End: 000...111
+                // Stop at 000...111 (last())
                 if (std::find(std::find(begin, end, 1), end, 0) == end) {
                     return;
                 }
@@ -640,7 +630,7 @@ namespace legacy {
 
         static ruleT prev(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked) {
             return redispatch(mask, par, rule, locked, [](bool* begin, bool* end) {
-                // Begin: 111...000
+                // Stop at 111...000 (first())
                 if (std::find(std::find(begin, end, 0), end, 1) == end) {
                     return;
                 }

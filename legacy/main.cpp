@@ -22,10 +22,13 @@ inline bool imgui_enterbutton(const char* label) {
         bind_id = button_id;
     }
     if (bind_id == button_id) {
+        // TODO: should not be invokable when in disabled scope...
+        // (GImGui->CurrentItemFlags & ImGuiItemFlags_Disabled) == 0 ~ not disabled, but this requires
+        // the internal header... Are there public ways to do the same thing?
         if (imgui_keypressed(ImGuiKey_Enter, false)) {
             ret = true;
         }
-        const ImU32 col = ret ? IM_COL32_WHITE : IM_COL32(160, 160, 160, 255);
+        const ImU32 col = ret ? IM_COL32_WHITE : IM_COL32(128, 128, 128, 255);
         ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() - ImVec2(2, 2),
                                             ImGui::GetItemRectMax() + ImVec2(2, 2), col);
     }
@@ -441,6 +444,14 @@ void stone_constraints(rule_recorder& recorder) {
     }
 }
 
+// <TODO: add strict mode, and open by default.
+// (the mask itself must satisfy the concepts denoted by the par)
+// ~ what is allowed/not allowed when violated?
+// ~ how to show violation?
+// ~ how to deal with duality (which requires identity mask...) all concepts are currently implicitly based on
+// mask_zero...
+// TODO>
+
 // TODO: ideally, `locked` doesn't belong to editor...
 // TODO: should be a class... how to decouple? ...
 std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_image& icons) {
@@ -461,26 +472,24 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
         static const char* const mask_labels[]{"Zero", "Identity", "Custom"};
         static const legacy::maskT* const mask_ptrs[]{&legacy::mask_zero, &legacy::mask_identity, &mask_custom};
 
-        // TODO: add explanations in the tooltip...
+        // TODO: add explanations in the tooltip... (especially custom mode)
         ImGui::AlignTextToFramePadding();
         imgui_str("Mask");
         for (int i = 0; i < 3; i++) {
-        ImGui::SameLine();
+            ImGui::SameLine();
             if (ImGui::RadioButton(mask_labels[i], mask_ptr == mask_ptrs[i])) {
                 mask_ptr = mask_ptrs[i];
-        }
+            }
             tooltip(*mask_ptrs[i]);
         }
 
+        ImGui::SameLine();
         if (mask_ptr == &mask_custom) {
-            ImGui::SameLine();
             if (ImGui::Button("Take current rule")) {
                 mask_custom.viewer = target;
             }
             tooltip(mask_custom);
         } else {
-            // TODO: demonstration-only (this function should be explicit). Redesign...
-            ImGui::SameLine();
             if (ImGui::Button("Try custom")) {
                 mask_ptr = &mask_custom;
             }
@@ -608,7 +617,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
                 const bool inconsistent = scanlist[j].inconsistent();
                 const auto& group = par.jth_group(j);
                 const legacy::codeT head = group[0];
-                const bool has_lock = legacy::any_locked(locked, group);
+                const bool has_lock = scanlist[j].any_locked();
 
                 if (inconsistent) {
                     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0, 0, 1));
@@ -625,7 +634,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
 
                 if (has_lock) {
                     // TODO: -> widget func... (addborder)
-                    const ImU32 col = legacy::all_locked(locked, group) ? -1 : 0xaaaaaaaa;
+                    const ImU32 col = scanlist[j].all_locked() ? IM_COL32_WHITE : IM_COL32(128, 128, 128, 255);
                     ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() - ImVec2(2, 2),
                                                         ImGui::GetItemRectMax() + ImVec2(2, 2), col);
                 }

@@ -27,6 +27,20 @@ Still-life constraints: ...
 * The program is able to load multiple rules from files or the clipboard. Click "Paste" to load from the clipboard. There are no specific requirements for the file format - the program just treats ??? as byte streams and extracts every sequences recognizable as MAP strings.
 * Paths of the files can be provided as ???, or the program is able to select the paths via a ???
 
+#### Use cases
+~ Randomization
+(mask: zero vs identity)
+
+~ Iterating through all rules under von Neumann neighborhood
+... (add spatial symmetry) ...(mis-combination (that makes into a whole group))
+
+~ Dialing through Game of Life rules in the iso subset...
+(show some of the interesting rules)
+(randomization based on custom mask(==gol))
+
+~ Capture the glider
+(show the glider-only rule)
+(wrong way of capturing (e.g. for oscillators, bounding-box is not enough))
 
 #### Dependency
 * ImGui
