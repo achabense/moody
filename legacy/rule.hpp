@@ -31,6 +31,7 @@ namespace legacy {
         template <class T>
         using map_to = std::array<T, 512>;
 
+        // rename to bpos_*?
         enum bposE : int { env_q = 0, env_w, env_e, env_a, env_s, env_d, env_z, env_x, env_c };
     };
 

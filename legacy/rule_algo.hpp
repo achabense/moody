@@ -681,8 +681,9 @@ namespace legacy {
 #include <optional> // TODO: in this header optional is used to represent empty set. not very suitable...
 
 namespace legacy {
-    // TODO: it seems that, if the underlying mask is essentially different (not interchangeable), the
+    // TODO: (outdated) it seems that, if the underlying mask is essentially different (not interchangeable), the
     // result of & of two subsetT can result in | of multiple subsetT...
+    // (the result is indeed either a subsetT or an empty set...)
     struct subsetT {
         maskT mask;
         equivT eq;
@@ -729,7 +730,7 @@ namespace legacy {
         // Now flip [codeT] as well as the rest [codeT] in the [groupT]. It's obvious that, such a rule still belongs to
         // both a and b.
         // 3. notice that determines the rest [codeT]s in the group, so there is no outside of {{r},...}...
-        // ... no, not strictly uniquely deterministic...
+        // TODO... finish the proof...
 
         // nullopt: empty set...
         friend std::optional<subsetT> operator&(const std::optional<subsetT>& a_op,
@@ -747,19 +748,7 @@ namespace legacy {
             ruleT common_rule{};
             codeT::map_to<bool> done{};
 
-// TODO: it turns out that, the result is not deterministic - can be dependent on certain invocation sequence...
-// So, & may not result in a single subsetT (but | of multiple subsetTs)...
-#if 1
-            std::array<codeT, 512> codes{};
             for_each_code(code) {
-                auto [q, w, e, a, s, d, z, x, c] = decode(code);
-                codes[q * 256 + w * 2 + e * 4 + a * 8 + s * 16 + d * 32 + z * 64 + x * 128 + c * 1] = code;
-            }
-
-            for (codeT code : codes) {
-#else
-            for_each_code(code) {
-#endif
                 if (!done[code]) {
                     for (codeT c : par_both.group_for(code)) {
                         assert(!done[c]);
@@ -769,6 +758,7 @@ namespace legacy {
                                                                                              auto& self) -> bool {
                         if (done[code]) {
                             if (common_rule(code) != v) {
+                                // TODO: explain why (when) this can happen
                                 return false;
                             }
                         } else {
@@ -810,6 +800,7 @@ namespace legacy {
         }
     };
 
+    // TODO: add test for subsetT... (e.g. iso inclusion etc...)
     inline static const subsetT test_ignore_s_and_self_cmpl = [] {
         const auto mk = [](const mapperT& mp) {
             equivT eq{};
@@ -823,6 +814,30 @@ namespace legacy {
 
             auto sc = sa & sb;
             assert(sc);
+
+            // 2024/1/20 2AM
+            // There is NO problem in the algorithm.
+            // It's just that, in this situation the maskT has a strong bias, so that it's too easy to generate rules in
+            // a certain direction...
+            const auto copy_from = [](codeT::bposE bpos) {
+                ruleT rule{};
+                for_each_code(code) {
+                    rule.set(code, get(code, bpos));
+                }
+                return rule;
+            };
+
+            using enum codeT::bposE;
+            assert(sc->contains(copy_from(env_q)));
+            assert(sc->contains(copy_from(env_w)));
+            assert(sc->contains(copy_from(env_e)));
+            assert(sc->contains(copy_from(env_a)));
+            assert(!sc->contains(copy_from(env_s))); // identity rule doesn't belong to ignore_s.
+            assert(sc->contains(copy_from(env_d)));
+            assert(sc->contains(copy_from(env_z)));
+            assert(sc->contains(copy_from(env_x)));
+            assert(sc->contains(copy_from(env_c)));
+
             return *sc;
         } else {
             subsetT s0{mask_zero, mk(mp_refl_qsc)};

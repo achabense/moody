@@ -28,9 +28,8 @@ inline bool imgui_enterbutton(const char* label) {
         if (imgui_keypressed(ImGuiKey_Enter, false)) {
             ret = true;
         }
-        const ImU32 col = ret ? IM_COL32_WHITE : IM_COL32(128, 128, 128, 255);
-        ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() - ImVec2(2, 2),
-                                            ImGui::GetItemRectMax() + ImVec2(2, 2), col);
+        const ImU32 col = ret ? IM_COL32(128, 128, 128, 255) : IM_COL32_WHITE;
+        ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), col);
     }
     return ret;
 }
@@ -504,6 +503,8 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
         ImGui::EndTooltip();
     }
 
+    // TODO: mask should come after selection planes, and doesn't participate subset-definition.
+    // TODO: should enable testing masking rule instead of target rule when hovered.
     static legacy::maskT mask_custom{{}};
     static const legacy::maskT* mask_ptr = &legacy::mask_zero;
     {
@@ -556,6 +557,9 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
     const auto& par = parcol.select_par(target, locked);
 
     {
+        // TODO: for non-matching rules, when doing redispatch, whether to do auto-approximation (or enforce intentional
+        // approx)?
+
         // TODO: still unstable between partition switches...
         // TODO: the range should be scoped by locks... so, what should rcount be?
         static int rcount = 0.5 * par.k();
@@ -601,6 +605,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
             locked = {};
         }
         ImGui::SameLine();
+        // TODO: allow enhancement unless pure?
         if (ImGui::Button("Enhance locks")) {
             legacy::enhance(par, locked);
         }
@@ -646,6 +651,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
                     ++c_inconsistent;
                 }
             }
+            // TODO: locked{all-0,all-1,inc}, unlocked{all-0,all-1...} etc...
             ImGui::Text("Groups:%d (Locked:%d) [%c:%d] [%c:%d] [%c:%d]", c_group, c_locked, strs[0][1], c_0, strs[1][1],
                         c_1, 'x', c_inconsistent);
         }

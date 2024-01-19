@@ -1,3 +1,5 @@
+**support building with cmake**
+
 Common todos
 Unify naming conventions. (e.g. always use Abc for enums)
 More Documentations. More meaningful names.
