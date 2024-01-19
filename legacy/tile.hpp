@@ -174,7 +174,7 @@ namespace legacy {
                     const bool _x = _line(_y + 1)[0];
                     bool* _dest = dest._line(_y);
 
-                    _dest[0] = rule(encode(_q, _w, _e, _a, _s, _d, _z, _x, _c));
+                    _dest[0] = rule(encode({_q, _w, _e, _a, _s, _d, _z, _x, _c}));
                 }
                 return;
             }
@@ -191,17 +191,17 @@ namespace legacy {
                 bool* _dest = dest._line(_y);
 
                 // clang-format off
-                _dest[0] = rule(encode(_q, _up[0], _up[1],
-                                       _a, _ct[0], _ct[1],
-                                       _z, _dw[0], _dw[1]));
+                _dest[0] = rule(encode({_q, _up[0], _up[1],
+                                        _a, _ct[0], _ct[1],
+                                        _z, _dw[0], _dw[1]}));
                 for (int x = 1; x < width - 1; ++x) {
-                    _dest[x] = rule(encode(_up[x - 1], _up[x], _up[x + 1],
-                                           _ct[x - 1], _ct[x], _ct[x + 1],
-                                           _dw[x - 1], _dw[x], _dw[x + 1]));
+                    _dest[x] = rule(encode({_up[x - 1], _up[x], _up[x + 1],
+                                            _ct[x - 1], _ct[x], _ct[x + 1],
+                                            _dw[x - 1], _dw[x], _dw[x + 1]}));
                 }
-                _dest[width - 1] = rule(encode(_up[width - 2], _up[width - 1], _e,
-                                               _ct[width - 2], _ct[width - 1], _d,
-                                               _dw[width - 2], _dw[width - 1], _c));
+                _dest[width - 1] = rule(encode({_up[width - 2], _up[width - 1], _e,
+                                                _ct[width - 2], _ct[width - 1], _d,
+                                                _dw[width - 2], _dw[width - 1], _c}));
                 // clang-format on
             }
         }

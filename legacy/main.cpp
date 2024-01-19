@@ -616,7 +616,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
         static const ImVec4 cols[2]{{1, 1, 1, 1}, {1, 1, 1, 1}}; // TODO: use different color for 0 and 1...
         const auto strs = strss[&mask == &legacy::mask_zero ? 0 : &mask == &legacy::mask_identity ? 1 : 2];
 
-        const legacy::ruleT_data drule = mask.from_rule(target);
+        const legacy::ruleT_masked drule = mask.from_rule(target);
         const auto scanlist = legacy::scan(par, drule, locked);
         {
             // TODO: add more statistics... e.g. full vs partial lock...

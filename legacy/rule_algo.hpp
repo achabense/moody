@@ -9,28 +9,29 @@
 namespace legacy {
     // TODO: Document that this is not the only situation that flicking effect can occur...
     inline bool will_flick(const ruleT& rule) {
-        static_assert(encode(0, 0, 0, 0, 0, 0, 0, 0, 0) == 0);
-        static_assert(encode(1, 1, 1, 1, 1, 1, 1, 1, 1) == 511);
-        return rule(codeT{0}) == 1 && rule(codeT{511}) == 0;
+        constexpr codeT all_0 = encode({0, 0, 0, 0, 0, 0, 0, 0, 0});
+        constexpr codeT all_1 = encode({1, 1, 1, 1, 1, 1, 1, 1, 1});
+        return rule(all_0) == 1 && rule(all_1) == 0;
     }
 
+    using ruleT_masked = codeT::map_to<bool>;
+
     // XOR mask for ruleT.
-    // TODO: rename ruleT_data (based on maskT)?
     // TODO: operator const ruleT&()?
     struct maskT {
         ruleT viewer;
 
         // both methods are actually XOR...
         // TODO: better name... operator^ ?
-        ruleT_data from_rule(const ruleT& rule) const {
-            ruleT_data diff{};
+        ruleT_masked from_rule(const ruleT& rule) const {
+            ruleT_masked diff{};
             for_each_code(code) {
                 diff[code] = rule(code) == viewer(code) ? 0 : 1;
             }
             return diff;
         }
 
-        ruleT to_rule(const ruleT_data& diff) const {
+        ruleT to_rule(const ruleT_masked& diff) const {
             ruleT rule{};
             for_each_code(code) {
                 rule.set(code, diff[code] ? !viewer(code) : viewer(code));
@@ -47,7 +48,7 @@ namespace legacy {
         inline constexpr maskT mask_identity{[] {
             ruleT rule{};
             for_each_code(code) {
-                rule.set(code, decode_s(code));
+                rule.set(code, get_s(code));
             }
             return rule;
         }()};
@@ -112,9 +113,9 @@ namespace legacy {
             };
 
             // clang-format off
-            return encode(take(q2), take(w2), take(e2),
+            return encode({take(q2), take(w2), take(e2),
                           take(a2), take(s2), take(d2),
-                          take(z2), take(x2), take(c2));
+                           take(z2), take(x2), take(c2)});
             // clang-format on
         }
     };
@@ -122,7 +123,7 @@ namespace legacy {
     // A pair of mapperT defines an equivalence relation.
     struct mapperT_pair {
         mapperT a, b;
-        bool test(const ruleT_data& rule) const {
+        bool test(const ruleT_masked& rule) const {
             for_each_code(code) {
                 if (rule[a(code)] != rule[b(code)]) {
                     return false;
@@ -154,7 +155,7 @@ namespace legacy {
             }
         }
 
-        bool test(const ruleT_data& r) const {
+        bool test(const ruleT_masked& r) const {
             for_each_code(code) {
                 if (r[code] != r[parof[code]]) {
                     return false;
@@ -387,7 +388,7 @@ namespace legacy {
             }
         }
         // TODO: Is this needed?
-        bool test(const ruleT_data& r) const {
+        bool test(const ruleT_masked& r) const {
             for_each_code(code) {
                 if (r[code] != r[head_for(code)]) {
                     return false;
@@ -427,7 +428,7 @@ namespace legacy {
 
     using lockT = codeT::map_to<bool>;
 
-    inline auto scan(const partitionT& par, const ruleT_data& rule, const lockT& locked) {
+    inline auto scan(const partitionT& par, const ruleT_masked& rule, const lockT& locked) {
         struct counterT {
             int free_0 = 0, free_1 = 0;
             int locked_0 = 0, locked_1 = 0;
@@ -477,7 +478,7 @@ namespace legacy {
     // TODO: explain...
     inline ruleT purify(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked) {
         // TODO: for locked code A and B, what if r[A] != r[B]?
-        ruleT_data r = mask.from_rule(rule);
+        ruleT_masked r = mask.from_rule(rule);
         for (int j = 0; j < par.k(); ++j) {
             const groupT group = par.jth_group(j);
             // TODO: should be scan-based... what if inconsistent?
@@ -516,7 +517,7 @@ namespace legacy {
                             auto fn /*void(bool* begin, bool* end)*/) {
         // TODO: precondition?
 
-        ruleT_data r = mask.from_rule(rule);
+        ruleT_masked r = mask.from_rule(rule);
 
         std::vector<int> free_indexes;
         for (int j = 0; j < par.k(); ++j) {
@@ -651,14 +652,14 @@ namespace legacy {
         ruleT mir{};
         for_each_code(code) {
             const codeT codex = codeT(~code & 511);
-            const bool flip = decode_s(codex) != rule(codex);
-            mir.set(code, flip ? !decode_s(code) : decode_s(code));
+            const bool flip = get_s(codex) != rule(codex);
+            mir.set(code, flip ? !get_s(code) : get_s(code));
         }
         return mir;
     }
 
     inline bool satisfies(const ruleT& rule, const lockT& locked, const maskT& mask, const equivT& e) {
-        const ruleT_data r = mask.from_rule(rule);
+        const ruleT_masked r = mask.from_rule(rule);
         codeT::map_to<int> record;
         record.fill(2);
         for_each_code(code) {

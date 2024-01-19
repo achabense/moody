@@ -30,6 +30,8 @@ namespace legacy {
 
         template <class T>
         using map_to = std::array<T, 512>;
+
+        enum bposE : int { env_q = 0, env_w, env_e, env_a, env_s, env_d, env_z, env_x, env_c };
     };
 
     // (`name` must not be modified within the loop body)
@@ -38,27 +40,29 @@ namespace legacy {
     constexpr codeT encode(const envT& env) {
         // ~ bool is implicitly promoted to int.
         // clang-format off
-        const int code = (env.q << 0) | (env.w << 1) | (env.e << 2) |
-                         (env.a << 3) | (env.s << 4) | (env.d << 5) |
-                         (env.z << 6) | (env.x << 7) | (env.c << 8);
+        using enum codeT::bposE;
+        const int code = (env.q << env_q) | (env.w << env_w) | (env.e << env_e) |
+                         (env.a << env_a) | (env.s << env_s) | (env.d << env_d) |
+                         (env.z << env_z) | (env.x << env_x) | (env.c << env_c);
         // clang-format on
         assert(code >= 0 && code < 512);
         return codeT{code};
     }
 
-    constexpr codeT encode(bool q, bool w, bool e, bool a, bool s, bool d, bool z, bool x, bool c) {
-        const int code =
-            (q << 0) | (w << 1) | (e << 2) | (a << 3) | (s << 4) | (d << 5) | (z << 6) | (x << 7) | (c << 8);
-        assert(code >= 0 && code < 512);
-        return codeT{code};
+    constexpr envT decode(codeT code) {
+        using enum codeT::bposE;
+        const bool q = (code >> env_q) & 1, w = (code >> env_w) & 1, e = (code >> env_e) & 1;
+        const bool a = (code >> env_a) & 1, s = (code >> env_s) & 1, d = (code >> env_d) & 1;
+        const bool z = (code >> env_z) & 1, x = (code >> env_x) & 1, c = (code >> env_c) & 1;
+        return {q, w, e, a, s, d, z, x, c};
     }
 
-    constexpr envT decode(codeT code) {
-        assert(code >= 0 && code < 512);
-        const bool q = (code >> 0) & 1, w = (code >> 1) & 1, e = (code >> 2) & 1;
-        const bool a = (code >> 3) & 1, s = (code >> 4) & 1, d = (code >> 5) & 1;
-        const bool z = (code >> 6) & 1, x = (code >> 7) & 1, c = (code >> 8) & 1;
-        return {q, w, e, a, s, d, z, x, c};
+    constexpr bool get(codeT code, codeT::bposE bpos) {
+        return (code >> bpos) & 1;
+    }
+
+    constexpr bool get_s(codeT code) {
+        return (code >> codeT::env_s) & 1;
     }
 
 #ifndef NDEBUG
@@ -74,19 +78,11 @@ namespace legacy {
     } // namespace _misc
 #endif
 
-    // TODO: better names...
-    constexpr bool decode_s(codeT code) {
-        return (code >> 4) & 1;
-    }
-
-    // TODO: better rename to something independent of ruleT...
-    using ruleT_data = codeT::map_to<bool>;
-
     // TODO: rephrase...
     // TODO: explain why using operator() as getter...
     // Unambiguously refer to the map from env-code to the new state.
     class ruleT {
-        ruleT_data map{}; // TODO: change name...
+        codeT::map_to<bool> map{}; // TODO: change name...
     public:
         constexpr bool operator()(codeT code) const { return map[code]; }
         constexpr void set(codeT code, bool b) { map[code] = b; }
