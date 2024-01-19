@@ -54,6 +54,58 @@ namespace legacy {
         }()};
     } // namespace constants
 
+    // Partition of all codeT ({0}~{511}), in the form of union-find set.
+    // (Lacks the ability to efficiently list groups)
+    class equivT {
+        mutable codeT::map_to<codeT> parof;
+
+    public:
+        equivT() {
+            for_each_code(code) {
+                parof[code] = code;
+            }
+        }
+
+        // TODO: const or not?
+        // headof?
+        codeT rootof(codeT c) const {
+            if (parof[c] == c) {
+                return c;
+            } else {
+                return parof[c] = rootof(parof[c]);
+            }
+        }
+
+        bool test(const ruleT_masked& r) const {
+            for_each_code(code) {
+                if (r[code] != r[parof[code]]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // TODO: better names...
+        void add_eq(codeT a, codeT b) { parof[rootof(a)] = rootof(b); }
+        void add_eq(const equivT& other) {
+            for_each_code(code) {
+                add_eq(code, other.parof[code]);
+            }
+        }
+
+        bool has_eq(codeT a, codeT b) const { return rootof(a) == rootof(b); }
+        bool has_eq(const equivT& other) const {
+            for_each_code(code) {
+                if (!has_eq(code, other.parof[code])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // bool is_refinement_of(const equivT& other) const { return other.has_eq(*this); }
+    };
+
     // A mapperT defines a rule that maps each codeT to another codeT.
     // Specifically, mapperT{q2=q,w2=w,...} maps any codeT to the same value.
     struct mapperT {
@@ -133,72 +185,20 @@ namespace legacy {
         }
     };
 
-    // Partition of all codeT ({0}~{511}), in the form of union-find set.
-    // (Lacks the ability to efficiently list groups)
-    class equivT {
-        mutable codeT::map_to<codeT> parof;
+    inline void add_eq(equivT& eq, const mapperT_pair& mp) {
+        for_each_code(code) {
+            eq.add_eq(mp.a(code), mp.b(code));
+        }
+    }
 
-    public:
-        equivT() {
-            for_each_code(code) {
-                parof[code] = code;
+    inline bool has_eq(const equivT& eq, const mapperT_pair& mp) {
+        for_each_code(code) {
+            if (!eq.has_eq(mp.a(code), mp.b(code))) {
+                return false;
             }
         }
-
-        // TODO: const or not?
-        // headof?
-        codeT rootof(codeT c) const {
-            if (parof[c] == c) {
-                return c;
-            } else {
-                return parof[c] = rootof(parof[c]);
-            }
-        }
-
-        bool test(const ruleT_masked& r) const {
-            for_each_code(code) {
-                if (r[code] != r[parof[code]]) {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        void add_eq(codeT a, codeT b) { parof[rootof(a)] = rootof(b); }
-        equivT& add_eq(const mapperT_pair& e) {
-            for_each_code(code) {
-                add_eq(e.a(code), e.b(code));
-            }
-            return *this;
-        }
-        equivT& add_eq(const equivT& e) {
-            for_each_code(code) {
-                // TODO: can be parof?
-                add_eq(code, e.rootof(code));
-            }
-            return *this;
-        }
-
-        bool has_eq(codeT a, codeT b) const { return rootof(a) == rootof(b); }
-        bool has_eq(const mapperT_pair& e) const {
-            for_each_code(code) {
-                if (!has_eq(e.a(code), e.b(code))) {
-                    return false;
-                }
-            }
-            return true;
-        }
-        // TODO: can this correctly check refinement-relation?
-        bool has_eq(const equivT& e) const {
-            for_each_code(code) {
-                // TODO: can be parof?
-                if (!has_eq(code, e.rootof(code))) {
-                    return false;
-                }
-            }
-            return true;
-        }
-    };
+        return true;
+    }
 
     inline namespace constants {
         // TODO: recheck these mappers...
@@ -739,7 +739,8 @@ namespace legacy {
             }
             const subsetT &a = *a_op, &b = *b_op;
 
-            equivT eq_both = equivT(a.eq).add_eq(b.eq);
+            equivT eq_both = a.eq;
+            eq_both.add_eq(b.eq);
             partitionT par_a(a.eq), par_b(b.eq), par_both(eq_both);
 
             // find a rule that is contained by both a and b...
@@ -749,7 +750,7 @@ namespace legacy {
 // TODO: it turns out that, the result is not deterministic - can be dependent on certain invocation sequence...
 // So, & may not result in a single subsetT (but | of multiple subsetTs)...
 #if 1
-            std::array<codeT, 512> codes;
+            std::array<codeT, 512> codes{};
             for_each_code(code) {
                 auto [q, w, e, a, s, d, z, x, c] = decode(code);
                 codes[q * 256 + w * 2 + e * 4 + a * 8 + s * 16 + d * 32 + z * 64 + x * 128 + c * 1] = code;
@@ -810,16 +811,22 @@ namespace legacy {
     };
 
     inline static const subsetT test_ignore_s_and_self_cmpl = [] {
+        const auto mk = [](const mapperT& mp) {
+            equivT eq{};
+            add_eq(eq, {mp_identity, mp});
+            return eq;
+        };
+
         if (1) {
-            subsetT sa{mask_zero, equivT{}.add_eq({mp_ignore_s, mp_identity})};
-            subsetT sb{mask_identity, equivT{}.add_eq({mp_dual, mp_identity})};
+            subsetT sa{mask_zero, mk(mp_ignore_s)};
+            subsetT sb{mask_identity, mk(mp_dual)};
 
             auto sc = sa & sb;
             assert(sc);
             return *sc;
         } else {
-            subsetT s0{mask_zero, equivT{}.add_eq({mp_refl_qsc, mp_identity})};
-            subsetT s1{mask_zero, equivT{}.add_eq({mp_C4, mp_identity})};
+            subsetT s0{mask_zero, mk(mp_refl_qsc)};
+            subsetT s1{mask_zero, mk(mp_C4)};
             std::mt19937 rand;
             s0.change_mask({s0.random_rule(10, rand)});
             s1.change_mask({s1.random_rule(12, rand)});

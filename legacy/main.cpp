@@ -129,7 +129,7 @@ namespace legacy {
             const auto mk = [](std::initializer_list<mapperT> ms) {
                 equivT eq{};
                 for (const mapperT& m : ms) {
-                    eq.add_eq({mp_identity, m});
+                    add_eq(eq, {mp_identity, m});
                 }
                 return eq;
             };
