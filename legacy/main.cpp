@@ -80,7 +80,7 @@ namespace legacy {
     // TODO: refine analyzer...
     class partition_collection {
         struct termT {
-            const char* msg;
+            const char* title;
             equivT eq;
             bool selected = false;
             bool covered = false;
@@ -98,28 +98,18 @@ namespace legacy {
 
         void reset_par() {
             equivT q{};
-            auto set = [&q](termT_vec& terms) {
-                for (termT& t : terms) {
+            for (termT_vec* terms : {&terms_ignore, &terms_native, &terms_misc, &terms_hex}) {
+                for (termT& t : *terms) {
                     if (t.selected) {
                         q.add_eq(t.eq);
                     }
                 }
-            };
-            set(terms_ignore);
-            set(terms_native);
-            set(terms_misc);
-            set(terms_hex);
-
-            auto test = [&q](termT_vec& terms) {
-                for (termT& t : terms) {
+            }
+            for (termT_vec* terms : {&terms_ignore, &terms_native, &terms_misc, &terms_hex}) {
+                for (termT& t : *terms) {
                     t.covered = q.has_eq(t.eq);
                 }
-            };
-            test(terms_ignore);
-            test(terms_native);
-            test(terms_misc);
-            test(terms_hex);
-
+            }
             par.emplace(q);
         }
 
@@ -214,8 +204,8 @@ namespace legacy {
             };
 
             // TODO: the layout is still horrible...
-            const ImGuiTableFlags flags_outer = ImGuiTableFlags_BordersH | ImGuiTableFlags_BordersInnerV |
-                                                ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoHostExtendX;
+            const ImGuiTableFlags flags_outer =
+                ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoHostExtendX;
             const ImGuiTableFlags flags_inner =
                 ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoHostExtendX;
 
@@ -247,7 +237,7 @@ namespace legacy {
                         ImGui::TableNextRow();
                         for (termT& t : terms) {
                             ImGui::TableNextColumn();
-                            imgui_str(t.msg);
+                            imgui_str(t.title);
                             check(t, sqr);
                         }
                         ImGui::EndTable();
@@ -495,16 +485,21 @@ void stone_constraints(rule_recorder& recorder) {
 std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_image& icons) {
     std::optional<legacy::ruleT> out;
 
-    if (imgui_enterbutton("Experimental")) {
-        out = legacy::test_ignore_s_and_self_cmpl.random_rule(20, global_mt19937());
-    }
-    if (ImGui::BeginItemTooltip()) {
-        imgui_str(to_MAP_str(legacy::test_ignore_s_and_self_cmpl.mask.viewer));
-        ImGui::EndTooltip();
+    static legacy::lockT locked{};
+    if (temp_lock) {
+        locked = *temp_lock;
+        temp_lock.reset();
     }
 
-    // TODO: mask should come after selection planes, and doesn't participate subset-definition.
-    // TODO: should enable testing masking rule instead of target rule when hovered.
+    // TODO: rename...
+    static legacy::partition_collection parcol;
+    const auto& par = parcol.select_par(target, locked);
+
+    ImGui::Separator();
+
+    // TODO: mask should no longer take part in subset definition...
+    // TODO: add more selections...
+    // TODO: enable testing masking rule instead of target rule when hovered...
     static legacy::maskT mask_custom{{}};
     static const legacy::maskT* mask_ptr = &legacy::mask_zero;
     {
@@ -543,22 +538,11 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
             }
         }
     }
-
     const legacy::maskT& mask = *mask_ptr;
 
-    static legacy::lockT locked{};
-    if (temp_lock) {
-        locked = *temp_lock;
-        temp_lock.reset();
-    }
-
-    // TODO: rename...
-    static legacy::partition_collection parcol;
-    const auto& par = parcol.select_par(target, locked);
-
     {
-        // TODO: for non-matching rules, when doing redispatch, whether to do auto-approximation (or enforce intentional
-        // approx)?
+        // TODO: for non-matching rules, when doing redispatch, whether to do auto-approximation (or enforce
+        // intentional approx)?
 
         // TODO: still unstable between partition switches...
         // TODO: the range should be scoped by locks... so, what should rcount be?
