@@ -114,7 +114,7 @@ namespace legacy {
 
             // clang-format off
             return encode({take(q2), take(w2), take(e2),
-                          take(a2), take(s2), take(d2),
+                           take(a2), take(s2), take(d2),
                            take(z2), take(x2), take(c2)});
             // clang-format on
         }
@@ -165,16 +165,18 @@ namespace legacy {
         }
 
         void add_eq(codeT a, codeT b) { parof[rootof(a)] = rootof(b); }
-        void add_eq(const mapperT_pair& e) {
+        equivT& add_eq(const mapperT_pair& e) {
             for_each_code(code) {
                 add_eq(e.a(code), e.b(code));
             }
+            return *this;
         }
-        void add_eq(const equivT& e) {
+        equivT& add_eq(const equivT& e) {
             for_each_code(code) {
                 // TODO: can be parof?
                 add_eq(code, e.rootof(code));
             }
+            return *this;
         }
 
         bool has_eq(codeT a, codeT b) const { return rootof(a) == rootof(b); }
@@ -675,3 +677,156 @@ namespace legacy {
         return true;
     }
 } // namespace legacy
+
+#include <optional> // TODO: in this header optional is used to represent empty set. not very suitable...
+
+namespace legacy {
+    // TODO: it seems that, if the underlying mask is essentially different (not interchangeable), the
+    // result of & of two subsetT can result in | of multiple subsetT...
+    struct subsetT {
+        maskT mask;
+        equivT eq;
+
+        bool contains(const ruleT& rule) const { return eq.test(mask.from_rule(rule)); }
+        bool contains(const subsetT& other) const { return contains(other.mask.viewer) && other.eq.has_eq(eq); }
+        bool equals(const subsetT& other) const { return contains(other) && other.contains(*this); }
+        bool change_mask(const maskT& mask2) {
+            if (!contains(mask2.viewer)) {
+                return false;
+            }
+
+            mask = mask2;
+            return true;
+        }
+
+        // TODO...
+        ruleT approximate(const ruleT& r) const;
+
+        // Temporary...
+        ruleT random_rule(int count, std::mt19937& rand) const {
+            partitionT par(eq); // TODO: expensive...
+            enum boolT : bool {};
+            std::vector<boolT> ss(par.k());
+            for (int i = 0; i < ss.size() && i < count; ++i) {
+                ss[i] = boolT{true};
+            }
+            std::shuffle(ss.begin(), ss.end(), rand);
+            ruleT rule = mask.viewer;
+            for (int j = 0; j < ss.size(); ++j) {
+                if (ss[j]) { // TODO: how is this allowed in the standard?
+                    for (codeT code : par.jth_group(j)) {
+                        rule.set(code, !rule(code));
+                    }
+                }
+            }
+            return rule;
+        }
+
+        // prove that for arbitrary subsetT a and b, a & b result in either an empty set, or still another subsetT:
+        // 1. prove a & b may result in an empty set ({}).
+        // 2. suppose a & b != {}, so there is a rule r ∈ a and ∈ b:
+        // look at any [codeT] of it.
+        // Now flip [codeT] as well as the rest [codeT] in the [groupT]. It's obvious that, such a rule still belongs to
+        // both a and b.
+        // 3. notice that determines the rest [codeT]s in the group, so there is no outside of {{r},...}...
+        // ... no, not strictly uniquely deterministic...
+
+        // nullopt: empty set...
+        friend std::optional<subsetT> operator&(const std::optional<subsetT>& a_op,
+                                                const std::optional<subsetT>& b_op) {
+            if (!a_op || !b_op) {
+                return std::nullopt;
+            }
+            const subsetT &a = *a_op, &b = *b_op;
+
+            equivT eq_both = equivT(a.eq).add_eq(b.eq);
+            partitionT par_a(a.eq), par_b(b.eq), par_both(eq_both);
+
+            // find a rule that is contained by both a and b...
+            ruleT common_rule{};
+            codeT::map_to<bool> done{};
+
+// TODO: it turns out that, the result is not deterministic - can be dependent on certain invocation sequence...
+// So, & may not result in a single subsetT (but | of multiple subsetTs)...
+#if 1
+            std::array<codeT, 512> codes;
+            for_each_code(code) {
+                auto [q, w, e, a, s, d, z, x, c] = decode(code);
+                codes[q * 256 + w * 2 + e * 4 + a * 8 + s * 16 + d * 32 + z * 64 + x * 128 + c * 1] = code;
+            }
+
+            for (codeT code : codes) {
+#else
+            for_each_code(code) {
+#endif
+                if (!done[code]) {
+                    for (codeT c : par_both.group_for(code)) {
+                        assert(!done[c]);
+                    }
+
+                    auto transfer_dependency = [&a, &b, &done, &common_rule, &par_a, &par_b](codeT code, bool v,
+                                                                                             auto& self) -> bool {
+                        if (done[code]) {
+                            if (common_rule(code) != v) {
+                                return false;
+                            }
+                        } else {
+                            done[code] = true;
+                            common_rule.set(code, v);
+                            {
+                                const bool viewed_by_a = a.mask.viewer(code) ^ v;
+                                for (codeT c : par_a.group_for(code)) {
+                                    if (!self(c, a.mask.viewer(c) ^ viewed_by_a, self)) {
+                                        return false;
+                                    }
+                                }
+                            }
+                            {
+                                bool viewed_by_b = b.mask.viewer(code) ^ v;
+                                for (codeT c : par_b.group_for(code)) {
+                                    if (!self(c, b.mask.viewer(c) ^ viewed_by_b, self)) {
+                                        return false;
+                                    }
+                                }
+                            }
+                        }
+                        return true;
+                    };
+
+                    // TODO: 0 or a.mask.viewer(code)?
+                    if (!transfer_dependency(code, a.mask.viewer(code), transfer_dependency)) {
+                        return std::nullopt;
+                    }
+
+                    for (codeT c : par_both.group_for(code)) {
+                        assert(done[c]);
+                    }
+                }
+            }
+            assert(a.contains(subsetT{.mask{common_rule}, .eq{eq_both}}));
+            assert(b.contains(subsetT{.mask{common_rule}, .eq{eq_both}}));
+            return subsetT{.mask{common_rule}, .eq{eq_both}};
+        }
+    };
+
+    inline static const subsetT test_ignore_s_and_self_cmpl = [] {
+        if (1) {
+            subsetT sa{mask_zero, equivT{}.add_eq({mp_ignore_s, mp_identity})};
+            subsetT sb{mask_identity, equivT{}.add_eq({mp_dual, mp_identity})};
+
+            auto sc = sa & sb;
+            assert(sc);
+            return *sc;
+        } else {
+            subsetT s0{mask_zero, equivT{}.add_eq({mp_refl_qsc, mp_identity})};
+            subsetT s1{mask_zero, equivT{}.add_eq({mp_C4, mp_identity})};
+            std::mt19937 rand;
+            s0.change_mask({s0.random_rule(10, rand)});
+            s1.change_mask({s1.random_rule(12, rand)});
+
+            auto s2 = s0 & s1;
+            assert(s2);
+            return *s2;
+        }
+    }();
+} //  namespace legacy

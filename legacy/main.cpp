@@ -496,6 +496,14 @@ void stone_constraints(rule_recorder& recorder) {
 std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_image& icons) {
     std::optional<legacy::ruleT> out;
 
+    if (imgui_enterbutton("Experimental")) {
+        out = legacy::test_ignore_s_and_self_cmpl.random_rule(20, global_mt19937());
+    }
+    if (ImGui::BeginItemTooltip()) {
+        imgui_str(to_MAP_str(legacy::test_ignore_s_and_self_cmpl.mask.viewer));
+        ImGui::EndTooltip();
+    }
+
     static legacy::maskT mask_custom{{}};
     static const legacy::maskT* mask_ptr = &legacy::mask_zero;
     {
