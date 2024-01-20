@@ -3,12 +3,144 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #endif
 
-#include "app.hpp"
 #include "app_imgui.hpp"
 #include "app_sdl.hpp"
 
 #include "rule_algo.hpp"
 
+// TODO: this is still not a suitable pos for these definitions...
+#ifndef TEMP_POS
+// TODO: better name...
+// TODO: explain why float (there is no instant ImGui::SliderDouble)
+// (std::optional<uint32_t> has proven to be very awkward)
+struct tileT_filler {
+    bool use_seed;
+    uint32_t seed;
+    float density; // ∈ [0.0f, 1.0f]
+
+    void fill(legacy::tileT& tile) const {
+        if (use_seed) {
+            std::mt19937 rand(seed);
+            legacy::random_fill(tile, rand, density);
+        } else {
+            legacy::random_fill(tile, global_mt19937(), density);
+        }
+    }
+};
+
+class torusT {
+    legacy::tileT m_tile, m_side;
+    int m_gen;
+
+public:
+    explicit torusT(const legacy::rectT& size) : m_tile(size), m_side(size), m_gen(0) {}
+
+    // TODO: reconsider whether to expose non-const tile...
+    legacy::tileT& tile() { return m_tile; }
+    const legacy::tileT& tile() const { return m_tile; }
+    int gen() const { return m_gen; }
+
+    void restart(tileT_filler filler, std::optional<legacy::rectT> resize = {}) {
+        if (resize) {
+            m_tile.resize(*resize);
+        }
+
+        filler.fill(m_tile);
+        m_gen = 0;
+    }
+
+    void run(const legacy::ruleT& rule, int count = 1) {
+        for (int c = 0; c < count; ++c) {
+            m_tile.gather(m_tile, m_tile, m_tile, m_tile, m_tile, m_tile, m_tile, m_tile);
+            m_tile.apply(rule, m_side);
+            m_tile.swap(m_side);
+
+            ++m_gen;
+        }
+    }
+
+    // TODO: recheck logic...
+    void shift(int dx, int dy) {
+        const int width = m_tile.width(), height = m_tile.height();
+
+        // TODO: proper name...
+        const auto round_clip = [](int v, int r) { return ((v % r) + r) % r; };
+        dx = round_clip(-dx, width);
+        dy = round_clip(-dy, height);
+        if (dx == 0 && dy == 0) {
+            return;
+        }
+
+        m_side.resize(m_tile.size());
+        for (int y = 0; y < height; ++y) {
+            bool* source = m_tile.line((y + dy) % height);
+            bool* dest = m_side.line(y);
+            std::copy_n(source, width, dest);
+            std::rotate(dest, dest + dx, dest + width);
+        }
+        m_tile.swap(m_side);
+    }
+};
+
+// Never empty.
+// TODO: (gui) whether to support random-access mode?
+class rule_recorder {
+    std::vector<legacy::compressT> m_record;
+    int m_pos;
+
+public:
+    rule_recorder() {
+        m_record.emplace_back(legacy::game_of_life());
+        m_pos = 0;
+    }
+
+    int size() const { return m_record.size(); }
+
+    // [0, size() - 1]
+    int pos() const { return m_pos; }
+
+    // TODO: look for better names...
+    // TODO: reconsider what should be done when already exists in the whole vec...
+    void take(const legacy::ruleT& rule) {
+        legacy::compressT cmpr(rule);
+        if (cmpr != m_record[m_pos]) {
+            m_record.push_back(cmpr);
+            m_pos = m_record.size() - 1;
+        }
+    }
+
+    // void replace_current(const legacy::ruleT& rule) { //
+    //     m_record[m_pos] = legacy::compressT(rule);
+    // }
+
+    legacy::ruleT current() const {
+        assert(m_pos >= 0 && m_pos < size());
+        return static_cast<legacy::ruleT>(m_record[m_pos]);
+    }
+
+    void set_pos(int pos) { //
+        m_pos = std::clamp(pos, 0, size() - 1);
+    }
+    void set_next() { set_pos(m_pos + 1); }
+    void set_prev() { set_pos(m_pos - 1); }
+    void set_first() { set_pos(0); }
+    void set_last() { set_pos(size() - 1); }
+
+    // TODO: reconsider m_pos logic...
+    // void append(const std::vector<legacy::compressT>& vec) { //
+    //     m_record.insert(m_record.end(), vec.begin(), vec.end());
+    // }
+
+    void replace(std::vector<legacy::compressT>&& vec) {
+        if (!vec.empty()) {
+            m_record.swap(vec);
+            m_pos = 0;
+        }
+        // else???
+    }
+};
+
+#endif
 // TODO: rename...
 const int FixedItemWidth = 220;
 
@@ -333,7 +465,7 @@ void show_target_rule(const legacy::ruleT& target, rule_recorder& recorder) {
     if (ImGui::Button("Paste")) {
         // TODO: redesign... (especially, should not replace directly?)
         if (const char* text = ImGui::GetClipboardText()) {
-            auto result = extract_rules(text);
+            auto result = legacy::extract_rules(text);
             // TODO: copied from the main function...
             if (!result.empty()) {
                 logger::log_temp(500ms, "found {} rules", result.size());
@@ -788,7 +920,7 @@ public:
 
         // TODO: better layout...
         if (auto sel = m_nav.display()) {
-            auto result = extract_rules(load_binary(*sel, 1'000'000));
+            auto result = legacy::extract_rules(load_binary(*sel, 1'000'000));
             if (!result.empty()) {
                 logger::log_temp(500ms, "found {} rules", result.size());
                 m_recorder.replace(std::move(result));

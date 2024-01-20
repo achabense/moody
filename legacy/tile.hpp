@@ -212,7 +212,7 @@ namespace legacy {
     };
 
 #ifndef NDEBUG
-    namespace _misc {
+    namespace _misc::tests {
         // TODO: enhance this test?
         inline const bool test_tileT = [] {
             const rectT size{1, 1};
@@ -235,7 +235,7 @@ namespace legacy {
             }
             return true;
         }();
-    } // namespace _misc
+    } // namespace _misc::tests
 #endif
 
     inline namespace tileT_utils {
@@ -507,13 +507,13 @@ namespace legacy {
 
 #ifndef NDEBUG
     // TODO: update when from_RLE_str accepts x = ... line...
-    namespace _misc {
+    namespace _misc::tests {
         inline const bool test_RLE_str = [] {
             tileT tile({.width = 32, .height = 60});
             random_fill(tile, global_mt19937(), 0.5);
             assert(tile == from_RLE_str(to_RLE_str(tile), tile.size()));
             return true;
         }();
-    } // namespace _misc
+    } // namespace _misc::tests
 #endif
 } // namespace legacy

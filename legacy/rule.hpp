@@ -4,6 +4,7 @@
 #include <array>
 #include <cassert>
 #include <regex>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -69,16 +70,14 @@ namespace legacy {
     }
 
 #ifndef NDEBUG
-    namespace _misc {
-        // TODO: whether to add / keep these tests?
-        // (full tests covering the whole project is infeasible...)
+    namespace _misc::tests {
         inline const bool test_codeT = [] {
             for_each_code(code) {
                 assert(encode(decode(code)) == code);
             }
             return true;
         }();
-    } // namespace _misc
+    } // namespace _misc::tests
 #endif
 
     // TODO: rephrase...
@@ -100,6 +99,14 @@ namespace legacy {
 
         constexpr friend bool operator==(const ruleT&, const ruleT&) = default;
     };
+
+    // inline constexpr ruleT make_rule(const auto& fn) {
+    //     ruleT rule{};
+    //     for_each_code(code) {
+    //         rule[code] = fn(code);
+    //     }
+    //     return rule;
+    // }
 
     // "Convay's Game of Life" (B3/S23)
     inline ruleT game_of_life() {
@@ -203,35 +210,37 @@ namespace legacy {
         return reg;
     }
 
-    inline ruleT from_MAP_str(const std::string& map_str) {
-        assert(std::regex_match(map_str, regex_MAP_str()));
-        bool MAP_rule[512]{};
-        auto put = [&MAP_rule](int i, bool b) {
-            if (i < 512) {
-                MAP_rule[i] = b;
-            }
-        };
+    namespace _misc {
+        inline ruleT from_MAP_str(const std::string& map_str) {
+            assert(std::regex_match(map_str, regex_MAP_str()));
+            bool MAP_rule[512]{};
+            auto put = [&MAP_rule](int i, bool b) {
+                if (i < 512) {
+                    MAP_rule[i] = b;
+                }
+            };
 
-        int chp = 3; // skip "MAP"
-        for (int i = 0; i < 512; i += 6) {
-            const uint8_t b6 = _misc::from_base64(map_str[chp++]);
-            put(i + 5, (b6 >> 0) & 1);
-            put(i + 4, (b6 >> 1) & 1);
-            put(i + 3, (b6 >> 2) & 1);
-            put(i + 2, (b6 >> 3) & 1);
-            put(i + 1, (b6 >> 4) & 1);
-            put(i + 0, (b6 >> 5) & 1);
+            int chp = 3; // skip "MAP"
+            for (int i = 0; i < 512; i += 6) {
+                const uint8_t b6 = _misc::from_base64(map_str[chp++]);
+                put(i + 5, (b6 >> 0) & 1);
+                put(i + 4, (b6 >> 1) & 1);
+                put(i + 3, (b6 >> 2) & 1);
+                put(i + 2, (b6 >> 3) & 1);
+                put(i + 1, (b6 >> 4) & 1);
+                put(i + 0, (b6 >> 5) & 1);
+            }
+            ruleT rule{};
+            for_each_code(code) {
+                const auto [q, w, e, a, s, d, z, x, c] = decode(code);
+                rule[code] = MAP_rule[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1];
+            }
+            return rule;
         }
-        ruleT rule{};
-        for_each_code(code) {
-            const auto [q, w, e, a, s, d, z, x, c] = decode(code);
-            rule[code] = MAP_rule[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1];
-        }
-        return rule;
-    }
+    } // namespace _misc
 
 #ifndef NDEBUG
-    namespace _misc {
+    namespace _misc::tests {
         // https://golly.sourceforge.io/Help/Algorithms/QuickLife.html
         // > So, Conway's Life (B3/S23) encoded as a MAP rule is:
         // > rule = MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA
@@ -244,7 +253,30 @@ namespace legacy {
             assert(from_MAP_str(gol_str) == gol);
             return true;
         }();
-    } // namespace _misc
+    } // namespace _misc::tests
 #endif
+
+    inline std::vector<compressT> extract_rules(const char* begin, const char* end) {
+        std::vector<compressT> rules;
+
+        const auto& regex = regex_MAP_str();
+        std::cmatch match;
+        while (std::regex_search(begin, end, match, regex)) {
+            compressT rule(_misc::from_MAP_str(match[0]));
+            if (rules.empty() || rules.back() != rule) {
+                rules.push_back(rule);
+            }
+            begin = match.suffix().first;
+        }
+        return rules;
+    }
+
+    inline std::vector<compressT> extract_rules(std::span<const char> data) {
+        return extract_rules(data.data(), data.data() + data.size());
+    }
+
+    inline std::vector<compressT> extract_rules(const char* str) {
+        return extract_rules(str, str + strlen(str));
+    }
 
 } // namespace legacy

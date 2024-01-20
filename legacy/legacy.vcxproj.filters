@@ -39,9 +39,6 @@
     <ClInclude Include="imgui\imgui_internal.h">
       <Filter>imgui</Filter>
     </ClInclude>
-    <ClInclude Include="app.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="imgui\imconfig.h">
       <Filter>imgui</Filter>
     </ClInclude>
@@ -51,7 +48,7 @@
     <ClInclude Include="rule_algo.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="app2.hpp">
+    <ClInclude Include="app_imgui.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -80,12 +77,10 @@
     <ClCompile Include="imgui\imgui_widgets.cpp">
       <Filter>imgui</Filter>
     </ClCompile>
-    <ClCompile Include="TODOS.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />
     <None Include="README.md" />
+    <None Include="TODOS.md" />
   </ItemGroup>
 </Project>
