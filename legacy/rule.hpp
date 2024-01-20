@@ -82,13 +82,21 @@ namespace legacy {
 #endif
 
     // TODO: rephrase...
-    // TODO: explain why using operator() as getter...
     // Unambiguously refer to the map from env-code to the new state.
     class ruleT {
-        codeT::map_to<bool> map{}; // TODO: change name...
+        codeT::map_to<bool> m_map{};
+
     public:
-        constexpr bool operator()(codeT code) const { return map[code]; }
-        constexpr void set(codeT code, bool b) { map[code] = b; }
+        // (TODO; temp) compared to operator[]:
+        // pro: will not expose the address...
+        // con: less "natural" than operator[] (especially as std::*map etc uses [] too)
+        // constexpr void set(codeT code, bool b) { m_map[code] = b; }
+
+        // TODO: explain why defining an extra operator().
+        constexpr bool operator()(codeT code) const { return m_map[code]; }
+
+        constexpr bool operator[](codeT code) const { return m_map[code]; }
+        constexpr bool& operator[](codeT code) { return m_map[code]; }
 
         constexpr friend bool operator==(const ruleT&, const ruleT&) = default;
     };
@@ -100,11 +108,11 @@ namespace legacy {
             const auto [q, w, e, a, s, d, z, x, c] = decode(code);
             const int count = q + w + e + a + d + z + x + c;
             if (count == 2) { // 2:S ~ 0->0, 1->1 ~ equal to "s".
-                rule.set(code, s);
+                rule[code] = s;
             } else if (count == 3) { // 3:BS ~ 0->1, 1->1 ~ always 1.
-                rule.set(code, 1);
+                rule[code] = 1;
             } else {
-                rule.set(code, 0);
+                rule[code] = 0;
             }
         }
         return rule;
@@ -115,14 +123,14 @@ namespace legacy {
     public:
         explicit compressT(const ruleT& rule) : bits{} {
             for_each_code(code) {
-                bits[code / 8] |= rule(code) << (code % 8);
+                bits[code / 8] |= rule[code] << (code % 8);
             }
         }
 
         /*implicit*/ operator ruleT() const {
             ruleT rule{};
             for_each_code(code) {
-                rule.set(code, (bits[code / 8] >> (code % 8)) & 1);
+                rule[code] = (bits[code / 8] >> (code % 8)) & 1;
             }
             return rule;
         }
@@ -177,7 +185,7 @@ namespace legacy {
         bool MAP_rule[512]{};
         for_each_code(code) {
             const auto [q, w, e, a, s, d, z, x, c] = decode(code);
-            MAP_rule[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1] = rule(code);
+            MAP_rule[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1] = rule[code];
         }
         const auto get = [&MAP_rule](int i) { return i < 512 ? MAP_rule[i] : 0; };
         std::string str = "MAP";
@@ -217,7 +225,7 @@ namespace legacy {
         ruleT rule{};
         for_each_code(code) {
             const auto [q, w, e, a, s, d, z, x, c] = decode(code);
-            rule.set(code, MAP_rule[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1]);
+            rule[code] = MAP_rule[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1];
         }
         return rule;
     }

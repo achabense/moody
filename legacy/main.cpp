@@ -461,7 +461,7 @@ void stone_constraints(rule_recorder& recorder) {
                         imbue(env.z, board[y + 1][x - 1]);
                         imbue(env.x, board[y + 1][x]);
                         imbue(env.c, board[y + 1][x + 1]);
-                        rule.set(legacy::encode(env), board[y][x] == F ? 0 : 1);
+                        rule[legacy::encode(env)] = board[y][x] == F ? 0 : 1;
                         locked[legacy::encode(env)] = true;
                     }
                 }
@@ -506,7 +506,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
         const auto tooltip = [](const legacy::maskT& mask) {
             if (ImGui::BeginItemTooltip()) {
                 ImGui::PushTextWrapPos(250); // TODO: how to decide wrap pos properly?
-                imgui_str(to_MAP_str(mask.viewer));
+                imgui_str(to_MAP_str(mask));
                 ImGui::PopTextWrapPos();
                 ImGui::EndTooltip();
             }
@@ -529,7 +529,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
         ImGui::SameLine();
         if (mask_ptr == &mask_custom) {
             if (ImGui::Button("Take current rule")) {
-                mask_custom.viewer = target;
+                mask_custom = {target};
             }
             tooltip(mask_custom);
         } else {
@@ -613,7 +613,8 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
         static const ImVec4 cols[2]{{1, 1, 1, 1}, {1, 1, 1, 1}}; // TODO: use different color for 0 and 1...
         const auto strs = strss[&mask == &legacy::mask_zero ? 0 : &mask == &legacy::mask_identity ? 1 : 2];
 
-        const legacy::ruleT_masked drule = mask.from_rule(target);
+        // TODO: rename... (note that `r` is used as the name for a ruleT (if (button_hit) {...}))
+        const legacy::ruleT_masked drule = mask ^ target;
         const auto scanlist = legacy::scan(par, drule, locked);
         {
             // TODO: add more statistics... e.g. full vs partial lock...
@@ -715,7 +716,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
                     // TODO: reconsider how to deal with conflicts... (especially via masking rule...)
                     legacy::ruleT r = target;
                     if (ImGui::GetIO().KeyCtrl) {
-                        legacy::copy(group, mask.viewer, r);
+                        legacy::copy(group, mask, r);
                     } else {
                         legacy::flip(group, r);
                     }
@@ -1221,7 +1222,7 @@ int main(int argc, char** argv) {
                     legacy::lockT locked{};
                     auto rulx = [&](legacy::codeT code) {
                         locked[code] = true;
-                        return ctrl.rule(code);
+                        return ctrl.rule[code];
                     };
                     // TODO: how to decide generation?
                     for (int g = 0; g < 50; ++g) {

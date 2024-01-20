@@ -7,59 +7,49 @@
 #include "rule.hpp"
 
 namespace legacy {
+    // TODO: move elsewhere?
     // TODO: Document that this is not the only situation that flicking effect can occur...
     inline bool will_flick(const ruleT& rule) {
         constexpr codeT all_0 = encode({0, 0, 0, 0, 0, 0, 0, 0, 0});
         constexpr codeT all_1 = encode({1, 1, 1, 1, 1, 1, 1, 1, 1});
-        return rule(all_0) == 1 && rule(all_1) == 0;
+        return rule[all_0] == 1 && rule[all_1] == 0;
     }
 
+    // TODO: better name for ruleT_masked?
+    // TODO: is it safe to define maskT this way?
+    // TODO: explain the meaning of maskT_result (how is a rule different from maskT)...
+
+    // A maskT is a special ruleT used to do XOR mask for other rules.
+    struct maskT : public ruleT {};
     using ruleT_masked = codeT::map_to<bool>;
 
-    // XOR mask for ruleT.
-    // TODO: operator const ruleT&()?
-    struct maskT {
-        ruleT viewer;
+    // TODO: whether to forbid calling mask^mask?
+    // inline void operator^(const maskT&, const maskT&) = delete;
 
-        // both methods are actually XOR...
-        // TODO: better name... operator^ ?
-        ruleT_masked from_rule(const ruleT& rule) const {
-            ruleT_masked diff{};
-            for_each_code(code) {
-                diff[code] = rule(code) == viewer(code) ? 0 : 1;
-            }
-            return diff;
+    inline ruleT_masked operator^(const maskT& mask, const ruleT& rule) {
+        ruleT_masked r{};
+        for_each_code(code) {
+            r[code] = mask[code] ^ rule[code];
         }
+        return r;
+    }
 
-        ruleT to_rule(const ruleT_masked& diff) const {
-            ruleT rule{};
-            for_each_code(code) {
-                rule.set(code, diff[code] ? !viewer(code) : viewer(code));
-            }
-            return rule;
+    inline ruleT operator^(const maskT& mask, const ruleT_masked& r) {
+        ruleT rule{};
+        for_each_code(code) {
+            rule[code] = mask[code] ^ r[code];
         }
-    };
+        return rule;
+    }
 
-    inline namespace constants {
-        // TODO: explain the effects of these mask...
-        // rule ^ mask_zero -> TODO
-        inline constexpr maskT mask_zero{{}};
-        // rule ^ mask_identity -> TODO
-        inline constexpr maskT mask_identity{[] {
-            ruleT rule{};
-            for_each_code(code) {
-                rule.set(code, get_s(code));
-            }
-            return rule;
-        }()};
-    } // namespace constants
-
-    // Partition of all codeT ({0}~{511}), in the form of union-find set.
+    // Union-find set for the partition of all codeT ({0...511}).
     // (Lacks the ability to efficiently list groups)
+    // TODO: merge equivT and partitionT into a single class if possible...
     class equivT {
         mutable codeT::map_to<codeT> parof;
 
     public:
+        // TODO: how to clang-format to a single line?
         equivT() {
             for_each_code(code) {
                 parof[code] = code;
@@ -106,6 +96,8 @@ namespace legacy {
         // TODO: refinement is more of a concept when talking about "partition"...
         bool is_refinement_of(const equivT& other) const { return other.has_eq(*this); }
     };
+
+    // TODO: define subsetT here...
 
     // A mapperT defines a rule that maps each codeT to another codeT.
     // Specifically, mapperT{q2=q,w2=w,...} maps any codeT to the same value.
@@ -176,9 +168,9 @@ namespace legacy {
     // A pair of mapperT defines an equivalence relation.
     struct mapperT_pair {
         mapperT a, b;
-        bool test(const ruleT_masked& rule) const {
+        bool test(const ruleT_masked& r) const {
             for_each_code(code) {
-                if (rule[a(code)] != rule[b(code)]) {
+                if (r[a(code)] != r[b(code)]) {
                     return false;
                 }
             }
@@ -201,7 +193,21 @@ namespace legacy {
         return true;
     }
 
-    inline namespace constants {
+    // TODO: is `recipes` a proper name?
+    inline namespace recipes {
+        // TODO: explain the effects of these mask...
+        // rule ^ mask_zero -> TODO
+        inline constexpr maskT mask_zero{{}};
+        // rule ^ mask_identity -> TODO
+        inline constexpr maskT mask_identity{[] {
+            ruleT rule{};
+            for_each_code(code) {
+                rule[code] = get_s(code);
+            }
+            return rule;
+        }()};
+        // TODO: mask_copy_q/w/e/a/s(~mask_identity)/d/z/x/c etc?
+
         // TODO: recheck these mappers...
 
         // mp_identity(any code) -> the same code
@@ -318,7 +324,7 @@ namespace legacy {
                                                 "asd"
                                                 "zx0"); // ignore_(q, c)
 
-    } // namespace constants
+    } // namespace recipes
 
     using groupT = std::span<const codeT>;
 
@@ -403,29 +409,27 @@ namespace legacy {
         // TODO: refer to https://en.wikipedia.org/wiki/Partition_of_a_set#Refinement_of_partitions
     };
 
-    // TODO: refine "concept"...
-    // 1. Does a rule satisfy the concept.
-    // 2. How to generate all possible rules that satisfy some concepts...
+    // TODO: outdated... should be replaced by subsetT utils finally...
     inline bool satisfies(const ruleT& rule, const maskT& mask, const mapperT_pair& q) {
-        return q.test(mask.from_rule(rule));
+        return q.test(mask ^ rule);
     }
     inline bool satisfies(const ruleT& rule, const maskT& mask, const equivT& q) {
-        return q.test(mask.from_rule(rule));
+        return q.test(mask ^ rule);
     }
     inline bool satisfies(const ruleT& rule, const maskT& mask, const partitionT& q) {
-        return q.test(mask.from_rule(rule));
+        return q.test(mask ^ rule);
     }
 
+    // TODO: (flip & copy) inline... or at least move elsewhere...
     inline void flip(groupT group, ruleT& rule) {
         for (codeT c : group) {
-            rule.set(c, !rule(c));
+            rule[c] = !rule[c];
         }
     }
 
-    // TODO: obscure???
     inline void copy(groupT group, const ruleT& source, ruleT& dest) {
         for (codeT c : group) {
-            dest.set(c, source(c));
+            dest[c] = source[c];
         }
     }
 
@@ -481,7 +485,7 @@ namespace legacy {
     // TODO: explain...
     inline ruleT purify(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked) {
         // TODO: for locked code A and B, what if r[A] != r[B]?
-        ruleT_masked r = mask.from_rule(rule);
+        ruleT_masked r = mask ^ rule;
         for (int j = 0; j < par.k(); ++j) {
             const groupT group = par.jth_group(j);
             // TODO: should be scan-based... what if inconsistent?
@@ -493,7 +497,7 @@ namespace legacy {
                 }
             }
         }
-        return mask.to_rule(r);
+        return mask ^ r;
     }
 
     // TODO: replace with stricter version...
@@ -520,7 +524,7 @@ namespace legacy {
                             auto fn /*void(bool* begin, bool* end)*/) {
         // TODO: precondition?
 
-        ruleT_masked r = mask.from_rule(rule);
+        ruleT_masked r = mask ^ rule;
 
         std::vector<int> free_indexes;
         for (int j = 0; j < par.k(); ++j) {
@@ -545,7 +549,7 @@ namespace legacy {
                 r[code] = bools[j];
             }
         }
-        return mask.to_rule(r);
+        return mask ^ r;
     }
 
     // TODO: count_min denotes free groups now; whether to switch to total groups (at least in the gui part)?
@@ -655,14 +659,14 @@ namespace legacy {
         ruleT mir{};
         for_each_code(code) {
             const codeT codex = codeT(~code & 511);
-            const bool flip = get_s(codex) != rule(codex);
-            mir.set(code, flip ? !get_s(code) : get_s(code));
+            const bool flip = get_s(codex) != rule[codex];
+            mir[code] = flip ? !get_s(code) : get_s(code);
         }
         return mir;
     }
 
     inline bool satisfies(const ruleT& rule, const lockT& locked, const maskT& mask, const equivT& e) {
-        const ruleT_masked r = mask.from_rule(rule);
+        const ruleT_masked r = mask ^ rule;
         codeT::map_to<int> record;
         record.fill(2);
         for_each_code(code) {
@@ -680,15 +684,17 @@ namespace legacy {
 } // namespace legacy
 
 namespace legacy {
+    // TODO: quick way to decide that A & B -> {}?
+
     // A subsetT defines a subset in ...[TODO; name]
     class subsetT {
         struct nonemptyT {
             maskT mask;
             equivT eq;
 
-            bool contains(const ruleT& rule) const { return eq.test(mask.from_rule(rule)); }
+            bool contains(const ruleT& rule) const { return eq.test(mask ^ rule); }
             bool includes(const nonemptyT& other) const {
-                return contains(other.mask.viewer) && eq.is_refinement_of(other.eq);
+                return contains(other.mask) && eq.is_refinement_of(other.eq);
             }
         };
 
@@ -714,7 +720,7 @@ namespace legacy {
         }
 
         void change_mask(const maskT& mask) {
-            if (!contains(mask.viewer)) {
+            if (!contains(mask)) {
                 // ???
             }
             m_set.mask = mask;
@@ -743,32 +749,32 @@ namespace legacy {
             // find a rule that is contained by both a and b...
             ruleT common_rule{};
 
-            if (a.contains(b.mask.viewer)) {
-                common_rule = b.mask.viewer;
-            } else if (b.contains(a.mask.viewer)) {
-                common_rule = a.mask.viewer;
+            if (a.contains(b.mask)) {
+                common_rule = b.mask;
+            } else if (b.contains(a.mask)) {
+                common_rule = a.mask;
             } else {
                 codeT::map_to<bool> has_val{};
 
                 auto transfer_dependency = [&](codeT code, bool v, auto& self) -> bool {
                     if (has_val[code]) {
-                        if (common_rule(code) != v) {
+                        if (common_rule[code] != v) {
                             // TODO: explain why (when) this can happen
                             return false;
                         }
                     } else {
                         has_val[code] = true;
-                        common_rule.set(code, v);
-                        const bool viewed_by_a = a.mask.viewer(code) ^ v;
-                        const bool viewed_by_b = b.mask.viewer(code) ^ v;
-                        // TODO: analyse complexity...
+                        common_rule[code] = v;
+                        const bool viewed_by_a = a.mask[code] ^ v;
+                        const bool viewed_by_b = b.mask[code] ^ v;
+                        // TODO: analyze complexity...
                         for (const codeT c : par_a.group_for(code)) {
-                            if (!self(c, a.mask.viewer(c) ^ viewed_by_a, self)) {
+                            if (!self(c, a.mask[c] ^ viewed_by_a, self)) {
                                 return false;
                             }
                         }
                         for (const codeT c : par_b.group_for(code)) {
-                            if (!self(c, b.mask.viewer(c) ^ viewed_by_b, self)) {
+                            if (!self(c, b.mask[c] ^ viewed_by_b, self)) {
                                 return false;
                             }
                         }
@@ -819,7 +825,7 @@ namespace legacy {
             const auto copy_from = [](codeT::bposE bpos) {
                 ruleT rule{};
                 for_each_code(code) {
-                    rule.set(code, get(code, bpos));
+                    rule[code] = get(code, bpos);
                 }
                 return rule;
             };
