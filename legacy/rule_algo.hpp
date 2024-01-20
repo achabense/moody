@@ -103,7 +103,8 @@ namespace legacy {
             return true;
         }
 
-        // bool is_refinement_of(const equivT& other) const { return other.has_eq(*this); }
+        // TODO: refinement is more of a concept when talking about "partition"...
+        bool is_refinement_of(const equivT& other) const { return other.has_eq(*this); }
     };
 
     // A mapperT defines a rule that maps each codeT to another codeT.
@@ -678,125 +679,122 @@ namespace legacy {
     }
 } // namespace legacy
 
-#include <optional> // TODO: in this header optional is used to represent empty set. not very suitable...
-
 namespace legacy {
-    // TODO: (outdated) it seems that, if the underlying mask is essentially different (not interchangeable), the
-    // result of & of two subsetT can result in | of multiple subsetT...
-    // (the result is indeed either a subsetT or an empty set...)
-    struct subsetT {
-        maskT mask;
-        equivT eq;
+    // A subsetT defines a subset in ...[TODO; name]
+    class subsetT {
+        struct nonemptyT {
+            maskT mask;
+            equivT eq;
 
-        bool contains(const ruleT& rule) const { return eq.test(mask.from_rule(rule)); }
-        bool contains(const subsetT& other) const { return contains(other.mask.viewer) && other.eq.has_eq(eq); }
-        bool equals(const subsetT& other) const { return contains(other) && other.contains(*this); }
-        bool change_mask(const maskT& mask2) {
-            if (!contains(mask2.viewer)) {
-                return false;
+            bool contains(const ruleT& rule) const { return eq.test(mask.from_rule(rule)); }
+            bool includes(const nonemptyT& other) const {
+                return contains(other.mask.viewer) && eq.is_refinement_of(other.eq);
             }
+        };
 
-            mask = mask2;
-            return true;
+        bool m_empty;
+        nonemptyT m_set;
+
+        // TODO: redesign ctors...
+        subsetT(nullptr_t) : m_empty{true}, m_set{} {}
+
+    public:
+        subsetT(const maskT& mask, const equivT& eq) : m_empty{false}, m_set({mask, eq}) {}
+
+        bool empty() const { return m_empty; }
+        bool contains(const ruleT& rule) const { return !m_empty && m_set.contains(rule); }
+        bool includes(const subsetT& other) const { return other.m_empty || (!m_empty && m_set.includes(other.m_set)); }
+        bool equals(const subsetT& other) const { return includes(other) && other.includes(*this); }
+
+        const maskT& get_mask() const {
+            if (m_empty) {
+                // ???
+            }
+            return m_set.mask;
         }
 
-        // TODO...
-        ruleT approximate(const ruleT& r) const;
-
-        // Temporary...
-        ruleT random_rule(int count, std::mt19937& rand) const {
-            partitionT par(eq); // TODO: expensive...
-            enum boolT : bool {};
-            std::vector<boolT> ss(par.k());
-            for (int i = 0; i < ss.size() && i < count; ++i) {
-                ss[i] = boolT{true};
+        void change_mask(const maskT& mask) {
+            if (!contains(mask.viewer)) {
+                // ???
             }
-            std::shuffle(ss.begin(), ss.end(), rand);
-            ruleT rule = mask.viewer;
-            for (int j = 0; j < ss.size(); ++j) {
-                if (ss[j]) { // TODO: how is this allowed in the standard?
-                    for (codeT code : par.jth_group(j)) {
-                        rule.set(code, !rule(code));
-                    }
-                }
-            }
-            return rule;
+            m_set.mask = mask;
         }
 
-        // prove that for arbitrary subsetT a and b, a & b result in either an empty set, or still another subsetT:
-        // 1. prove a & b may result in an empty set ({}).
-        // 2. suppose a & b != {}, so there is a rule r ∈ a and ∈ b:
-        // look at any [codeT] of it.
-        // Now flip [codeT] as well as the rest [codeT] in the [groupT]. It's obvious that, such a rule still belongs to
-        // both a and b.
-        // 3. notice that determines the rest [codeT]s in the group, so there is no outside of {{r},...}...
-        // TODO... finish the proof...
+        // TODO... & lockT version...
+        ruleT approximate(const ruleT& rule) const;
+        ruleT redispatch(const ruleT& rule, auto fn) const;
 
-        // nullopt: empty set...
-        friend std::optional<subsetT> operator&(const std::optional<subsetT>& a_op,
-                                                const std::optional<subsetT>& b_op) {
-            if (!a_op || !b_op) {
-                return std::nullopt;
+        // Prove that the intersection(&) of any two subsetT (a) and (b) is either an empty set or another subsetT.
+        // 1. If (a & b) result in an empty set, it is a subsetT.
+        // 2. Otherwise, there is at least a rule (r) in (a & b).
+        // TODO... finish the proof... (need to add detailed explanation for equivT...)
+        friend subsetT operator&(const subsetT& a_, const subsetT& b_) {
+            if (a_.m_empty || b_.m_empty) {
+                return {0};
             }
-            const subsetT &a = *a_op, &b = *b_op;
 
+            const nonemptyT &a = a_.m_set, &b = b_.m_set;
+
+            // TODO: partitionT is expensive...
             equivT eq_both = a.eq;
             eq_both.add_eq(b.eq);
             partitionT par_a(a.eq), par_b(b.eq), par_both(eq_both);
 
             // find a rule that is contained by both a and b...
             ruleT common_rule{};
-            codeT::map_to<bool> done{};
 
-            for_each_code(code) {
-                if (!done[code]) {
-                    for (codeT c : par_both.group_for(code)) {
-                        assert(!done[c]);
-                    }
+            if (a.contains(b.mask.viewer)) {
+                common_rule = b.mask.viewer;
+            } else if (b.contains(a.mask.viewer)) {
+                common_rule = a.mask.viewer;
+            } else {
+                codeT::map_to<bool> has_val{};
 
-                    auto transfer_dependency = [&a, &b, &done, &common_rule, &par_a, &par_b](codeT code, bool v,
-                                                                                             auto& self) -> bool {
-                        if (done[code]) {
-                            if (common_rule(code) != v) {
-                                // TODO: explain why (when) this can happen
+                auto transfer_dependency = [&](codeT code, bool v, auto& self) -> bool {
+                    if (has_val[code]) {
+                        if (common_rule(code) != v) {
+                            // TODO: explain why (when) this can happen
+                            return false;
+                        }
+                    } else {
+                        has_val[code] = true;
+                        common_rule.set(code, v);
+                        const bool viewed_by_a = a.mask.viewer(code) ^ v;
+                        const bool viewed_by_b = b.mask.viewer(code) ^ v;
+                        // TODO: analyse complexity...
+                        for (const codeT c : par_a.group_for(code)) {
+                            if (!self(c, a.mask.viewer(c) ^ viewed_by_a, self)) {
                                 return false;
                             }
-                        } else {
-                            done[code] = true;
-                            common_rule.set(code, v);
-                            {
-                                const bool viewed_by_a = a.mask.viewer(code) ^ v;
-                                for (codeT c : par_a.group_for(code)) {
-                                    if (!self(c, a.mask.viewer(c) ^ viewed_by_a, self)) {
-                                        return false;
-                                    }
-                                }
-                            }
-                            {
-                                bool viewed_by_b = b.mask.viewer(code) ^ v;
-                                for (codeT c : par_b.group_for(code)) {
-                                    if (!self(c, b.mask.viewer(c) ^ viewed_by_b, self)) {
-                                        return false;
-                                    }
-                                }
+                        }
+                        for (const codeT c : par_b.group_for(code)) {
+                            if (!self(c, b.mask.viewer(c) ^ viewed_by_b, self)) {
+                                return false;
                             }
                         }
-                        return true;
-                    };
-
-                    // TODO: 0 or a.mask.viewer(code)?
-                    if (!transfer_dependency(code, a.mask.viewer(code), transfer_dependency)) {
-                        return std::nullopt;
                     }
+                    return true;
+                };
 
-                    for (codeT c : par_both.group_for(code)) {
-                        assert(done[c]);
+                for_each_code(code) {
+                    if (!has_val[code]) {
+                        for (codeT c : par_both.group_for(code)) {
+                            assert(!has_val[c]);
+                        }
+                        if (!transfer_dependency(code, 0, transfer_dependency)) {
+                            return {0};
+                        }
+                        for (codeT c : par_both.group_for(code)) {
+                            assert(has_val[c]);
+                        }
                     }
                 }
             }
-            assert(a.contains(subsetT{.mask{common_rule}, .eq{eq_both}}));
-            assert(b.contains(subsetT{.mask{common_rule}, .eq{eq_both}}));
-            return subsetT{.mask{common_rule}, .eq{eq_both}};
+
+            // TODO refine post check...
+            assert(a.includes({{common_rule}, eq_both}));
+            assert(b.includes({{common_rule}, eq_both}));
+            return {{common_rule}, eq_both};
         }
     };
 
@@ -813,7 +811,6 @@ namespace legacy {
             subsetT sb{mask_identity, mk(mp_dual)};
 
             auto sc = sa & sb;
-            assert(sc);
 
             // 2024/1/20 2AM
             // There is NO problem in the algorithm.
@@ -828,27 +825,28 @@ namespace legacy {
             };
 
             using enum codeT::bposE;
-            assert(sc->contains(copy_from(env_q)));
-            assert(sc->contains(copy_from(env_w)));
-            assert(sc->contains(copy_from(env_e)));
-            assert(sc->contains(copy_from(env_a)));
-            assert(!sc->contains(copy_from(env_s))); // identity rule doesn't belong to ignore_s.
-            assert(sc->contains(copy_from(env_d)));
-            assert(sc->contains(copy_from(env_z)));
-            assert(sc->contains(copy_from(env_x)));
-            assert(sc->contains(copy_from(env_c)));
+            assert(!sc.empty());
+            assert(sc.contains(copy_from(env_q)));
+            assert(sc.contains(copy_from(env_w)));
+            assert(sc.contains(copy_from(env_e)));
+            assert(sc.contains(copy_from(env_a)));
+            assert(!sc.contains(copy_from(env_s))); // identity rule doesn't belong to ignore_s.
+            assert(sc.contains(copy_from(env_d)));
+            assert(sc.contains(copy_from(env_z)));
+            assert(sc.contains(copy_from(env_x)));
+            assert(sc.contains(copy_from(env_c)));
 
-            return *sc;
+            return sc;
         } else {
             subsetT s0{mask_zero, mk(mp_refl_qsc)};
             subsetT s1{mask_zero, mk(mp_C4)};
             std::mt19937 rand;
-            s0.change_mask({s0.random_rule(10, rand)});
-            s1.change_mask({s1.random_rule(12, rand)});
+            // s0.change_mask({s0.random_rule(10, rand)});
+            // s1.change_mask({s1.random_rule(12, rand)});
 
             auto s2 = s0 & s1;
-            assert(s2);
-            return *s2;
+            assert(!s2.empty());
+            return s2;
         }
     }();
 } //  namespace legacy
