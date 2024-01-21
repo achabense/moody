@@ -463,11 +463,11 @@ namespace legacy {
     }
 
     inline bool any_locked(const lockT& locked, const groupT group) {
-        return std::any_of(group.begin(), group.end(), [&locked](codeT code) { return locked[code]; });
+        return std::ranges::any_of(group, [&locked](codeT code) { return locked[code]; });
     }
 
     inline bool all_locked(const lockT& locked, const groupT group) {
-        return std::all_of(group.begin(), group.end(), [&locked](codeT code) { return locked[code]; });
+        return std::ranges::all_of(group, [&locked](codeT code) { return locked[code]; });
     }
 
     // TODO: blindly applying enhance can lead to more inconsistent locked groups...
@@ -489,7 +489,7 @@ namespace legacy {
         for (int j = 0; j < par.k(); ++j) {
             const groupT group = par.jth_group(j);
             // TODO: should be scan-based... what if inconsistent?
-            const auto fnd = std::find_if(group.begin(), group.end(), [&locked](codeT code) { return locked[code]; });
+            const auto fnd = std::ranges::find_if(group, [&locked](codeT code) { return locked[code]; });
             if (fnd != group.end()) {
                 const bool b = r[*fnd];
                 for (codeT code : group) {
@@ -686,6 +686,8 @@ namespace legacy {
 namespace legacy {
     // TODO: quick way to decide that A & B -> {}?
 
+    // TODO: tag init/assign (empty set, whole set)
+
     // A subsetT defines a subset in ...[TODO; name]
     class subsetT {
         struct nonemptyT {
@@ -729,6 +731,9 @@ namespace legacy {
         // TODO... & lockT version...
         ruleT approximate(const ruleT& rule) const;
         ruleT redispatch(const ruleT& rule, auto fn) const;
+        // TODO: lockT is currently not a part of subsetT (but do take part in generation)
+        // Extension is possible - let subsetT be ...(TODO, detailed explanation)
+        bool can_approx(const ruleT& rule, const lockT& lock) const;
 
         // Prove that the intersection(&) of any two subsetT (a) and (b) is either an empty set or another subsetT.
         // 1. If (a & b) result in an empty set, it is a subsetT.
@@ -741,12 +746,11 @@ namespace legacy {
 
             const nonemptyT &a = a_.m_set, &b = b_.m_set;
 
-            // TODO: partitionT is expensive...
+            // TODO: add operator... for equivT...
             equivT eq_both = a.eq;
             eq_both.add_eq(b.eq);
-            partitionT par_a(a.eq), par_b(b.eq), par_both(eq_both);
 
-            // find a rule that is contained by both a and b...
+            // Find a rule that both a and b contains.
             ruleT common_rule{};
 
             if (a.contains(b.mask)) {
@@ -754,16 +758,18 @@ namespace legacy {
             } else if (b.contains(a.mask)) {
                 common_rule = a.mask;
             } else {
-                codeT::map_to<bool> has_val{};
+                // TODO: partitionT is expensive...
+                partitionT par_a(a.eq), par_b(b.eq), par_both(eq_both);
+                codeT::map_to<bool> assigned{};
 
-                auto transfer_dependency = [&](codeT code, bool v, auto& self) -> bool {
-                    if (has_val[code]) {
+                auto try_assign = [&](const codeT code, const bool v, auto& self) -> bool {
+                    if (assigned[code]) {
                         if (common_rule[code] != v) {
                             // TODO: explain why (when) this can happen
                             return false;
                         }
                     } else {
-                        has_val[code] = true;
+                        assigned[code] = true;
                         common_rule[code] = v;
                         const bool viewed_by_a = a.mask[code] ^ v;
                         const bool viewed_by_b = b.mask[code] ^ v;
@@ -783,21 +789,18 @@ namespace legacy {
                 };
 
                 for_each_code(code) {
-                    if (!has_val[code]) {
-                        for (codeT c : par_both.group_for(code)) {
-                            assert(!has_val[c]);
-                        }
-                        if (!transfer_dependency(code, 0, transfer_dependency)) {
+                    if (!assigned[code]) {
+                        assert(std::ranges::none_of(par_both.group_for(code), [&](codeT c) { return assigned[c]; }));
+                        if (!try_assign(code, 0, try_assign)) {
                             return {0};
                         }
-                        for (codeT c : par_both.group_for(code)) {
-                            assert(has_val[c]);
-                        }
+                        assert(std::ranges::all_of(par_both.group_for(code), [&](codeT c) { return assigned[c]; }));
                     }
                 }
             }
 
-            // TODO refine post check...
+            // TODO: is `try_assign -> true` really able to guarantee conflicts wont happen?
+            // (if not, still able to do the final check here, but not in the form of assertions...)
             assert(a.includes({{common_rule}, eq_both}));
             assert(b.includes({{common_rule}, eq_both}));
             return {{common_rule}, eq_both};

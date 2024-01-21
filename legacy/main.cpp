@@ -10,6 +10,13 @@
 
 // TODO: this is still not a suitable pos for these definitions...
 #ifndef TEMP_POS
+
+// TODO: explain...
+inline std::mt19937& global_mt19937() {
+    static std::mt19937 rand(time(0));
+    return rand;
+}
+
 // TODO: better name...
 // TODO: explain why float (there is no instant ImGui::SliderDouble)
 // (std::optional<uint32_t> has proven to be very awkward)
@@ -355,8 +362,7 @@ namespace legacy {
 
                 auto toggle_select = [&](termT_vec& terms, const char* label) {
                     if (ImGui::Button(label, sqr)) {
-                        const bool any_selected =
-                            std::any_of(terms.begin(), terms.end(), [](const termT& t) { return t.selected; });
+                        const bool any_selected = std::ranges::any_of(terms, &termT::selected);
                         for (termT& t : terms) {
                             t.selected = !any_selected;
                         }

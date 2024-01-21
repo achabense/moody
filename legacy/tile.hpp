@@ -7,13 +7,6 @@
 
 #include "rule.hpp"
 
-// TODO: together with tileT functions -> utils header...
-// TODO: explain...
-inline std::mt19937& global_mt19937() {
-    static std::mt19937 rand(time(0));
-    return rand;
-}
-
 namespace legacy {
     static_assert(INT_MAX >= INT32_MAX);
 
@@ -510,7 +503,9 @@ namespace legacy {
     namespace _misc::tests {
         inline const bool test_RLE_str = [] {
             tileT tile({.width = 32, .height = 60});
-            random_fill(tile, global_mt19937(), 0.5);
+            // TODO: better source of rand...
+            std::mt19937 rand{};
+            random_fill(tile, rand, 0.5);
             assert(tile == from_RLE_str(to_RLE_str(tile), tile.size()));
             return true;
         }();
