@@ -783,7 +783,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
             const int zoom = 7;
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 4));
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
-            for (int j = 0; j < par.k(); ++j) {
+            par.for_each_group([&](int j, const legacy::groupT& group) {
                 if (j % 8 != 0) {
                     ImGui::SameLine();
                 }
@@ -791,7 +791,6 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
                     ImGui::Separator(); // TODO: refine...
                 }
                 const bool inconsistent = scanlist[j].inconsistent();
-                const auto& group = par.jth_group(j);
                 const legacy::codeT head = group[0];
                 const bool has_lock = scanlist[j].any_locked();
 
@@ -860,7 +859,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
                     }
                     out = r;
                 }
-            }
+            });
             ImGui::PopStyleVar(2);
         }
     }

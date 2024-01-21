@@ -346,21 +346,31 @@ namespace legacy {
         // Con: harder to use...
         std::vector<group_pos> m_groups;
 
-    public:
-        int k() const { return m_k; }
+        // TODO: whether to expose index?
+        indexT index_for(codeT code) const { return m_p[code]; }
         groupT jth_group(indexT j) const {
             const auto [pos, size] = m_groups[j];
             return groupT(m_data.data() + pos, size);
         }
-
-        // TODO: whether to expose index?
-        indexT index_for(codeT code) const { return m_p[code]; }
-        groupT group_for(codeT code) const { return jth_group(index_for(code)); }
         // TODO: when is head for needed?
         // TODO: why not directly store a equivT?
         codeT head_for(codeT code) const {
             // group_for(code).front();
             return m_data[m_groups[index_for(code)].pos];
+        }
+
+    public:
+        groupT group_for(codeT code) const { return jth_group(index_for(code)); }
+
+        int k() const { return m_k; }
+        void for_each_group(auto fn) const {
+            for (int j = 0; j < m_k; ++j) {
+                if constexpr (requires { fn(jth_group(j)); }) {
+                    fn(jth_group(j));
+                } else {
+                    fn(j, jth_group(j));
+                }
+            }
         }
 
         explicit partitionT(const equivT& u) {
@@ -421,13 +431,13 @@ namespace legacy {
     }
 
     // TODO: (flip & copy) inline... or at least move elsewhere...
-    inline void flip(groupT group, ruleT& rule) {
+    inline void flip(const groupT& group, ruleT& rule) {
         for (codeT c : group) {
             rule[c] = !rule[c];
         }
     }
 
-    inline void copy(groupT group, const ruleT& source, ruleT& dest) {
+    inline void copy(const groupT& group, const ruleT& source, ruleT& dest) {
         for (codeT c : group) {
             dest[c] = source[c];
         }
@@ -450,44 +460,46 @@ namespace legacy {
         };
 
         std::vector<counterT> vec(par.k());
-        for (int j = 0; j < par.k(); ++j) {
-            for (codeT code : par.jth_group(j)) {
+        par.for_each_group([&](int j, const groupT& group) {
+            for (codeT code : group) {
                 if (locked[code]) {
                     rule[code] ? ++vec[j].locked_1 : ++vec[j].locked_0;
                 } else {
                     rule[code] ? ++vec[j].free_1 : ++vec[j].free_0;
                 }
             }
-        }
+        });
         return vec;
     }
 
-    inline bool any_locked(const lockT& locked, const groupT group) {
+    inline bool any_locked(const lockT& locked, const groupT& group) {
         return std::ranges::any_of(group, [&locked](codeT code) { return locked[code]; });
     }
 
-    inline bool all_locked(const lockT& locked, const groupT group) {
+    inline bool all_locked(const lockT& locked, const groupT& group) {
         return std::ranges::all_of(group, [&locked](codeT code) { return locked[code]; });
+    }
+
+    inline bool none_locked(const lockT& locked, const groupT& group) {
+        return std::ranges::none_of(group, [&locked](codeT code) { return locked[code]; });
     }
 
     // TODO: blindly applying enhance can lead to more inconsistent locked groups...
     inline void enhance(const partitionT& par, lockT& locked) {
-        for (int j = 0; j < par.k(); ++j) {
-            const groupT group = par.jth_group(j);
+        par.for_each_group([&](const groupT& group) {
             if (any_locked(locked, group)) {
-                for (const codeT code : group) {
+                for (codeT code : group) {
                     locked[code] = true;
                 }
             }
-        }
+        });
     }
 
     // TODO: explain...
     inline ruleT purify(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked) {
         // TODO: for locked code A and B, what if r[A] != r[B]?
         ruleT_masked r = mask ^ rule;
-        for (int j = 0; j < par.k(); ++j) {
-            const groupT group = par.jth_group(j);
+        par.for_each_group([&](const groupT& group) {
             // TODO: should be scan-based... what if inconsistent?
             const auto fnd = std::ranges::find_if(group, [&locked](codeT code) { return locked[code]; });
             if (fnd != group.end()) {
@@ -496,7 +508,7 @@ namespace legacy {
                     r[code] = b;
                 }
             }
-        }
+        });
         return mask ^ r;
     }
 
@@ -509,11 +521,11 @@ namespace legacy {
 
     inline int count_free(const partitionT& par, const lockT& locked) {
         int free = 0;
-        for (int j = 0; j < par.k(); ++j) {
-            if (!any_locked(locked, par.jth_group(j))) {
+        par.for_each_group([&](const groupT& group) {
+            if (none_locked(locked, group)) {
                 ++free;
             }
-        }
+        });
         return free;
     }
 
@@ -523,32 +535,31 @@ namespace legacy {
     inline ruleT redispatch(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked,
                             auto fn /*void(bool* begin, bool* end)*/) {
         // TODO: precondition?
-
         ruleT_masked r = mask ^ rule;
 
-        std::vector<int> free_indexes;
-        for (int j = 0; j < par.k(); ++j) {
-            if (!any_locked(locked, par.jth_group(j))) {
-                free_indexes.push_back(j);
-            }
-        }
-
-        // TODO: explain bools is not a map for ruleT...
-        // TODO: use other containers instead?
-        // TODO: are there better ways than using front?
+        // TODO: explain bools is not a codeT::map_to<bool>.
+        assert(par.k() <= 512);
         std::array<bool, 512> bools{};
-        for (int j = 0; j < free_indexes.size(); ++j) {
-            bools[j] = r[par.jth_group(free_indexes[j]).front()];
-        }
-
-        fn(bools.data(), bools.data() + free_indexes.size());
-
-        for (int j = 0; j < free_indexes.size(); ++j) {
-            // TODO: cannot suitably deal with inconsistent groups...
-            for (codeT code : par.jth_group(free_indexes[j])) {
-                r[code] = bools[j];
+        int z = 0;
+        par.for_each_group([&](const groupT& group) {
+            if (none_locked(locked, group)) {
+                bools[z] = r[group[0]];
+                ++z;
             }
-        }
+        });
+
+        fn(bools.data(), bools.data() + z);
+
+        z = 0;
+        par.for_each_group([&](const groupT& group) {
+            if (none_locked(locked, group)) {
+                for (codeT code : group) {
+                    r[code] = bools[z];
+                }
+                ++z;
+            }
+        });
+
         return mask ^ r;
     }
 
