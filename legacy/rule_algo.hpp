@@ -19,6 +19,7 @@ namespace legacy {
     // TODO: is it safe to define maskT this way?
     // TODO: explain the meaning of maskT_result (how is a rule different from maskT)...
 
+    // TODO: explain these types are defined only to avoid concept misuse...
     // A maskT is a special ruleT used to do XOR mask for other rules.
     struct maskT : public ruleT {};
     using ruleT_masked = codeT::map_to<bool>;
@@ -56,15 +57,36 @@ namespace legacy {
             }
         }
 
-        // TODO: const or not?
-        // headof?
-        codeT rootof(codeT c) const {
+        codeT headof(codeT c) const {
             if (parof[c] == c) {
                 return c;
             } else {
-                return parof[c] = rootof(parof[c]);
+                return parof[c] = headof(parof[c]);
             }
         }
+
+#if 1
+        // TODO: delete again if not useful...
+        // (these methods are all marked const as they do not change the meaning of the partition)
+        bool is_head(codeT c) const { return parof[c] == c; }
+        void as_head(codeT c) const {
+            const codeT head = headof(c);
+            if (head != c) {
+                parof[c] = c;
+                parof[head] = c;
+            }
+        }
+        void regulate() const {
+            codeT::map_to<bool> met{};
+            for_each_code(code) {
+                if (!met[headof(code)]) {
+                    as_head(code);
+                    assert(is_head(code));
+                    met[code] = true;
+                }
+            }
+        }
+#endif
 
         bool test(const ruleT_masked& r) const {
             for_each_code(code) {
@@ -76,14 +98,14 @@ namespace legacy {
         }
 
         // TODO: better names...
-        void add_eq(codeT a, codeT b) { parof[rootof(a)] = rootof(b); }
+        void add_eq(codeT a, codeT b) { parof[headof(a)] = headof(b); }
         void add_eq(const equivT& other) {
             for_each_code(code) {
                 add_eq(code, other.parof[code]);
             }
         }
 
-        bool has_eq(codeT a, codeT b) const { return rootof(a) == rootof(b); }
+        bool has_eq(codeT a, codeT b) const { return headof(a) == headof(b); }
         bool has_eq(const equivT& other) const {
             for_each_code(code) {
                 if (!has_eq(code, other.parof[code])) {
@@ -328,39 +350,26 @@ namespace legacy {
 
     using groupT = std::span<const codeT>;
 
-    // With full capacity...
     class partitionT {
         using indexT = int;
         codeT::map_to<indexT> m_p;
         int m_k;
 
-        // Though with size 512, m_data is not a map for codeT.
-        // Instead, it stores codeT of the same group consecutively.
-        // (In short, m_data[codeT] has no meaning related to codeT itself...)
+        // `m_data` is not a codeT::map_to<codeT>.
+        // It's for storing codeT of the same group consecutively.
         std::array<codeT, 512> m_data;
         struct group_pos {
             int pos, size;
         };
-        // TODO: there is std::sample; will be very convenient if storing directly...
-        // Pro: directly-copyable.
-        // Con: harder to use...
         std::vector<group_pos> m_groups;
 
-        // TODO: whether to expose index?
-        indexT index_for(codeT code) const { return m_p[code]; }
         groupT jth_group(indexT j) const {
             const auto [pos, size] = m_groups[j];
             return groupT(m_data.data() + pos, size);
         }
-        // TODO: when is head for needed?
-        // TODO: why not directly store a equivT?
-        codeT head_for(codeT code) const {
-            // group_for(code).front();
-            return m_data[m_groups[index_for(code)].pos];
-        }
 
     public:
-        groupT group_for(codeT code) const { return jth_group(index_for(code)); }
+        groupT group_for(codeT code) const { return jth_group(m_p[code]); }
 
         int k() const { return m_k; }
         void for_each_group(auto fn) const {
@@ -373,17 +382,19 @@ namespace legacy {
             }
         }
 
+        // TODO: optimize out the map...
         explicit partitionT(const equivT& u) {
             std::map<codeT, indexT> m;
             indexT i = 0;
             for_each_code(code) {
-                codeT head = u.rootof(code);
+                const codeT head = u.headof(code);
                 if (!m.contains(head)) {
                     m[head] = i++;
                 }
                 m_p[code] = m[head];
             }
 
+            assert(i == m.size());
             m_k = i;
 
             std::vector<int> count(m_k, 0);
@@ -406,27 +417,9 @@ namespace legacy {
                 m_data[pos[col]++] = code;
             }
         }
-        // TODO: Is this needed?
-        bool test(const ruleT_masked& r) const {
-            for_each_code(code) {
-                if (r[code] != r[head_for(code)]) {
-                    return false;
-                }
-            }
-            return true;
-        }
-        // TODO: is refinement checking needed for partitionT?
-        // TODO: refer to https://en.wikipedia.org/wiki/Partition_of_a_set#Refinement_of_partitions
     };
 
-    // TODO: outdated... should be replaced by subsetT utils finally...
-    inline bool satisfies(const ruleT& rule, const maskT& mask, const mapperT_pair& q) {
-        return q.test(mask ^ rule);
-    }
     inline bool satisfies(const ruleT& rule, const maskT& mask, const equivT& q) {
-        return q.test(mask ^ rule);
-    }
-    inline bool satisfies(const ruleT& rule, const maskT& mask, const partitionT& q) {
         return q.test(mask ^ rule);
     }
 
@@ -484,6 +477,16 @@ namespace legacy {
         return std::ranges::none_of(group, [&locked](codeT code) { return locked[code]; });
     }
 
+    inline int count_free(const partitionT& par, const lockT& locked) {
+        int free = 0;
+        par.for_each_group([&](const groupT& group) {
+            if (none_locked(locked, group)) {
+                ++free;
+            }
+        });
+        return free;
+    }
+
     // TODO: blindly applying enhance can lead to more inconsistent locked groups...
     inline void enhance(const partitionT& par, lockT& locked) {
         par.for_each_group([&](const groupT& group) {
@@ -518,16 +521,6 @@ namespace legacy {
     // TODO: the lockT will become meaningless on irrelevant rule switch (clipboard/file...)
 
     // TODO: should (lr/up/)mirror conversions modify locks as well?
-
-    inline int count_free(const partitionT& par, const lockT& locked) {
-        int free = 0;
-        par.for_each_group([&](const groupT& group) {
-            if (none_locked(locked, group)) {
-                ++free;
-            }
-        });
-        return free;
-    }
 
     // TODO: what's the best way to pass fn?
     // TODO: is `redispatch` a suitable name?
@@ -682,7 +675,7 @@ namespace legacy {
         record.fill(2);
         for_each_code(code) {
             if (locked[code]) {
-                int& rep = record[e.rootof(code)];
+                int& rep = record[e.headof(code)];
                 if (rep == 2) {
                     rep = r[code];
                 } else if (rep != r[code]) {
