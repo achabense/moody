@@ -29,17 +29,13 @@ namespace legacy {
 
     inline ruleT_masked operator^(const maskT& mask, const ruleT& rule) {
         ruleT_masked r{};
-        for_each_code(code) {
-            r[code] = mask[code] ^ rule[code];
-        }
+        for_each_code(code) { r[code] = mask[code] ^ rule[code]; }
         return r;
     }
 
     inline ruleT operator^(const maskT& mask, const ruleT_masked& r) {
         ruleT rule{};
-        for_each_code(code) {
-            rule[code] = mask[code] ^ r[code];
-        }
+        for_each_code(code) { rule[code] = mask[code] ^ r[code]; }
         return rule;
     }
 
@@ -52,9 +48,7 @@ namespace legacy {
     public:
         // TODO: how to clang-format to a single line?
         equivT() {
-            for_each_code(code) {
-                parof[code] = code;
-            }
+            for_each_code(code) { parof[code] = code; }
         }
 
         codeT headof(codeT c) const {
@@ -100,9 +94,7 @@ namespace legacy {
         // TODO: better names...
         void add_eq(codeT a, codeT b) { parof[headof(a)] = headof(b); }
         void add_eq(const equivT& other) {
-            for_each_code(code) {
-                add_eq(code, other.parof[code]);
-            }
+            for_each_code(code) { add_eq(code, other.parof[code]); }
         }
 
         bool has_eq(codeT a, codeT b) const { return headof(a) == headof(b); }
@@ -201,9 +193,7 @@ namespace legacy {
     };
 
     inline void add_eq(equivT& eq, const mapperT_pair& mp) {
-        for_each_code(code) {
-            eq.add_eq(mp.a(code), mp.b(code));
-        }
+        for_each_code(code) { eq.add_eq(mp.a(code), mp.b(code)); }
     }
 
     inline bool has_eq(const equivT& eq, const mapperT_pair& mp) {
@@ -223,9 +213,7 @@ namespace legacy {
         // rule ^ mask_identity -> TODO
         inline constexpr maskT mask_identity{[] {
             ruleT rule{};
-            for_each_code(code) {
-                rule[code] = get_s(code);
-            }
+            for_each_code(code) { rule[code] = get_s(code); }
             return rule;
         }()};
         // TODO: mask_copy_q/w/e/a/s(~mask_identity)/d/z/x/c etc?
@@ -419,7 +407,7 @@ namespace legacy {
         }
     };
 
-    inline bool satisfies(const ruleT& rule, const maskT& mask, const equivT& q) {
+    inline bool satisfies(const ruleT& rule, const maskT& mask, const equivT& q) { //
         return q.test(mask ^ rule);
     }
 
@@ -831,9 +819,7 @@ namespace legacy {
             // a certain direction...
             const auto copy_from = [](codeT::bposE bpos) {
                 ruleT rule{};
-                for_each_code(code) {
-                    rule[code] = get(code, bpos);
-                }
+                for_each_code(code) { rule[code] = get(code, bpos); }
                 return rule;
             };
 

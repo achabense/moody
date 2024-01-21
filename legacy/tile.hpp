@@ -22,7 +22,7 @@ namespace legacy {
         friend bool operator==(const posT&, const posT&) = default;
     };
 
-    inline posT as_pos(const rectT& size) {
+    inline posT as_pos(const rectT& size) { //
         return {.x = size.width, .y = size.height};
     }
 
@@ -391,7 +391,7 @@ namespace legacy {
         return str;
     }
 
-    inline std::string to_RLE_str(const tileT& tile) {
+    inline std::string to_RLE_str(const tileT& tile) { //
         return to_RLE_str(tile, {0, 0}, as_pos(tile.size()));
     }
 

@@ -37,7 +37,7 @@ inline std::string cpp17_u8string(const std::filesystem::path& p) {
 
 // Unlike ImGui::TextWrapped, doesn't take fmt str...
 // TODO: the name is awful...
-inline void imgui_str(std::string_view str) {
+inline void imgui_str(std::string_view str) { //
     ImGui::TextUnformatted(str.data(), str.data() + str.size());
 }
 
@@ -110,17 +110,11 @@ inline bool imgui_keypressed(ImGuiKey key, bool repeat) {
 
 // TODO: other mouse functions...
 // TODO: rename to _mouse_XXX?
-inline bool imgui_scrolling() {
-    return ImGui::GetIO().MouseWheel != 0;
-}
+inline bool imgui_scrolling() { return ImGui::GetIO().MouseWheel != 0; }
 
-inline bool imgui_scrolldown() {
-    return ImGui::GetIO().MouseWheel < 0;
-}
+inline bool imgui_scrolldown() { return ImGui::GetIO().MouseWheel < 0; }
 
-inline bool imgui_scrollup() {
-    return ImGui::GetIO().MouseWheel > 0;
-}
+inline bool imgui_scrollup() { return ImGui::GetIO().MouseWheel > 0; }
 
 struct [[nodiscard]] imgui_window {
     imgui_window(const imgui_window&) = delete;

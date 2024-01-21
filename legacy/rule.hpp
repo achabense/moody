@@ -62,20 +62,18 @@ namespace legacy {
         return {q, w, e, a, s, d, z, x, c};
     }
 
-    constexpr bool get(codeT code, codeT::bposE bpos) {
+    constexpr bool get(codeT code, codeT::bposE bpos) { //
         return (code >> bpos) & 1;
     }
 
-    constexpr bool get_s(codeT code) {
+    constexpr bool get_s(codeT code) { //
         return (code >> codeT::env_s) & 1;
     }
 
 #ifndef NDEBUG
     namespace _misc::tests {
         inline const bool test_codeT = [] {
-            for_each_code(code) {
-                assert(encode(decode(code)) == code);
-            }
+            for_each_code(code) { assert(encode(decode(code)) == code); }
             return true;
         }();
     } // namespace _misc::tests
@@ -130,16 +128,12 @@ namespace legacy {
         std::array<uint8_t, 64> bits; // as bitset.
     public:
         explicit compressT(const ruleT& rule) : bits{} {
-            for_each_code(code) {
-                bits[code / 8] |= rule[code] << (code % 8);
-            }
+            for_each_code(code) { bits[code / 8] |= rule[code] << (code % 8); }
         }
 
         /*implicit*/ operator ruleT() const {
             ruleT rule{};
-            for_each_code(code) {
-                rule[code] = (bits[code / 8] >> (code % 8)) & 1;
-            }
+            for_each_code(code) { rule[code] = (bits[code / 8] >> (code % 8)) & 1; }
             return rule;
         }
 
@@ -276,7 +270,7 @@ namespace legacy {
         return extract_rules(data.data(), data.data() + data.size());
     }
 
-    inline std::vector<compressT> extract_rules(const char* str) {
+    inline std::vector<compressT> extract_rules(const char* str) { //
         return extract_rules(str, str + strlen(str));
     }
 
