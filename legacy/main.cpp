@@ -216,7 +216,6 @@ inline void iter_pair(const char* tag_first, const char* tag_prev, const char* t
 
 // TODO: should not belong to namespace legacy...
 namespace legacy {
-    // TODO: (unfinished) forbid resulting in empty set (bool disabled...)
     // TODO: (unfinished) the mask in the rule_editor is currently invalidated...
     class subset_selector {
         subsetT current;
@@ -226,7 +225,8 @@ namespace legacy {
             subsetT set;
             bool selected = false;
             bool includes_cur = false;
-            const char* description = nullptr; // TODO...
+            bool disabled = false; // current & set -> empty.
+            const char* description = nullptr;
         };
 
         using termT_vec = std::vector<termT>;
@@ -238,6 +238,7 @@ namespace legacy {
         // TODO: customized...
 
         void reset_current() {
+            // TODO: add relation assertion between selected, includes_cur and disabled.
             current = subsetT::universalT{};
 
             for (termT_vec* terms : {&terms_ignore, &terms_native, &terms_misc, &terms_hex}) {
@@ -247,15 +248,25 @@ namespace legacy {
                     }
                 }
             }
+            assert(!current.empty());
+
             for (termT_vec* terms : {&terms_ignore, &terms_native, &terms_misc, &terms_hex}) {
                 for (termT& t : *terms) {
                     t.includes_cur = t.set.includes(current);
+                }
+            }
+            for (termT_vec* terms : {&terms_ignore, &terms_native, &terms_misc, &terms_hex}) {
+                for (termT& t : *terms) {
+                    // TODO: involves a lot of unneeded calculations...
+                    t.disabled = !t.includes_cur && (t.set & current).empty();
                 }
             }
         }
 
     public:
         subset_selector() : current(subsetT::universalT{}) {
+            // TODO: add more subsets (von, direct iso, etc)
+            // TODO: add some tests after the construction...
             const auto mk = [](std::initializer_list<mapperT> ms, const maskT& mask = mask_zero) {
                 equivT eq{};
                 for (const mapperT& m : ms) {
@@ -268,8 +279,8 @@ namespace legacy {
             terms_ignore.emplace_back("w", mk({mp_ignore_w}));
             terms_ignore.emplace_back("e", mk({mp_ignore_e}));
             terms_ignore.emplace_back("a", mk({mp_ignore_a}));
-            // Note that mask_identity, {mp_ignore_s} is sensible,
-            // but results in totally different subsets.
+
+            // TODO: add {mask_identity, {mp_ignore_s}}? it's sensible but totally different.
             terms_ignore.emplace_back("s", mk({mp_ignore_s}));
             terms_ignore.emplace_back("d", mk({mp_ignore_d}));
             terms_ignore.emplace_back("z", mk({mp_ignore_z}));
@@ -305,11 +316,11 @@ namespace legacy {
             terms_misc.emplace_back("Hex_Tot", mk({mp_hex_C6, mp_hex_tot_exc_s}));
             terms_misc.emplace_back("Hex_Tot(+s)", mk({mp_hex_C6, mp_hex_tot_inc_s}));
 
-            // reset_current(); TODO (temp) not needed...
+            reset_current();
         }
 
         const subsetT& select_subset(const ruleT& target, const lockT& locked) {
-            bool sel = false;
+            bool need_reset = false;
             const float r = ImGui::GetFrameHeight();
             const ImVec2 sqr{r, r};
 
@@ -323,7 +334,10 @@ namespace legacy {
                 // TODO: explain coloring scheme; redesign if necessary (especially ring col)
                 const ImU32 cen_col = term.selected       ? ImGui::GetColorU32(ImGuiCol_ButtonHovered)
                                       : term.includes_cur ? ImGui::GetColorU32(ImGuiCol_FrameBg)
+                                      : term.disabled     ? IM_COL32(150, 0, 0, 255)
                                                           : IM_COL32_BLACK;
+                // TODO: find better color for "disabled"... currently too ugly.
+
                 const ImU32 ring_col = term.set.contains(target)              ? IM_COL32(0, 255, 0, 255)
                                        : compatible(target, locked, term.set) ? IM_COL32(0, 100, 0, 255)
                                                                               : IM_COL32(100, 0, 0, 255);
@@ -332,18 +346,22 @@ namespace legacy {
                 ImGui::GetWindowDrawList()->AddRect(pos, pos_max, ring_col);
 
                 ImGui::PushID(id++);
-                const bool hit = ImGui::InvisibleButton("Check", size);
-                // TODO: this is in imgui_internal.h...
-                // TODO: Ask is it intentional to make InvisibleButton highlight-less?
-                // TODO: use normal buttons instead?
-                ImGui::RenderNavHighlight({ImGui::GetItemRectMin(), ImGui::GetItemRectMax()}, ImGui::GetItemID());
-                // ImGui::RenderNavHighlight({pos, pos_max}, ImGui::GetItemID()); TODO: is this correct?
-                ImGui::PopID();
-
-                if (hit) {
-                    term.selected = !term.selected;
-                    sel = true;
+                if (!term.disabled) {
+                    if (ImGui::InvisibleButton("Check", size)) {
+                        term.selected = !term.selected;
+                        // TODO: no need to reset if term.selected now and term.includes_cur...
+                        need_reset = true;
+                    }
+                    // TODO: this is in imgui_internal.h...
+                    // TODO: Ask is it intentional to make InvisibleButton highlight-less?
+                    // TODO: use normal buttons instead?
+                    ImGui::RenderNavHighlight({ImGui::GetItemRectMin(), ImGui::GetItemRectMax()}, ImGui::GetItemID());
+                    // ImGui::RenderNavHighlight({pos, pos_max}, ImGui::GetItemID()); TODO: is this correct?
+                } else {
+                    ImGui::Dummy(size);
                 }
+
+                ImGui::PopID();
             };
 
             // TODO: the layout is still horrible...
@@ -353,6 +371,8 @@ namespace legacy {
                 ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoHostExtendX;
 
             if (ImGui::BeginTable("Checklists", 2, flags_outer)) {
+                // TODO: (temp; to remove) there should instead be a single button to clear all selections...
+#if 0
                 auto clear_select = [&](termT_vec& terms, const char* label) {
                     if (ImGui::Button(label, sqr)) {
                         for (termT& t : terms) {
@@ -373,6 +393,7 @@ namespace legacy {
                         sel = true;
                     }
                 };
+#endif
 
                 auto checklist = [&](termT_vec& terms, const char* label) {
                     if (ImGui::BeginTable(label, terms.size(), flags_inner)) {
@@ -390,8 +411,8 @@ namespace legacy {
                     ImGui::TableNextRow();
                     ImGui::TableNextColumn();
                     imgui_str("Ignore");
-                    ImGui::SameLine();
-                    clear_select(terms_ignore, "c##Ignore");
+                    // ImGui::SameLine();
+                    // clear_select(terms_ignore, "c##Ignore");
 
                     ImGui::TableNextColumn();
                     if (ImGui::BeginTable("Checklist##Ignore", 1, flags_inner)) {
@@ -419,8 +440,8 @@ namespace legacy {
                     ImGui::TableNextRow();
                     ImGui::TableNextColumn();
                     imgui_str("Native");
-                    ImGui::SameLine();
-                    toggle_select(terms_native, "f##Native");
+                    // ImGui::SameLine();
+                    // toggle_select(terms_native, "f##Native");
 
                     ImGui::TableNextColumn();
                     checklist(terms_native, "Checklist##Native");
@@ -430,8 +451,8 @@ namespace legacy {
                     ImGui::TableNextRow();
                     ImGui::TableNextColumn();
                     imgui_str("Misc");
-                    ImGui::SameLine();
-                    clear_select(terms_misc, "c##Misc");
+                    // ImGui::SameLine();
+                    // clear_select(terms_misc, "c##Misc");
 
                     ImGui::TableNextColumn();
                     checklist(terms_misc, "Checklist##Misc");
@@ -443,8 +464,8 @@ namespace legacy {
                     imgui_str("qw-    q w\n"
                               "asd ~ a s d\n"
                               "-xc    x c");
-                    ImGui::SameLine();
-                    toggle_select(terms_hex, "f##Hex");
+                    // ImGui::SameLine();
+                    // toggle_select(terms_hex, "f##Hex");
 
                     ImGui::TableNextColumn();
                     checklist(terms_hex, "Checklist##Hex");
@@ -453,7 +474,7 @@ namespace legacy {
                 ImGui::EndTable();
             }
 
-            if (sel) {
+            if (need_reset) {
                 reset_current();
             }
             return current;
