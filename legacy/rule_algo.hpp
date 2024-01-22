@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <random>
 #include <span>
 
@@ -29,14 +30,12 @@ namespace legacy {
         return rule;
     }
 
-    // Union-find set for the partition of all codeT ({0...511}).
-    // (Lacks the ability to efficiently list groups)
-    // TODO: merge equivT and partitionT into a single class if possible...
+    // TODO: rephrase...
+    // Equivalence relation for codeT ({0...511}), in the form of union-find set.
     class equivT {
         mutable codeT::map_to<codeT> parof;
 
     public:
-        // TODO: how to clang-format to a single line?
         equivT() {
             for_each_code(code) { parof[code] = code; }
         }
@@ -48,29 +47,6 @@ namespace legacy {
                 return parof[c] = headof(parof[c]);
             }
         }
-
-#if 0
-        // TODO: delete again if not useful...
-        // (these methods are all marked const as they do not change the meaning of the partition)
-        bool is_head(codeT c) const { return parof[c] == c; }
-        void as_head(codeT c) const {
-            const codeT head = headof(c);
-            if (head != c) {
-                parof[c] = c;
-                parof[head] = c;
-            }
-        }
-        void regulate() const {
-            codeT::map_to<bool> met{};
-            for_each_code(code) {
-                if (!met[headof(code)]) {
-                    as_head(code);
-                    assert(is_head(code));
-                    met[code] = true;
-                }
-            }
-        }
-#endif
 
         bool test(const ruleT_masked& r) const {
             for_each_code(code) {
@@ -96,20 +72,13 @@ namespace legacy {
             }
             return true;
         }
-
-        // TODO: refinement is more of a concept when talking about "partition"...
-        bool is_refinement_of(const equivT& other) const { return other.has_eq(*this); }
-
-        friend equivT operator|(const equivT& a, const equivT& b) {
-            equivT ab = a;
-            ab.add_eq(b);
-            return ab;
-        }
     };
 
     using groupT = std::span<const codeT>;
 
     class partitionT {
+        equivT m_eq;
+
         // TODO: explain more naturally...
         // Map codeT to [j: its group is the jth one] encountered during the `for_each_code` scan.
         codeT::map_to<int> m_map;
@@ -142,7 +111,7 @@ namespace legacy {
             }
         }
 
-        explicit partitionT(const equivT& u) {
+        /*implicit*/ partitionT(const equivT& u) : m_eq(u) {
             m_k = 0;
 
             codeT::map_to<int> m;
@@ -176,77 +145,81 @@ namespace legacy {
                 m_data[pos[j]++] = code;
             }
         }
+
+        // TODO: expose m_eq for `compatible`; drop this dependence when convenient...
+        const equivT& get_eq() const { return m_eq; }
+        bool test(const ruleT_masked& r) const { return m_eq.test(r); }
+        bool is_refinement_of(const partitionT& other) const { return other.m_eq.has_eq(m_eq); }
+
+        friend partitionT operator|(const partitionT& a, const partitionT& b) {
+            equivT ab = a.m_eq;
+            ab.add_eq(b.m_eq);
+            return partitionT(ab);
+        }
     };
 
-    // A subsetT defines a subset in ...[TODO; name]
+    // A subsetT defines a subset all possible ruleT.
     // TODO: lockT is currently not a part of subsetT (but do take part in generation)
     // Extension is possible - let subsetT be ...(TODO, detailed explanation)
     class subsetT {
         struct nonemptyT {
             maskT mask;
-            equivT eq;
+            partitionT par;
 
-            bool contains(const ruleT& rule) const { return eq.test(mask ^ rule); }
+            bool contains(const ruleT& rule) const { return par.test(mask ^ rule); }
             bool includes(const nonemptyT& other) const {
-                return contains(other.mask) && eq.is_refinement_of(other.eq);
+                return contains(other.mask) && par.is_refinement_of(other.par);
             }
         };
 
-        bool m_empty;
-        nonemptyT m_set;
+        std::optional<nonemptyT> m_set;
 
     public:
-        subsetT(const maskT& mask, const equivT& eq) : m_empty{false}, m_set{mask, eq} {}
+        subsetT(const maskT& mask, const equivT& eq) { m_set.emplace(mask, eq); }
+        subsetT(const maskT& mask, const partitionT& par) { m_set.emplace(mask, par); }
 
+        // TODO: replace with static ctor... static subsetT XXX();
         struct emptyT {};
-        subsetT(emptyT) : m_empty{true} {}
+        subsetT(emptyT) {}
         struct universalT {};
-        subsetT(universalT) : m_empty{false}, m_set{.mask{}, .eq{}} {}
+        subsetT(universalT) : subsetT(maskT{}, equivT{}) {}
 
-        bool empty() const { return m_empty; }
-        bool contains(const ruleT& rule) const { return !m_empty && m_set.contains(rule); }
-        bool includes(const subsetT& other) const { return other.m_empty || (!m_empty && m_set.includes(other.m_set)); }
+        bool empty() const { return !m_set.has_value(); }
+        bool contains(const ruleT& rule) const { return m_set && m_set->contains(rule); }
+        bool includes(const subsetT& other) const { return other.empty() || (m_set && m_set->includes(*other.m_set)); }
         bool equals(const subsetT& other) const { return includes(other) && other.includes(*this); }
 
+        // TODO: is !empty() precond or runtime-error?
         const maskT& get_mask() const {
-            if (m_empty) {
-                // ???
-            }
-            return m_set.mask;
+            assert(!empty());
+            return m_set->mask;
         }
-
-        void change_mask(const maskT& mask) {
-            if (!contains(mask)) {
-                // ???
-            }
-            m_set.mask = mask;
+        const partitionT& get_par() const {
+            assert(!empty());
+            return m_set->par;
         }
 
         // Prove that the intersection(&) of any two subsetT (a) and (b) is either an empty set or another subsetT.
         // 1. If (a & b) result in an empty set, it is a subsetT.
         // 2. Otherwise, there is at least a rule (r) in (a & b).
-        // TODO... finish the proof... (need to add detailed explanation for equivT...)
+        // TODO... finish the proof...
         friend subsetT operator&(const subsetT& a_, const subsetT& b_) {
-            if (a_.m_empty || b_.m_empty) {
-                return emptyT{};
+            if (a_.empty() || b_.empty()) {
+                return {emptyT{}};
             }
 
-            const nonemptyT &a = a_.m_set, &b = b_.m_set;
-            equivT eq_both = a.eq | b.eq;
+            const nonemptyT &a = *a_.m_set, &b = *b_.m_set;
+            partitionT par_both = a.par | b.par;
 
             if (a.contains(b.mask)) {
-                return {b.mask, eq_both};
+                return {b.mask, par_both};
             } else if (b.contains(a.mask)) {
-                return {a.mask, eq_both};
+                return {a.mask, par_both};
             }
 
             // Look for a rule that both a and b contains.
             ruleT common_rule{};
             codeT::map_to<bool> assigned{};
-
-            // TODO: avoid partitionT if possible...
-            const partitionT par_a(a.eq), par_b(b.eq);
-            [[maybe_unused]] const partitionT par_both(eq_both);
 
             // TODO: explain try-assign will result a correct rule iff a & b != {}.
             // TODO: analyze complexity...
@@ -256,10 +229,10 @@ namespace legacy {
                     common_rule[code] = v;
                     const bool masked_by_a = a.mask[code] ^ v;
                     const bool masked_by_b = b.mask[code] ^ v;
-                    for (const codeT c : par_a.group_for(code)) {
+                    for (const codeT c : a.par.group_for(code)) {
                         self(c, a.mask[c] ^ masked_by_a, self);
                     }
-                    for (const codeT c : par_b.group_for(code)) {
+                    for (const codeT c : b.par.group_for(code)) {
                         self(c, b.mask[c] ^ masked_by_b, self);
                     }
                 }
@@ -274,15 +247,11 @@ namespace legacy {
             }
 
             if (!a.contains(common_rule) || !b.contains(common_rule)) {
-                return emptyT{};
+                return {emptyT{}};
             }
-            return {{common_rule}, eq_both};
+            return {{common_rule}, par_both};
         }
     };
-
-    inline bool satisfies(const ruleT& rule, const maskT& mask, const equivT& q) { //
-        return q.test(mask ^ rule);
-    }
 
     // TODO: (flip & copy) inline... or at least move elsewhere...
     inline void flip(const groupT& group, ruleT& rule) {
@@ -361,10 +330,10 @@ namespace legacy {
 
     // TODO: explain...
     // TODO: stricter version...
-    inline ruleT purify(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked) {
+    inline ruleT purify(const subsetT& subset, const ruleT& rule, const lockT& locked) {
         // TODO: for locked code A and B, what if r[A] != r[B]?
-        ruleT_masked r = mask ^ rule;
-        par.for_each_group([&](const groupT& group) {
+        ruleT_masked r = subset.get_mask() ^ rule;
+        subset.get_par().for_each_group([&](const groupT& group) {
             // TODO: should be scan-based... what if inconsistent?
             const auto fnd = std::ranges::find_if(group, [&locked](codeT code) { return locked[code]; });
             if (fnd != group.end()) {
@@ -374,7 +343,7 @@ namespace legacy {
                 }
             }
         });
-        return mask ^ r;
+        return subset.get_mask() ^ r;
     }
 
     // TODO: the lockT will become meaningless on irrelevant rule switch (clipboard/file...)
@@ -384,16 +353,16 @@ namespace legacy {
     // TODO: what's the best way to pass fn?
     // TODO: is `redispatch` a suitable name?
     // TODO: whether to skip/allow inconsistent groups?
-    inline ruleT redispatch(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked,
+    inline ruleT redispatch(const subsetT& subset, const ruleT& rule, const lockT& locked,
                             auto fn /*void(bool* begin, bool* end)*/) {
         // TODO: precondition?
-        ruleT_masked r = mask ^ rule;
+        ruleT_masked r = subset.get_mask() ^ rule;
 
         // TODO: explain bools is not a codeT::map_to<bool>.
-        assert(par.k() <= 512);
+        assert(subset.get_par().k() <= 512);
         std::array<bool, 512> bools{};
         int z = 0;
-        par.for_each_group([&](const groupT& group) {
+        subset.get_par().for_each_group([&](const groupT& group) {
             if (none_locked(locked, group)) {
                 bools[z] = r[group[0]];
                 ++z;
@@ -403,7 +372,7 @@ namespace legacy {
         fn(bools.data(), bools.data() + z);
 
         z = 0;
-        par.for_each_group([&](const groupT& group) {
+        subset.get_par().for_each_group([&](const groupT& group) {
             if (none_locked(locked, group)) {
                 for (codeT code : group) {
                     r[code] = bools[z];
@@ -412,15 +381,14 @@ namespace legacy {
             }
         });
 
-        return mask ^ r;
+        return subset.get_mask() ^ r;
     }
 
     // TODO: count_min denotes free groups now; whether to switch to total groups (at least in the gui part)?
-    inline ruleT randomize(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked,
-                           std::mt19937& rand, int count_min,
-                           int count_max /* not used, subject to future extension */) {
+    inline ruleT randomize(const subsetT& subset, const ruleT& rule, const lockT& locked, std::mt19937& rand,
+                           int count_min, int count_max /* not used, subject to future extension */) {
         assert(count_max == count_min);
-        return redispatch(mask, par, rule, locked, [&rand, count_min](bool* begin, bool* end) {
+        return redispatch(subset, rule, locked, [&rand, count_min](bool* begin, bool* end) {
             int c = std::clamp(count_min, 0, int(end - begin));
             std::fill(begin, end, 0);
             std::fill_n(begin, c, 1);
@@ -428,24 +396,23 @@ namespace legacy {
         });
     }
 
-    inline ruleT shuffle(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked,
-                         std::mt19937& rand) {
-        return redispatch(mask, par, rule, locked, [&rand](bool* begin, bool* end) { std::shuffle(begin, end, rand); });
+    inline ruleT shuffle(const subsetT& subset, const ruleT& rule, const lockT& locked, std::mt19937& rand) {
+        return redispatch(subset, rule, locked, [&rand](bool* begin, bool* end) { std::shuffle(begin, end, rand); });
     }
 
     // TODO: rename to [set_]first / ...
     struct act_int {
         // TODO: disable !par.test(...) checks...
-        static ruleT first(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked) {
-            return redispatch(mask, par, rule, locked, [](bool* begin, bool* end) { std::fill(begin, end, 0); });
+        static ruleT first(const subsetT& subset, const ruleT& rule, const lockT& locked) {
+            return redispatch(subset, rule, locked, [](bool* begin, bool* end) { std::fill(begin, end, 0); });
         }
 
-        static ruleT last(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked) {
-            return redispatch(mask, par, rule, locked, [](bool* begin, bool* end) { std::fill(begin, end, 1); });
+        static ruleT last(const subsetT& subset, const ruleT& rule, const lockT& locked) {
+            return redispatch(subset, rule, locked, [](bool* begin, bool* end) { std::fill(begin, end, 1); });
         }
 
-        static ruleT next(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked) {
-            return redispatch(mask, par, rule, locked, [](bool* begin, bool* end) {
+        static ruleT next(const subsetT& subset, const ruleT& rule, const lockT& locked) {
+            return redispatch(subset, rule, locked, [](bool* begin, bool* end) {
                 // 11...0 -> 00...1; stop at 111...1 (last())
                 bool* first_0 = std::find(begin, end, 0);
                 if (first_0 != end) {
@@ -455,8 +422,8 @@ namespace legacy {
             });
         }
 
-        static ruleT prev(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked) {
-            return redispatch(mask, par, rule, locked, [](bool* begin, bool* end) {
+        static ruleT prev(const subsetT& subset, const ruleT& rule, const lockT& locked) {
+            return redispatch(subset, rule, locked, [](bool* begin, bool* end) {
                 // 00...1 -> 11...0; stop at 000...0 (first())
                 bool* first_1 = std::find(begin, end, 1);
                 if (first_1 != end) {
@@ -472,24 +439,24 @@ namespace legacy {
     // (TODO: rephrase) As to CTAD vs make_XXX..., here is pitfall for using std::reverse_iterator directly.
     // https://quuxplusone.github.io/blog/2022/08/02/reverse-iterator-ctad/
     struct act_perm {
-        static ruleT first(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked) {
-            return redispatch(mask, par, rule, locked, [](bool* begin, bool* end) {
+        static ruleT first(const subsetT& subset, const ruleT& rule, const lockT& locked) {
+            return redispatch(subset, rule, locked, [](bool* begin, bool* end) {
                 int c = std::count(begin, end, 1);
                 std::fill(begin, end, 0);
                 std::fill_n(begin, c, 1);
             });
         }
 
-        static ruleT last(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked) {
-            return redispatch(mask, par, rule, locked, [](bool* begin, bool* end) {
+        static ruleT last(const subsetT& subset, const ruleT& rule, const lockT& locked) {
+            return redispatch(subset, rule, locked, [](bool* begin, bool* end) {
                 int c = std::count(begin, end, 1);
                 std::fill(begin, end, 0);
                 std::fill_n(end - c, c, 1);
             });
         }
 
-        static ruleT next(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked) {
-            return redispatch(mask, par, rule, locked, [](bool* begin, bool* end) {
+        static ruleT next(const subsetT& subset, const ruleT& rule, const lockT& locked) {
+            return redispatch(subset, rule, locked, [](bool* begin, bool* end) {
                 // Stop at 000...111 (last())
                 if (std::find(std::find(begin, end, 1), end, 0) == end) {
                     return;
@@ -499,8 +466,8 @@ namespace legacy {
             });
         }
 
-        static ruleT prev(const maskT& mask, const partitionT& par, const ruleT& rule, const lockT& locked) {
-            return redispatch(mask, par, rule, locked, [](bool* begin, bool* end) {
+        static ruleT prev(const subsetT& subset, const ruleT& rule, const lockT& locked) {
+            return redispatch(subset, rule, locked, [](bool* begin, bool* end) {
                 // Stop at 111...000 (first())
                 if (std::find(std::find(begin, end, 0), end, 1) == end) {
                     return;
@@ -528,13 +495,17 @@ namespace legacy {
         return mir;
     }
 
-    inline bool satisfies(const ruleT& rule, const lockT& locked, const maskT& mask, const equivT& e) {
-        const ruleT_masked r = mask ^ rule;
+    // TODO: this is tightly related to subsetT (lock adoption)
+    // redesign related parts...
+    inline bool compatible(const ruleT& rule, const lockT& locked, const subsetT& subset) {
+        const ruleT_masked r = subset.get_mask() ^ rule;
         codeT::map_to<int> record;
         record.fill(2);
+
+        const equivT& eq = subset.get_par().get_eq();
         for_each_code(code) {
             if (locked[code]) {
-                int& rep = record[e.headof(code)];
+                int& rep = record[eq.headof(code)];
                 if (rep == 2) {
                     rep = r[code];
                 } else if (rep != r[code]) {

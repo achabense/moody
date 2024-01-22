@@ -216,13 +216,17 @@ inline void iter_pair(const char* tag_first, const char* tag_prev, const char* t
 
 // TODO: should not belong to namespace legacy...
 namespace legacy {
-    // TODO: refine analyzer...
-    class partition_collection {
+    // TODO: (unfinished) forbid resulting in empty set (bool disabled...)
+    // TODO: (unfinished) the mask in the rule_editor is currently invalidated...
+    class subset_selector {
+        subsetT current;
+
         struct termT {
             const char* title;
-            equivT eq;
+            subsetT set;
             bool selected = false;
-            bool covered = false;
+            bool includes_cur = false;
+            const char* description = nullptr; // TODO...
         };
 
         using termT_vec = std::vector<termT>;
@@ -233,39 +237,39 @@ namespace legacy {
         termT_vec terms_hex;
         // TODO: customized...
 
-        std::optional<partitionT> par;
+        void reset_current() {
+            current = subsetT::universalT{};
 
-        void reset_par() {
-            equivT q{};
             for (termT_vec* terms : {&terms_ignore, &terms_native, &terms_misc, &terms_hex}) {
                 for (termT& t : *terms) {
                     if (t.selected) {
-                        q.add_eq(t.eq);
+                        current = current & t.set;
                     }
                 }
             }
             for (termT_vec* terms : {&terms_ignore, &terms_native, &terms_misc, &terms_hex}) {
                 for (termT& t : *terms) {
-                    t.covered = q.has_eq(t.eq);
+                    t.includes_cur = t.set.includes(current);
                 }
             }
-            par.emplace(q);
         }
 
     public:
-        partition_collection() {
-            const auto mk = [](std::initializer_list<mapperT> ms) {
+        subset_selector() : current(subsetT::universalT{}) {
+            const auto mk = [](std::initializer_list<mapperT> ms, const maskT& mask = mask_zero) {
                 equivT eq{};
                 for (const mapperT& m : ms) {
                     add_eq(eq, {mp_identity, m});
                 }
-                return eq;
+                return subsetT{mask, eq};
             };
 
             terms_ignore.emplace_back("q", mk({mp_ignore_q}));
             terms_ignore.emplace_back("w", mk({mp_ignore_w}));
             terms_ignore.emplace_back("e", mk({mp_ignore_e}));
             terms_ignore.emplace_back("a", mk({mp_ignore_a}));
+            // Note that mask_identity, {mp_ignore_s} is sensible,
+            // but results in totally different subsets.
             terms_ignore.emplace_back("s", mk({mp_ignore_s}));
             terms_ignore.emplace_back("d", mk({mp_ignore_d}));
             terms_ignore.emplace_back("z", mk({mp_ignore_z}));
@@ -282,7 +286,8 @@ namespace legacy {
             terms_misc.emplace_back("'C8'", mk({mp_C8}));
             terms_misc.emplace_back("Tot", mk({mp_C8, mp_tot_exc_s}));
             terms_misc.emplace_back("Tot(+s)", mk({mp_C8, mp_tot_inc_s}));
-            terms_misc.emplace_back("Dual", mk({mp_dual}));
+
+            terms_misc.emplace_back("Dual", mk({mp_dual}, mask_identity)); // <-------
 
             terms_hex.emplace_back("Hex", mk({mp_hex_ignore}));
             terms_hex.emplace_back("a-d", mk({mp_hex_refl_asd}));
@@ -300,10 +305,10 @@ namespace legacy {
             terms_misc.emplace_back("Hex_Tot", mk({mp_hex_C6, mp_hex_tot_exc_s}));
             terms_misc.emplace_back("Hex_Tot(+s)", mk({mp_hex_C6, mp_hex_tot_inc_s}));
 
-            reset_par();
+            // reset_current(); TODO (temp) not needed...
         }
 
-        const partitionT& select_par(const ruleT& target, const lockT& locked) {
+        const subsetT& select_subset(const ruleT& target, const lockT& locked) {
             bool sel = false;
             const float r = ImGui::GetFrameHeight();
             const ImVec2 sqr{r, r};
@@ -316,13 +321,12 @@ namespace legacy {
                 const ImVec2 pos_max = pos + size;
                 // TODO: add size assertion? (size>8 etc)
                 // TODO: explain coloring scheme; redesign if necessary (especially ring col)
-                const ImU32 cen_col = term.selected  ? ImGui::GetColorU32(ImGuiCol_ButtonHovered)
-                                      : term.covered ? ImGui::GetColorU32(ImGuiCol_FrameBg)
-                                                     : IM_COL32_BLACK;
-                const ImU32 ring_col = satisfies(target, mask_zero, term.eq) ? IM_COL32(0, 255, 0, 255)
-                                       : satisfies(target, locked, mask_zero, term.eq)
-                                           ? IM_COL32(0, 100, 0, 255)
-                                           : ImGui::GetColorU32(ImGuiCol_Button);
+                const ImU32 cen_col = term.selected       ? ImGui::GetColorU32(ImGuiCol_ButtonHovered)
+                                      : term.includes_cur ? ImGui::GetColorU32(ImGuiCol_FrameBg)
+                                                          : IM_COL32_BLACK;
+                const ImU32 ring_col = term.set.contains(target)              ? IM_COL32(0, 255, 0, 255)
+                                       : compatible(target, locked, term.set) ? IM_COL32(0, 100, 0, 255)
+                                                                              : IM_COL32(100, 0, 0, 255);
 
                 ImGui::GetWindowDrawList()->AddRectFilled(pos + ImVec2(4, 4), pos_max - ImVec2(4, 4), cen_col);
                 ImGui::GetWindowDrawList()->AddRect(pos, pos_max, ring_col);
@@ -450,9 +454,9 @@ namespace legacy {
             }
 
             if (sel) {
-                reset_par();
+                reset_current();
             }
-            return *par;
+            return current;
         }
     };
 } // namespace legacy
@@ -629,13 +633,14 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
         temp_lock.reset();
     }
 
-    // TODO: rename...
-    static legacy::partition_collection parcol;
-    const auto& par = parcol.select_par(target, locked);
+    static legacy::subset_selector selector;
+    const legacy::subsetT& subset = selector.select_subset(target, locked);
+    assert(!subset.empty());
+    const legacy::partitionT& par = subset.get_par();
 
     ImGui::Separator();
 
-    // TODO: mask should no longer take part in subset definition...
+    // TODO: redesign this section...
     // TODO: add more selections...
     // TODO: enable testing masking rule instead of target rule when hovered...
     static legacy::maskT mask_custom{{}};
@@ -695,26 +700,26 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
         ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
         // TODO: better to have a prev button for randomize...
         if (imgui_enterbutton("Randomize")) {
-            out = legacy::randomize(mask, par, target, locked, global_mt19937(), rcount, rcount);
+            out = legacy::randomize(subset, target, locked, global_mt19937(), rcount, rcount);
         }
         ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
         if (imgui_enterbutton("Shuffle")) {
-            out = legacy::shuffle(mask, par, target, locked, global_mt19937());
+            out = legacy::shuffle(subset, target, locked, global_mt19937());
         }
 
         iter_pair(
             "<00..", "dec", "inc", "11..>", //
-            [&] { out = legacy::act_int::first(mask, par, target, locked); },
-            [&] { out = legacy::act_int::prev(mask, par, target, locked); },
-            [&] { out = legacy::act_int::next(mask, par, target, locked); },
-            [&] { out = legacy::act_int::last(mask, par, target, locked); });
+            [&] { out = legacy::act_int::first(subset, target, locked); },
+            [&] { out = legacy::act_int::prev(subset, target, locked); },
+            [&] { out = legacy::act_int::next(subset, target, locked); },
+            [&] { out = legacy::act_int::last(subset, target, locked); });
         ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
         iter_pair(
             "<1.0.", "pprev", "pnext", "0.1.>", //
-            [&] { out = legacy::act_perm::first(mask, par, target, locked); },
-            [&] { out = legacy::act_perm::prev(mask, par, target, locked); },
-            [&] { out = legacy::act_perm::next(mask, par, target, locked); },
-            [&] { out = legacy::act_perm::last(mask, par, target, locked); });
+            [&] { out = legacy::act_perm::first(subset, target, locked); },
+            [&] { out = legacy::act_perm::prev(subset, target, locked); },
+            [&] { out = legacy::act_perm::next(subset, target, locked); },
+            [&] { out = legacy::act_perm::last(subset, target, locked); });
         ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
         // TODO: should mirror also relocate locks?
         if (ImGui::Button("Mir")) {
@@ -733,13 +738,13 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
         }
         ImGui::SameLine();
         if (ImGui::Button("Purify")) {
-            out = legacy::purify(mask, par, target, locked);
+            out = legacy::purify(subset, target, locked);
         }
         // TODO: purify -> enhance != enhance -> purify...
         // TODO: problematic: enhance can lead to more inconsistent groups...
         ImGui::SameLine();
         if (ImGui::Button("Purify -> Enhance")) {
-            out = legacy::purify(mask, par, target, locked);
+            out = legacy::purify(subset, target, locked);
             legacy::enhance(par, locked);
         }
     }
