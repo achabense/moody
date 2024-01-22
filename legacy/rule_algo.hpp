@@ -178,6 +178,108 @@ namespace legacy {
         }
     };
 
+    // A subsetT defines a subset in ...[TODO; name]
+    // TODO: lockT is currently not a part of subsetT (but do take part in generation)
+    // Extension is possible - let subsetT be ...(TODO, detailed explanation)
+    class subsetT {
+        struct nonemptyT {
+            maskT mask;
+            equivT eq;
+
+            bool contains(const ruleT& rule) const { return eq.test(mask ^ rule); }
+            bool includes(const nonemptyT& other) const {
+                return contains(other.mask) && eq.is_refinement_of(other.eq);
+            }
+        };
+
+        bool m_empty;
+        nonemptyT m_set;
+
+    public:
+        subsetT(const maskT& mask, const equivT& eq) : m_empty{false}, m_set{mask, eq} {}
+
+        struct emptyT {};
+        subsetT(emptyT) : m_empty{true} {}
+        struct universalT {};
+        subsetT(universalT) : m_empty{false}, m_set{.mask{}, .eq{}} {}
+
+        bool empty() const { return m_empty; }
+        bool contains(const ruleT& rule) const { return !m_empty && m_set.contains(rule); }
+        bool includes(const subsetT& other) const { return other.m_empty || (!m_empty && m_set.includes(other.m_set)); }
+        bool equals(const subsetT& other) const { return includes(other) && other.includes(*this); }
+
+        const maskT& get_mask() const {
+            if (m_empty) {
+                // ???
+            }
+            return m_set.mask;
+        }
+
+        void change_mask(const maskT& mask) {
+            if (!contains(mask)) {
+                // ???
+            }
+            m_set.mask = mask;
+        }
+
+        // Prove that the intersection(&) of any two subsetT (a) and (b) is either an empty set or another subsetT.
+        // 1. If (a & b) result in an empty set, it is a subsetT.
+        // 2. Otherwise, there is at least a rule (r) in (a & b).
+        // TODO... finish the proof... (need to add detailed explanation for equivT...)
+        friend subsetT operator&(const subsetT& a_, const subsetT& b_) {
+            if (a_.m_empty || b_.m_empty) {
+                return emptyT{};
+            }
+
+            const nonemptyT &a = a_.m_set, &b = b_.m_set;
+            equivT eq_both = a.eq | b.eq;
+
+            if (a.contains(b.mask)) {
+                return {b.mask, eq_both};
+            } else if (b.contains(a.mask)) {
+                return {a.mask, eq_both};
+            }
+
+            // Look for a rule that both a and b contains.
+            ruleT common_rule{};
+            codeT::map_to<bool> assigned{};
+
+            // TODO: avoid partitionT if possible...
+            const partitionT par_a(a.eq), par_b(b.eq);
+            [[maybe_unused]] const partitionT par_both(eq_both);
+
+            // TODO: explain try-assign will result a correct rule iff a & b != {}.
+            // TODO: analyze complexity...
+            auto try_assign = [&](const codeT code, const bool v, auto& self) -> void {
+                if (!assigned[code]) {
+                    assigned[code] = true;
+                    common_rule[code] = v;
+                    const bool masked_by_a = a.mask[code] ^ v;
+                    const bool masked_by_b = b.mask[code] ^ v;
+                    for (const codeT c : par_a.group_for(code)) {
+                        self(c, a.mask[c] ^ masked_by_a, self);
+                    }
+                    for (const codeT c : par_b.group_for(code)) {
+                        self(c, b.mask[c] ^ masked_by_b, self);
+                    }
+                }
+            };
+
+            for_each_code(code) {
+                if (!assigned[code]) {
+                    assert(std::ranges::none_of(par_both.group_for(code), [&](codeT c) { return assigned[c]; }));
+                    try_assign(code, 0, try_assign);
+                    assert(std::ranges::all_of(par_both.group_for(code), [&](codeT c) { return assigned[c]; }));
+                }
+            }
+
+            if (!a.contains(common_rule) || !b.contains(common_rule)) {
+                return emptyT{};
+            }
+            return {{common_rule}, eq_both};
+        }
+    };
+
     inline bool satisfies(const ruleT& rule, const maskT& mask, const equivT& q) { //
         return q.test(mask ^ rule);
     }
@@ -445,108 +547,6 @@ namespace legacy {
 } // namespace legacy
 
 namespace legacy {
-    // A subsetT defines a subset in ...[TODO; name]
-    // TODO: lockT is currently not a part of subsetT (but do take part in generation)
-    // Extension is possible - let subsetT be ...(TODO, detailed explanation)
-    class subsetT {
-        struct nonemptyT {
-            maskT mask;
-            equivT eq;
-
-            bool contains(const ruleT& rule) const { return eq.test(mask ^ rule); }
-            bool includes(const nonemptyT& other) const {
-                return contains(other.mask) && eq.is_refinement_of(other.eq);
-            }
-        };
-
-        bool m_empty;
-        nonemptyT m_set;
-
-    public:
-        subsetT(const maskT& mask, const equivT& eq) : m_empty{false}, m_set{mask, eq} {}
-
-        struct emptyT {};
-        subsetT(emptyT) : m_empty{true} {}
-        struct universalT {};
-        subsetT(universalT) : m_empty{false}, m_set{.mask{}, .eq{}} {}
-
-        bool empty() const { return m_empty; }
-        bool contains(const ruleT& rule) const { return !m_empty && m_set.contains(rule); }
-        bool includes(const subsetT& other) const { return other.m_empty || (!m_empty && m_set.includes(other.m_set)); }
-        bool equals(const subsetT& other) const { return includes(other) && other.includes(*this); }
-
-        const maskT& get_mask() const {
-            if (m_empty) {
-                // ???
-            }
-            return m_set.mask;
-        }
-
-        void change_mask(const maskT& mask) {
-            if (!contains(mask)) {
-                // ???
-            }
-            m_set.mask = mask;
-        }
-
-        // Prove that the intersection(&) of any two subsetT (a) and (b) is either an empty set or another subsetT.
-        // 1. If (a & b) result in an empty set, it is a subsetT.
-        // 2. Otherwise, there is at least a rule (r) in (a & b).
-        // TODO... finish the proof... (need to add detailed explanation for equivT...)
-        friend subsetT operator&(const subsetT& a_, const subsetT& b_) {
-            if (a_.m_empty || b_.m_empty) {
-                return emptyT{};
-            }
-
-            const nonemptyT &a = a_.m_set, &b = b_.m_set;
-            equivT eq_both = a.eq | b.eq;
-
-            if (a.contains(b.mask)) {
-                return {b.mask, eq_both};
-            } else if (b.contains(a.mask)) {
-                return {a.mask, eq_both};
-            }
-
-            // Look for a rule that both a and b contains.
-            ruleT common_rule{};
-            codeT::map_to<bool> assigned{};
-
-            // TODO: avoid partitionT if possible...
-            const partitionT par_a(a.eq), par_b(b.eq);
-            [[maybe_unused]] const partitionT par_both(eq_both);
-
-            // TODO: explain try-assign will result a correct rule iff a & b != {}.
-            // TODO: analyze complexity...
-            auto try_assign = [&](const codeT code, const bool v, auto& self) -> void {
-                if (!assigned[code]) {
-                    assigned[code] = true;
-                    common_rule[code] = v;
-                    const bool masked_by_a = a.mask[code] ^ v;
-                    const bool masked_by_b = b.mask[code] ^ v;
-                    for (const codeT c : par_a.group_for(code)) {
-                        self(c, a.mask[c] ^ masked_by_a, self);
-                    }
-                    for (const codeT c : par_b.group_for(code)) {
-                        self(c, b.mask[c] ^ masked_by_b, self);
-                    }
-                }
-            };
-
-            for_each_code(code) {
-                if (!assigned[code]) {
-                    assert(std::ranges::none_of(par_both.group_for(code), [&](codeT c) { return assigned[c]; }));
-                    try_assign(code, 0, try_assign);
-                    assert(std::ranges::all_of(par_both.group_for(code), [&](codeT c) { return assigned[c]; }));
-                }
-            }
-
-            if (!a.contains(common_rule) || !b.contains(common_rule)) {
-                return emptyT{};
-            }
-            return {{common_rule}, eq_both};
-        }
-    };
-
     // A mapperT defines a rule that maps each codeT to another codeT.
     // Specifically, mapperT{q2=q,w2=w,...} maps any codeT to the same value.
     struct mapperT {
@@ -770,15 +770,16 @@ namespace legacy {
 
     } // namespace recipes
 
-    // TODO: add test for subsetT... (e.g. iso inclusion etc...)
-    inline static const subsetT test_ignore_s_and_self_cmpl = [] {
-        const auto mk = [](const mapperT& mp) {
-            equivT eq{};
-            add_eq(eq, {mp_identity, mp});
-            return eq;
-        };
+#ifndef NDEBUG
+      // TODO: add more tests for subsetT... (e.g. iso inclusion etc...)
+    namespace _misc::tests {
+        inline const bool test_ignore_s_and_self_cmpl = [] {
+            const auto mk = [](const mapperT& mp) {
+                equivT eq{};
+                add_eq(eq, {mp_identity, mp});
+                return eq;
+            };
 
-        if (1) {
             subsetT sa{mask_zero, mk(mp_ignore_s)};
             subsetT sb{mask_identity, mk(mp_dual)};
 
@@ -805,18 +806,9 @@ namespace legacy {
             assert(sc.contains(copy_from(env_z)));
             assert(sc.contains(copy_from(env_x)));
             assert(sc.contains(copy_from(env_c)));
+            return true;
+        }();
+    } // namespace _misc::tests
+#endif
 
-            return sc;
-        } else {
-            subsetT s0{mask_zero, mk(mp_refl_qsc)};
-            subsetT s1{mask_zero, mk(mp_C4)};
-            std::mt19937 rand;
-            // s0.change_mask({s0.random_rule(10, rand)});
-            // s1.change_mask({s1.random_rule(12, rand)});
-
-            auto s2 = s0 & s1;
-            assert(!s2.empty());
-            return s2;
-        }
-    }();
 } //  namespace legacy
