@@ -99,6 +99,14 @@ namespace legacy {
         constexpr friend bool operator==(const ruleT&, const ruleT&) = default;
     };
 
+    // TODO: rename...
+    // TODO: Document that this is not the only situation that flicking effect can occur...
+    inline bool will_flick(const ruleT& rule) {
+        constexpr codeT all_0 = encode({0, 0, 0, 0, 0, 0, 0, 0, 0});
+        constexpr codeT all_1 = encode({1, 1, 1, 1, 1, 1, 1, 1, 1});
+        return rule[all_0] == 1 && rule[all_1] == 0;
+    }
+
     // inline constexpr ruleT make_rule(const auto& fn) {
     //     ruleT rule{};
     //     for_each_code(code) {
