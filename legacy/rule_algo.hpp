@@ -1,6 +1,5 @@
 #pragma once
 
-#include <map>
 #include <random>
 #include <span>
 
@@ -109,6 +108,12 @@ namespace legacy {
 
         // TODO: refinement is more of a concept when talking about "partition"...
         bool is_refinement_of(const equivT& other) const { return other.has_eq(*this); }
+
+        friend equivT operator|(const equivT& a, const equivT& b) {
+            equivT ab = a;
+            ab.add_eq(b);
+            return ab;
+        }
     };
 
     // TODO: define subsetT here...
@@ -339,8 +344,9 @@ namespace legacy {
     using groupT = std::span<const codeT>;
 
     class partitionT {
-        using indexT = int;
-        codeT::map_to<indexT> m_p;
+        // TODO: explain more naturally...
+        // Map codeT to [j: its group is the jth one] encountered during the `for_each_code` scan.
+        codeT::map_to<int> m_map;
         int m_k;
 
         // `m_data` is not a codeT::map_to<codeT>.
@@ -351,13 +357,13 @@ namespace legacy {
         };
         std::vector<group_pos> m_groups;
 
-        groupT jth_group(indexT j) const {
+        groupT jth_group(int j) const {
             const auto [pos, size] = m_groups[j];
             return groupT(m_data.data() + pos, size);
         }
 
     public:
-        groupT group_for(codeT code) const { return jth_group(m_p[code]); }
+        groupT group_for(codeT code) const { return jth_group(m_map[code]); }
 
         int k() const { return m_k; }
         void for_each_group(auto fn) const {
@@ -370,24 +376,23 @@ namespace legacy {
             }
         }
 
-        // TODO: optimize out the map...
         explicit partitionT(const equivT& u) {
-            std::map<codeT, indexT> m;
-            indexT i = 0;
+            m_k = 0;
+
+            codeT::map_to<int> m;
+            m.fill(-1);
             for_each_code(code) {
                 const codeT head = u.headof(code);
-                if (!m.contains(head)) {
-                    m[head] = i++;
+                if (m[head] == -1) {
+                    m[head] = m_k++;
                 }
-                m_p[code] = m[head];
+                m_map[code] = m[head];
             }
-
-            assert(i == m.size());
-            m_k = i;
+            // m_k is now the number of groups in the partition.
 
             std::vector<int> count(m_k, 0);
-            for (indexT col : m_p) {
-                ++count[col];
+            for (int j : m_map) {
+                ++count[j];
             }
 
             std::vector<int> pos(m_k, 0);
@@ -401,8 +406,8 @@ namespace legacy {
             }
 
             for_each_code(code) {
-                indexT col = m_p[code];
-                m_data[pos[col]++] = code;
+                int j = m_map[code];
+                m_data[pos[j]++] = code;
             }
         }
     };
@@ -676,10 +681,6 @@ namespace legacy {
 } // namespace legacy
 
 namespace legacy {
-    // TODO: quick way to decide that A & B -> {}?
-
-    // TODO: tag init/assign (empty set, whole set)
-
     // A subsetT defines a subset in ...[TODO; name]
     class subsetT {
         struct nonemptyT {
@@ -695,11 +696,13 @@ namespace legacy {
         bool m_empty;
         nonemptyT m_set;
 
-        // TODO: redesign ctors...
-        subsetT(nullptr_t) : m_empty{true}, m_set{} {}
-
     public:
-        subsetT(const maskT& mask, const equivT& eq) : m_empty{false}, m_set({mask, eq}) {}
+        subsetT(const maskT& mask, const equivT& eq) : m_empty{false}, m_set{mask, eq} {}
+
+        struct emptyT {};
+        subsetT(emptyT) : m_empty{true} {}
+        struct universalT {};
+        subsetT(universalT) : m_empty{false}, m_set{.mask{}, .eq{}} {}
 
         bool empty() const { return m_empty; }
         bool contains(const ruleT& rule) const { return !m_empty && m_set.contains(rule); }
@@ -733,68 +736,54 @@ namespace legacy {
         // TODO... finish the proof... (need to add detailed explanation for equivT...)
         friend subsetT operator&(const subsetT& a_, const subsetT& b_) {
             if (a_.m_empty || b_.m_empty) {
-                return {0};
+                return emptyT{};
             }
 
             const nonemptyT &a = a_.m_set, &b = b_.m_set;
-
-            // TODO: add operator... for equivT...
-            equivT eq_both = a.eq;
-            eq_both.add_eq(b.eq);
-
-            // Find a rule that both a and b contains.
-            ruleT common_rule{};
+            equivT eq_both = a.eq | b.eq;
 
             if (a.contains(b.mask)) {
-                common_rule = b.mask;
+                return {b.mask, eq_both};
             } else if (b.contains(a.mask)) {
-                common_rule = a.mask;
-            } else {
-                // TODO: partitionT is expensive...
-                partitionT par_a(a.eq), par_b(b.eq), par_both(eq_both);
-                codeT::map_to<bool> assigned{};
+                return {a.mask, eq_both};
+            }
 
-                auto try_assign = [&](const codeT code, const bool v, auto& self) -> bool {
-                    if (assigned[code]) {
-                        if (common_rule[code] != v) {
-                            // TODO: explain why (when) this can happen
-                            return false;
-                        }
-                    } else {
-                        assigned[code] = true;
-                        common_rule[code] = v;
-                        const bool viewed_by_a = a.mask[code] ^ v;
-                        const bool viewed_by_b = b.mask[code] ^ v;
-                        // TODO: analyze complexity...
-                        for (const codeT c : par_a.group_for(code)) {
-                            if (!self(c, a.mask[c] ^ viewed_by_a, self)) {
-                                return false;
-                            }
-                        }
-                        for (const codeT c : par_b.group_for(code)) {
-                            if (!self(c, b.mask[c] ^ viewed_by_b, self)) {
-                                return false;
-                            }
-                        }
-                    }
-                    return true;
-                };
+            // Look for a rule that both a and b contains.
+            ruleT common_rule{};
+            codeT::map_to<bool> assigned{};
 
-                for_each_code(code) {
-                    if (!assigned[code]) {
-                        assert(std::ranges::none_of(par_both.group_for(code), [&](codeT c) { return assigned[c]; }));
-                        if (!try_assign(code, 0, try_assign)) {
-                            return {0};
-                        }
-                        assert(std::ranges::all_of(par_both.group_for(code), [&](codeT c) { return assigned[c]; }));
+            // TODO: avoid partitionT if possible...
+            const partitionT par_a(a.eq), par_b(b.eq);
+            [[maybe_unused]] const partitionT par_both(eq_both);
+
+            // TODO: explain try-assign will result a correct rule iff a & b != {}.
+            // TODO: analyze complexity...
+            auto try_assign = [&](const codeT code, const bool v, auto& self) -> void {
+                if (!assigned[code]) {
+                    assigned[code] = true;
+                    common_rule[code] = v;
+                    const bool masked_by_a = a.mask[code] ^ v;
+                    const bool masked_by_b = b.mask[code] ^ v;
+                    for (const codeT c : par_a.group_for(code)) {
+                        self(c, a.mask[c] ^ masked_by_a, self);
                     }
+                    for (const codeT c : par_b.group_for(code)) {
+                        self(c, b.mask[c] ^ masked_by_b, self);
+                    }
+                }
+            };
+
+            for_each_code(code) {
+                if (!assigned[code]) {
+                    assert(std::ranges::none_of(par_both.group_for(code), [&](codeT c) { return assigned[c]; }));
+                    try_assign(code, 0, try_assign);
+                    assert(std::ranges::all_of(par_both.group_for(code), [&](codeT c) { return assigned[c]; }));
                 }
             }
 
-            // TODO: is `try_assign -> true` really able to guarantee conflicts wont happen?
-            // (if not, still able to do the final check here, but not in the form of assertions...)
-            assert(a.includes({{common_rule}, eq_both}));
-            assert(b.includes({{common_rule}, eq_both}));
+            if (!a.contains(common_rule) || !b.contains(common_rule)) {
+                return emptyT{};
+            }
             return {{common_rule}, eq_both};
         }
     };

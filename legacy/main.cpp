@@ -276,8 +276,8 @@ namespace legacy {
             terms_native.emplace_back("-", mk({mp_refl_asd}));
             terms_native.emplace_back("\\", mk({mp_refl_qsc}));
             terms_native.emplace_back("/", mk({mp_refl_esz}));
-            terms_native.emplace_back("C2(180)", mk({mp_C2}));
-            terms_native.emplace_back("C4(90)", mk({mp_C4}));
+            terms_native.emplace_back("C2", mk({mp_C2}));
+            terms_native.emplace_back("C4", mk({mp_C4})); // TODO: add explanations in the gui
 
             terms_misc.emplace_back("'C8'", mk({mp_C8}));
             terms_misc.emplace_back("Tot", mk({mp_C8, mp_tot_exc_s}));
@@ -292,9 +292,9 @@ namespace legacy {
             terms_hex.emplace_back("q|w", mk({mp_hex_refl_qw}));
             terms_hex.emplace_back("w|d", mk({mp_hex_refl_wd}));
 
-            terms_hex.emplace_back("C2(180)", mk({mp_hex_C2}));
-            terms_hex.emplace_back("C3(120)", mk({mp_hex_C3}));
-            terms_hex.emplace_back("C6(60)", mk({mp_hex_C6}));
+            terms_hex.emplace_back("C2", mk({mp_hex_C2}));
+            terms_hex.emplace_back("C3", mk({mp_hex_C3}));
+            terms_hex.emplace_back("C6", mk({mp_hex_C6}));
 
             // TODO: temp...
             terms_misc.emplace_back("Hex_Tot", mk({mp_hex_C6, mp_hex_tot_exc_s}));
