@@ -350,11 +350,10 @@ namespace legacy {
 
     // TODO: should (lr/up/)mirror conversions modify locks as well?
 
-    // TODO: what's the best way to pass fn?
     // TODO: is `redispatch` a suitable name?
     // TODO: whether to skip/allow inconsistent groups?
     inline ruleT redispatch(const subsetT& subset, const ruleT& rule, const lockT& locked,
-                            auto fn /*void(bool* begin, bool* end)*/) {
+                            std::invocable<bool*, bool*> auto fn) {
         // TODO: precondition?
         ruleT_masked r = subset.get_mask() ^ rule;
 

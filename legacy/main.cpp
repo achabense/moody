@@ -237,30 +237,31 @@ namespace legacy {
         termT_vec terms_hex;
         // TODO: customized...
 
+        void for_each_term(auto fn) {
+            for (termT_vec* terms : {&terms_ignore, &terms_native, &terms_misc, &terms_hex}) {
+                for (termT& t : *terms) {
+                    fn(t);
+                }
+            }
+        }
+
         void reset_current() {
             // TODO: add relation assertion between selected, includes_cur and disabled.
             current = subsetT::universalT{};
 
-            for (termT_vec* terms : {&terms_ignore, &terms_native, &terms_misc, &terms_hex}) {
-                for (termT& t : *terms) {
-                    if (t.selected) {
-                        current = current & t.set;
-                    }
+            for_each_term([&](termT& t) {
+                if (t.selected) {
+                    current = current & t.set;
                 }
-            }
+            });
+
             assert(!current.empty());
 
-            for (termT_vec* terms : {&terms_ignore, &terms_native, &terms_misc, &terms_hex}) {
-                for (termT& t : *terms) {
-                    t.includes_cur = t.set.includes(current);
-                }
-            }
-            for (termT_vec* terms : {&terms_ignore, &terms_native, &terms_misc, &terms_hex}) {
-                for (termT& t : *terms) {
-                    // TODO: involves a lot of unneeded calculations...
-                    t.disabled = !t.includes_cur && (t.set & current).empty();
-                }
-            }
+            for_each_term([&](termT& t) {
+                t.includes_cur = t.set.includes(current);
+                // TODO: involves a lot of unneeded calculations...
+                t.disabled = !t.includes_cur && (t.set & current).empty();
+            });
         }
 
     public:
@@ -349,8 +350,11 @@ namespace legacy {
                 if (!term.disabled) {
                     if (ImGui::InvisibleButton("Check", size)) {
                         term.selected = !term.selected;
-                        // TODO: no need to reset if term.selected now and term.includes_cur...
+                        // TODO: whether to try to avoid unnecessary calculation?
+                        // No need to reset if the newly selected term already included current.
+                        // if (!(term.selected && term.includes_cur)) {
                         need_reset = true;
+                        // }
                     }
                     // TODO: this is in imgui_internal.h...
                     // TODO: Ask is it intentional to make InvisibleButton highlight-less?
@@ -371,30 +375,6 @@ namespace legacy {
                 ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoHostExtendX;
 
             if (ImGui::BeginTable("Checklists", 2, flags_outer)) {
-                // TODO: (temp; to remove) there should instead be a single button to clear all selections...
-#if 0
-                auto clear_select = [&](termT_vec& terms, const char* label) {
-                    if (ImGui::Button(label, sqr)) {
-                        for (termT& t : terms) {
-                            if (t.selected) {
-                                t.selected = false;
-                                sel = true;
-                            }
-                        }
-                    }
-                };
-
-                auto toggle_select = [&](termT_vec& terms, const char* label) {
-                    if (ImGui::Button(label, sqr)) {
-                        const bool any_selected = std::ranges::any_of(terms, &termT::selected);
-                        for (termT& t : terms) {
-                            t.selected = !any_selected;
-                        }
-                        sel = true;
-                    }
-                };
-#endif
-
                 auto checklist = [&](termT_vec& terms, const char* label) {
                     if (ImGui::BeginTable(label, terms.size(), flags_inner)) {
                         ImGui::TableNextRow();
@@ -411,8 +391,6 @@ namespace legacy {
                     ImGui::TableNextRow();
                     ImGui::TableNextColumn();
                     imgui_str("Ignore");
-                    // ImGui::SameLine();
-                    // clear_select(terms_ignore, "c##Ignore");
 
                     ImGui::TableNextColumn();
                     if (ImGui::BeginTable("Checklist##Ignore", 1, flags_inner)) {
@@ -440,8 +418,6 @@ namespace legacy {
                     ImGui::TableNextRow();
                     ImGui::TableNextColumn();
                     imgui_str("Native");
-                    // ImGui::SameLine();
-                    // toggle_select(terms_native, "f##Native");
 
                     ImGui::TableNextColumn();
                     checklist(terms_native, "Checklist##Native");
@@ -451,8 +427,6 @@ namespace legacy {
                     ImGui::TableNextRow();
                     ImGui::TableNextColumn();
                     imgui_str("Misc");
-                    // ImGui::SameLine();
-                    // clear_select(terms_misc, "c##Misc");
 
                     ImGui::TableNextColumn();
                     checklist(terms_misc, "Checklist##Misc");
@@ -464,14 +438,23 @@ namespace legacy {
                     imgui_str("qw-    q w\n"
                               "asd ~ a s d\n"
                               "-xc    x c");
-                    // ImGui::SameLine();
-                    // toggle_select(terms_hex, "f##Hex");
 
                     ImGui::TableNextColumn();
                     checklist(terms_hex, "Checklist##Hex");
                 }
 
                 ImGui::EndTable();
+
+                // TODO: better layout... or right-click menu?
+                ImGui::SameLine();
+                if (ImGui::Button("Clear")) {
+                    for_each_term([&](termT& t) {
+                        if (t.selected) {
+                            t.selected = false;
+                            need_reset = true;
+                        }
+                    });
+                }
             }
 
             if (need_reset) {
@@ -661,7 +644,9 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
 
     ImGui::Separator();
 
-    // TODO: redesign this section...
+    // TODO: let subset select working masks...
+    // TODO: any mask should be usable (if view only), but to allow edition the rule the subset should contain the
+    // mask...
     // TODO: add more selections...
     // TODO: enable testing masking rule instead of target rule when hovered...
     static legacy::maskT mask_custom{{}};
@@ -857,6 +842,9 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
                         show_group = !show_group;
                     }
                     if (show_group && ImGui::BeginTooltip()) {
+                        imgui_str("Right click to turn on/off the tooltip");
+                        ImGui::Text("Group size: %d", (int)group.size());
+                        const int max_to_show = 40;
                         for (int x = 0; auto code : group) {
                             if (x++ % 8 != 0) {
                                 ImGui::SameLine();
@@ -870,6 +858,12 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
                                 ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() - ImVec2(2, 2),
                                                                     ImGui::GetItemRectMax() + ImVec2(2, 2), -1);
                             }
+                            if (x == max_to_show) {
+                                break;
+                            }
+                        }
+                        if (group.size() > max_to_show) {
+                            imgui_str("...");
                         }
                         ImGui::EndTooltip();
                     }

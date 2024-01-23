@@ -126,6 +126,7 @@ namespace legacy {
 
     public:
         // TODO: This could be used to support boundless space.
+        // TODO: boundless space (as well as & tiling) are no longer planned for the first release
         // TODO: const or not?
         // (The problem is that, t.gather(t,t,t,t,t,t,t,t) is intentionally a valid operation, so passing by const&
         // seems an over-promise...)
@@ -147,11 +148,12 @@ namespace legacy {
             }
         }
 
-        // TODO: This could be used to support constraint gathering...
-        // TODO: go back to template when needed...
+        // TODO: use is_invocable_r instead?
         // I hate this function, it is the payment for consecutive data...
-        void apply(const auto& rule, tileT& dest) const {
-            // pre: already gathered ???<TODO>, which is untestable.
+        void apply(const std::invocable<codeT> auto& rule, tileT& dest) const {
+            // There is supposed to be a call to `gather` before calling `apply`.
+            // (Which is untestable and must be guaranteed by the callers.)
+
             assert(this != &dest);
             dest.resize(m_size);
 
