@@ -266,6 +266,8 @@ namespace legacy {
         }
     }
 
+    // TODO: the lockT will become meaningless on irrelevant rule switch (clipboard/file...)
+    // TODO: should mirror conversions (and lr/ud/... if there are to be) modify locks as well?
     using lockT = codeT::map_to<bool>;
 
     inline auto scan(const partitionT& par, const ruleT_masked& rule, const lockT& locked) {
@@ -346,41 +348,56 @@ namespace legacy {
         return subset.get_mask() ^ r;
     }
 
-    // TODO: the lockT will become meaningless on irrelevant rule switch (clipboard/file...)
+    // TODO: redispatch currently does two jobs:
+    // 1. implicitly does an "approximation" for the rule if not contains, ignoring locked groups.
+    // 2. perform in-set "redispatch" (or whatever suitable word), still ignoring locked groups.
 
-    // TODO: should (lr/up/)mirror conversions modify locks as well?
+    // The fact that the impl ignore the locked groups means this function still cannot guarantee the result
+    // belongs to the subset. (when the locked parts are incompatible with the subset)
+    // For better clarity, it's better to enforce stricter and more fine-grained editions instead...
+    // (Compatible->Approximate->Redispatch(must already contains, so this is purely a function to convert within
+    // the same subset))
+
+    // Also, it might be helpful to support "in-lock" redispatch. For example, to dial to find potentially related
+    // patterns...
+    // Directly invert the locks, or add a flag in redispatch?
 
     // TODO: is `redispatch` a suitable name?
     // TODO: whether to skip/allow inconsistent groups?
     inline ruleT redispatch(const subsetT& subset, const ruleT& rule, const lockT& locked,
                             std::invocable<bool*, bool*> auto fn) {
-        // TODO: precondition?
-        ruleT_masked r = subset.get_mask() ^ rule;
+        assert(!subset.empty());
+        // assert(subset.contains(rule)); // TODO: apply this precondition...
 
-        // TODO: explain bools is not a codeT::map_to<bool>.
+        const maskT& mask = subset.get_mask();
+        const partitionT& par = subset.get_par();
+
+        ruleT_masked r = mask ^ rule;
+
+        // `seq` is not a codeT::map_to<bool>.
         assert(subset.get_par().k() <= 512);
-        std::array<bool, 512> bools{};
+        std::array<bool, 512> seq{};
         int z = 0;
-        subset.get_par().for_each_group([&](const groupT& group) {
+        par.for_each_group([&](const groupT& group) {
             if (none_locked(locked, group)) {
-                bools[z] = r[group[0]];
+                seq[z] = r[group[0]];
                 ++z;
             }
         });
 
-        fn(bools.data(), bools.data() + z);
+        fn(seq.data(), seq.data() + z);
 
         z = 0;
-        subset.get_par().for_each_group([&](const groupT& group) {
+        par.for_each_group([&](const groupT& group) {
             if (none_locked(locked, group)) {
                 for (codeT code : group) {
-                    r[code] = bools[z];
+                    r[code] = seq[z];
                 }
                 ++z;
             }
         });
 
-        return subset.get_mask() ^ r;
+        return mask ^ r;
     }
 
     // TODO: count_min denotes free groups now; whether to switch to total groups (at least in the gui part)?

@@ -341,7 +341,8 @@ namespace legacy {
 
                 const ImU32 ring_col = term.set.contains(target)              ? IM_COL32(0, 255, 0, 255)
                                        : compatible(target, locked, term.set) ? IM_COL32(0, 100, 0, 255)
-                                                                              : IM_COL32(100, 0, 0, 255);
+                                                                              : IM_COL32(255, 0, 0, 255);
+                // TODO: ring_col is also terrible...
 
                 ImGui::GetWindowDrawList()->AddRectFilled(pos + ImVec2(4, 4), pos_max - ImVec2(4, 4), cen_col);
                 ImGui::GetWindowDrawList()->AddRect(pos, pos_max, ring_col);
@@ -1134,16 +1135,17 @@ int main(int argc, char** argv) {
             }
         }
 
-        // TODO:
-        // whether to support drawing?
-        // [clear 1] [clear outside 1]
-        // [set as init-state] problem: what if size is already changed?
-        // [random fill] whether to use tileT_filler? where to specify density?
-        // [min-width/height constraint]
-        // [mini-window when zoom==1]
-        // [on-restart / on new rule behavior]
-        // whether to support period?
-        // whether to consume "rule = ..."
+        // TODO: set pattern as init state? what if size is already changed?
+        // TODO: mini-window is necessary (when zoom==1)
+        // TODO: specify mouse-dragging behavior (especially, no-op must be an option)
+        // TODO: range-selected randomization don't need fixed seed. However, there should be a way to specify density.
+        // TODO: support drawing as a dragging behavior if easy.
+        // TODO: copy bs copy to clipboard; paste vs paste from clipboard? (don't want to pollute clipboard with small
+        // rls strings...
+        // TODO: should be able to recognize "rule = " part in the rle string.
+
+        // TODO: "periodical tile" feature is generally not too useful without boundless space, and generally torus is
+        // enough for visual feedback.
         auto show_tile = [&] {
             // TODO: refine "resize" gui and logic...
             static char input_width[20]{}, input_height[20]{};
@@ -1207,6 +1209,7 @@ int main(int argc, char** argv) {
                 return;
             }
 
+            // TODO: the constraint is arbitrary; are there more sensible ways to decide size constraint?
             const auto clamp_size = [](int width, int height) {
                 return legacy::rectT{.width = std::clamp(width, 10, 1200), .height = std::clamp(height, 10, 1200)};
             };
