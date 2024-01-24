@@ -216,7 +216,6 @@ inline void iter_pair(const char* tag_first, const char* tag_prev, const char* t
 
 // TODO: should not belong to namespace legacy...
 namespace legacy {
-    // TODO: (unfinished) the mask in the rule_editor is currently invalidated...
     class subset_selector {
         subsetT current;
 
@@ -320,7 +319,7 @@ namespace legacy {
             reset_current();
         }
 
-        const subsetT& select_subset(const ruleT& target, const lockT& locked) {
+        subsetT& select_subset(const ruleT& target, const lockT& locked) {
             bool need_reset = false;
             const float r = ImGui::GetFrameHeight();
             const ImVec2 sqr{r, r};
@@ -340,7 +339,7 @@ namespace legacy {
                 // TODO: find better color for "disabled"... currently too ugly.
 
                 const ImU32 ring_col = term.set.contains(target)              ? IM_COL32(0, 255, 0, 255)
-                                       : compatible(target, locked, term.set) ? IM_COL32(0, 100, 0, 255)
+                                       : compatible(term.set, target, locked) ? IM_COL32(0, 100, 0, 255)
                                                                               : IM_COL32(255, 0, 0, 255);
                 // TODO: ring_col is also terrible...
 
@@ -639,7 +638,10 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
     }
 
     static legacy::subset_selector selector;
-    const legacy::subsetT& subset = selector.select_subset(target, locked);
+
+    // TODO: non-const for set_mask. this is conceptually unsafe as it also allows assignments...
+    // TODO: move mask selection logic into selector as well?
+    legacy::subsetT& subset = selector.select_subset(target, locked);
     assert(!subset.empty());
     const legacy::partitionT& par = subset.get_par();
 
@@ -650,50 +652,71 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
     // mask...
     // TODO: add more selections...
     // TODO: enable testing masking rule instead of target rule when hovered...
-    static legacy::maskT mask_custom{{}};
-    static const legacy::maskT* mask_ptr = &legacy::mask_zero;
+    const legacy::maskT* mask_ptr = nullptr;
     {
-        const auto tooltip = [](const legacy::maskT& mask) {
+        const auto tooltip = [](const legacy::maskT& mask, const char* description) {
             if (ImGui::BeginItemTooltip()) {
                 ImGui::PushTextWrapPos(250); // TODO: how to decide wrap pos properly?
+                imgui_str(description);
                 imgui_str(to_MAP_str(mask));
                 ImGui::PopTextWrapPos();
                 ImGui::EndTooltip();
             }
         };
 
-        static const char* const mask_labels[]{"Zero", "Identity", "Custom"};
-        static const legacy::maskT* const mask_ptrs[]{&legacy::mask_zero, &legacy::mask_identity, &mask_custom};
+        static legacy::maskT mask_custom{{}};
 
-        // TODO: add explanations in the tooltip... (especially custom mode)
+        // TODO: better name...
+        static const char* const mask_labels[]{"Zero", "Identity", "????", "Custom"};
+        static const char* const mask_descriptions[]{"...", //
+                                                     "...", //
+                                                     "...", // TODO...
+                                                     "..."};
+        static int mask_id = 0;
+
+        const legacy::maskT* const mask_ptrs[]{&legacy::mask_zero, &legacy::mask_identity, &subset.get_mask(),
+                                               &mask_custom};
+
         ImGui::AlignTextToFramePadding();
         imgui_str("Mask");
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 4; i++) {
             ImGui::SameLine();
-            if (ImGui::RadioButton(mask_labels[i], mask_ptr == mask_ptrs[i])) {
-                mask_ptr = mask_ptrs[i];
+            // ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+            if (ImGui::RadioButton(mask_labels[i], mask_id == i)) {
+                mask_id = i;
             }
-            tooltip(*mask_ptrs[i]);
+            tooltip(*mask_ptrs[i], mask_descriptions[i]);
         }
 
         ImGui::SameLine();
-        if (mask_ptr == &mask_custom) {
+        if (mask_id == 3) {
             if (ImGui::Button("Take current rule")) {
                 mask_custom = {target};
             }
-            tooltip(mask_custom);
+            tooltip(mask_custom, mask_descriptions[3]);
         } else {
             if (ImGui::Button("Try custom")) {
-                mask_ptr = &mask_custom;
+                mask_id = 3;
             }
         }
+
+        mask_ptr = mask_ptrs[mask_id];
     }
-    const legacy::maskT& mask = *mask_ptr;
+
+    // TODO: (temp) about the lifetime of mask:
+    // mask points at either static objects or par.mask, so this should be safe here...
+    const legacy::maskT& mask = *mask_ptr; // TODO: any lifetime issue?
+
+    // TODO: redesign edition logic...
+    // const bool editable = subset.set_mask(mask); // TODO: consider other approaches...
+    // const bool can_approx = editable && legacy::compatible(subset, target, locked);
+    // const bool can_redispatch = editable && subset.contains(target);
+    const bool editable = subset.set_mask(mask) && subset.contains(target); // TODO (temp; protective)
+    if (!editable) {
+        ImGui::BeginDisabled();
+    }
 
     {
-        // TODO: for non-matching rules, when doing redispatch, whether to do auto-approximation (or enforce
-        // intentional approx)?
-
         // TODO: still unstable between partition switches...
         // TODO: the range should be scoped by locks... so, what should rcount be?
         static int rcount = 0.5 * par.k();
@@ -745,18 +768,19 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
         }
         ImGui::SameLine();
         if (ImGui::Button("Purify")) {
-            out = legacy::purify(subset, target, locked);
+            out = legacy::approximate(subset, target, locked);
         }
         // TODO: purify -> enhance != enhance -> purify...
         // TODO: problematic: enhance can lead to more inconsistent groups...
         ImGui::SameLine();
         if (ImGui::Button("Purify -> Enhance")) {
-            out = legacy::purify(subset, target, locked);
+            out = legacy::approximate(subset, target, locked);
             legacy::enhance(par, locked);
         }
     }
 
     {
+        // TODO: broken now; redesign...
         static const char* const strss[3][2]{{"-0", "-1"}, //
                                              {"-.", "-f"},
                                              {"-.", "-d"}};
@@ -837,6 +861,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
                 ImGui::SameLine();
                 imgui_strdisabled("?");
                 // TODO: recheck other IsItemHovered usages...
+                // TODO: the transparency of the tooltip is also affected if this part disabled block...
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
                     static bool show_group = true;
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
@@ -884,7 +909,9 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_i
             ImGui::PopStyleVar(2);
         }
     }
-
+    if (!editable) {
+        ImGui::EndDisabled();
+    }
     return out;
 }
 

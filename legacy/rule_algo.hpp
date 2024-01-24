@@ -198,6 +198,16 @@ namespace legacy {
             assert(!empty());
             return m_set->par;
         }
+        // TODO: whether to change the subset's mask directly? or just use the an independent mask
+        // under the control of the subset?
+        bool set_mask(const maskT& mask) {
+            assert(!empty());
+            if (!contains(mask)) {
+                return false;
+            }
+            m_set->mask = mask;
+            return true;
+        }
 
         // Prove that the intersection(&) of any two subsetT (a) and (b) is either an empty set or another subsetT.
         // 1. If (a & b) result in an empty set, it is a subsetT.
@@ -330,22 +340,44 @@ namespace legacy {
         });
     }
 
-    // TODO: explain...
-    // TODO: stricter version...
-    inline ruleT purify(const subsetT& subset, const ruleT& rule, const lockT& locked) {
-        // TODO: for locked code A and B, what if r[A] != r[B]?
-        ruleT_masked r = subset.get_mask() ^ rule;
-        subset.get_par().for_each_group([&](const groupT& group) {
-            // TODO: should be scan-based... what if inconsistent?
-            const auto fnd = std::ranges::find_if(group, [&locked](codeT code) { return locked[code]; });
-            if (fnd != group.end()) {
-                const bool b = r[*fnd];
-                for (codeT code : group) {
-                    r[code] = b;
+    inline bool compatible(const subsetT& subset, const ruleT& rule, const lockT& locked) {
+        if (subset.empty()) {
+            return false;
+        }
+
+        const ruleT_masked r = subset.get_mask() ^ rule;
+        codeT::map_to<int> record;
+        record.fill(2);
+
+        const equivT& eq = subset.get_par().get_eq();
+        for_each_code(code) {
+            if (locked[code]) {
+                int& rep = record[eq.headof(code)];
+                if (rep == 2) {
+                    rep = r[code];
+                } else if (rep != r[code]) {
+                    return false;
                 }
             }
+        }
+        return true;
+    }
+
+    inline ruleT approximate(const subsetT& subset, const ruleT& rule, const lockT& locked) {
+        assert(compatible(subset, rule, locked));
+
+        const maskT& mask = subset.get_mask();
+        const partitionT& par = subset.get_par();
+
+        ruleT_masked r = mask ^ rule;
+        par.for_each_group([&](const groupT& group) {
+            const auto fnd = std::ranges::find_if(group, [&locked](codeT code) { return locked[code]; });
+            const bool b = fnd != group.end() ? r[*fnd] : r[group[0]];
+            for (codeT code : group) {
+                r[code] = b;
+            }
         });
-        return subset.get_mask() ^ r;
+        return mask ^ r;
     }
 
     // TODO: redispatch currently does two jobs:
@@ -366,8 +398,7 @@ namespace legacy {
     // TODO: whether to skip/allow inconsistent groups?
     inline ruleT redispatch(const subsetT& subset, const ruleT& rule, const lockT& locked,
                             std::invocable<bool*, bool*> auto fn) {
-        assert(!subset.empty());
-        // assert(subset.contains(rule)); // TODO: apply this precondition...
+        assert(subset.contains(rule));
 
         const maskT& mask = subset.get_mask();
         const partitionT& par = subset.get_par();
@@ -375,7 +406,7 @@ namespace legacy {
         ruleT_masked r = mask ^ rule;
 
         // `seq` is not a codeT::map_to<bool>.
-        assert(subset.get_par().k() <= 512);
+        assert(par.k() <= 512);
         std::array<bool, 512> seq{};
         int z = 0;
         par.for_each_group([&](const groupT& group) {
@@ -509,27 +540,6 @@ namespace legacy {
             mir[code] = flip ? !get_s(code) : get_s(code);
         }
         return mir;
-    }
-
-    // TODO: this is tightly related to subsetT (lock adoption)
-    // redesign related parts...
-    inline bool compatible(const ruleT& rule, const lockT& locked, const subsetT& subset) {
-        const ruleT_masked r = subset.get_mask() ^ rule;
-        codeT::map_to<int> record;
-        record.fill(2);
-
-        const equivT& eq = subset.get_par().get_eq();
-        for_each_code(code) {
-            if (locked[code]) {
-                int& rep = record[eq.headof(code)];
-                if (rep == 2) {
-                    rep = r[code];
-                } else if (rep != r[code]) {
-                    return false;
-                }
-            }
-        }
-        return true;
     }
 } // namespace legacy
 
