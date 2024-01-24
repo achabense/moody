@@ -85,11 +85,6 @@ namespace legacy {
         codeT::map_to<bool> m_map{};
 
     public:
-        // (TODO; temp) compared to operator[]:
-        // pro: will not expose the address...
-        // con: less "natural" than operator[] (especially as std::*map etc uses [] too)
-        // constexpr void set(codeT code, bool b) { m_map[code] = b; }
-
         // TODO: explain why defining an extra operator().
         constexpr bool operator()(codeT code) const { return m_map[code]; }
 
@@ -107,29 +102,25 @@ namespace legacy {
         return rule[all_0] == 1 && rule[all_1] == 0;
     }
 
-    // inline constexpr ruleT make_rule(const auto& fn) {
-    //     ruleT rule{};
-    //     for_each_code(code) {
-    //         rule[code] = fn(code);
-    //     }
-    //     return rule;
-    // }
+    inline constexpr ruleT make_rule(const auto& fn) {
+        ruleT rule{};
+        for_each_code(code) { rule[code] = fn(code); }
+        return rule;
+    }
 
     // "Convay's Game of Life" (B3/S23)
     inline ruleT game_of_life() {
-        ruleT rule{};
-        for_each_code(code) {
+        return make_rule([](codeT code) -> bool {
             const auto [q, w, e, a, s, d, z, x, c] = decode(code);
             const int count = q + w + e + a + d + z + x + c;
             if (count == 2) { // 2:S ~ 0->0, 1->1 ~ equal to "s".
-                rule[code] = s;
+                return s;
             } else if (count == 3) { // 3:BS ~ 0->1, 1->1 ~ always 1.
-                rule[code] = 1;
+                return 1;
             } else {
-                rule[code] = 0;
+                return 0;
             }
-        }
-        return rule;
+        });
     }
 
     class compressT {
@@ -140,9 +131,7 @@ namespace legacy {
         }
 
         /*implicit*/ operator ruleT() const {
-            ruleT rule{};
-            for_each_code(code) { rule[code] = (bits[code / 8] >> (code % 8)) & 1; }
-            return rule;
+            return make_rule([&](codeT code) -> bool { return (bits[code / 8] >> (code % 8)) & 1; });
         }
 
         friend bool operator==(const compressT& l, const compressT& r) = default;
@@ -207,13 +196,13 @@ namespace legacy {
         return str;
     }
 
-    inline const std::regex& regex_MAP_str() {
-        static_assert((512 + 5) / 6 == 86);
-        static const std::regex reg{"MAP[a-zA-Z0-9+/]{86}", std::regex_constants::optimize};
-        return reg;
-    }
-
     namespace _misc {
+        inline const std::regex& regex_MAP_str() {
+            static_assert((512 + 5) / 6 == 86);
+            static const std::regex reg{"MAP[a-zA-Z0-9+/]{86}", std::regex_constants::optimize};
+            return reg;
+        }
+
         inline ruleT from_MAP_str(const std::string& map_str) {
             assert(std::regex_match(map_str, regex_MAP_str()));
             bool MAP_rule[512]{};
@@ -233,12 +222,11 @@ namespace legacy {
                 put(i + 1, (b6 >> 4) & 1);
                 put(i + 0, (b6 >> 5) & 1);
             }
-            ruleT rule{};
-            for_each_code(code) {
+
+            return make_rule([&MAP_rule](codeT code) -> bool {
                 const auto [q, w, e, a, s, d, z, x, c] = decode(code);
-                rule[code] = MAP_rule[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1];
-            }
-            return rule;
+                return MAP_rule[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1];
+            });
         }
     } // namespace _misc
 
@@ -262,9 +250,8 @@ namespace legacy {
     inline std::vector<compressT> extract_rules(const char* begin, const char* end) {
         std::vector<compressT> rules;
 
-        const auto& regex = regex_MAP_str();
         std::cmatch match;
-        while (std::regex_search(begin, end, match, regex)) {
+        while (std::regex_search(begin, end, match, _misc::regex_MAP_str())) {
             compressT rule(_misc::from_MAP_str(match[0]));
             if (rules.empty() || rules.back() != rule) {
                 rules.push_back(rule);

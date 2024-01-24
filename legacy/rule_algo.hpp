@@ -669,6 +669,7 @@ namespace legacy {
         // rule ^ mask_zero -> TODO
         inline constexpr maskT mask_zero{{}};
         // rule ^ mask_identity -> TODO
+        // TODO: use make_rule...
         inline constexpr maskT mask_identity{[] {
             ruleT rule{};
             for_each_code(code) { rule[code] = get_s(code); }
