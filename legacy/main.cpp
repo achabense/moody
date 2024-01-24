@@ -700,16 +700,20 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
     // mask points at either static objects or par.mask, so this should be safe here...
     const legacy::maskT& mask = *mask_ptr; // TODO: any lifetime issue?
 
-    // TODO: redesign edition logic...
-    // const bool editable = subset.set_mask(mask); // TODO: consider other approaches...
-    // const bool can_approx = editable && legacy::compatible(subset, target, locked);
-    // const bool can_redispatch = editable && subset.contains(target);
-    const bool editable = subset.set_mask(mask) && subset.contains(target); // TODO (temp; protective)
-    if (!editable) {
+    const bool mask_avail = subset.set_mask(mask);
+    const bool redispatch_avail = mask_avail && subset.contains(target);
+
+    // TODO: this is disabling all the operations, including mirror, clear-lock etc...
+    // What can be allowed when the selected mask doesn't belong to the set?
+    if (!mask_avail) {
         ImGui::BeginDisabled();
     }
 
     {
+        if (!redispatch_avail) {
+            ImGui::BeginDisabled();
+        }
+
         // TODO: still unstable between partition switches...
         // TODO: the range should be scoped by locks... so, what should rcount be?
         static int rcount = 0.5 * par.k();
@@ -743,32 +747,32 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
             [&] { out = legacy::act_perm::prev(subset, target, locked); },
             [&] { out = legacy::act_perm::next(subset, target, locked); },
             [&] { out = legacy::act_perm::last(subset, target, locked); });
-        ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
-        // TODO: should mirror also relocate locks?
-        if (ImGui::Button("Mir")) {
-            out = legacy::mirror(target);
+
+        // TODO: (temp) new line begins here...
+        // TODO: enhance might be stricter than necessary...
+        if (ImGui::Button("Enhance locks")) {
+            legacy::enhance(subset, target, locked);
         }
-    }
-    {
-        // TODO: statistics...
+        if (!redispatch_avail) {
+            ImGui::EndDisabled();
+        }
+
+        ImGui::SameLine();
         if (ImGui::Button("Clear locks")) {
             locked = {};
         }
         ImGui::SameLine();
-        // TODO: allow enhancement unless pure?
-        if (ImGui::Button("Enhance locks")) {
-            legacy::enhance(par, locked);
+        // TODO: move elsewhere
+        if (ImGui::Button("Mir")) {
+            out = legacy::mirror_v2(target, locked);
         }
         ImGui::SameLine();
-        if (ImGui::Button("Purify")) {
-            out = legacy::approximate(subset, target, locked);
-        }
-        // TODO: purify -> enhance != enhance -> purify...
-        // TODO: problematic: enhance can lead to more inconsistent groups...
-        ImGui::SameLine();
-        if (ImGui::Button("Purify -> Enhance")) {
-            out = legacy::approximate(subset, target, locked);
-            legacy::enhance(par, locked);
+        if (ImGui::Button("Approximate")) {
+            if (legacy::compatible(subset, target, locked)) {
+                out = legacy::approximate(subset, target, locked);
+            } else {
+                logger::log_temp(300ms, "Incompatible ... TODO"); // TODO refine...
+            }
         }
     }
 
@@ -854,11 +858,15 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
                 ImGui::SameLine();
                 imgui_strdisabled("?");
                 // TODO: recheck other IsItemHovered usages...
-                // TODO: the transparency of the tooltip is also affected if this part disabled block...
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
                     static bool show_group = true;
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
                         show_group = !show_group;
+                    }
+                    // TODO: transparency of the tooltip is also affected if in disabled block... Is the effect
+                    // intentional / configurable?
+                    if (!mask_avail) {
+                        ImGui::EndDisabled();
                     }
                     if (show_group && ImGui::BeginTooltip()) {
                         imgui_str("Right click to turn on/off the tooltip");
@@ -886,6 +894,9 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
                         }
                         ImGui::EndTooltip();
                     }
+                    if (!mask_avail) {
+                        ImGui::BeginDisabled();
+                    }
                 }
                 if (button_hit) {
                     // TODO: document this behavior... (keyctrl->resolve conflicts)
@@ -902,7 +913,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
             ImGui::PopStyleVar(2);
         }
     }
-    if (!editable) {
+    if (!mask_avail) {
         ImGui::EndDisabled();
     }
     return out;

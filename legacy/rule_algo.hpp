@@ -330,8 +330,21 @@ namespace legacy {
     }
 
     // TODO: blindly applying enhance can lead to more inconsistent locked groups...
-    inline void enhance(const partitionT& par, lockT& locked) {
-        par.for_each_group([&](const groupT& group) {
+    // inline void enhance(const partitionT& par, lockT& locked) {
+    //     par.for_each_group([&](const groupT& group) {
+    //         if (any_locked(locked, group)) {
+    //             for (codeT code : group) {
+    //                 locked[code] = true;
+    //             }
+    //         }
+    //     });
+    // }
+
+    // TODO: too strict?
+    inline void enhance(const subsetT& subset, const ruleT& rule, lockT& locked) {
+        assert(subset.contains(rule));
+
+        subset.get_par().for_each_group([&](const groupT& group) {
             if (any_locked(locked, group)) {
                 for (codeT code : group) {
                     locked[code] = true;
@@ -541,6 +554,20 @@ namespace legacy {
         }
         return mir;
     }
+
+    inline ruleT mirror_v2(const ruleT& rule, lockT& locked) {
+        ruleT rule_mir{};
+        lockT locked_mir{};
+        for_each_code(code) {
+            const codeT codex = codeT(~code & 511);
+            const bool flip = get_s(codex) != rule[codex];
+            rule_mir[code] = flip ? !get_s(code) : get_s(code);
+            locked_mir[code] = locked[codex];
+        }
+        locked = locked_mir;
+        return rule_mir;
+    }
+
 } // namespace legacy
 
 namespace legacy {
