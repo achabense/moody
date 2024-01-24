@@ -506,11 +506,8 @@ void show_target_rule(const legacy::ruleT& target, rule_recorder& recorder) {
         [&] { recorder.set_last(); });
 }
 
-// TODO: too shaky...
-std::optional<legacy::lockT> temp_lock{};
-
 // TODO: rename; redesign...
-void stone_constraints(rule_recorder& recorder) {
+std::optional<std::pair<legacy::ruleT, legacy::lockT>> stone_constraints() {
     enum stateE { Any, F, T, F_Cond, T_Cond }; // TODO: rename; explain
     const int r = 9;
     static stateE board[r][r]{/*Any...*/};
@@ -612,10 +609,10 @@ void stone_constraints(rule_recorder& recorder) {
                     }
                 }
             }
-            recorder.take(rule);
-            temp_lock = locked; // TODO: refactor...
+            return {{rule, locked}};
         }
     }
+    return std::nullopt;
 }
 
 // <TODO: add strict mode, and open by default.
@@ -628,14 +625,10 @@ void stone_constraints(rule_recorder& recorder) {
 
 // TODO: ideally, `locked` doesn't belong to editor...
 // TODO: should be a class... how to decouple? ...
-std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, const code_image& icons) {
+// TODO: the target and lock belongs to a single sync point...
+// It's undesirable to return new rule while doing in-place modification on the lock...
+std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lockT& locked, const code_image& icons) {
     std::optional<legacy::ruleT> out;
-
-    static legacy::lockT locked{};
-    if (temp_lock) {
-        locked = *temp_lock;
-        temp_lock.reset();
-    }
 
     static legacy::subset_selector selector;
 
@@ -989,6 +982,8 @@ public:
 // TODO: reconsider: where should "current-rule" be located...
 struct runner_ctrl {
     legacy::ruleT rule;
+    legacy::lockT locked;
+    // TODO: temporal pos; the sync point ((ruleT,lockT) pair) shouldn't belong to runner_ctrl...
 
     // TODO: better name?
     static constexpr int pace_min = 1, pace_max = 20;
@@ -1080,8 +1075,13 @@ int main(int argc, char** argv) {
     torusT runner({.width = 480, .height = 360});
     runner.restart(filler);
 
-    runner_ctrl ctrl{
-        .rule = recorder.current(), .pace = 1, .anti_flick = true, .start_from = 0, .gap_frame = 0, .pause = false};
+    runner_ctrl ctrl{.rule = recorder.current(),
+                     .locked = {},
+                     .pace = 1,
+                     .anti_flick = true,
+                     .start_from = 0,
+                     .gap_frame = 0,
+                     .pause = false};
 
     bool show_nav_window = true;
     file_nav_with_recorder nav;
@@ -1417,7 +1417,7 @@ int main(int argc, char** argv) {
                         cap.apply(rulx, cap2);
                         cap.swap(cap2);
                     }
-                    temp_lock.emplace(locked);
+                    ctrl.locked = locked;
                 }
             }
         };
@@ -1445,8 +1445,12 @@ int main(int argc, char** argv) {
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
                 if (auto child = imgui_childwindow("Rul")) {
-                    stone_constraints(recorder); // TODO: temp...
-                    if (auto out = edit_rule(ctrl.rule, icons)) {
+                    if (auto out = stone_constraints()) {
+                        auto& [rule, lock] = *out;
+                        recorder.take(rule);
+                        ctrl.locked = lock;
+                    }
+                    if (auto out = edit_rule(ctrl.rule, ctrl.locked, icons)) {
                         recorder.take(*out);
                     }
                 }
