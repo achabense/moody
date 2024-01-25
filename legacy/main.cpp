@@ -1101,7 +1101,7 @@ int main(int argc, char** argv) {
 
     tile_image img;
     ImVec2 img_off = {0, 0}; // TODO: supposed to be of integer-precision...
-    int img_zoom = 1;        // TODO: mini window when zoom == 1?
+    int img_zoom = 1;
 
     // TODO: too awkward... refactor...
     class pasteT : public std::optional<legacy::tileT> {
@@ -1174,15 +1174,14 @@ int main(int argc, char** argv) {
         }
 
         // TODO: set pattern as init state? what if size is already changed?
-        // TODO: mini-window is necessary (when zoom==1)
         // TODO: specify mouse-dragging behavior (especially, no-op must be an option)
         // TODO: range-selected randomization don't need fixed seed. However, there should be a way to specify density.
         // TODO: support drawing as a dragging behavior if easy.
         // TODO: copy bs copy to clipboard; paste vs paste from clipboard? (don't want to pollute clipboard with small
-        // rls strings...
+        // rle strings...
         // TODO: should be able to recognize "rule = " part in the rle string.
 
-        // TODO: "periodical tile" feature is generally not too useful without boundless space, and generally torus is
+        // TODO: "periodical tile" feature is generally not too useful without boundless space, and torus is
         // enough for visual feedback.
         auto show_tile = [&] {
             // TODO: refine "resize" gui and logic...
@@ -1249,7 +1248,7 @@ int main(int argc, char** argv) {
 
             // TODO: the constraint is arbitrary; are there more sensible ways to decide size constraint?
             const auto clamp_size = [](int width, int height) {
-                return legacy::rectT{.width = std::clamp(width, 10, 1200), .height = std::clamp(height, 10, 1200)};
+                return legacy::rectT{.width = std::clamp(width, 64, 1200), .height = std::clamp(height, 64, 1200)};
             };
             if (fit) {
                 img_off = {0, 0};
@@ -1347,6 +1346,31 @@ int main(int argc, char** argv) {
                     img_off = (mouse_pos - cellidx * img_zoom) - canvas_pos;
                     img_off.x = round(img_off.x);
                     img_off.y = round(img_off.y); // TODO: is rounding correct?
+                }
+
+                // TODO: refine...
+                if (img_zoom <= 2 && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                    int celx = floor((mouse_pos.x - img_pos.x) / img_zoom);
+                    int cely = floor((mouse_pos.y - img_pos.y) / img_zoom);
+                    if (celx >= 0 && celx < tile_size.width && cely >= 0 && cely < tile_size.height) {
+                        static bool show_zoom = true;
+                        // TODO: using middle button as this conflicts with right-ctrl...
+                        if (ImGui::IsMouseClicked(ImGuiMouseButton_Middle)) {
+                            show_zoom = !show_zoom;
+                        }
+                        if (show_zoom && ImGui::BeginTooltip()) {
+                            int minx = std::max(celx - 20, 0);
+                            int miny = std::max(cely - 20, 0);
+                            int maxx = std::min(celx + 20, tile_size.width);
+                            int maxy = std::min(cely + 20, tile_size.height);
+                            int w = maxx - minx, h = maxy - miny;
+                            imgui_str("Middle click to turn on/off\nthe tooltip");
+                            ImGui::Image(img.texture(), ImVec2(w * 4, h * 4),
+                                         {(float)minx / tile_size.width, (float)miny / tile_size.height},
+                                         {(float)maxx / tile_size.width, (float)maxy / tile_size.height});
+                            ImGui::EndTooltip();
+                        }
+                    }
                 }
 
                 // TODO: this shall belong to the runner.
