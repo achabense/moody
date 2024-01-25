@@ -115,7 +115,6 @@ public:
         return true;
     }
 
-    // TODO: rename...
     static void end_frame() {
         assert(window && renderer);
 

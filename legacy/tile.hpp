@@ -259,15 +259,15 @@ namespace legacy {
                    0 <= begin.y && begin.y <= end.y && end.y <= tile.height();
         }
 
-        // TODO: is this copy or paste???
+        // TODO: is this "copy" or "paste"???
         enum class copyE { Value, Or, Xor };
         template <copyE mode = copyE::Value>
         inline void copy(const tileT& source, posT begin, posT end, tileT& dest, posT dbegin) {
             assert(&source != &dest);
             assert(verify_pos(source, begin, end));
-            // TODO: dbegin...
 
             const int width = end.x - begin.x, height = end.y - begin.y;
+            assert(verify_pos(dest, dbegin, {dbegin.x + width, dbegin.y + height}));
             for (int dy = 0; dy < height; ++dy) {
                 const bool* const s = source.line(begin.y + dy) + begin.x;
                 bool* const d = dest.line(dbegin.y + dy) + dbegin.x;
@@ -408,20 +408,11 @@ namespace legacy {
                            to_RLE_str(tile, begin, end));
     }
 
-    // TODO: skip lines leading with #
-    // TODO: parse leading line (x = ...)
-    // TODO: what if not matching? currently returning a 1x1 dot... should return nothing...
+    // TODO: whether to skip lines leading with '#'?
     inline tileT from_RLE_str(std::string_view text, const rectT& max_size) {
-        {
-            const char *str = text.data(), *end = str + text.size();
-            // TODO: temp; skip first line; test only...
-            if (*str == 'x') {
-                while (str != end && *str != '\n') {
-                    ++str;
-                }
-                ++str;
-            }
-            text = std::string_view(str, end);
+        // TODO: do the real parse... (especially "rule = ..." part)
+        if (text.starts_with('x')) {
+            text.remove_prefix(std::min(text.size(), text.find('\n')));
         }
 
         auto take = [end = text.data() + text.size()](const char*& str) -> std::pair<int, char> {

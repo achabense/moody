@@ -173,11 +173,6 @@ inline bool imgui_enterbutton(const char* label) {
     return ret;
 }
 
-// TODO: remove optional<lockT>...
-// TODO: extract image-data class...
-// TODO: extract paste-info class...
-// TODO: extract ctrl.rule & recorder...
-
 // TODO: support rollbacking diff rules?
 // TODO: support rollbacking locks?
 // TODO: for editing opt, support in-lock and outof-lock mode?
@@ -234,7 +229,7 @@ namespace legacy {
         termT_vec terms_native;
         termT_vec terms_misc;
         termT_vec terms_hex;
-        // TODO: customized...
+        // TODO: about the plan to support user-defined subsets...
 
         void for_each_term(auto fn) {
             for (termT_vec* terms : {&terms_ignore, &terms_native, &terms_misc, &terms_hex}) {
@@ -300,6 +295,9 @@ namespace legacy {
 
             terms_misc.emplace_back("Dual", mk({mp_dual}, mask_identity)); // <-------
 
+            terms_misc.emplace_back("Hex_Tot", mk({mp_hex_C6, mp_hex_tot_exc_s}));
+            terms_misc.emplace_back("Hex_Tot(+s)", mk({mp_hex_C6, mp_hex_tot_inc_s}));
+
             terms_hex.emplace_back("Hex", mk({mp_hex_ignore}));
             terms_hex.emplace_back("a-d", mk({mp_hex_refl_asd}));
             terms_hex.emplace_back("q-c", mk({mp_hex_refl_qsc}));
@@ -311,10 +309,6 @@ namespace legacy {
             terms_hex.emplace_back("C2", mk({mp_hex_C2}));
             terms_hex.emplace_back("C3", mk({mp_hex_C3}));
             terms_hex.emplace_back("C6", mk({mp_hex_C6}));
-
-            // TODO: temp...
-            terms_misc.emplace_back("Hex_Tot", mk({mp_hex_C6, mp_hex_tot_exc_s}));
-            terms_misc.emplace_back("Hex_Tot(+s)", mk({mp_hex_C6, mp_hex_tot_inc_s}));
 
             reset_current();
         }
@@ -698,7 +692,8 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
 
     // TODO: (temp) about the lifetime of mask:
     // mask points at either static objects or par.mask, so this should be safe here...
-    const legacy::maskT& mask = *mask_ptr; // TODO: any lifetime issue?
+    // still this is a horrible design; need redesign...
+    const legacy::maskT& mask = *mask_ptr;
 
     const bool mask_avail = subset.set_mask(mask);
     const bool redispatch_avail = mask_avail && subset.contains(target);
@@ -725,7 +720,6 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
 
         // TODO: imgui_innerx...
         ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
-        // TODO: better to have a prev button for randomize...
         if (imgui_enterbutton("Randomize")) {
             out = legacy::randomize(subset, target, locked, global_mt19937(), rcount, rcount);
         }
@@ -781,7 +775,8 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
         static const char* const strss[3][2]{{"-0", "-1"}, //
                                              {"-.", "-f"},
                                              {"-.", "-d"}};
-        static const ImVec4 cols[2]{{1, 1, 1, 1}, {1, 1, 1, 1}}; // TODO: use different color for 0 and 1...
+        // TODO: instead of using different color, support filtering instead...
+        // static const ImVec4 cols[2]{{1, 1, 1, 1}, {1, 1, 1, 1}};
         const auto strs = strss[&mask == &legacy::mask_zero ? 0 : &mask == &legacy::mask_identity ? 1 : 2];
 
         // TODO: rename... (note that `r` is used as the name for a ruleT (if (button_hit) {...}))
@@ -836,7 +831,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
                 const bool button_hover = ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip);
                 ImGui::SameLine();
                 ImGui::AlignTextToFramePadding();
-                imgui_strcolored(cols[drule[head]], strs[drule[head]]);
+                imgui_str(strs[drule[head]]);
                 // (wontfix) The vertical alignment is imprecise here. For precise alignment see:
                 // https://github.com/ocornut/imgui/issues/2064
 
@@ -880,7 +875,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
                             icons.image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
                             ImGui::SameLine();
                             ImGui::AlignTextToFramePadding();
-                            imgui_strcolored(cols[drule[head]], strs[drule[code]]);
+                            imgui_str(strs[drule[code]]);
                             if (locked[code]) {
                                 ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() - ImVec2(2, 2),
                                                                     ImGui::GetItemRectMax() + ImVec2(2, 2), -1);
@@ -1038,29 +1033,30 @@ struct runner_ctrl {
 int main(int argc, char** argv) {
     app_backend::init();
     {
-        // TODO: refine (names; logic)
         char* base_path = SDL_GetBasePath();
 
-        // TODO: must succeed?
-        if (base_path) {
-            const std::string path = base_path;
-            assert(path.ends_with('\\') || path.ends_with('/'));
-
-            const auto strdup = [](const std::string& str) {
-                char* buf = new char[str.size() + 1];
-                strcpy(buf, str.c_str());
-                return buf;
-            };
-
-            file_nav::add_special_path(std::filesystem::u8path(path), "Exe path");
-
-            // Avoid "imgui.ini" (and maybe also "imgui_log.txt") sprinkling everywhere.
-            // TODO: IniFilename and LogFilename should be unconditionally fixed (even if !base_path...)
-            // (wontfix) These memory leaks are negligible.
-            ImGui::GetIO().IniFilename = strdup(path + "imgui.ini");
-            ImGui::GetIO().LogFilename = strdup(path + "imgui_log.txt");
-            SDL_free(base_path);
+        if (!base_path) {
+            printf("Error: %s", SDL_GetError());
+            exit(EXIT_FAILURE);
         }
+
+        const std::string path = base_path;
+        assert(path.ends_with('\\') || path.ends_with('/'));
+        SDL_free(base_path);
+
+        const auto strdup = [](const std::string& str) {
+            char* buf = new char[str.size() + 1];
+            strcpy(buf, str.c_str());
+            return buf;
+        };
+
+        file_nav::add_special_path(std::filesystem::u8path(path), "Exe path");
+
+        // Avoid "imgui.ini" (and maybe also "imgui_log.txt") sprinkling everywhere.
+        // TODO: IniFilename and LogFilename should be unconditionally fixed (even if not using base-path)
+        // (wontfix) These memory leaks are negligible.
+        ImGui::GetIO().IniFilename = strdup(path + "imgui.ini");
+        ImGui::GetIO().LogFilename = strdup(path + "imgui_log.txt");
 
         // TODO: remove when finished...
         file_nav::add_special_path(R"(C:\*redacted*\Desktop\rulelists_new)", "Temp");
@@ -1073,11 +1069,8 @@ int main(int argc, char** argv) {
     ImGui::StyleColorsDark();
 
     // TODO: works but blurry, and how to apply in project?
-    // {
-    //     const char* fnpath = R"(C:\*redacted*\Desktop\Deng.ttf)";
-    //     ImGui::GetIO().Fonts->AddFontFromFileTTF(fnpath, 13, nullptr,
-    //                                                ImGui::GetIO().Fonts->GetGlyphRangesChineseFull());
-    // }
+    // ImGui::GetIO().Fonts->AddFontFromFileTTF(R"(C:\*redacted*\Desktop\Deng.ttf)", 13, nullptr,
+    //                                          ImGui::GetIO().Fonts->GetGlyphRangesChineseFull());
 
     rule_recorder recorder;
 
@@ -1164,6 +1157,7 @@ int main(int argc, char** argv) {
 
     while (app_backend::begin_frame()) {
         // TODO: applying following logic; consider refining it.
+        // (there should be a single sync point to represent current rule (and lock)...)
         // recorder is modified during display, but will synchronize with runner's before next frame.
         assert(ctrl.rule == recorder.current());
 

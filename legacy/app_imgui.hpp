@@ -193,7 +193,7 @@ class logger {
 public:
     logger() = delete;
 
-    // TODO: replace XXXms with variables...
+    // TODO: replace XXXms with variables... (or enums...)
     template <class... U>
     static void log_temp(std::chrono::milliseconds ms, std::format_string<const U&...> fmt, const U&... args) noexcept {
         m_tempstrs.emplace_back(std::format(fmt, args...), ms);

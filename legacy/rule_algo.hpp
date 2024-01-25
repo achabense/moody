@@ -699,7 +699,6 @@ namespace legacy {
 
         // TODO: clarify the [exact] meaning (&&effects) of these mappers...
         // Native symmetry.
-        // Combination of these requirements can lead to ... TODO: explain, and explain "requirements"...
         inline constexpr mapperT mp_refl_asd("zxc"
                                              "asd"
                                              "qwe"); // '-'
