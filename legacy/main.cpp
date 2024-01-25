@@ -282,6 +282,13 @@ namespace legacy {
             terms_ignore.emplace_back("x", mk({mp_ignore_x}));
             terms_ignore.emplace_back("c", mk({mp_ignore_c}));
 
+            // TODO: temp...
+            terms_ignore.emplace_back("S'", mk({mp_ignore_s}, mask_identity));
+            terms_ignore.emplace_back("Hex", mk({mp_hex_ignore}));
+            // TODO: or define mp_von_ignore?
+            terms_ignore.emplace_back("Von", mk({mp_ignore_q, mp_ignore_e, mp_ignore_z, mp_ignore_c}));
+
+            terms_native.emplace_back("All", mk({mp_refl_wsx, mp_refl_qsc}));
             terms_native.emplace_back("|", mk({mp_refl_wsx}));
             terms_native.emplace_back("-", mk({mp_refl_asd}));
             terms_native.emplace_back("\\", mk({mp_refl_qsc}));
@@ -298,7 +305,7 @@ namespace legacy {
             terms_misc.emplace_back("Hex_Tot", mk({mp_hex_C6, mp_hex_tot_exc_s}));
             terms_misc.emplace_back("Hex_Tot(+s)", mk({mp_hex_C6, mp_hex_tot_inc_s}));
 
-            terms_hex.emplace_back("Hex", mk({mp_hex_ignore}));
+            terms_hex.emplace_back("All", mk({mp_hex_refl_asd, mp_hex_refl_aq}));
             terms_hex.emplace_back("a-d", mk({mp_hex_refl_asd}));
             terms_hex.emplace_back("q-c", mk({mp_hex_refl_qsc}));
             terms_hex.emplace_back("w-x", mk({mp_hex_refl_wsx}));
@@ -395,6 +402,7 @@ namespace legacy {
                         // TODO: slightly confusing; light color should represent "take-into-account" instead of
                         // "ignore" Is this solvable by applying specific coloring scheme?
                         ImGui::TableNextColumn();
+                        ImGui::BeginGroup();
                         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1, 1)); // TODO: too tight...
                         for (int l = 0; l < 3; ++l) {
                             check(terms_ignore[l * 3 + 0], sqr);
@@ -404,6 +412,17 @@ namespace legacy {
                             check(terms_ignore[l * 3 + 2], sqr);
                         }
                         ImGui::PopStyleVar();
+                        ImGui::EndGroup();
+
+                        // TODO (temp) experimental and unstable...
+                        for (int i = 9; i < terms_ignore.size(); ++i) {
+                            ImGui::SameLine();
+                            ImGui::BeginGroup();
+                            imgui_str(terms_ignore[i].title);
+                            check(terms_ignore[i], sqr);
+                            ImGui::EndGroup();
+                        }
+
                         ImGui::EndTable();
                     }
                 }
@@ -439,6 +458,7 @@ namespace legacy {
 
                 ImGui::EndTable();
 
+                // TODO: or just clear on a per-line basis?
                 // TODO: better layout... or right-click menu?
                 ImGui::SameLine();
                 if (ImGui::Button("Clear")) {
