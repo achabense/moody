@@ -10,8 +10,9 @@
 namespace legacy {
     static_assert(INT_MAX >= INT32_MAX);
 
-    // TODO: explain layout... reorganize for better readability...
-    // TODO: add assertions, especially about empty tileT... (e.g. currently even operator== is invalid)
+    // TODO: explain layout.
+    // TODO: add assertions about emptiness...
+    // TODO: define posT pair as rangeT?
     class tileT {
     public:
         struct posT {
@@ -26,7 +27,7 @@ namespace legacy {
 
     private:
         sizeT m_size; // observable width and height.
-        bool* m_data; // layout: [height+2][width]|[height+2][2].
+        bool* m_data; // layout: [height+2][width+2].
 
     public:
         void swap(tileT& other) noexcept {
@@ -40,7 +41,7 @@ namespace legacy {
             return *this;
         }
 
-        explicit tileT(const sizeT& size) : tileT() {
+        explicit tileT(sizeT size) : tileT() {
             if (size.width > 0 && size.height > 0) {
                 m_size = size;
                 m_data = new bool[(m_size.width + 2) * (m_size.height + 2)]{};
@@ -50,7 +51,7 @@ namespace legacy {
 
         // TODO: rephrase...
         // conceptually write-only after this call...
-        void resize(const sizeT& size) {
+        void resize(sizeT size) {
             if (m_size != size) {
                 tileT resized(size);
                 swap(resized);
@@ -89,21 +90,21 @@ namespace legacy {
     private:
         bool* _line(int _y) {
             assert(_y >= 0 && _y < m_size.height + 2);
-            return m_data + _y * m_size.width;
+            return m_data + _y * (m_size.width + 2);
         }
         const bool* _line(int _y) const {
             assert(_y >= 0 && _y < m_size.height + 2);
-            return m_data + _y * m_size.width;
+            return m_data + _y * (m_size.width + 2);
         }
 
     public:
         bool* line(int y) {
             assert(y >= 0 && y < m_size.height);
-            return _line(y + 1);
+            return _line(y + 1) + 1;
         }
         const bool* line(int y) const {
             assert(y >= 0 && y < m_size.height);
-            return _line(y + 1);
+            return _line(y + 1) + 1;
         }
 
         // TODO: avoid code duplication...
@@ -134,19 +135,6 @@ namespace legacy {
         }
 
         // TODO: at(posT)?
-    private:
-        void _set_lr(int _y, bool l, bool r) {
-            assert(_y >= 0 && _y < m_size.height + 2);
-            bool* lr = m_data + m_size.width * (m_size.height + 2);
-            lr[_y * 2] = l;
-            lr[_y * 2 + 1] = r;
-        }
-
-        std::pair<bool, bool> _get_lr(int _y) const {
-            assert(_y >= 0 && _y < m_size.height + 2);
-            const bool* lr = m_data + m_size.width * (m_size.height + 2);
-            return {lr[_y * 2], lr[_y * 2 + 1]};
-        }
 
     public:
         // TODO: This could be used to support boundless space.
@@ -162,18 +150,23 @@ namespace legacy {
             // assert m_shape == *.m_shape.
             const int width = m_size.width, height = m_size.height;
 
-            std::copy_n(w._line(height), width, _line(0));
-            std::copy_n(x._line(1), width, _line(height + 1));
+            auto _set_lr = [width](bool* _line, bool l, bool r) {
+                _line[0] = l;
+                _line[width + 1] = r;
+            };
 
-            _set_lr(0, q._line(height)[width - 1], e._line(height)[0]);
-            _set_lr(height + 1, z._line(1)[width - 1], c._line(1)[0]);
+            _set_lr(_line(0), q._line(height)[width], e._line(height)[1]);
+            std::copy_n(w._line(height) + 1, width, _line(0) + 1);
+
             for (int _y = 1; _y <= height; ++_y) {
-                _set_lr(_y, a._line(_y)[width - 1], d._line(_y)[0]);
+                _set_lr(_line(_y), a._line(_y)[width], d._line(_y)[1]);
             }
+
+            _set_lr(_line(height + 1), z._line(1)[width], c._line(1)[1]);
+            std::copy_n(x._line(1) + 1, width, _line(height + 1) + 1);
         }
 
         // TODO: use is_invocable_r instead?
-        // I hate this function, it is the payment for consecutive data...
         void apply(const std::invocable<codeT> auto& rule, tileT& dest) const {
             // There is supposed to be a call to `gather` before calling `apply`.
             // (Which is untestable and must be guaranteed by the callers.)
@@ -181,52 +174,24 @@ namespace legacy {
             assert(this != &dest);
             dest.resize(m_size);
 
-            const int width = m_size.width, height = m_size.height;
-
-            if (width == 1) [[unlikely]] {
-                for (int _y = 1; _y <= height; ++_y) {
-                    const auto [_q, _e] = _get_lr(_y - 1);
-                    const auto [_a, _d] = _get_lr(_y);
-                    const auto [_z, _c] = _get_lr(_y + 1);
-                    const bool _w = _line(_y - 1)[0];
-                    const bool _s = _line(_y)[0];
-                    const bool _x = _line(_y + 1)[0];
-                    bool* _dest = dest._line(_y);
-
-                    _dest[0] = rule(encode({_q, _w, _e, _a, _s, _d, _z, _x, _c}));
-                }
-                return;
-            }
-
-            for (int _y = 1; _y <= height; ++_y) {
-                const auto [_q, _e] = _get_lr(_y - 1);
-                const auto [_a, _d] = _get_lr(_y);
-                const auto [_z, _c] = _get_lr(_y + 1);
-
-                const bool* _up = _line(_y - 1); // _q _up _e
-                const bool* _ct = _line(_y);     // _a _ct _d
-                const bool* _dw = _line(_y + 1); // _z _dw _c
-
+            for (int _y = 1; _y <= m_size.height; ++_y) {
+                const bool* _up = _line(_y - 1);
+                const bool* _cn = _line(_y);
+                const bool* _dw = _line(_y + 1);
                 bool* _dest = dest._line(_y);
 
-                // clang-format off
-                _dest[0] = rule(encode({_q, _up[0], _up[1],
-                                        _a, _ct[0], _ct[1],
-                                        _z, _dw[0], _dw[1]}));
-                for (int x = 1; x < width - 1; ++x) {
-                    _dest[x] = rule(encode({_up[x - 1], _up[x], _up[x + 1],
-                                            _ct[x - 1], _ct[x], _ct[x + 1],
-                                            _dw[x - 1], _dw[x], _dw[x + 1]}));
+                for (int _x = 1; _x <= m_size.width; ++_x) {
+                    _dest[_x] = rule(encode({
+                        _up[_x - 1], _up[_x], _up[_x + 1], //
+                        _cn[_x - 1], _cn[_x], _cn[_x + 1], //
+                        _dw[_x - 1], _dw[_x], _dw[_x + 1], //
+                    }));
                 }
-                _dest[width - 1] = rule(encode({_up[width - 2], _up[width - 1], _e,
-                                                _ct[width - 2], _ct[width - 1], _d,
-                                                _dw[width - 2], _dw[width - 1], _c}));
-                // clang-format on
             }
         }
 
         // TODO: refine...
-        friend bool operator==(const tileT& l, const tileT& r) { //
+        friend bool operator==(const tileT& l, const tileT& r) {
             if (l.m_size != r.m_size) {
                 return false;
             }
@@ -343,7 +308,7 @@ namespace legacy {
 
         // TODO: is the name meaningful?
         // Return smallest sizeT ~ (>= target) && (% period == 0)
-        inline tileT::sizeT upscale(const tileT::sizeT& target, const tileT::sizeT& period) {
+        inline tileT::sizeT upscale(tileT::sizeT target, tileT::sizeT period) {
             const auto upscale = [](int target, int period) { //
                 return ((target + period - 1) / period) * period;
             };
@@ -414,7 +379,7 @@ namespace legacy {
     }
 
     // TODO: whether to skip lines leading with '#'?
-    inline tileT from_RLE_str(std::string_view text, const tileT::sizeT& max_size) {
+    inline tileT from_RLE_str(std::string_view text, tileT::sizeT max_size) {
         // TODO: do the real parse... (especially "rule = ..." part)
         if (text.starts_with('x')) {
             text.remove_prefix(std::min(text.size(), text.find('\n')));

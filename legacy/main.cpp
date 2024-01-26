@@ -40,7 +40,7 @@ class torusT {
     int m_gen;
 
 public:
-    explicit torusT(const legacy::tileT::sizeT& size) : m_tile(size), m_side(size), m_gen(0) {}
+    explicit torusT(legacy::tileT::sizeT size) : m_tile(size), m_side(size), m_gen(0) {}
 
     // TODO: reconsider whether to expose non-const tile...
     legacy::tileT& tile() { return m_tile; }
@@ -1142,7 +1142,7 @@ int main(int argc, char** argv) {
         legacy::tileT::posT select_0{0, 0}, select_1{0, 0}; // cell index, not pixel.
 
         void clear() { select_0 = select_1 = {0, 0}; }
-        void toggle_select_all(const legacy::tileT::sizeT& size) {
+        void toggle_select_all(legacy::tileT::sizeT size) {
             // all-selected ? clear : select-all
             const auto [min, max] = get();
             if (min.x == 0 && min.y == 0 && max.x == size.width && max.y == size.height) {
