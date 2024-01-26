@@ -40,16 +40,16 @@ class torusT {
     int m_gen;
 
 public:
-    explicit torusT(const legacy::rectT& size) : m_tile(size), m_side(size), m_gen(0) {}
+    explicit torusT(const legacy::tileT::sizeT& size) : m_tile(size), m_side(size), m_gen(0) {}
 
     // TODO: reconsider whether to expose non-const tile...
     legacy::tileT& tile() { return m_tile; }
     const legacy::tileT& tile() const { return m_tile; }
     int gen() const { return m_gen; }
 
-    void restart(tileT_filler filler, std::optional<legacy::rectT> resize = {}) {
-        if (resize) {
-            m_tile.resize(*resize);
+    void restart(tileT_filler filler, std::optional<legacy::tileT::sizeT> size = {}) {
+        if (size) {
+            m_tile.resize(*size);
         }
 
         filler.fill(m_tile);
@@ -1121,7 +1121,7 @@ int main(int argc, char** argv) {
         tile_image m_img{};
 
     public:
-        legacy::posT pos{0, 0}; // dbegin for copy... (TODO: this is confusing...)
+        legacy::tileT::posT pos{0, 0}; // dbegin for copy... (TODO: this is confusing...)
 
         void update(legacy::tileT&& tile) {
             emplace(std::move(tile));
@@ -1139,13 +1139,13 @@ int main(int argc, char** argv) {
     // TODO: ctrl to move selected area?
     struct selectT {
         // []
-        legacy::posT select_0{0, 0}, select_1{0, 0}; // cell index, not pixel.
+        legacy::tileT::posT select_0{0, 0}, select_1{0, 0}; // cell index, not pixel.
 
         void clear() { select_0 = select_1 = {0, 0}; }
-        void toggle_select_all(const legacy::rectT& size) {
+        void toggle_select_all(const legacy::tileT::sizeT& size) {
             // all-selected ? clear : select-all
             const auto [min, max] = get();
-            if (min == legacy::posT{0, 0} && max == legacy::as_pos(size)) {
+            if (min.x == 0 && min.y == 0 && max.x == size.width && max.y == size.height) {
                 clear();
             } else {
                 select_0 = {0, 0};
@@ -1155,9 +1155,9 @@ int main(int argc, char** argv) {
 
         struct minmaxT {
             // [) ; (((min, max ~ imgui naming style...)))
-            legacy::posT min, max;
+            legacy::tileT::posT min, max;
 
-            legacy::rectT size() const { return {.width = max.x - min.x, .height = max.y - min.y}; }
+            legacy::tileT::sizeT size() const { return {.width = max.x - min.x, .height = max.y - min.y}; }
             explicit operator bool() const { return (max.x - min.x > 1) || (max.y - min.y > 1); }
         };
 
@@ -1262,12 +1262,14 @@ int main(int argc, char** argv) {
 
             // TODO: the constraint is arbitrary; are there more sensible ways to decide size constraint?
             const auto clamp_size = [](int width, int height) {
-                return legacy::rectT{.width = std::clamp(width, 64, 1200), .height = std::clamp(height, 64, 1200)};
+                return legacy::tileT::sizeT{.width = std::clamp(width, 64, 1200),
+                                            .height = std::clamp(height, 64, 1200)};
             };
             if (fit) {
                 img_off = {0, 0};
 
-                const legacy::rectT size = clamp_size((int)canvas_size.x / img_zoom, (int)canvas_size.y / img_zoom);
+                const legacy::tileT::sizeT size =
+                    clamp_size((int)canvas_size.x / img_zoom, (int)canvas_size.y / img_zoom);
                 if (runner.tile().size() != size) {
                     runner.restart(filler, size);
                     // TODO: how to support background period then?
@@ -1282,7 +1284,7 @@ int main(int argc, char** argv) {
                 if (ec == std::errc{} && ec2 == std::errc{}) {
                     img_off = {0, 0};
                     img_zoom = 1; // <-- TODO: whether to reset zoom here?
-                    const legacy::rectT size = clamp_size(iwidth, iheight);
+                    const legacy::tileT::sizeT size = clamp_size(iwidth, iheight);
                     if (runner.tile().size() != size) {
                         runner.restart(filler, size);
                     }
@@ -1293,7 +1295,7 @@ int main(int argc, char** argv) {
             }
 
             // Size is fixed now:
-            const legacy::rectT tile_size = runner.tile().size();
+            const legacy::tileT::sizeT tile_size = runner.tile().size();
             const ImVec2 img_size(tile_size.width * img_zoom, tile_size.height * img_zoom);
 
             if (corner) {
@@ -1454,7 +1456,7 @@ int main(int argc, char** argv) {
                 if (imgui_keypressed(ImGuiKey_P, false)) {
                     // TODO: support specifying padding area...
                     legacy::tileT cap(s.size()), cap2(s.size());
-                    legacy::copy(runner.tile(), s.min, s.max, cap, {0, 0});
+                    legacy::copy(runner.tile(), s.min, s.max, cap, cap.begin_pos());
                     legacy::lockT locked{};
                     auto rulx = [&](legacy::codeT code) {
                         locked[code] = true;

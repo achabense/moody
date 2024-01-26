@@ -179,18 +179,20 @@ public:
 
         void* pixels = nullptr;
         int pitch = 0;
+        // TODO: when will pitch != m_w * sizeof(Uint32)?
         const bool succ = SDL_LockTexture(m_texture, nullptr, &pixels, &pitch) == 0;
-        if (!succ || pitch != m_w * sizeof(Uint32)) {
-            // TODO: can pitch == m_w * sizeof(Uint32) be guaranteed?
+        if (!succ) {
             printf("Error: %s", SDL_GetError());
             exit(EXIT_FAILURE);
         }
 
-        // TODO: Relying on both image and tile data being consecutive.
-        const auto data = tile.data();
-        for (int i = 0; i < tile.area(); ++i) {
-            ((Uint32*)pixels)[i] = data[i] ? IM_COL32_WHITE : IM_COL32_BLACK;
-        }
+        tile.for_each_line(tile.begin_pos(), tile.end_pos(), [&](int y, std::span<const bool> line) {
+            Uint32* p = (Uint32*)((char*)pixels + pitch * y);
+            for (bool v : line) {
+                *p++ = v ? IM_COL32_WHITE : IM_COL32_BLACK;
+            }
+        });
+
         SDL_UnlockTexture(m_texture);
 
         return m_texture;
