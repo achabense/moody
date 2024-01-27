@@ -16,8 +16,8 @@
 // For example, bool is allowed to have padding bits, so memcmp may not apply...
 
 namespace legacy {
-    // The environment around "s".
-    // TODO: other layouts are possible: https://en.wikipedia.org/wiki/QWERTZ
+    // The environment around `s`.
+    // (The variables are named after the keys in the qwerty keyboard.)
     struct envT {
         bool q, w, e;
         bool a, s, d;
@@ -25,6 +25,7 @@ namespace legacy {
     };
 
     // TODO: remove remaining direct use of "512"...
+    // Encode envT to an integer.
     struct codeT {
         int val;
         constexpr /*implicit*/ operator int() const {
@@ -35,7 +36,7 @@ namespace legacy {
         template <class T>
         using map_to = std::array<T, 512>;
 
-        // rename to bpos_*?
+        // TODO: rename to bpos_*?
         enum bposE : int { env_q = 0, env_w, env_e, env_a, env_s, env_d, env_z, env_x, env_c };
     };
 
@@ -79,13 +80,11 @@ namespace legacy {
     } // namespace _misc::tests
 #endif
 
-    // TODO: rephrase...
-    // Unambiguously refer to the map from env-code to the new state.
+    // Map codeT to the value `s` become at next generation.
     class ruleT {
         codeT::map_to<bool> m_map{};
 
     public:
-        // TODO: explain why defining an extra operator().
         constexpr bool operator()(codeT code) const { return m_map[code]; }
 
         constexpr bool operator[](codeT code) const { return m_map[code]; }

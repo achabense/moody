@@ -209,10 +209,15 @@ namespace legacy {
             return true;
         }
 
-        // Prove that the intersection(&) of any two subsetT (a) and (b) is either an empty set or another subsetT.
-        // 1. If (a & b) result in an empty set, it is a subsetT.
-        // 2. Otherwise, there is at least a rule (r) in (a & b).
-        // TODO... finish the proof...
+        // TODO: finish the proof...
+        // Prove that the intersection (&) of any two subsetT (a) and (b) is still another subsetT.
+        // If (a & b) results in an empty set, it is a subsetT.
+        // Otherwise, let (p) be (a.par | b.par), and let (r) be one of the rule that belongs to (a & b).
+        // It can be shown that (a & b) == subsetT(r, p).
+        // 1. Any rule in (r, p) can be gotten by flipping some groups of (p) from (r).
+        // ...
+        // 2. For any r' != r but belongs to (a) and (b), ... look at any [codeT] of it.
+        // ...
         friend subsetT operator&(const subsetT& a_, const subsetT& b_) {
             if (a_.empty() || b_.empty()) {
                 return {emptyT{}};
@@ -329,17 +334,6 @@ namespace legacy {
         return free;
     }
 
-    // TODO: blindly applying enhance can lead to more inconsistent locked groups...
-    // inline void enhance(const partitionT& par, lockT& locked) {
-    //     par.for_each_group([&](const groupT& group) {
-    //         if (any_locked(locked, group)) {
-    //             for (codeT code : group) {
-    //                 locked[code] = true;
-    //             }
-    //         }
-    //     });
-    // }
-
     // TODO: too strict?
     inline void enhance(const subsetT& subset, const ruleT& rule, lockT& locked) {
         assert(subset.contains(rule));
@@ -393,22 +387,14 @@ namespace legacy {
         return mask ^ r;
     }
 
-    // TODO: redispatch currently does two jobs:
-    // 1. implicitly does an "approximation" for the rule if not contains, ignoring locked groups.
-    // 2. perform in-set "redispatch" (or whatever suitable word), still ignoring locked groups.
+    // TODO: redispatch is sometimes too strict.
+    // For example, when doing randomization/000/111, whether the current rule belongs to the subset
+    // doesn't matter much... (but what about locked groups?)
 
-    // The fact that the impl ignore the locked groups means this function still cannot guarantee the result
-    // belongs to the subset. (when the locked parts are incompatible with the subset)
-    // For better clarity, it's better to enforce stricter and more fine-grained editions instead...
-    // (Compatible->Approximate->Redispatch(must already contains, so this is purely a function to convert within
-    // the same subset))
-
+    // TODO: is `redispatch` a suitable name?
     // Also, it might be helpful to support "in-lock" redispatch. For example, to dial to find potentially related
     // patterns...
     // Directly invert the locks, or add a flag in redispatch?
-
-    // TODO: is `redispatch` a suitable name?
-    // TODO: whether to skip/allow inconsistent groups?
     inline ruleT redispatch(const subsetT& subset, const ruleT& rule, const lockT& locked,
                             std::invocable<bool*, bool*> auto fn) {
         assert(subset.contains(rule));
@@ -462,7 +448,6 @@ namespace legacy {
 
     // TODO: rename to [set_]first / ...
     struct act_int {
-        // TODO: disable !par.test(...) checks...
         static ruleT first(const subsetT& subset, const ruleT& rule, const lockT& locked) {
             return redispatch(subset, rule, locked, [](bool* begin, bool* end) { std::fill(begin, end, 0); });
         }

@@ -240,10 +240,10 @@ namespace legacy {
         }
 
         void reset_current() {
-            // TODO: add relation assertion between selected, includes_cur and disabled.
             current = subsetT::universalT{};
 
             for_each_term([&](termT& t) {
+                assert(!t.disabled || !t.selected); // disabled -> !selected
                 if (t.selected) {
                     current = current & t.set;
                 }
@@ -253,6 +253,7 @@ namespace legacy {
 
             for_each_term([&](termT& t) {
                 t.includes_cur = t.set.includes(current);
+                assert(!t.selected || t.includes_cur); // selected -> includes_cur
                 // TODO: involves a lot of unneeded calculations...
                 t.disabled = !t.includes_cur && (t.set & current).empty();
             });
@@ -629,14 +630,7 @@ std::optional<std::pair<legacy::ruleT, legacy::lockT>> stone_constraints() {
     return std::nullopt;
 }
 
-// <TODO: add strict mode, and open by default.
-// (the mask itself must satisfy the concepts denoted by the par)
-// ~ what is allowed/not allowed when violated?
-// ~ how to show violation?
-// ~ how to deal with duality (which requires identity mask...) all concepts are currently implicitly based on
-// mask_zero...
-// TODO>
-
+// TODO: there must be an [obvious] way to support "dial" mode.
 // TODO: ideally, `locked` doesn't belong to editor...
 // TODO: should be a class... how to decouple? ...
 // TODO: the target and lock belongs to a single sync point...
@@ -715,6 +709,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
     // still this is a horrible design; need redesign...
     const legacy::maskT& mask = *mask_ptr;
 
+    // TODO: make what to do obvious when !mask_avail !redispatch_avail etc...
     const bool mask_avail = subset.set_mask(mask);
     const bool redispatch_avail = mask_avail && subset.contains(target);
 
@@ -729,6 +724,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
             ImGui::BeginDisabled();
         }
 
+        // TODO: support different rand mode here ("density" and "exact")
         // TODO: still unstable between partition switches...
         // TODO: the range should be scoped by locks... so, what should rcount be?
         static int rcount = 0.5 * par.k();
@@ -776,17 +772,17 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
             locked = {};
         }
         ImGui::SameLine();
-        // TODO: move elsewhere
-        if (ImGui::Button("Mir")) {
-            out = legacy::mirror_v2(target, locked);
-        }
-        ImGui::SameLine();
         if (ImGui::Button("Approximate")) {
             if (legacy::compatible(subset, target, locked)) {
                 out = legacy::approximate(subset, target, locked);
             } else {
                 logger::log_temp(300ms, "Incompatible ... TODO"); // TODO refine...
             }
+        }
+        ImGui::SameLine();
+        // TODO: move elsewhere
+        if (ImGui::Button("Mir")) {
+            out = legacy::mirror_v2(target, locked);
         }
     }
 
@@ -799,9 +795,9 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
         // static const ImVec4 cols[2]{{1, 1, 1, 1}, {1, 1, 1, 1}};
         const auto strs = strss[&mask == &legacy::mask_zero ? 0 : &mask == &legacy::mask_identity ? 1 : 2];
 
-        // TODO: rename... (note that `r` is used as the name for a ruleT (if (button_hit) {...}))
-        const legacy::ruleT_masked drule = mask ^ target;
-        const auto scanlist = legacy::scan(par, drule, locked);
+        // TODO: find a better name for `ruleT_masked` and the variables...
+        const legacy::ruleT_masked masked = mask ^ target;
+        const auto scanlist = legacy::scan(par, masked, locked);
         {
             // TODO: add more statistics... e.g. full vs partial lock...
             const int c_group = par.k();
@@ -851,7 +847,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
                 const bool button_hover = ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip);
                 ImGui::SameLine();
                 ImGui::AlignTextToFramePadding();
-                imgui_str(strs[drule[head]]);
+                imgui_str(strs[masked[head]]);
                 // (wontfix) The vertical alignment is imprecise here. For precise alignment see:
                 // https://github.com/ocornut/imgui/issues/2064
 
@@ -892,10 +888,11 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
                                 ImGui::SameLine();
                             }
                             // TODO: change color?
+                            // ImGui::GetStyle().Colors[ImGuiCol_Button]
                             icons.image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
                             ImGui::SameLine();
                             ImGui::AlignTextToFramePadding();
-                            imgui_str(strs[drule[code]]);
+                            imgui_str(strs[masked[code]]);
                             if (locked[code]) {
                                 ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() - ImVec2(2, 2),
                                                                     ImGui::GetItemRectMax() + ImVec2(2, 2), -1);
@@ -1339,6 +1336,7 @@ int main(int argc, char** argv) {
             const bool active = ImGui::IsItemActive();
             ctrl.pause2 = paste || active; // TODO: won't work if |= active... should ctrl.run clear pause2?
             if (ImGui::IsItemHovered()) {
+                // TODO: reorganize...
                 const ImGuiIO& io = ImGui::GetIO();
 
                 assert(ImGui::IsMousePosValid());
@@ -1365,7 +1363,8 @@ int main(int argc, char** argv) {
                 }
 
                 // TODO: refine...
-                if (img_zoom <= 2 && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                if (img_zoom <= 2 && !ImGui::IsMouseDown(ImGuiMouseButton_Left) &&
+                    !ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
                     int celx = floor((mouse_pos.x - img_pos.x) / img_zoom);
                     int cely = floor((mouse_pos.y - img_pos.y) / img_zoom);
                     if (celx >= 0 && celx < tile_size.width && cely >= 0 && cely < tile_size.height) {
