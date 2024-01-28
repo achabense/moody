@@ -446,6 +446,14 @@ namespace legacy {
         return redispatch(subset, rule, locked, [&rand](bool* begin, bool* end) { std::shuffle(begin, end, rand); });
     }
 
+    inline ruleT randomize_v2(const subsetT& subset, const ruleT& rule, const lockT& locked, std::mt19937& rand,
+                              double density) {
+        return redispatch(subset, rule, locked, [&rand, density](bool* begin, bool* end) {
+            std::bernoulli_distribution dist(std::clamp(density, 0.0, 1.0));
+            std::generate(begin, end, [&] { return dist(rand); });
+        });
+    }
+
     // TODO: rename to [set_]first / ...
     struct act_int {
         static ruleT first(const subsetT& subset, const ruleT& rule, const lockT& locked) {

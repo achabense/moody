@@ -744,6 +744,18 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
             out = legacy::shuffle(subset, target, locked, global_mt19937());
         }
 
+        {
+            // TODO; experimental...
+            ImGui::SetNextItemWidth(FixedItemWidth);
+            static float density = 0.5;
+            ImGui::SliderFloat("##Density", &density, 0, 1, std::format("Around {}", round(density * par.k())).c_str(),
+                               ImGuiSliderFlags_NoInput);
+            ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+            if (imgui_enterbutton("Randomize(V2)")) {
+                out = legacy::randomize_v2(subset, target, locked, global_mt19937(), density);
+            }
+        }
+
         iter_pair(
             "<00..", "dec", "inc", "11..>", //
             [&] { out = legacy::act_int::first(subset, target, locked); },
@@ -1184,6 +1196,8 @@ int main(int argc, char** argv) {
             }
         }
 
+        // TODO: let right+ctrl move the block?
+
         // TODO: set pattern as init state? what if size is already changed?
         // TODO: specify mouse-dragging behavior (especially, no-op must be an option)
         // TODO: range-selected randomization don't need fixed seed. However, there should be a way to specify density.
@@ -1315,6 +1329,7 @@ int main(int argc, char** argv) {
             if (paste && (paste->width() > tile_size.width || paste->height() > tile_size.height)) {
                 paste.reset();
             }
+            // TODO: displays poorly with miniwindow...
             if (paste) {
                 ctrl.pause2 = true;
                 paste.pos.x = std::clamp(paste.pos.x, 0, tile_size.width - paste->width());
@@ -1327,8 +1342,12 @@ int main(int argc, char** argv) {
                 drawlist->AddRectFilled(min, max, IM_COL32(255, 0, 0, 60));
             }
             if (const auto s = sel.get()) {
+                // drawlist->AddRectFilled(img_pos + ImVec2(s.min.x, s.min.y) * img_zoom,
+                //                         img_pos + ImVec2(s.max.x, s.max.y) * img_zoom, IM_COL32(0, 255, 0, 60));
                 drawlist->AddRectFilled(img_pos + ImVec2(s.min.x, s.min.y) * img_zoom,
-                                        img_pos + ImVec2(s.max.x, s.max.y) * img_zoom, IM_COL32(0, 255, 0, 60));
+                                        img_pos + ImVec2(s.max.x, s.max.y) * img_zoom, IM_COL32(0, 255, 0, 40));
+                drawlist->AddRect(img_pos + ImVec2(s.min.x, s.min.y) * img_zoom,
+                                  img_pos + ImVec2(s.max.x, s.max.y) * img_zoom, IM_COL32(0, 255, 0, 160));
             }
             drawlist->PopClipRect();
 
@@ -1348,18 +1367,6 @@ int main(int argc, char** argv) {
                     } else if (img_zoom == 1) {
                         runner.shift(io.MouseDelta.x, io.MouseDelta.y);
                     }
-                }
-                if (imgui_scrolling()) {
-                    const ImVec2 cellidx = (mouse_pos - img_pos) / img_zoom;
-                    if (imgui_scrolldown() && img_zoom != 1) {
-                        img_zoom /= 2;
-                    }
-                    if (imgui_scrollup() && img_zoom != 8) {
-                        img_zoom *= 2;
-                    }
-                    img_off = (mouse_pos - cellidx * img_zoom) - canvas_pos;
-                    img_off.x = round(img_off.x);
-                    img_off.y = round(img_off.y); // TODO: is rounding correct?
                 }
 
                 // TODO: refine...
@@ -1417,6 +1424,20 @@ int main(int argc, char** argv) {
                         legacy::copy<legacy::copyE::Or>(*paste, runner.tile(), paste.pos);
                         paste.reset();
                     }
+                }
+
+                // TODO (temp) moved here to avoid affecting other utils (which rely on img_pos)
+                if (imgui_scrolling()) {
+                    const ImVec2 cellidx = (mouse_pos - img_pos) / img_zoom;
+                    if (imgui_scrolldown() && img_zoom != 1) {
+                        img_zoom /= 2;
+                    }
+                    if (imgui_scrollup() && img_zoom != 8) {
+                        img_zoom *= 2;
+                    }
+                    img_off = (mouse_pos - cellidx * img_zoom) - canvas_pos;
+                    img_off.x = round(img_off.x);
+                    img_off.y = round(img_off.y); // TODO: is rounding correct?
                 }
             }
 
@@ -1502,6 +1523,12 @@ int main(int argc, char** argv) {
                     }
                     if (auto out = edit_rule(ctrl.rule, ctrl.locked, icons)) {
                         recorder.take(*out);
+                    }
+
+                    // TODO: This is used to pair with enter key and is somewhat broken...
+                    // TODO: should enter set_next first?
+                    if (imgui_keypressed(ImGuiKey_Apostrophe, false)) {
+                        recorder.set_prev();
                     }
                 }
                 ImGui::TableNextColumn();
