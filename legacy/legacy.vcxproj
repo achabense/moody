@@ -80,11 +80,11 @@
     <LibraryPath>F:\lib\SDL2-devel-2.28.4-VC\SDL2-2.28.4\lib\x64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>F:\lib\SDL2-devel-2.28.4-VC\SDL2-2.28.4\include;C:\*redacted*\source\repos\legacy\legacy\imgui;$(IncludePath)</IncludePath>
+    <IncludePath>F:\lib\SDL2-devel-2.28.4-VC\SDL2-2.28.4\include;C:\*redacted*\source\repos\legacy\legacy\imgui;C:\*redacted*\source\repos\legacy\legacy\imgui_sdl2;$(IncludePath)</IncludePath>
     <LibraryPath>F:\lib\SDL2-devel-2.28.4-VC\SDL2-2.28.4\lib\x64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>F:\lib\SDL2-devel-2.28.4-VC\SDL2-2.28.4\include;C:\*redacted*\source\repos\legacy\legacy\imgui;$(IncludePath)</IncludePath>
+    <IncludePath>F:\lib\SDL2-devel-2.28.4-VC\SDL2-2.28.4\include;C:\*redacted*\source\repos\legacy\legacy\imgui;C:\*redacted*\source\repos\legacy\legacy\imgui_sdl2;$(IncludePath)</IncludePath>
     <LibraryPath>F:\lib\SDL2-devel-2.28.4-VC\SDL2-2.28.4\lib\x64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">

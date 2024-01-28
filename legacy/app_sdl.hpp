@@ -20,8 +20,8 @@
 #include <SDL.h>
 
 #include "imgui.h"
-#include "imgui_sdl2/imgui_impl_sdl2.h"
-#include "imgui_sdl2/imgui_impl_sdlrenderer2.h"
+#include "imgui_impl_sdl2.h"
+#include "imgui_impl_sdlrenderer2.h"
 
 #include "rule.hpp"
 #include "tile.hpp"
