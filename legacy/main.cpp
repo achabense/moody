@@ -329,45 +329,41 @@ namespace legacy {
             // TODO: tooltip...
             // TODO: recheck id & tid logic... (& imagebutton)
             auto check = [&, id = 0](termT& term, const ImVec2& size) mutable {
-                // TODO: which should come first? rendering or dummy button?
-                const ImVec2 pos = ImGui::GetCursorScreenPos();
-                const ImVec2 pos_max = pos + size;
-                // TODO: add size assertion? (size>8 etc)
-                // TODO: explain coloring scheme; redesign if necessary (especially ring col)
-                const ImU32 cen_col = term.selected       ? ImGui::GetColorU32(ImGuiCol_ButtonHovered)
-                                      : term.includes_cur ? ImGui::GetColorU32(ImGuiCol_FrameBg)
-                                      : term.disabled     ? IM_COL32(150, 0, 0, 255)
-                                                          : IM_COL32_BLACK;
-                // TODO: find better color for "disabled"... currently too ugly.
-
-                const ImU32 ring_col = term.set.contains(target)              ? IM_COL32(0, 255, 0, 255)
-                                       : compatible(term.set, target, locked) ? IM_COL32(0, 100, 0, 255)
-                                                                              : IM_COL32(255, 0, 0, 255);
-                // TODO: ring_col is also terrible...
-
-                ImGui::GetWindowDrawList()->AddRectFilled(pos + ImVec2(4, 4), pos_max - ImVec2(4, 4), cen_col);
-                ImGui::GetWindowDrawList()->AddRect(pos, pos_max, ring_col);
-
+                // TODO: change color when hovered?
+                // bool hovered = false;
                 ImGui::PushID(id++);
                 if (!term.disabled) {
                     if (ImGui::InvisibleButton("Check", size)) {
                         term.selected = !term.selected;
-                        // TODO: whether to try to avoid unnecessary calculation?
-                        // No need to reset if the newly selected term already included current.
-                        // if (!(term.selected && term.includes_cur)) {
+                        // TODO: No need to reset if the newly selected term already included current.
                         need_reset = true;
-                        // }
+
+                        // TODO: need to recheck all invisible buttons etc if to enable Navigation.
+                        // e.g. RenderNavHighlight
                     }
-                    // TODO: this is in imgui_internal.h...
-                    // TODO: Ask is it intentional to make InvisibleButton highlight-less?
-                    // TODO: use normal buttons instead?
-                    ImGui::RenderNavHighlight({ImGui::GetItemRectMin(), ImGui::GetItemRectMax()}, ImGui::GetItemID());
-                    // ImGui::RenderNavHighlight({pos, pos_max}, ImGui::GetItemID()); TODO: is this correct?
+                    // hovered = ImGui::IsItemHovered();
                 } else {
                     ImGui::Dummy(size);
                 }
-
                 ImGui::PopID();
+
+                // TODO: explain coloring scheme; redesign if necessary (especially ring col)
+                // TODO: find better color for "disabled"/incompatible etc... currently too ugly.
+                const ImU32 cen_col = term.selected       ? ImGui::GetColorU32(ImGuiCol_ButtonHovered)
+                                      : term.includes_cur ? ImGui::GetColorU32(ImGuiCol_FrameBg)
+                                      : term.disabled     ? IM_COL32(150, 0, 0, 255)
+                                                          : IM_COL32_BLACK;
+                const ImU32 ring_col = term.set.contains(target)              ? IM_COL32(0, 255, 0, 255)
+                                       : compatible(term.set, target, locked) ? IM_COL32(0, 100, 0, 255)
+                                                                              : IM_COL32(255, 0, 0, 255);
+
+                const ImVec2 pos_min = ImGui::GetItemRectMin();
+                const ImVec2 pos_max = ImGui::GetItemRectMax();
+                assert(pos_min.x + size.x == pos_max.x);
+                assert(pos_min.y + size.y == pos_max.y);
+                assert(size.x > 8 && size.y > 8);
+                ImGui::GetWindowDrawList()->AddRectFilled(pos_min + ImVec2(4, 4), pos_max - ImVec2(4, 4), cen_col);
+                ImGui::GetWindowDrawList()->AddRect(pos_min, pos_max, ring_col);
             };
 
             // TODO: the layout is still horrible...
@@ -648,14 +644,14 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
 
     ImGui::Separator();
 
-    // TODO: let subset select working masks...
-    // TODO: any mask should be usable (if view only), but to allow edition the rule the subset should contain the
-    // mask...
+    // TODO: this part is fairly poorly designed and implemented... redesign...
     // TODO: add more selections...
     // TODO: enable testing masking rule instead of target rule when hovered...
     const legacy::maskT* mask_ptr = nullptr;
+    char chr_0 = '0', chr_1 = '1';
     {
         const auto tooltip = [](const legacy::maskT& mask, const char* description) {
+            // TODO: toggle on/off...
             if (ImGui::BeginItemTooltip()) {
                 ImGui::PushTextWrapPos(250); // TODO: how to decide wrap pos properly?
                 imgui_str(description);
@@ -665,6 +661,16 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
             }
         };
 
+        // TODO: should not be here?
+        constexpr auto make_id = [](legacy::codeT::bposE bpos) {
+            return legacy::make_rule([bpos](legacy::codeT c) { return legacy::get(c, bpos); });
+        };
+        static const legacy::maskT mask_ids[]{
+            make_id(legacy::codeT::env_q), make_id(legacy::codeT::env_w), make_id(legacy::codeT::env_e),
+            make_id(legacy::codeT::env_a), make_id(legacy::codeT::env_s), make_id(legacy::codeT::env_d),
+            make_id(legacy::codeT::env_z), make_id(legacy::codeT::env_x), make_id(legacy::codeT::env_c)};
+        static int id_tag = 4; // s...
+
         static legacy::maskT mask_custom{{}};
 
         // TODO: better name...
@@ -673,35 +679,55 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
                                                      "...", //
                                                      "...", // TODO...
                                                      "..."};
-        static int mask_id = 0;
+        static int mask_tag = 0;
 
-        const legacy::maskT* const mask_ptrs[]{&legacy::mask_zero, &legacy::mask_identity, &subset.get_mask(),
-                                               &mask_custom};
+        const legacy::maskT* mask_ptrs[]{&legacy::mask_zero, &mask_ids[id_tag], &subset.get_mask(), &mask_custom};
 
         ImGui::AlignTextToFramePadding();
         imgui_str("Mask");
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 4; ++i) {
             ImGui::SameLine();
             // ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
-            if (ImGui::RadioButton(mask_labels[i], mask_id == i)) {
-                mask_id = i;
+
+            if (i != 1) {
+                if (ImGui::RadioButton(mask_labels[i], mask_tag == i)) {
+                    mask_tag = i;
+                }
+            } else {
+                if (ImGui::RadioButton(std::format("Identity({})###Identity", "qweasdzxc"[id_tag]).c_str(),
+                                       mask_tag == i)) {
+                    mask_tag = i;
+                }
+                // TODO: awkward; use popup window instead?
+                if (ImGui::IsItemHovered()) {
+                    if (imgui_scrollup()) {
+                        id_tag = std::max(id_tag - 1, 0);
+                    }
+                    if (imgui_scrolldown()) {
+                        id_tag = std::min(id_tag + 1, 8);
+                    }
+                }
             }
             tooltip(*mask_ptrs[i], mask_descriptions[i]);
         }
 
         ImGui::SameLine();
-        if (mask_id == 3) {
+        if (mask_tag == 3) {
             if (ImGui::Button("Take current rule")) {
                 mask_custom = {target};
             }
             tooltip(mask_custom, mask_descriptions[3]);
         } else {
             if (ImGui::Button("Try custom")) {
-                mask_id = 3;
+                mask_tag = 3;
             }
         }
 
-        mask_ptr = mask_ptrs[mask_id];
+        mask_ptr = mask_ptrs[mask_tag];
+        // TODO: horrible...
+        if (mask_tag != 0) {
+            chr_0 = '.', chr_1 = '!';
+        }
     }
 
     // TODO: (temp) about the lifetime of mask:
@@ -798,14 +824,9 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
         }
     }
 
+    // TODO: support filtering?
     {
-        // TODO: broken now; redesign...
-        static const char* const strss[3][2]{{"-0", "-1"}, //
-                                             {"-.", "-f"},
-                                             {"-.", "-d"}};
-        // TODO: instead of using different color, support filtering instead...
-        // static const ImVec4 cols[2]{{1, 1, 1, 1}, {1, 1, 1, 1}};
-        const auto strs = strss[&mask == &legacy::mask_zero ? 0 : &mask == &legacy::mask_identity ? 1 : 2];
+        const char labels[2][3]{{'-', chr_0, '\0'}, {'-', chr_1, '\0'}};
 
         // TODO: find a better name for `ruleT_masked` and the variables...
         const legacy::ruleT_masked masked = mask ^ target;
@@ -831,8 +852,8 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
                 }
             }
             // TODO: locked{all-0,all-1,inc}, unlocked{all-0,all-1...} etc...
-            ImGui::Text("Groups:%d (Locked:%d) [%c:%d] [%c:%d] [%c:%d]", c_group, c_locked, strs[0][1], c_0, strs[1][1],
-                        c_1, 'x', c_inconsistent);
+            ImGui::Text("Groups:%d (Locked:%d) [%c:%d] [%c:%d] [%c:%d]", c_group, c_locked, chr_0, c_0, chr_1, c_1, 'x',
+                        c_inconsistent);
         }
 
         if (auto child = imgui_childwindow("Details")) {
@@ -859,7 +880,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
                 const bool button_hover = ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip);
                 ImGui::SameLine();
                 ImGui::AlignTextToFramePadding();
-                imgui_str(strs[masked[head]]);
+                imgui_str(labels[masked[head]]);
                 // (wontfix) The vertical alignment is imprecise here. For precise alignment see:
                 // https://github.com/ocornut/imgui/issues/2064
 
@@ -904,7 +925,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
                             icons.image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
                             ImGui::SameLine();
                             ImGui::AlignTextToFramePadding();
-                            imgui_str(strs[masked[code]]);
+                            imgui_str(labels[masked[code]]);
                             if (locked[code]) {
                                 ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() - ImVec2(2, 2),
                                                                     ImGui::GetItemRectMax() + ImVec2(2, 2), -1);
