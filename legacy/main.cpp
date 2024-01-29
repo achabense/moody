@@ -8,6 +8,9 @@
 
 #include "rule_algo.hpp"
 
+// TODO: Right-click must either to open a submenu, or to toggle on/off the tooltip.
+// TODO: Generalize typical behavior patterns to find new rules.
+
 // TODO: this is still not a suitable pos for these definitions...
 #ifndef TEMP_POS
 
@@ -650,14 +653,14 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
     const legacy::maskT* mask_ptr = nullptr;
     char chr_0 = '0', chr_1 = '1';
     {
-        const auto tooltip = [](const legacy::maskT& mask, const char* description) {
-            // TODO: toggle on/off...
-            if (ImGui::BeginItemTooltip()) {
-                ImGui::PushTextWrapPos(250); // TODO: how to decide wrap pos properly?
+        const auto mask_tooltip = [](const legacy::maskT& mask, const char* description) {
+            static bool toggle = true;
+            if (auto tooltip = imgui_itemtooltip(toggle)) {
+                ImGui::PushTextWrapPos(280); // TODO: how to decide wrap pos properly?
+                imgui_str("Right click to turn on/off the tooltip");
                 imgui_str(description);
                 imgui_str(to_MAP_str(mask));
                 ImGui::PopTextWrapPos();
-                ImGui::EndTooltip();
             }
         };
 
@@ -708,7 +711,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
                     }
                 }
             }
-            tooltip(*mask_ptrs[i], mask_descriptions[i]);
+            mask_tooltip(*mask_ptrs[i], mask_descriptions[i]);
         }
 
         ImGui::SameLine();
@@ -716,7 +719,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
             if (ImGui::Button("Take current rule")) {
                 mask_custom = {target};
             }
-            tooltip(mask_custom, mask_descriptions[3]);
+            mask_tooltip(mask_custom, mask_descriptions[3]);
         } else {
             if (ImGui::Button("Try custom")) {
                 mask_tag = 3;
@@ -877,7 +880,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
                     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.9f, 0, 0, 1));
                 }
                 const bool button_hit = icons.button(head, zoom);
-                const bool button_hover = ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip);
+                const bool button_hover = ImGui::IsItemHovered();
                 ImGui::SameLine();
                 ImGui::AlignTextToFramePadding();
                 imgui_str(labels[masked[head]]);
@@ -901,18 +904,17 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
                 }
                 ImGui::SameLine();
                 imgui_strdisabled("?");
-                // TODO: recheck other IsItemHovered usages...
-                if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
-                    static bool show_group = true;
-                    if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-                        show_group = !show_group;
-                    }
+                {
+                    // TODO: (temp) the application of imgui_itemtooltip unnecessarily brought End/Begin Disabled
+                    // to each group...
+
                     // TODO: transparency of the tooltip is also affected if in disabled block... Is the effect
                     // intentional / configurable?
                     if (!mask_avail) {
                         ImGui::EndDisabled();
                     }
-                    if (show_group && ImGui::BeginTooltip()) {
+                    static bool toggle = true;
+                    if (auto tooltip = imgui_itemtooltip(toggle)) {
                         imgui_str("Right click to turn on/off the tooltip");
                         ImGui::Text("Group size: %d", (int)group.size());
                         const int max_to_show = 40;
@@ -937,7 +939,6 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
                         if (group.size() > max_to_show) {
                             imgui_str("...");
                         }
-                        ImGui::EndTooltip();
                     }
                     if (!mask_avail) {
                         ImGui::BeginDisabled();
@@ -1112,8 +1113,13 @@ int main(int argc, char** argv) {
         file_nav::add_special_path(R"(C:\*redacted*\Desktop\rulelists_new)", "Temp");
     }
 
-    // ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
-    // ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
+    // TODO: rephrase...
+    // Currently the program doesn't attempt to deal with navigation mode.
+    // The controls and program-defined widgets are not taking nav-mode compatiblity into consideration.
+    // ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // X
+    // ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // X
+    assert(!(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_NavEnableKeyboard));
+    assert(!(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_NavEnableGamepad));
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
@@ -1391,27 +1397,44 @@ int main(int argc, char** argv) {
                 }
 
                 // TODO: refine...
-                if (img_zoom <= 2 && !ImGui::IsMouseDown(ImGuiMouseButton_Left) &&
-                    !ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-                    int celx = floor((mouse_pos.x - img_pos.x) / img_zoom);
-                    int cely = floor((mouse_pos.y - img_pos.y) / img_zoom);
-                    if (celx >= 0 && celx < tile_size.width && cely >= 0 && cely < tile_size.height) {
-                        static bool show_zoom = true;
-                        // TODO: using middle button as this conflicts with right-ctrl...
-                        if (ImGui::IsMouseClicked(ImGuiMouseButton_Middle)) {
-                            show_zoom = !show_zoom;
-                        }
-                        if (show_zoom && ImGui::BeginTooltip()) {
-                            int minx = std::max(celx - 20, 0);
-                            int miny = std::max(cely - 20, 0);
-                            int maxx = std::min(celx + 20, tile_size.width);
-                            int maxy = std::min(cely + 20, tile_size.height);
-                            int w = maxx - minx, h = maxy - miny;
-                            imgui_str("Middle click to turn on/off\nthe tooltip");
-                            ImGui::Image(img.texture(), ImVec2(w * 4, h * 4),
+                // TODO: zoom window temporarily conflicts with range selection... (both use Rclick)
+                if (img_zoom <= 2 && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                    const int celx = floor((mouse_pos.x - img_pos.x) / img_zoom);
+                    const int cely = floor((mouse_pos.y - img_pos.y) / img_zoom);
+                    if (celx >= -10 && celx < tile_size.width + 10 && cely >= -10 && cely < tile_size.height + 10) {
+                        static bool toggle = true;
+                        if (auto tooltip = imgui_itemtooltip(toggle)) {
+                            // int minx = std::max(celx - 20, 0);
+                            // int miny = std::max(cely - 20, 0);
+                            // int maxx = std::min(celx + 20, tile_size.width);
+                            // int maxy = std::min(cely + 20, tile_size.height);
+
+                            // TODO: simplify...
+                            assert(tile_size.width >= 40);
+                            assert(tile_size.height >= 40);
+                            int minx = celx - 20, miny = cely - 20;
+                            int maxx = celx + 20, maxy = cely + 20;
+                            if (minx < 0) {
+                                minx = 0, maxx = 40;
+                            }
+                            if (miny < 0) {
+                                miny = 0, maxy = 40;
+                            }
+                            if (maxx > tile_size.width) {
+                                minx = tile_size.width - 40, maxx = tile_size.width;
+                            }
+                            if (maxy > tile_size.height) {
+                                miny = tile_size.height - 40, maxy = tile_size.height;
+                            }
+                            assert(maxx - minx == 40 && maxy - miny == 40);
+
+                            const int w = maxx - minx, h = maxy - miny;
+                            ImGui::PushTextWrapPos(200);
+                            imgui_str("Right click to turn on/off the tooltip");
+                            ImGui::PopTextWrapPos();
+                            ImGui::Image(img.texture(), ImVec2(40 * 4, 40 * 4),
                                          {(float)minx / tile_size.width, (float)miny / tile_size.height},
                                          {(float)maxx / tile_size.width, (float)maxy / tile_size.height});
-                            ImGui::EndTooltip();
                         }
                     }
                 }
@@ -1420,22 +1443,22 @@ int main(int argc, char** argv) {
                 // TODO: precedence against left-clicking?
                 if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
                     // ctrl.pause = true;
-                    int celx = floor((mouse_pos.x - img_pos.x) / img_zoom);
-                    int cely = floor((mouse_pos.y - img_pos.y) / img_zoom);
+                    const int celx = floor((mouse_pos.x - img_pos.x) / img_zoom);
+                    const int cely = floor((mouse_pos.y - img_pos.y) / img_zoom);
 
                     sel.select_0.x = std::clamp(celx, 0, tile_size.width - 1);
                     sel.select_0.y = std::clamp(cely, 0, tile_size.height - 1);
                 }
                 if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-                    int celx = floor((mouse_pos.x - img_pos.x) / img_zoom);
-                    int cely = floor((mouse_pos.y - img_pos.y) / img_zoom);
+                    const int celx = floor((mouse_pos.x - img_pos.x) / img_zoom);
+                    const int cely = floor((mouse_pos.y - img_pos.y) / img_zoom);
 
                     sel.select_1.x = std::clamp(celx, 0, tile_size.width - 1);
                     sel.select_1.y = std::clamp(cely, 0, tile_size.height - 1);
                 }
                 if (paste) {
-                    int celx = floor((mouse_pos.x - img_pos.x) / img_zoom);
-                    int cely = floor((mouse_pos.y - img_pos.y) / img_zoom);
+                    const int celx = floor((mouse_pos.x - img_pos.x) / img_zoom);
+                    const int cely = floor((mouse_pos.y - img_pos.y) / img_zoom);
 
                     // TODO: can width<paste.width here?
                     paste.pos.x = std::clamp(celx, 0, tile_size.width - paste->width());

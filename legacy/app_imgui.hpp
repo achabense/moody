@@ -146,6 +146,32 @@ struct [[nodiscard]] imgui_childwindow {
     explicit operator bool() const { return visible; }
 };
 
+class [[nodiscard]] imgui_itemtooltip {
+    bool begun = false;
+
+public:
+    imgui_itemtooltip(const imgui_itemtooltip&) = delete;
+    imgui_itemtooltip& operator=(const imgui_itemtooltip&) = delete;
+
+    explicit imgui_itemtooltip(bool& toggle) {
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
+            if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+                toggle = !toggle;
+            }
+            if (toggle) {
+                ImGui::BeginTooltip();
+                begun = true;
+            }
+        }
+    }
+    ~imgui_itemtooltip() {
+        if (begun) {
+            ImGui::EndTooltip();
+        }
+    }
+
+    explicit operator bool() const { return begun; }
+};
 #if 0
 struct timeT {
     int year;
