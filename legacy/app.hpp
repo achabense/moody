@@ -14,78 +14,6 @@ inline std::mt19937& global_mt19937() {
     return rand;
 }
 
-// TODO: better name...
-// TODO: explain why float (there is no instant ImGui::SliderDouble)
-// (std::optional<uint32_t> has proven to be very awkward)
-struct tileT_filler {
-    bool use_seed;
-    uint32_t seed;
-    float density; // ¡Ê [0.0f, 1.0f]
-
-    void fill(legacy::tileT& tile) const {
-        if (use_seed) {
-            std::mt19937 rand(seed);
-            legacy::random_fill(tile, rand, density);
-        } else {
-            legacy::random_fill(tile, global_mt19937(), density);
-        }
-    }
-};
-
-class torusT {
-    legacy::tileT m_tile, m_side;
-    int m_gen;
-
-public:
-    explicit torusT(legacy::tileT::sizeT size) : m_tile(size), m_side(size), m_gen(0) {}
-
-    // TODO: reconsider whether to expose non-const tile...
-    legacy::tileT& tile() { return m_tile; }
-    const legacy::tileT& tile() const { return m_tile; }
-    int gen() const { return m_gen; }
-
-    void restart(tileT_filler filler, std::optional<legacy::tileT::sizeT> size = {}) {
-        if (size) {
-            m_tile.resize(*size);
-        }
-
-        filler.fill(m_tile);
-        m_gen = 0;
-    }
-
-    void run(const legacy::ruleT& rule, int count = 1) {
-        for (int c = 0; c < count; ++c) {
-            m_tile.gather(m_tile, m_tile, m_tile, m_tile, m_tile, m_tile, m_tile, m_tile);
-            m_tile.apply(rule, m_side);
-            m_tile.swap(m_side);
-
-            ++m_gen;
-        }
-    }
-
-    // TODO: recheck logic...
-    void shift(int dx, int dy) {
-        const int width = m_tile.width(), height = m_tile.height();
-
-        // TODO: proper name...
-        const auto round_clip = [](int v, int r) { return ((v % r) + r) % r; };
-        dx = round_clip(-dx, width);
-        dy = round_clip(-dy, height);
-        if (dx == 0 && dy == 0) {
-            return;
-        }
-
-        m_side.resize(m_tile.size());
-        for (int y = 0; y < height; ++y) {
-            bool* source = m_tile.line((y + dy) % height);
-            bool* dest = m_side.line(y);
-            std::copy_n(source, width, dest);
-            std::rotate(dest, dest + dx, dest + width);
-        }
-        m_tile.swap(m_side);
-    }
-};
-
 // Never empty.
 // TODO: (gui) whether to support random-access mode?
 class rule_recorder {
@@ -207,3 +135,5 @@ inline void iter_pair(const char* tag_first, const char* tag_prev, const char* t
 
 std::optional<std::pair<legacy::ruleT, legacy::lockT>> stone_constraints();
 std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lockT& locked, const code_image& icons);
+
+void edit_tile(const legacy::ruleT& target, legacy::lockT& locked, tile_image& img);
