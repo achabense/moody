@@ -1152,22 +1152,8 @@ int main(int argc, char** argv) {
     ImVec2 img_off = {0, 0}; // TODO: supposed to be of integer-precision...
     int img_zoom = 1;
 
-    // TODO: too awkward... refactor...
-    class pasteT : public std::optional<legacy::tileT> {
-        tile_image m_img{};
-
-    public:
+    struct pasteT : public std::optional<legacy::tileT> {
         legacy::tileT::posT pos{0, 0}; // dbegin for copy... (TODO: this is confusing...)
-
-        void update(legacy::tileT&& tile) {
-            emplace(std::move(tile));
-            m_img.update(**this);
-
-            // TODO: otherwise, alpha doesn't work...
-            // (solved by referring to ImGui_ImplSDLRenderer2_CreateFontsTexture...)
-            SDL_SetTextureBlendMode(m_img.texture(), SDL_BLENDMODE_BLEND);
-        }
-        ImTextureID texture() const { return m_img.texture(); }
     };
     pasteT paste;
 
@@ -1180,8 +1166,8 @@ int main(int argc, char** argv) {
         void clear() { select_0 = select_1 = {0, 0}; }
         void toggle_select_all(legacy::tileT::sizeT size) {
             // all-selected ? clear : select-all
-            const auto [min, max] = get();
-            if (min.x == 0 && min.y == 0 && max.x == size.width && max.y == size.height) {
+            const auto [begin, end] = range();
+            if (begin.x == 0 && begin.y == 0 && end.x == size.width && end.y == size.height) {
                 clear();
             } else {
                 select_0 = {0, 0};
@@ -1189,15 +1175,7 @@ int main(int argc, char** argv) {
             }
         }
 
-        struct minmaxT {
-            // [) ; (((min, max ~ imgui naming style...)))
-            legacy::tileT::posT min, max;
-
-            legacy::tileT::sizeT size() const { return {.width = max.x - min.x, .height = max.y - min.y}; }
-            explicit operator bool() const { return (max.x - min.x > 1) || (max.y - min.y > 1); }
-        };
-
-        minmaxT get() const {
+        legacy::tileT::rangeT range() const {
             int x0 = select_0.x, x1 = select_1.x;
             int y0 = select_0.y, y1 = select_1.y;
             if (x0 > x1) {
@@ -1206,7 +1184,7 @@ int main(int argc, char** argv) {
             if (y0 > y1) {
                 std::swap(y0, y1);
             }
-            return {.min{x0, y0}, .max{x1 + 1, y1 + 1}};
+            return {.begin{x0, y0}, .end{x1 + 1, y1 + 1}};
         }
     };
     selectT sel{};
@@ -1229,7 +1207,7 @@ int main(int argc, char** argv) {
         // TODO: specify mouse-dragging behavior (especially, no-op must be an option)
         // TODO: range-selected randomization don't need fixed seed. However, there should be a way to specify density.
         // TODO: support drawing as a dragging behavior if easy.
-        // TODO: copy bs copy to clipboard; paste vs paste from clipboard? (don't want to pollute clipboard with small
+        // TODO: copy vs copy to clipboard; paste vs paste from clipboard? (don't want to pollute clipboard with small
         // rle strings...
         // TODO: should be able to recognize "rule = " part in the rle string.
 
@@ -1297,9 +1275,15 @@ int main(int argc, char** argv) {
                 // ImGui::Text("canvas: x=%f y=%f", canvas_size.x,canvas_size.y);
                 return;
             }
+            // TODO: or like this?
+            // const ImVec2 canvas_size = [] {
+            //     // Values of GetContentRegionAvail() can be negative...
+            //     ImVec2 size = ImGui::GetContentRegionAvail();
+            //     return ImVec2(std::max(size.x, 50.0f), std::max(size.y, 50.0f));
+            // }();
 
             // TODO: the constraint is arbitrary; are there more sensible ways to decide size constraint?
-            const auto clamp_size = [](int width, int height) {
+            const auto size_clamped = [](int width, int height) {
                 return legacy::tileT::sizeT{.width = std::clamp(width, 64, 1200),
                                             .height = std::clamp(height, 64, 1200)};
             };
@@ -1307,7 +1291,7 @@ int main(int argc, char** argv) {
                 img_off = {0, 0};
 
                 const legacy::tileT::sizeT size =
-                    clamp_size((int)canvas_size.x / img_zoom, (int)canvas_size.y / img_zoom);
+                    size_clamped((int)canvas_size.x / img_zoom, (int)canvas_size.y / img_zoom);
                 if (runner.tile().size() != size) {
                     runner.restart(filler, size);
                     // TODO: how to support background period then?
@@ -1322,7 +1306,7 @@ int main(int argc, char** argv) {
                 if (ec == std::errc{} && ec2 == std::errc{}) {
                     img_off = {0, 0};
                     img_zoom = 1; // <-- TODO: whether to reset zoom here?
-                    const legacy::tileT::sizeT size = clamp_size(iwidth, iheight);
+                    const legacy::tileT::sizeT size = size_clamped(iwidth, iheight);
                     if (runner.tile().size() != size) {
                         runner.restart(filler, size);
                     }
@@ -1335,6 +1319,12 @@ int main(int argc, char** argv) {
             // Size is fixed now:
             const legacy::tileT::sizeT tile_size = runner.tile().size();
             const ImVec2 img_size(tile_size.width * img_zoom, tile_size.height * img_zoom);
+
+            // Validity of paste is fixed now:
+            // This can happen when e.g. paste -> resize...
+            if (paste && (paste->width() > tile_size.width || paste->height() > tile_size.height)) {
+                paste.reset();
+            }
 
             if (corner) {
                 img_off = {0, 0};
@@ -1350,31 +1340,36 @@ int main(int argc, char** argv) {
             ImDrawList* const drawlist = ImGui::GetWindowDrawList();
             drawlist->PushClipRect(canvas_pos, canvas_pos + canvas_size);
             drawlist->AddRectFilled(canvas_pos, canvas_pos + canvas_size, IM_COL32(20, 20, 20, 255));
-            drawlist->AddImage(img.update(runner.tile()), img_pos, img_pos + img_size);
 
-            // This can happen when e.g. paste -> resize...
-            if (paste && (paste->width() > tile_size.width || paste->height() > tile_size.height)) {
-                paste.reset();
-            }
-            // TODO: displays poorly with miniwindow...
-            if (paste) {
-                ctrl.pause2 = true;
+            if (!paste) {
+                drawlist->AddImage(img.update(runner.tile()), img_pos, img_pos + img_size);
+            } else {
+                // TODO: displays poorly with miniwindow...
+
+                assert(paste->width() <= tile_size.width && paste->height() <= tile_size.height);
                 paste.pos.x = std::clamp(paste.pos.x, 0, tile_size.width - paste->width());
                 paste.pos.y = std::clamp(paste.pos.y, 0, tile_size.height - paste->height());
+                // TODO: rename...
+                const legacy::tileT::rangeT range = {paste.pos, paste.pos + paste->size()};
 
-                const ImVec2 min = img_pos + ImVec2(paste.pos.x, paste.pos.y) * img_zoom;
-                const ImVec2 max =
-                    img_pos + ImVec2(paste.pos.x + paste->width(), paste.pos.y + paste->height()) * img_zoom;
-                drawlist->AddImage(paste.texture(), min, max, {0, 0}, {1, 1}, IM_COL32(255, 255, 255, 120));
-                drawlist->AddRectFilled(min, max, IM_COL32(255, 0, 0, 60));
+                legacy::tileT temp(paste->size()); // TODO: wasteful...
+                legacy::copy(temp, {0, 0}, runner.tile(), range);
+                legacy::copy<legacy::copyE::Or>(runner.tile(), paste.pos, *paste);
+
+                drawlist->AddImage(img.update(runner.tile()), img_pos, img_pos + img_size);
+
+                legacy::copy(runner.tile(), paste.pos, temp);
+
+                const ImVec2 paste_min = img_pos + ImVec2(range.begin.x, range.begin.y) * img_zoom;
+                const ImVec2 paste_max = img_pos + ImVec2(range.end.x, range.end.y) * img_zoom;
+                drawlist->AddRectFilled(paste_min, paste_max, IM_COL32(255, 0, 0, 60));
             }
-            if (const auto s = sel.get()) {
-                // drawlist->AddRectFilled(img_pos + ImVec2(s.min.x, s.min.y) * img_zoom,
-                //                         img_pos + ImVec2(s.max.x, s.max.y) * img_zoom, IM_COL32(0, 255, 0, 60));
-                drawlist->AddRectFilled(img_pos + ImVec2(s.min.x, s.min.y) * img_zoom,
-                                        img_pos + ImVec2(s.max.x, s.max.y) * img_zoom, IM_COL32(0, 255, 0, 40));
-                drawlist->AddRect(img_pos + ImVec2(s.min.x, s.min.y) * img_zoom,
-                                  img_pos + ImVec2(s.max.x, s.max.y) * img_zoom, IM_COL32(0, 255, 0, 160));
+
+            if (const auto range = sel.range(); range.width() > 1 || range.height() > 1) {
+                const ImVec2 sel_min = img_pos + ImVec2(range.begin.x, range.begin.y) * img_zoom;
+                const ImVec2 sel_max = img_pos + ImVec2(range.end.x, range.end.y) * img_zoom;
+                drawlist->AddRectFilled(sel_min, sel_max, IM_COL32(0, 255, 0, 40));
+                drawlist->AddRect(sel_min, sel_max, IM_COL32(0, 255, 0, 160));
             }
             drawlist->PopClipRect();
 
@@ -1398,7 +1393,7 @@ int main(int argc, char** argv) {
 
                 // TODO: refine...
                 // TODO: zoom window temporarily conflicts with range selection... (both use Rclick)
-                if (img_zoom <= 2 && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                if (!paste && img_zoom <= 2 && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
                     const int celx = floor((mouse_pos.x - img_pos.x) / img_zoom);
                     const int cely = floor((mouse_pos.y - img_pos.y) / img_zoom);
                     if (celx >= -10 && celx < tile_size.width + 10 && cely >= -10 && cely < tile_size.height + 10) {
@@ -1465,7 +1460,7 @@ int main(int argc, char** argv) {
                     paste.pos.y = std::clamp(cely, 0, tile_size.height - paste->height());
 
                     if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-                        legacy::copy<legacy::copyE::Or>(*paste, runner.tile(), paste.pos);
+                        legacy::copy<legacy::copyE::Or>(runner.tile(), paste.pos, *paste);
                         paste.reset();
                     }
                 }
@@ -1493,34 +1488,34 @@ int main(int argc, char** argv) {
                 if (const char* text = ImGui::GetClipboardText()) {
                     try {
                         // TODO: or ask whether to resize runner.tile?
-                        paste.update(legacy::from_RLE_str(text, tile_size));
+                        paste.emplace(legacy::from_RLE_str(text, tile_size));
                     } catch (const std::exception& err) {
                         logger::log_temp(2500ms, "{}", err.what());
                     }
                 }
             }
-            if (const auto s = sel.get()) {
+            if (const auto range = sel.range(); range.height() > 1 || range.width() > 1) {
                 if (imgui_keypressed(ImGuiKey_C, false) || imgui_keypressed(ImGuiKey_X, false)) {
-                    ImGui::SetClipboardText(legacy::to_RLE_str(ctrl.rule, runner.tile(), s.min, s.max).c_str());
+                    ImGui::SetClipboardText(legacy::to_RLE_str(ctrl.rule, runner.tile(), range).c_str());
                 }
                 if (imgui_keypressed(ImGuiKey_Backspace, false) || imgui_keypressed(ImGuiKey_X, false)) {
                     // TODO: 0/1.../ agar...
-                    legacy::clear_inside(runner.tile(), s.min, s.max, 0);
+                    legacy::clear_inside(runner.tile(), range, 0);
                 }
                 if (imgui_keypressed(ImGuiKey_Equal, false)) {
                     // TODO: specify density etc... or share with tileT_filler?
-                    legacy::random_fill(runner.tile(), global_mt19937(), 0.5, s.min, s.max);
+                    legacy::random_fill(runner.tile(), global_mt19937(), 0.5, range);
                 }
                 // TODO: redesign keyboard ctrl...
                 if (imgui_keypressed(ImGuiKey_0, false)) {
-                    legacy::clear_outside(runner.tile(), s.min, s.max, 0);
+                    legacy::clear_outside(runner.tile(), range, 0);
                 }
 
                 // TODO: refine capturing...
                 if (imgui_keypressed(ImGuiKey_P, false)) {
                     // TODO: support specifying padding area...
-                    legacy::tileT cap(s.size()), cap2(s.size());
-                    legacy::copy(runner.tile(), s.min, s.max, cap, cap.begin_pos());
+                    legacy::tileT cap(range.size()), cap2(range.size());
+                    legacy::copy(cap, {0, 0}, runner.tile(), range);
                     legacy::lockT locked{};
                     auto rulx = [&](legacy::codeT code) {
                         locked[code] = true;

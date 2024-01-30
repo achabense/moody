@@ -122,6 +122,9 @@ namespace legacy {
         });
     }
 
+    // TODO: the lockT will become meaningless on irrelevant rule switch (clipboard/file...)
+    using lockT = codeT::map_to<bool>;
+
     class compressT {
         std::array<uint8_t, 64> bits; // as bitset.
     public:

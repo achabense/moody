@@ -145,6 +145,9 @@ private:
     // TODO: there is an extra use of sdl_basepath in main...
 };
 
+// TODO: (temp) to make tint work on the textures, there should be an extra call to SDL_SetTextureBlendMode
+// for the texture (now there is no usage of image tint in the program)
+
 // TODO: in namespace or not? better name?
 class tile_image {
     int m_w, m_h;
@@ -186,7 +189,7 @@ public:
             exit(EXIT_FAILURE);
         }
 
-        tile.for_each_line(tile.begin_pos(), tile.end_pos(), [&](int y, std::span<const bool> line) {
+        tile.for_each_line(tile.range(), [&](int y, std::span<const bool> line) {
             Uint32* p = (Uint32*)((char*)pixels + pitch * y);
             for (bool v : line) {
                 *p++ = v ? IM_COL32_WHITE : IM_COL32_BLACK;
@@ -198,8 +201,7 @@ public:
         return m_texture;
     }
 
-    // TODO (temp) awkward workaround for paste utils...
-    SDL_Texture* texture() const { return m_texture; }
+    ImTextureID texture() const { return m_texture; }
 };
 
 // TODO: can be merged into app_backend...

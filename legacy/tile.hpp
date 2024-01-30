@@ -25,6 +25,18 @@ namespace legacy {
             friend bool operator==(const sizeT&, const sizeT&) = default;
         };
 
+        friend posT operator+(const posT& pos, const sizeT& size) {
+            return {.x = pos.x + size.width, .y = pos.y + size.height};
+        }
+
+        // TODO: add assertions?
+        struct rangeT {
+            posT begin, end; // [)
+            int width() const { return end.x - begin.x; }
+            int height() const { return end.y - begin.y; }
+            sizeT size() const { return {.width = end.x - begin.x, .height = end.y - begin.y}; }
+        };
+
     private:
         sizeT m_size; // observable width and height.
         bool* m_data; // layout: [height+2][width+2].
@@ -80,9 +92,12 @@ namespace legacy {
         int height() const { return m_size.height; }
         int area() const { return m_size.width * m_size.height; }
 
-        static posT begin_pos() { return {0, 0}; }
-        posT end_pos() const { return {.x = m_size.width, .y = m_size.height}; }
-        bool verify_pos(posT begin, posT end) const {
+        // TODO: pass by value or const&? (mainly for consistency...)
+        // TODO: rename to all_range?
+        rangeT range() const { return {{0, 0}, {.x = m_size.width, .y = m_size.height}}; }
+        // TODO: put `assert` into verify_range directly?
+        bool verify_range(const rangeT& range) const {
+            const auto& [begin, end] = range;
             return 0 <= begin.x && begin.x <= end.x && end.x <= m_size.width && //
                    0 <= begin.y && begin.y <= end.y && end.y <= m_size.height;
         }
@@ -108,9 +123,9 @@ namespace legacy {
         }
 
         // TODO: avoid code duplication...
-        void for_each_line(posT begin, posT end, auto fn) {
-            assert(verify_pos(begin, end));
-
+        void for_each_line(const rangeT& range, auto fn) {
+            assert(verify_range(range));
+            const auto& [begin, end] = range;
             for (int y = begin.y; y < end.y; ++y) {
                 bool* ln = line(y);
                 if constexpr (requires { fn(std::span{ln + begin.x, ln + end.x}); }) {
@@ -121,9 +136,9 @@ namespace legacy {
             }
         }
 
-        void for_each_line(posT begin, posT end, auto fn) const {
-            assert(verify_pos(begin, end));
-
+        void for_each_line(const rangeT& range, auto fn) const {
+            assert(verify_range(range));
+            const auto& [begin, end] = range;
             for (int y = begin.y; y < end.y; ++y) {
                 const bool* ln = line(y);
                 if constexpr (requires { fn(std::span{ln + begin.x, ln + end.x}); }) {
@@ -233,10 +248,12 @@ namespace legacy {
     } // namespace _misc::tests
 #endif
 
+    // TODO: std::optional<range>/nullopt for full-range?
+    // (or just ptr/nullptr...)
     inline namespace tileT_utils {
         inline int count(const tileT& tile) {
             int c = 0;
-            tile.for_each_line(tile.begin_pos(), tile.end_pos(), [&c](std::span<const bool> line) {
+            tile.for_each_line(tile.range(), [&c](std::span<const bool> line) {
                 for (bool v : line) {
                     c += v;
                 }
@@ -247,11 +264,11 @@ namespace legacy {
         // TODO: is this "copy" or "paste"???
         enum class copyE { Value, Or, Xor };
         template <copyE mode = copyE::Value>
-        inline void copy(const tileT& source, tileT::posT begin, tileT::posT end, tileT& dest, tileT::posT dbegin) {
+        inline void copy(tileT& dest, tileT::posT dbegin, const tileT& source, const tileT::rangeT& range) {
             assert(&source != &dest);
-            assert(dest.verify_pos(dbegin, {dbegin.x + (end.x - begin.x), dbegin.y + (end.y - begin.y)}));
+            assert(dest.verify_range({dbegin, dbegin + range.size()}));
 
-            source.for_each_line(begin, end, [&dest, &dbegin](int y, std::span<const bool> line) {
+            source.for_each_line(range, [&dest, &dbegin](int y, std::span<const bool> line) {
                 bool* d = dest.line(dbegin.y + y) + dbegin.x;
                 for (bool v : line) {
                     if constexpr (mode == copyE::Value) {
@@ -267,42 +284,43 @@ namespace legacy {
         }
 
         template <copyE mode = copyE::Value>
-        inline void copy(const tileT& source, tileT& dest, tileT::posT dbegin) {
-            copy<mode>(source, source.begin_pos(), source.end_pos(), dest, dbegin);
+        inline void copy(tileT& dest, tileT::posT dbegin, const tileT& source) {
+            copy<mode>(dest, dbegin, source, source.range());
         }
 
         // TODO: add param const...
         // TODO: is the algo correct?
         // TODO: explain why not using bernoulli_distribution
-        inline void random_fill(tileT& tile, std::mt19937& rand, double density, tileT::posT begin, tileT::posT end) {
+        inline void random_fill(tileT& tile, std::mt19937& rand, double density, const tileT::rangeT& range) {
             const uint32_t c = std::mt19937::max() * std::clamp(density, 0.0, 1.0);
-            tile.for_each_line(begin, end, [&](std::span<bool> line) { //
+            tile.for_each_line(range, [&](std::span<bool> line) { //
                 std::ranges::generate(line, [&] { return rand() < c; });
             });
         }
 
         inline void random_fill(tileT& tile, std::mt19937& rand, double density) {
-            random_fill(tile, rand, density, tile.begin_pos(), tile.end_pos());
+            random_fill(tile, rand, density, tile.range());
         }
 
-        inline void clear_inside(tileT& tile, tileT::posT begin, tileT::posT end, bool v) {
-            tile.for_each_line(begin, end, [v](std::span<bool> line) { std::ranges::fill(line, v); });
+        inline void clear_inside(tileT& tile, const tileT::rangeT& range, bool v) {
+            tile.for_each_line(range, [v](std::span<bool> line) { std::ranges::fill(line, v); });
         }
 
-        inline void clear_outside(tileT& tile, tileT::posT begin, tileT::posT end, bool v) {
-            assert(tile.verify_pos(begin, end));
-            tile.for_each_line(tile.begin_pos(), tile.end_pos(), [&](int y, std::span<bool> line) {
-                if (y < begin.y || y >= end.y) {
+        // TODO: mixture of tile.range() and range arg looks confusing... rename.
+        inline void clear_outside(tileT& tile, const tileT::rangeT& range, bool v) {
+            assert(tile.verify_range(range));
+            tile.for_each_line(tile.range(), [&](int y, std::span<bool> line) {
+                if (y < range.begin.y || y >= range.end.y) {
                     std::ranges::fill(line, v);
                 } else {
-                    std::fill(line.begin(), line.begin() + begin.x, v);
-                    std::fill(line.begin() + end.x, line.end(), v);
+                    std::fill(line.begin(), line.begin() + range.begin.x, v);
+                    std::fill(line.begin() + range.end.x, line.end(), v);
                 }
             });
         }
 
 #if 0
-        void shrink(const tileT& tile, tileT::posT& begin, tileT::posT& end, bool v);
+        tileT::rangeT shrink(const tileT& tile, const tileT::rangeT& range, bool v);
 
         inline int count_diff(const tileT& l, const tileT& r);
 
@@ -318,8 +336,6 @@ namespace legacy {
         }
 
         inline void piece_up(const tileT& period, tileT& target);
-
-        inline void piece_up(const tileT& period, tileT& target, tileT::posT begin /*[*/, tileT::posT end /*)*/);
 #endif
     } // namespace tileT_utils
 
@@ -327,11 +343,11 @@ namespace legacy {
     // clipboard-based copy/paste is wasteful... enable in-memory mode (tileT-based)...
 
     // https://conwaylife.com/wiki/Run_Length_Encoded
-    inline std::string to_RLE_str(const tileT& tile, tileT::posT begin, tileT::posT end) {
+    inline std::string to_RLE_str(const tileT& tile, const tileT::rangeT& range) {
         // (wontfix) consecutive '$'s are not combined.
         std::string str;
         int last_nl = 0;
-        tile.for_each_line(begin, end, [&str, &last_nl](int y, std::span<const bool> line) {
+        tile.for_each_line(range, [&str, &last_nl](int y, std::span<const bool> line) {
             if (y != 0) {
                 str += '$';
             }
@@ -365,17 +381,16 @@ namespace legacy {
     }
 
     inline std::string to_RLE_str(const tileT& tile) { //
-        return to_RLE_str(tile, tile.begin_pos(), tile.end_pos());
+        return to_RLE_str(tile, tile.range());
     }
 
-    inline std::string to_RLE_str(const ruleT& rule, const tileT& tile) {
-        return std::format("x = {}, y = {}, rule = {}\n{}!", tile.width(), tile.height(), to_MAP_str(rule),
-                           to_RLE_str(tile));
+    inline std::string to_RLE_str(const ruleT& rule, const tileT& tile, const tileT::rangeT& range) {
+        return std::format("x = {}, y = {}, rule = {}\n{}!", range.width(), range.height(), to_MAP_str(rule),
+                           to_RLE_str(tile, range));
     }
 
-    inline std::string to_RLE_str(const ruleT& rule, const tileT& tile, tileT::posT begin, tileT::posT end) {
-        return std::format("x = {}, y = {}, rule = {}\n{}!", end.x - begin.x, end.y - begin.y, to_MAP_str(rule),
-                           to_RLE_str(tile, begin, end));
+    inline std::string to_RLE_str(const ruleT& rule, const tileT& tile) { //
+        return to_RLE_str(rule, tile, tile.range());
     }
 
     // TODO: whether to skip lines leading with '#'?

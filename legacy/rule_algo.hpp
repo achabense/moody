@@ -281,10 +281,6 @@ namespace legacy {
         }
     }
 
-    // TODO: the lockT will become meaningless on irrelevant rule switch (clipboard/file...)
-    // TODO: should mirror conversions (and lr/ud/... if there are to be) modify locks as well?
-    using lockT = codeT::map_to<bool>;
-
     inline auto scan(const partitionT& par, const ruleT_masked& rule, const lockT& locked) {
         struct counterT {
             int free_0 = 0, free_1 = 0;
@@ -535,7 +531,7 @@ namespace legacy {
 
 // TODO: define xxxT = {rule, locked}?
 namespace legacy {
-    // TODO: other actions... (lr/ud/diag/counter-diag/...)
+    // TODO: should mirror conversions (and lr/ud/... if there are to be) modify locks as well?
 
     // TODO: proper name...
     inline ruleT mirror(const ruleT& rule) {
