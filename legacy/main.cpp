@@ -613,8 +613,106 @@ int main(int argc, char** argv) {
 
         // TODO: not robust
         // ~ runner.restart(...) shall not happen before rendering.
-        bool restart = false;
+        bool should_restart = false;
         int extra = 0;
+
+        auto edit_ctrl = [&] {
+            ImGui::BeginGroup();
+            {
+                ImGui::Checkbox("Pause", &ctrl.pause);
+                ImGui::SameLine();
+                ImGui::BeginDisabled();
+                ImGui::Checkbox("Pause2", &ctrl.pause2);
+                ImGui::EndDisabled();
+                ImGui::SameLine();
+                // ↑ TODO: better visual?
+                // ↓ TODO: imgui_repeatbutton?
+                ImGui::PushButtonRepeat(true);
+                // TODO: should allow keyboard control...
+
+                // TODO: visual feedback...
+                if (ImGui::Button("+1")) {
+                    extra = 1;
+                }
+                ImGui::SameLine();
+                // TODO: is this usage of ### correct?
+                // (Correct, but usage of format might be a bad idea here...)
+                if (ImGui::Button(std::format("+p({})###+p", ctrl.actual_pace()).c_str())) {
+                    extra = ctrl.actual_pace();
+                }
+                ImGui::PopButtonRepeat();
+                ImGui::SameLine();
+                if (ImGui::Button("Restart") || imgui_keypressed(ImGuiKey_R, false)) {
+                    should_restart = true;
+                }
+
+                // TODO: Gap-frame shall be really timer-based...
+                ImGui::SliderInt("Gap Frame (0~20)", &ctrl.gap_frame, ctrl.gap_min, ctrl.gap_max, "%d",
+                                 ImGuiSliderFlags_NoInput);
+                // TODO: move elsewhere...
+                imgui_int_slider("Start gen (0~200)", &ctrl.start_from, ctrl.start_min, ctrl.start_max);
+                imgui_int_slider("Pace (1~20)", &ctrl.pace, ctrl.pace_min, ctrl.pace_max);
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("(Actual pace: %d)", ctrl.actual_pace());
+                ImGui::SameLine();
+                ImGui::Checkbox("anti-flick", &ctrl.anti_flick);
+            }
+            ImGui::EndGroup();
+            ImGui::SameLine();
+            ImGui::BeginGroup();
+            {
+                // TODO: use radio instead?
+                if (ImGui::Checkbox("Use seed", &filler.use_seed)) {
+                    // TODO: unconditional?
+                    if (filler.use_seed) {
+                        should_restart = true;
+                    }
+                }
+                if (!filler.use_seed) {
+                    ImGui::BeginDisabled();
+                }
+                if (int seed = filler.seed; imgui_int_slider("Seed (0~99)", &seed, 0, 99)) {
+                    filler.seed = seed;
+                    should_restart = true;
+                }
+                if (!filler.use_seed) {
+                    ImGui::EndDisabled();
+                }
+
+                // TODO: integer(ratio) density?
+                if (ImGui::SliderFloat("Init density (0~1)", &filler.density, 0.0f, 1.0f, "%.3f",
+                                       ImGuiSliderFlags_NoInput)) {
+                    should_restart = true;
+                }
+            }
+            ImGui::EndGroup();
+
+            // TODO: enable/disable keyboard ctrl (enable by default)
+            // TODO: redesign keyboard ctrl...
+            if (imgui_keypressed(ImGuiKey_1, true)) {
+                ctrl.gap_frame = std::max(ctrl.gap_min, ctrl.gap_frame - 1);
+            }
+            if (imgui_keypressed(ImGuiKey_2, true)) {
+                ctrl.gap_frame = std::min(ctrl.gap_max, ctrl.gap_frame + 1);
+            }
+            if (imgui_keypressed(ImGuiKey_3, true)) {
+                ctrl.pace = std::max(ctrl.pace_min, ctrl.pace - 1);
+            }
+            if (imgui_keypressed(ImGuiKey_4, true)) {
+                ctrl.pace = std::min(ctrl.pace_max, ctrl.pace + 1);
+            }
+            // TODO: explain... apply to other ctrls?
+            if ((ctrl.pause2 || !ImGui::GetIO().WantCaptureKeyboard) && ImGui::IsKeyPressed(ImGuiKey_Space, false)) {
+                ctrl.pause = !ctrl.pause;
+            }
+            // TODO: temp (this function turns out to be necessary...)
+            if (imgui_keypressed(ImGuiKey_M, true)) {
+                if (ctrl.pause) {
+                    extra = ctrl.actual_pace();
+                }
+                ctrl.pause = true;
+            }
+        };
 
         const ImGuiWindowFlags flags =
             ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus;
@@ -653,105 +751,9 @@ int main(int argc, char** argv) {
                 // TODO: it seems this childwindow is not necessary?
                 if (auto child = imgui_childwindow("Til")) {
                     ImGui::PushItemWidth(FixedItemWidth);
-                    ImGui::BeginGroup();
-                    {
-                        ImGui::Checkbox("Pause", &ctrl.pause);
-                        ImGui::SameLine();
-                        ImGui::BeginDisabled();
-                        ImGui::Checkbox("Pause2", &ctrl.pause2);
-                        ImGui::EndDisabled();
-                        ImGui::SameLine();
-                        // ↑ TODO: better visual?
-                        // ↓ TODO: imgui_repeatbutton?
-                        ImGui::PushButtonRepeat(true);
-                        // TODO: should allow keyboard control...
-
-                        // TODO: visual feedback...
-                        if (ImGui::Button("+1")) {
-                            extra = 1;
-                        }
-                        ImGui::SameLine();
-                        // TODO: is this usage of ### correct?
-                        // (Correct, but usage of format might be a bad idea here...)
-                        if (ImGui::Button(std::format("+p({})###+p", ctrl.actual_pace()).c_str())) {
-                            extra = ctrl.actual_pace();
-                        }
-                        ImGui::PopButtonRepeat();
-                        ImGui::SameLine();
-                        if (ImGui::Button("Restart") || imgui_keypressed(ImGuiKey_R, false)) {
-                            restart = true;
-                        }
-
-                        // TODO: Gap-frame shall be really timer-based...
-                        ImGui::SliderInt("Gap Frame (0~20)", &ctrl.gap_frame, ctrl.gap_min, ctrl.gap_max, "%d",
-                                         ImGuiSliderFlags_NoInput);
-                        // TODO: move elsewhere...
-                        imgui_int_slider("Start gen (0~200)", &ctrl.start_from, ctrl.start_min, ctrl.start_max);
-                        imgui_int_slider("Pace (1~20)", &ctrl.pace, ctrl.pace_min, ctrl.pace_max);
-                        ImGui::AlignTextToFramePadding();
-                        ImGui::Text("(Actual pace: %d)", ctrl.actual_pace());
-                        ImGui::SameLine();
-                        ImGui::Checkbox("anti-flick", &ctrl.anti_flick);
-                    }
-                    ImGui::EndGroup();
-                    ImGui::SameLine();
-                    ImGui::BeginGroup();
-                    {
-                        // TODO: use radio instead?
-                        if (ImGui::Checkbox("Use seed", &filler.use_seed)) {
-                            // TODO: unconditional?
-                            if (filler.use_seed) {
-                                restart = true;
-                            }
-                        }
-                        if (!filler.use_seed) {
-                            ImGui::BeginDisabled();
-                        }
-                        if (int seed = filler.seed; imgui_int_slider("Seed (0~99)", &seed, 0, 99)) {
-                            filler.seed = seed;
-                            restart = true;
-                        }
-                        if (!filler.use_seed) {
-                            ImGui::EndDisabled();
-                        }
-
-                        // TODO: integer(ratio) density?
-                        if (ImGui::SliderFloat("Init density (0~1)", &filler.density, 0.0f, 1.0f, "%.3f",
-                                               ImGuiSliderFlags_NoInput)) {
-                            restart = true;
-                        }
-                    }
-                    ImGui::EndGroup();
-
+                    edit_ctrl();
                     show_tile();
                     ImGui::PopItemWidth();
-
-                    // TODO: enable/disable keyboard ctrl (enable by default)
-                    // TODO: redesign keyboard ctrl...
-                    if (imgui_keypressed(ImGuiKey_1, true)) {
-                        ctrl.gap_frame = std::max(ctrl.gap_min, ctrl.gap_frame - 1);
-                    }
-                    if (imgui_keypressed(ImGuiKey_2, true)) {
-                        ctrl.gap_frame = std::min(ctrl.gap_max, ctrl.gap_frame + 1);
-                    }
-                    if (imgui_keypressed(ImGuiKey_3, true)) {
-                        ctrl.pace = std::max(ctrl.pace_min, ctrl.pace - 1);
-                    }
-                    if (imgui_keypressed(ImGuiKey_4, true)) {
-                        ctrl.pace = std::min(ctrl.pace_max, ctrl.pace + 1);
-                    }
-                    // TODO: explain... apply to other ctrls?
-                    if ((ctrl.pause2 || !ImGui::GetIO().WantCaptureKeyboard) &&
-                        ImGui::IsKeyPressed(ImGuiKey_Space, false)) {
-                        ctrl.pause = !ctrl.pause;
-                    }
-                    // TODO: temp (this function turns out to be necessary...)
-                    if (imgui_keypressed(ImGuiKey_M, true)) {
-                        if (ctrl.pause) {
-                            extra = ctrl.actual_pace();
-                        }
-                        ctrl.pause = true;
-                    }
                 }
                 ImGui::EndTable();
             }
@@ -763,10 +765,10 @@ int main(int argc, char** argv) {
 
         if (ctrl.rule != recorder.current()) {
             ctrl.rule = recorder.current();
-            restart = true;
+            should_restart = true;
             ctrl.pause = false; // TODO: this should be configurable...
         }
-        if (restart) {
+        if (should_restart) {
             runner.restart(filler);
         }
         ctrl.run(runner, extra); // TODO: able to result in low fps...
