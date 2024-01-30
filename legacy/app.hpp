@@ -204,3 +204,6 @@ inline void iter_pair(const char* tag_first, const char* tag_prev, const char* t
         act_last();
     }
 };
+
+std::optional<std::pair<legacy::ruleT, legacy::lockT>> stone_constraints();
+std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lockT& locked, const code_image& icons);
