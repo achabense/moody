@@ -116,6 +116,27 @@ inline bool imgui_scrolldown() { return ImGui::GetIO().MouseWheel < 0; }
 
 inline bool imgui_scrollup() { return ImGui::GetIO().MouseWheel > 0; }
 
+// TODO: consider other approaches (native nav etc) if possible...
+// TODO: e.g. toggle between buttons by left/right... / clear binding...
+inline bool imgui_enterbutton(const char* label) {
+    static ImGuiID bind_id = 0;
+    bool ret = ImGui::Button(label);
+    const ImGuiID button_id = ImGui::GetItemID();
+    if (ret) {
+        bind_id = button_id;
+    }
+    // TODO: are there public ways (not relying on im gui_internal.h)
+    // to detect whether in disabled block?
+    if (bind_id == button_id && (GImGui->CurrentItemFlags & ImGuiItemFlags_Disabled) == 0) {
+        if (imgui_keypressed(ImGuiKey_Enter, false)) {
+            ret = true;
+        }
+        const ImU32 col = ret ? IM_COL32(128, 128, 128, 255) : IM_COL32_WHITE;
+        ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), col);
+    }
+    return ret;
+}
+
 struct [[nodiscard]] imgui_window {
     imgui_window(const imgui_window&) = delete;
     imgui_window& operator=(const imgui_window&) = delete;
@@ -172,34 +193,6 @@ public:
 
     explicit operator bool() const { return begun; }
 };
-#if 0
-struct timeT {
-    int year;
-    int month; // [1,12]
-    int day;   // [1,31]
-    int hour;  // [0,23]
-    int min;   // [0,59]
-    int sec;   // [0,59]
-    int ms;
-
-    static timeT now() {
-        using namespace std::chrono;
-        auto now = current_zone()->to_local(system_clock::now());
-
-        year_month_day ymd(floor<days>(now));
-        int year = ymd.year().operator int();
-        int month = ymd.month().operator unsigned int();
-        int day = ymd.day().operator unsigned int();
-
-        hh_mm_ss hms(floor<milliseconds>(now - floor<days>(now)));
-        int hour = hms.hours().count();
-        int min = hms.minutes().count();
-        int sec = hms.seconds().count();
-        int ms = hms.subseconds().count();
-        return timeT{year, month, day, hour, min, sec, ms};
-    }
-};
-#endif
 
 class logger {
     // TODO: refine...

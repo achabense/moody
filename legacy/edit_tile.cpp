@@ -6,7 +6,7 @@
 struct tileT_filler {
     bool use_seed;
     uint32_t seed;
-    float density; // ¡Ê [0.0f, 1.0f]
+    float density; // âˆˆ [0.0f, 1.0f]
 
     void fill(legacy::tileT& tile) const {
         if (use_seed) {
@@ -507,8 +507,8 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
             ImGui::Checkbox("Pause2", &ctrl.pause2);
             ImGui::EndDisabled();
             ImGui::SameLine();
-            // ¡ü TODO: better visual?
-            // ¡ý TODO: imgui_repeatbutton?
+            // â†‘ TODO: better visual?
+            // â†“ TODO: imgui_repeatbutton?
             ImGui::PushButtonRepeat(true);
             // TODO: should allow keyboard control...
 

@@ -77,28 +77,6 @@ public:
 // TODO: rename...
 const int FixedItemWidth = 220;
 
-// TODO: consider other approaches (native nav etc) if possible...
-// TODO: e.g. toggle between buttons by left/right... / clear binding...
-inline bool imgui_enterbutton(const char* label) {
-    static ImGuiID bind_id = 0;
-    bool ret = ImGui::Button(label);
-    const ImGuiID button_id = ImGui::GetItemID();
-    if (ret) {
-        bind_id = button_id;
-    }
-    if (bind_id == button_id) {
-        // TODO: should not be invokable when in disabled scope...
-        // (GImGui->CurrentItemFlags & ImGuiItemFlags_Disabled) == 0 ~ not disabled, but this requires
-        // the internal header... Are there public ways to do the same thing?
-        if (imgui_keypressed(ImGuiKey_Enter, false)) {
-            ret = true;
-        }
-        const ImU32 col = ret ? IM_COL32(128, 128, 128, 255) : IM_COL32_WHITE;
-        ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), col);
-    }
-    return ret;
-}
-
 // TODO: support rollbacking diff rules?
 // TODO: support rollbacking locks?
 // TODO: for editing opt, support in-lock and outof-lock mode?
