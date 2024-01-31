@@ -270,7 +270,7 @@ namespace legacy {
 } // namespace legacy
 
 // TODO: rename; redesign...
-std::optional<std::pair<legacy::ruleT, legacy::lockT>> stone_constraints() {
+std::optional<std::pair<legacy::ruleT, legacy::lockT>> static_constraints() {
     enum stateE { Any, F, T, F_Cond, T_Cond }; // TODO: rename; explain
     const int r = 9;
     static stateE board[r][r]{/*Any...*/};
@@ -310,70 +310,68 @@ std::optional<std::pair<legacy::ruleT, legacy::lockT>> stone_constraints() {
         ImGui::PopID();
     };
 
-    if (auto window = imgui_window("Constraints", ImGuiWindowFlags_AlwaysAutoResize)) {
-        const bool hit = ImGui::Button("Done");
-        ImGui::SameLine();
-        if (ImGui::Button("Clear")) {
-            for (auto& l : board) {
-                for (auto& s : l) {
-                    s = Any;
+    const bool hit = ImGui::Button("Done");
+    ImGui::SameLine();
+    if (ImGui::Button("Clear")) {
+        for (auto& l : board) {
+            for (auto& s : l) {
+                s = Any;
+            }
+        }
+    }
+
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {0, 0});
+    for (int y = 0; y < r; ++y) {
+        bool f = true;
+        for (int x = 0; x < r; ++x) {
+            if (!f) {
+                ImGui::SameLine();
+            }
+            f = false;
+            check(board[y][x], y >= 1 && y < r - 1 && x >= 1 && x < r - 1);
+        }
+    }
+    ImGui::PopStyleVar();
+
+    if (hit) {
+        legacy::ruleT rule{}; // recorder::current?
+        legacy::lockT locked{};
+        for (int y = 1; y < r - 1; ++y) {
+            for (int x = 1; x < r - 1; ++x) {
+                if (board[y][x] != F && board[y][x] != T) {
+                    continue;
+                }
+
+                for_each_code(code) {
+                    // TODO: (temp) Eh, took a while to find the [...,x,...] error...
+                    // auto [q, w, e, a, s, d, z, X, c] = decode(code);
+                    legacy::envT env = decode(code);
+                    auto imbue = [](bool& b, stateE state) {
+                        if (state == F || state == F_Cond) {
+                            b = 0;
+                        }
+                        if (state == T || state == T_Cond) {
+                            b = 1;
+                        }
+                    };
+
+                    imbue(env.q, board[y - 1][x - 1]);
+                    imbue(env.w, board[y - 1][x]);
+                    imbue(env.e, board[y - 1][x + 1]);
+
+                    imbue(env.a, board[y][x - 1]);
+                    imbue(env.s, board[y][x]);
+                    imbue(env.d, board[y][x + 1]);
+
+                    imbue(env.z, board[y + 1][x - 1]);
+                    imbue(env.x, board[y + 1][x]);
+                    imbue(env.c, board[y + 1][x + 1]);
+                    rule[legacy::encode(env)] = board[y][x] == F ? 0 : 1;
+                    locked[legacy::encode(env)] = true;
                 }
             }
         }
-
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {0, 0});
-        for (int y = 0; y < r; ++y) {
-            bool f = true;
-            for (int x = 0; x < r; ++x) {
-                if (!f) {
-                    ImGui::SameLine();
-                }
-                f = false;
-                check(board[y][x], y >= 1 && y < r - 1 && x >= 1 && x < r - 1);
-            }
-        }
-        ImGui::PopStyleVar();
-
-        if (hit) {
-            legacy::ruleT rule{}; // recorder::current?
-            legacy::lockT locked{};
-            for (int y = 1; y < r - 1; ++y) {
-                for (int x = 1; x < r - 1; ++x) {
-                    if (board[y][x] != F && board[y][x] != T) {
-                        continue;
-                    }
-
-                    for_each_code(code) {
-                        // TODO: (temp) Eh, took a while to find the [...,x,...] error...
-                        // auto [q, w, e, a, s, d, z, X, c] = decode(code);
-                        legacy::envT env = decode(code);
-                        auto imbue = [](bool& b, stateE state) {
-                            if (state == F || state == F_Cond) {
-                                b = 0;
-                            }
-                            if (state == T || state == T_Cond) {
-                                b = 1;
-                            }
-                        };
-
-                        imbue(env.q, board[y - 1][x - 1]);
-                        imbue(env.w, board[y - 1][x]);
-                        imbue(env.e, board[y - 1][x + 1]);
-
-                        imbue(env.a, board[y][x - 1]);
-                        imbue(env.s, board[y][x]);
-                        imbue(env.d, board[y][x + 1]);
-
-                        imbue(env.z, board[y + 1][x - 1]);
-                        imbue(env.x, board[y + 1][x]);
-                        imbue(env.c, board[y + 1][x + 1]);
-                        rule[legacy::encode(env)] = board[y][x] == F ? 0 : 1;
-                        locked[legacy::encode(env)] = true;
-                    }
-                }
-            }
-            return {{rule, locked}};
-        }
+        return {{rule, locked}};
     }
     return std::nullopt;
 }

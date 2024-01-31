@@ -8,7 +8,9 @@
 #include "app_imgui.hpp"
 #include "app_sdl.hpp"
 
-// TODO: explain...
+// TODO: app_sdl.hpp may need to be refactored away.
+// For example, it introduces both rule.hpp and tile.hpp, which is not needed for edit_rule.
+
 inline std::mt19937& global_mt19937() {
     static std::mt19937 rand(time(0));
     return rand;
@@ -133,7 +135,7 @@ inline void iter_pair(const char* tag_first, const char* tag_prev, const char* t
     }
 };
 
-std::optional<std::pair<legacy::ruleT, legacy::lockT>> stone_constraints();
+std::optional<std::pair<legacy::ruleT, legacy::lockT>> static_constraints();
 std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lockT& locked, const code_image& icons);
 
 void edit_tile(const legacy::ruleT& target, legacy::lockT& locked, tile_image& img);

@@ -242,7 +242,9 @@ public:
     }
 };
 
-// TODO: refine...
+// TODO: the state that file_nav uses global current_path makes it meaningless to define more
+// than one objects... either to make "current-path" object-local, or make it into pure function...
+
 // TODO: able to create/append/open file?
 class file_nav {
     using path = std::filesystem::path;

@@ -596,8 +596,10 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
         }
     };
 
+    ImGui::PushItemWidth(FixedItemWidth);
     edit_ctrl();
     show_tile();
+    ImGui::PopItemWidth();
 
     // TODO: (temp) this part was outside of begin_frame/end_frame...
     if (ctrl.rule != rule) {

@@ -167,34 +167,38 @@ int main(int argc, char** argv) {
     rule_recorder recorder; // rule ~ current...
     legacy::lockT locked{};
 
-    bool show_nav_window = true;
     file_nav_with_recorder nav;
 
     code_image icons;
     tile_image img;
 
     while (app_backend::begin_frame()) {
-        // TODO: applying following logic; consider refining it.
-        // (there should be a single sync point to represent current rule (and lock)...)
-        // recorder is modified during display, but will synchronize with runner's before next frame.
+        ImGui::ShowDemoWindow(); // TODO: remove (or comment-out) this when all done...
+
+        // TODO: refine sync logic...
         const legacy::ruleT rule = recorder.current();
 
-        if (show_nav_window) {
-            if (auto window = imgui_window("File nav", &show_nav_window)) {
-                nav.display(recorder);
+        if (auto window = imgui_window("File nav")) {
+            nav.display(recorder);
+        }
+
+        if (auto window = imgui_window("Constraints", ImGuiWindowFlags_AlwaysAutoResize)) {
+            if (auto out = static_constraints()) {
+                auto& [rule, lock] = *out;
+                recorder.take(rule); // TODO: (temp) will be used at next frame...
+                locked = lock;
             }
         }
 
         const ImGuiWindowFlags flags =
             ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus;
         const ImGuiViewport* viewport = ImGui::GetMainViewport();
+
         ImGui::SetNextWindowPos(viewport->WorkPos);
         ImGui::SetNextWindowSize(viewport->WorkSize);
-        if (auto window = imgui_window("Tile", flags)) {
-            ImGui::Checkbox("Nav window", &show_nav_window);
-            ImGui::SameLine();
+        if (auto window = imgui_window("Main", flags)) {
             // TODO: change color when is too fps is too low...
-            ImGui::Text("   (%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
+            ImGui::Text("(%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
 
             show_target_rule(rule, recorder);
             ImGui::Separator();
@@ -203,11 +207,6 @@ int main(int argc, char** argv) {
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
                 if (auto child = imgui_childwindow("Rul")) {
-                    if (auto out = stone_constraints()) {
-                        auto& [rule, lock] = *out;
-                        recorder.take(rule); // TODO: (temp) will be used at next frame...
-                        locked = lock;
-                    }
                     // TODO: let lock be dealt with like rule... (modifications are returned by value)
                     if (auto out = edit_rule(rule, locked, icons)) {
                         recorder.take(*out); // TODO: `edit_tile` uses the old rule at this frame... does this matter?
@@ -222,15 +221,12 @@ int main(int argc, char** argv) {
                 ImGui::TableNextColumn();
                 // TODO: it seems this childwindow is not necessary?
                 if (auto child = imgui_childwindow("Til")) {
-                    ImGui::PushItemWidth(FixedItemWidth);
                     edit_tile(rule, locked, img);
-                    ImGui::PopItemWidth();
                 }
                 ImGui::EndTable();
             }
         }
 
-        ImGui::ShowDemoWindow(); // TODO: remove (or comment-out) this when all done...
         logger::tempwindow();
         app_backend::end_frame();
     }
