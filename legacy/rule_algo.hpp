@@ -781,22 +781,23 @@ namespace legacy {
                                                 "asd"
                                                 "zx0"); // ignore_(q, c)
 
+        // TODO: (temp) the mappers implicitly define mapperT_pair{mapper,mp_identity}...
+        // (whether to take mapperT_pair instead?)
+        inline subsetT make_subset(std::initializer_list<mapperT> mappers, const maskT& mask = mask_zero) {
+            equivT eq{};
+            for (const mapperT& m : mappers) {
+                add_eq(eq, {mp_identity, m});
+            }
+            return subsetT{mask, eq};
+        }
+
     } // namespace recipes
 
 #ifndef NDEBUG
       // TODO: add more tests for subsetT... (e.g. iso inclusion etc...)
     namespace _misc::tests {
         inline const bool test_ignore_s_and_self_cmpl = [] {
-            const auto mk = [](const mapperT& mp) {
-                equivT eq{};
-                add_eq(eq, {mp_identity, mp});
-                return eq;
-            };
-
-            subsetT sa{mask_zero, mk(mp_ignore_s)};
-            subsetT sb{mask_identity, mk(mp_dual)};
-
-            auto sc = sa & sb;
+            subsetT sc = make_subset({mp_ignore_s}, mask_zero) & make_subset({mp_dual}, mask_identity);
 
             // 2024/1/20 2AM
             // There is NO problem in the algorithm.

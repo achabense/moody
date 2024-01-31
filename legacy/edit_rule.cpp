@@ -54,62 +54,52 @@ namespace legacy {
 
     public:
         subset_selector() : current(subsetT::universalT{}) {
-            // TODO: add more subsets (von, direct iso, etc)
             // TODO: add some tests after the construction...
-            const auto mk = [](std::initializer_list<mapperT> ms, const maskT& mask = mask_zero) {
-                equivT eq{};
-                for (const mapperT& m : ms) {
-                    add_eq(eq, {mp_identity, m});
-                }
-                return subsetT{mask, eq};
-            };
 
-            terms_ignore.emplace_back("q", mk({mp_ignore_q}));
-            terms_ignore.emplace_back("w", mk({mp_ignore_w}));
-            terms_ignore.emplace_back("e", mk({mp_ignore_e}));
-            terms_ignore.emplace_back("a", mk({mp_ignore_a}));
-
-            // TODO: add {mask_identity, {mp_ignore_s}}? it's sensible but totally different.
-            terms_ignore.emplace_back("s", mk({mp_ignore_s}));
-            terms_ignore.emplace_back("d", mk({mp_ignore_d}));
-            terms_ignore.emplace_back("z", mk({mp_ignore_z}));
-            terms_ignore.emplace_back("x", mk({mp_ignore_x}));
-            terms_ignore.emplace_back("c", mk({mp_ignore_c}));
+            terms_ignore.emplace_back("q", make_subset({mp_ignore_q}));
+            terms_ignore.emplace_back("w", make_subset({mp_ignore_w}));
+            terms_ignore.emplace_back("e", make_subset({mp_ignore_e}));
+            terms_ignore.emplace_back("a", make_subset({mp_ignore_a}));
+            terms_ignore.emplace_back("s", make_subset({mp_ignore_s}, mask_zero)); // TODO (temp) As opposed to S'...
+            terms_ignore.emplace_back("d", make_subset({mp_ignore_d}));
+            terms_ignore.emplace_back("z", make_subset({mp_ignore_z}));
+            terms_ignore.emplace_back("x", make_subset({mp_ignore_x}));
+            terms_ignore.emplace_back("c", make_subset({mp_ignore_c}));
 
             // TODO: temp...
-            terms_ignore.emplace_back("S'", mk({mp_ignore_s}, mask_identity));
-            terms_ignore.emplace_back("Hex", mk({mp_hex_ignore}));
+            terms_ignore.emplace_back("S'", make_subset({mp_ignore_s}, mask_identity));
+            terms_ignore.emplace_back("Hex", make_subset({mp_hex_ignore}));
             // TODO: or define mp_von_ignore?
-            terms_ignore.emplace_back("Von", mk({mp_ignore_q, mp_ignore_e, mp_ignore_z, mp_ignore_c}));
+            terms_ignore.emplace_back("Von", make_subset({mp_ignore_q, mp_ignore_e, mp_ignore_z, mp_ignore_c}));
 
-            terms_native.emplace_back("All", mk({mp_refl_wsx, mp_refl_qsc}));
-            terms_native.emplace_back("|", mk({mp_refl_wsx}));
-            terms_native.emplace_back("-", mk({mp_refl_asd}));
-            terms_native.emplace_back("\\", mk({mp_refl_qsc}));
-            terms_native.emplace_back("/", mk({mp_refl_esz}));
-            terms_native.emplace_back("C2", mk({mp_C2}));
-            terms_native.emplace_back("C4", mk({mp_C4})); // TODO: add explanations in the gui
+            terms_native.emplace_back("All", make_subset({mp_refl_wsx, mp_refl_qsc}));
+            terms_native.emplace_back("|", make_subset({mp_refl_wsx}));
+            terms_native.emplace_back("-", make_subset({mp_refl_asd}));
+            terms_native.emplace_back("\\", make_subset({mp_refl_qsc}));
+            terms_native.emplace_back("/", make_subset({mp_refl_esz}));
+            terms_native.emplace_back("C2", make_subset({mp_C2}));
+            terms_native.emplace_back("C4", make_subset({mp_C4})); // TODO: add explanations in the gui
 
-            terms_misc.emplace_back("'C8'", mk({mp_C8}));
-            terms_misc.emplace_back("Tot", mk({mp_C8, mp_tot_exc_s}));
-            terms_misc.emplace_back("Tot(+s)", mk({mp_C8, mp_tot_inc_s}));
+            terms_misc.emplace_back("'C8'", make_subset({mp_C8}));
+            terms_misc.emplace_back("Tot", make_subset({mp_C8, mp_tot_exc_s}));
+            terms_misc.emplace_back("Tot(+s)", make_subset({mp_C8, mp_tot_inc_s}));
 
-            terms_misc.emplace_back("Dual", mk({mp_dual}, mask_identity)); // <-------
+            terms_misc.emplace_back("Dual", make_subset({mp_dual}, mask_identity)); // <-------
 
-            terms_misc.emplace_back("Hex_Tot", mk({mp_hex_C6, mp_hex_tot_exc_s}));
-            terms_misc.emplace_back("Hex_Tot(+s)", mk({mp_hex_C6, mp_hex_tot_inc_s}));
+            terms_misc.emplace_back("Hex_Tot", make_subset({mp_hex_C6, mp_hex_tot_exc_s}));
+            terms_misc.emplace_back("Hex_Tot(+s)", make_subset({mp_hex_C6, mp_hex_tot_inc_s}));
 
-            terms_hex.emplace_back("All", mk({mp_hex_refl_asd, mp_hex_refl_aq}));
-            terms_hex.emplace_back("a-d", mk({mp_hex_refl_asd}));
-            terms_hex.emplace_back("q-c", mk({mp_hex_refl_qsc}));
-            terms_hex.emplace_back("w-x", mk({mp_hex_refl_wsx}));
-            terms_hex.emplace_back("a|q", mk({mp_hex_refl_aq}));
-            terms_hex.emplace_back("q|w", mk({mp_hex_refl_qw}));
-            terms_hex.emplace_back("w|d", mk({mp_hex_refl_wd}));
+            terms_hex.emplace_back("All", make_subset({mp_hex_refl_asd, mp_hex_refl_aq}));
+            terms_hex.emplace_back("a-d", make_subset({mp_hex_refl_asd}));
+            terms_hex.emplace_back("q-c", make_subset({mp_hex_refl_qsc}));
+            terms_hex.emplace_back("w-x", make_subset({mp_hex_refl_wsx}));
+            terms_hex.emplace_back("a|q", make_subset({mp_hex_refl_aq}));
+            terms_hex.emplace_back("q|w", make_subset({mp_hex_refl_qw}));
+            terms_hex.emplace_back("w|d", make_subset({mp_hex_refl_wd}));
 
-            terms_hex.emplace_back("C2", mk({mp_hex_C2}));
-            terms_hex.emplace_back("C3", mk({mp_hex_C3}));
-            terms_hex.emplace_back("C6", mk({mp_hex_C6}));
+            terms_hex.emplace_back("C2", make_subset({mp_hex_C2}));
+            terms_hex.emplace_back("C3", make_subset({mp_hex_C3}));
+            terms_hex.emplace_back("C6", make_subset({mp_hex_C6}));
 
             reset_current();
         }
@@ -247,18 +237,18 @@ namespace legacy {
                 }
 
                 ImGui::EndTable();
+            }
 
-                // TODO: or just clear on a per-line basis?
-                // TODO: better layout... or right-click menu?
-                ImGui::SameLine();
-                if (ImGui::Button("Clear")) {
-                    for_each_term([&](termT& t) {
-                        if (t.selected) {
-                            t.selected = false;
-                            need_reset = true;
-                        }
-                    });
-                }
+            // TODO: or just clear on a per-line basis?
+            // TODO: better layout... or right-click menu?
+            ImGui::SameLine();
+            if (ImGui::Button("Clear")) {
+                for_each_term([&](termT& t) {
+                    if (t.selected) {
+                        t.selected = false;
+                        need_reset = true;
+                    }
+                });
             }
 
             if (need_reset) {
