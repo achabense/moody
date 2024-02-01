@@ -1,3 +1,7 @@
+#ifndef IMGUI_DEFINE_MATH_OPERATORS
+#define IMGUI_DEFINE_MATH_OPERATORS
+#endif
+
 #include "rule_algo.hpp"
 
 #include "app.hpp"

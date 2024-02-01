@@ -1,20 +1,66 @@
 #pragma once
 
-// TODO: is this necessary?
-#ifndef IMGUI_DEFINE_MATH_OPERATORS
-#define IMGUI_DEFINE_MATH_OPERATORS
-#endif
-
 #include "app_imgui.hpp"
-#include "app_sdl.hpp"
-
-// TODO: app_sdl.hpp may need to be refactored away.
-// For example, it introduces both rule.hpp and tile.hpp, which is not needed for edit_rule.
+#include "rule.hpp"
+#include "tile.hpp"
 
 inline std::mt19937& global_mt19937() {
     static std::mt19937 rand(time(0));
     return rand;
 }
+
+// TODO: redesign (especially as some functions are moved to main.cpp,
+// which makes the rest methods a bit confusing...)
+class tile_image {
+    int m_w, m_h;
+    ImTextureID m_texture;
+
+public:
+    tile_image(const tile_image&) = delete;
+    tile_image& operator=(const tile_image&) = delete;
+
+    tile_image() : m_w{}, m_h{}, m_texture{nullptr} {}
+
+    ~tile_image();
+    ImTextureID update(const legacy::tileT& tile);
+
+    ImTextureID texture() const { return m_texture; }
+};
+
+class code_image {
+    ImTextureID m_texture;
+
+public:
+    code_image(const code_image&) = delete;
+    code_image& operator=(const code_image&) = delete;
+
+    code_image();
+    ~code_image();
+
+    void image(legacy::codeT code, int zoom, const ImVec4& tint_col = ImVec4(1, 1, 1, 1),
+               const ImVec4 border_col = ImVec4(0, 0, 0, 0)) const {
+        const ImVec2 size(3 * zoom, 3 * zoom);
+        const ImVec2 uv0(0, code * (1.0f / 512));
+        const ImVec2 uv1(1, (code + 1) * (1.0f / 512));
+        ImGui::Image(m_texture, size, uv0, uv1, tint_col, border_col);
+    }
+
+    bool button(legacy::codeT code, int zoom, const ImVec4& bg_col = ImVec4(0, 0, 0, 0),
+                const ImVec4& tint_col = ImVec4(1, 1, 1, 1)) const {
+        const ImVec2 size(3 * zoom, 3 * zoom);
+        const ImVec2 uv0(0, code * (1.0f / 512));
+        const ImVec2 uv1(1, (code + 1) * (1.0f / 512));
+        ImGui::PushID(code);
+        const bool hit = ImGui::ImageButton("Code", m_texture, size, uv0, uv1, bg_col, tint_col);
+        ImGui::PopID();
+        return hit;
+    }
+};
+
+std::optional<std::pair<legacy::ruleT, legacy::lockT>> static_constraints();
+std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lockT& locked, const code_image& icons);
+
+void edit_tile(const legacy::ruleT& target, legacy::lockT& locked, tile_image& img);
 
 // Never empty.
 // TODO: (gui) whether to support random-access mode?
@@ -112,8 +158,3 @@ inline void iter_pair(const char* tag_first, const char* tag_prev, const char* t
         act_last();
     }
 };
-
-std::optional<std::pair<legacy::ruleT, legacy::lockT>> static_constraints();
-std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lockT& locked, const code_image& icons);
-
-void edit_tile(const legacy::ruleT& target, legacy::lockT& locked, tile_image& img);
