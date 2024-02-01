@@ -4,22 +4,18 @@
 
 #include "app.hpp"
 
-// TODO: better name...
-// TODO: explain why float (there is no instant ImGui::SliderDouble)
-// (std::optional<uint32_t> has proven to be very awkward)
-struct tileT_filler {
-    bool use_seed;
+// TODO: explain...
+// #define ENABLE_START_GEN
+
+// TODO (temp) there was a `use_seed` in the class.
+// It is useless, as to get non-repeatable data range-select based fill can do exactly the same thing.
+
+// About float: there is only ImGui::SliderFloat, so use float for convenience.
+// TODO: define imgui_sliderdouble in app_imgui.hpp?
+struct initT {
+    legacy::tileT::sizeT size;
     uint32_t seed;
     float density; // ∈ [0.0f, 1.0f]
-
-    void fill(legacy::tileT& tile) const {
-        if (use_seed) {
-            std::mt19937 rand(seed);
-            legacy::random_fill(tile, rand, density);
-        } else {
-            legacy::random_fill(tile, global_mt19937(), density);
-        }
-    }
 };
 
 class torusT {
@@ -27,21 +23,20 @@ class torusT {
     int m_gen;
 
 public:
-    explicit torusT(legacy::tileT::sizeT size, tileT_filler filler) : m_tile(size), m_side(size), m_gen(0) {
-        restart(filler);
-    }
+    explicit torusT(const initT& init) : m_tile(init.size), m_side(init.size), m_gen(0) { restart(init); }
 
     // TODO: reconsider whether to expose non-const tile...
     legacy::tileT& tile() { return m_tile; }
     const legacy::tileT& tile() const { return m_tile; }
     int gen() const { return m_gen; }
 
-    void restart(tileT_filler filler, std::optional<legacy::tileT::sizeT> size = {}) {
-        if (size) {
-            m_tile.resize(*size);
-        }
+    void restart(const initT& init) {
+        m_tile.resize(init.size);
+        m_side.resize(init.size);
 
-        filler.fill(m_tile);
+        std::mt19937 rand(init.seed);
+        legacy::random_fill(m_tile, rand, init.density);
+
         m_gen = 0;
     }
 
@@ -59,7 +54,7 @@ public:
     void shift(int dx, int dy) {
         const int width = m_tile.width(), height = m_tile.height();
 
-        // TODO: proper name...
+        // TODO: proper name... (`wrap` seems a good one, e.g. unsigned's wrapping behavior)
         const auto round_clip = [](int v, int r) { return ((v % r) + r) % r; };
         dx = round_clip(-dx, width);
         dy = round_clip(-dy, height);
@@ -67,9 +62,9 @@ public:
             return;
         }
 
-        m_side.resize(m_tile.size());
+        assert(m_side.size() == m_tile.size());
         for (int y = 0; y < height; ++y) {
-            bool* source = m_tile.line((y + dy) % height);
+            const bool* source = m_tile.line((y + dy) % height);
             bool* dest = m_side.line(y);
             std::copy_n(source, width, dest);
             std::rotate(dest, dest + dx, dest + width);
@@ -78,7 +73,7 @@ public:
     }
 };
 
-struct runner_ctrl {
+struct ctrlT {
     legacy::ruleT rule{};
 
     // TODO: better name?
@@ -92,10 +87,12 @@ struct runner_ctrl {
         return pace;
     }
 
-    // TODO: remove this feature?
+#ifdef ENABLE_START_GEN
     static constexpr int start_min = 0, start_max = 200;
     int start_from = 0;
+#endif // ENABLE_START_GEN
 
+    // TODO: redesign?
     static constexpr int gap_min = 0, gap_max = 20;
     int gap_frame = 0;
 
@@ -103,19 +100,52 @@ struct runner_ctrl {
     bool pause2 = false; // TODO: explain...
 
     void run(torusT& runner, int extra = 0) const {
+#ifdef ENABLE_START_GEN
         if (runner.gen() < start_from) {
             runner.run(rule, start_from - runner.gen());
-        } else {
-            if (extra != 0) {
-                runner.run(rule, extra);
-                extra = 0;
-            }
-            if (!pause && !pause2) {
-                if (ImGui::GetFrameCount() % (gap_frame + 1) == 0) {
-                    runner.run(rule, actual_pace());
-                }
+            return;
+        }
+#endif // ENABLE_START_GEN
+
+        if (extra != 0) {
+            runner.run(rule, extra);
+            extra = 0;
+        }
+        if (!pause && !pause2) {
+            if (ImGui::GetFrameCount() % (gap_frame + 1) == 0) {
+                runner.run(rule, actual_pace());
             }
         }
+    }
+};
+
+// TODO: explain...
+struct selectT {
+    // []
+    legacy::tileT::posT select_0{0, 0}, select_1{0, 0}; // cell index, not pixel.
+
+    void clear() { select_0 = select_1 = {0, 0}; }
+    void toggle_select_all(legacy::tileT::sizeT size) {
+        // all-selected ? clear : select-all
+        const auto [begin, end] = range();
+        if (begin.x == 0 && begin.y == 0 && end.x == size.width && end.y == size.height) {
+            clear();
+        } else {
+            select_0 = {0, 0};
+            select_1 = {.x = size.width - 1, .y = size.height - 1};
+        }
+    }
+
+    legacy::tileT::rangeT range() const {
+        int x0 = select_0.x, x1 = select_1.x;
+        int y0 = select_0.y, y1 = select_1.y;
+        if (x0 > x1) {
+            std::swap(x0, x1);
+        }
+        if (y0 > y1) {
+            std::swap(y0, y1);
+        }
+        return {.begin{x0, y0}, .end{x1 + 1, y1 + 1}};
     }
 };
 
@@ -123,52 +153,23 @@ struct runner_ctrl {
 void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img) {
     // TODO: (temp) these variables become static after moving code in main into this function...
     // which is not ideal...
-    static tileT_filler filler{.use_seed = true, .seed = 0, .density = 0.5};
-    static torusT runner({.width = 480, .height = 360}, filler);
-    static runner_ctrl ctrl{
-        .rule = rule, .pace = 1, .anti_flick = true, .start_from = 0, .gap_frame = 0, .pause = false};
+    static initT init{.size{.width = 480, .height = 360}, .seed = 0, .density = 0.5};
+    static torusT runner(init);
+    assert(init.size == runner.tile().size());
+
+    static ctrlT ctrl{.rule = rule, .pace = 1, .anti_flick = true, .gap_frame = 0, .pause = false};
 
     static ImVec2 img_off = {0, 0}; // TODO: supposed to be of integer-precision...
     static int img_zoom = 1;
 
-    struct pasteT : public std::optional<legacy::tileT> {
-        legacy::tileT::posT pos{0, 0}; // dbegin for copy... (TODO: this is confusing...)
-    };
-    static pasteT paste;
+    static std::optional<legacy::tileT> paste;
+    static legacy::tileT::posT paste_beg{0, 0}; // dbegin for copy... (TODO: this is confusing...)
 
-    // TODO: rename; move elsewhere...
-    // TODO: ctrl to move selected area?
-    struct selectT {
-        // []
-        legacy::tileT::posT select_0{0, 0}, select_1{0, 0}; // cell index, not pixel.
-
-        void clear() { select_0 = select_1 = {0, 0}; }
-        void toggle_select_all(legacy::tileT::sizeT size) {
-            // all-selected ? clear : select-all
-            const auto [begin, end] = range();
-            if (begin.x == 0 && begin.y == 0 && end.x == size.width && end.y == size.height) {
-                clear();
-            } else {
-                select_0 = {0, 0};
-                select_1 = {.x = size.width - 1, .y = size.height - 1};
-            }
-        }
-
-        legacy::tileT::rangeT range() const {
-            int x0 = select_0.x, x1 = select_1.x;
-            int y0 = select_0.y, y1 = select_1.y;
-            if (x0 > x1) {
-                std::swap(x0, x1);
-            }
-            if (y0 > y1) {
-                std::swap(y0, y1);
-            }
-            return {.begin{x0, y0}, .end{x1 + 1, y1 + 1}};
-        }
-    };
     static selectT sel{};
 
-    // TODO: let right+ctrl move the block?
+    // TODO: add a menu somewhere...
+
+    // TODO: let right+ctrl move selected area?
 
     // TODO: set pattern as init state? what if size is already changed?
     // TODO: specify mouse-dragging behavior (especially, no-op must be an option)
@@ -258,10 +259,9 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
 
             const legacy::tileT::sizeT size =
                 size_clamped((int)canvas_size.x / img_zoom, (int)canvas_size.y / img_zoom);
-            if (runner.tile().size() != size) {
-                runner.restart(filler, size);
-                // TODO: how to support background period then?
-                assert(runner.tile().size() == size); // ???
+            if (init.size != size) {
+                init.size = size;
+                runner.restart(init);
             }
         }
         if (resize) {
@@ -273,8 +273,9 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
                 img_off = {0, 0};
                 img_zoom = 1; // <-- TODO: whether to reset zoom here?
                 const legacy::tileT::sizeT size = size_clamped(iwidth, iheight);
-                if (runner.tile().size() != size) {
-                    runner.restart(filler, size);
+                if (init.size != size) {
+                    init.size = size;
+                    runner.restart(init);
                 }
             }
             // else ...
@@ -283,7 +284,7 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
         }
 
         // Size is fixed now:
-        const legacy::tileT::sizeT tile_size = runner.tile().size();
+        const legacy::tileT::sizeT tile_size = runner.tile().size(); // TODO: which (vs init.size) is better?
         const ImVec2 img_size(tile_size.width * img_zoom, tile_size.height * img_zoom);
 
         // Validity of paste is fixed now:
@@ -313,18 +314,18 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
             // TODO: displays poorly with miniwindow...
 
             assert(paste->width() <= tile_size.width && paste->height() <= tile_size.height);
-            paste.pos.x = std::clamp(paste.pos.x, 0, tile_size.width - paste->width());
-            paste.pos.y = std::clamp(paste.pos.y, 0, tile_size.height - paste->height());
+            paste_beg.x = std::clamp(paste_beg.x, 0, tile_size.width - paste->width());
+            paste_beg.y = std::clamp(paste_beg.y, 0, tile_size.height - paste->height());
             // TODO: rename...
-            const legacy::tileT::rangeT range = {paste.pos, paste.pos + paste->size()};
+            const legacy::tileT::rangeT range = {paste_beg, paste_beg + paste->size()};
 
             legacy::tileT temp(paste->size()); // TODO: wasteful...
             legacy::copy(temp, {0, 0}, runner.tile(), range);
-            legacy::copy<legacy::copyE::Or>(runner.tile(), paste.pos, *paste);
+            legacy::copy<legacy::copyE::Or>(runner.tile(), paste_beg, *paste);
 
             drawlist->AddImage(img.update(runner.tile()), img_pos, img_pos + img_size);
 
-            legacy::copy(runner.tile(), paste.pos, temp);
+            legacy::copy(runner.tile(), paste_beg, temp);
 
             const ImVec2 paste_min = img_pos + ImVec2(range.begin.x, range.begin.y) * img_zoom;
             const ImVec2 paste_max = img_pos + ImVec2(range.end.x, range.end.y) * img_zoom;
@@ -422,11 +423,11 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
                 const int cely = floor((mouse_pos.y - img_pos.y) / img_zoom);
 
                 // TODO: can width<paste.width here?
-                paste.pos.x = std::clamp(celx, 0, tile_size.width - paste->width());
-                paste.pos.y = std::clamp(cely, 0, tile_size.height - paste->height());
+                paste_beg.x = std::clamp(celx, 0, tile_size.width - paste->width());
+                paste_beg.y = std::clamp(cely, 0, tile_size.height - paste->height());
 
                 if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-                    legacy::copy<legacy::copyE::Or>(runner.tile(), paste.pos, *paste);
+                    legacy::copy<legacy::copyE::Or>(runner.tile(), paste_beg, *paste);
                     paste.reset();
                 }
             }
@@ -535,8 +536,11 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
             // TODO: Gap-frame shall be really timer-based...
             ImGui::SliderInt("Gap Frame (0~20)", &ctrl.gap_frame, ctrl.gap_min, ctrl.gap_max, "%d",
                              ImGuiSliderFlags_NoInput);
-            // TODO: move elsewhere...
+
+#ifdef ENABLE_START_GEN
             imgui_int_slider("Start gen (0~200)", &ctrl.start_from, ctrl.start_min, ctrl.start_max);
+#endif // ENABLE_START_GEN
+
             imgui_int_slider("Pace (1~20)", &ctrl.pace, ctrl.pace_min, ctrl.pace_max);
             ImGui::AlignTextToFramePadding();
             ImGui::Text("(Actual pace: %d)", ctrl.actual_pace());
@@ -547,27 +551,13 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
         ImGui::SameLine();
         ImGui::BeginGroup();
         {
-            // TODO: use radio instead?
-            if (ImGui::Checkbox("Use seed", &filler.use_seed)) {
-                // TODO: unconditional?
-                if (filler.use_seed) {
-                    should_restart = true;
-                }
-            }
-            if (!filler.use_seed) {
-                ImGui::BeginDisabled();
-            }
-            if (int seed = filler.seed; imgui_int_slider("Seed (0~99)", &seed, 0, 99)) {
-                filler.seed = seed;
+            if (int seed = init.seed; imgui_int_slider("Seed (0~99)", &seed, 0, 99)) {
+                init.seed = seed;
                 should_restart = true;
-            }
-            if (!filler.use_seed) {
-                ImGui::EndDisabled();
             }
 
             // TODO: integer(ratio) density?
-            if (ImGui::SliderFloat("Init density (0~1)", &filler.density, 0.0f, 1.0f, "%.3f",
-                                   ImGuiSliderFlags_NoInput)) {
+            if (ImGui::SliderFloat("Init density (0~1)", &init.density, 0.0f, 1.0f, "%.3f", ImGuiSliderFlags_NoInput)) {
                 should_restart = true;
             }
         }
@@ -612,7 +602,7 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
         ctrl.pause = false; // TODO: this should be configurable...
     }
     if (should_restart) {
-        runner.restart(filler);
+        runner.restart(init);
     }
     ctrl.run(runner, extra); // TODO: able to result in low fps...
 }
