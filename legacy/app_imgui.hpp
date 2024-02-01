@@ -235,81 +235,112 @@ public:
     }
 };
 
-// TODO: the state that file_nav uses global current_path makes it meaningless to define more
-// than one objects... either to make "current-path" object-local, or make it into pure function...
-
+// TODO: recheck...
 // TODO: able to create/append/open file?
 class file_nav {
     using path = std::filesystem::path;
+    using entries = std::vector<std::filesystem::directory_entry>;
     using clock = std::chrono::steady_clock;
 
     char buf_path[200]{};
     char buf_filter[20]{".txt"};
 
-    std::vector<std::filesystem::directory_entry> dirs;
-    std::vector<std::filesystem::directory_entry> files;
+    // TODO: is canonical path necessary?
+    bool valid = false; // The last call to `collect(current, ...)` is successful.
+    path current;       // Canonical path.
+    entries dirs, files;
 
-    clock::time_point expired = {};
+    clock::time_point expired = {}; // TODO: better name...
 
-    void set_current(const path& p) {
-        // (Catching eagerly to avoid some flickering...)
-        try {
-            std::filesystem::current_path(p);
-            expired = {};
-        } catch (const std::exception& what) {
-            // TODO: what encoding?
-            // TODO: treat exceptions specially... (btw, 1000ms is too short)
-            logger::log_temp(1000ms, "Exception:\n{}", what.what());
+    static void collect(const path& p, entries& dirs, entries& files) {
+        dirs.clear();
+        files.clear();
+        for (const auto& entry :
+             std::filesystem::directory_iterator(p, std::filesystem::directory_options::skip_permission_denied)) {
+            const auto status = entry.status();
+            if (is_directory(status)) {
+                dirs.emplace_back(entry);
+            }
+            if (is_regular_file(status)) {
+                files.emplace_back(entry);
+            }
         }
     }
-    void refresh() {
-        // Setting outside of try-block to avoid too frequent failures...
-        // TODO: log_temp is global; can be problematic...
-        expired = std::chrono::steady_clock::now() + 3000ms;
+
+    // Intentionally pass by value.
+    void set_current(path p) {
         try {
-            dirs.clear();
-            files.clear();
-            for (const auto& entry : std::filesystem::directory_iterator(
-                     std::filesystem::current_path(), std::filesystem::directory_options::skip_permission_denied)) {
-                const auto status = entry.status();
-                if (is_regular_file(status)) {
-                    files.emplace_back(entry);
-                }
-                if (is_directory(status)) {
-                    dirs.emplace_back(entry);
-                }
-            }
+            p = std::filesystem::canonical(p);
+            entries p_dirs, p_files;
+            collect(p, p_dirs, p_files);
+
+            valid = true;
+            current.swap(p);
+            dirs.swap(p_dirs);
+            files.swap(p_files);
+
+            expired = clock::now() + 3000ms;
         } catch (const std::exception& what) {
-            // TODO: what encoding?
-            logger::log_temp(1000ms, "Exception:\n{}", what.what());
+            // TODO: report error... what encoding?
+        }
+    }
+
+    void refresh_if_valid() {
+        if (valid && clock::now() > expired) {
+            try {
+                collect(current, dirs, files);
+                expired = clock::now() + 3000ms;
+            } catch (const std::exception& what) {
+                // TODO: report error... what encoding?
+                valid = false;
+                dirs.clear();
+                files.clear();
+            }
         }
     }
 
 public:
+    file_nav(path p = std::filesystem::current_path()) {
+        valid = false;
+        set_current(std::move(p));
+    }
+
     // TODO: refine...
     inline static std::vector<std::pair<path, std::string>> additionals;
-    static void add_special_path(path&& path, const char* title) { //
-        additionals.emplace_back(std::move(path), title);
+    static bool add_special_path(path p, const char* title) { //
+        std::error_code ec{};
+        p = std::filesystem::canonical(p, ec);
+        if (!ec) {
+            additionals.emplace_back(std::move(p), title);
+            return true;
+        }
+        return false;
     }
 
     [[nodiscard]] std::optional<path> display() {
         std::optional<path> target = std::nullopt;
 
-        imgui_strwrapped(cpp17_u8string(std::filesystem::current_path()));
+        refresh_if_valid();
+
+        if (valid) {
+            imgui_str(cpp17_u8string(current));
+        } else {
+            assert(dirs.empty() && files.empty());
+            imgui_strdisabled("(Invalid) " + cpp17_u8string(current));
+        }
+
         ImGui::Separator();
 
         if (ImGui::BeginTable("##Table", 2, ImGuiTableFlags_Resizable)) {
-            if (clock::now() > expired) {
-                refresh();
-            }
-
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             {
                 // TODO: better hint...
                 if (ImGui::InputTextWithHint("Path", "-> enter", buf_path, std::size(buf_path),
                                              ImGuiInputTextFlags_EnterReturnsTrue)) {
-                    set_current(std::filesystem::u8path(buf_path));
+                    // TODO: is the usage of / correct?
+                    // TODO: is this still ok when !valid?
+                    set_current(current / std::filesystem::u8path(buf_path));
                     buf_path[0] = '\0';
                 }
                 for (const auto& [path, title] : additionals) {
@@ -318,20 +349,26 @@ public:
                     }
                 }
                 if (ImGui::MenuItem("..")) {
-                    set_current("..");
+                    set_current(current.parent_path());
                 }
                 ImGui::Separator();
                 if (auto child = imgui_childwindow("Folders")) {
                     if (dirs.empty()) {
                         imgui_strdisabled("None");
                     }
+                    const std::filesystem::directory_entry* sel = nullptr;
                     for (const auto& entry : dirs) {
                         // TODO: cache str?
                         const auto str = cpp17_u8string(entry.path().filename());
                         if (ImGui::Selectable(str.c_str())) {
-                            // Won't affect the loop at this frame.
-                            set_current(entry.path());
+                            sel = &entry;
                         }
+                    }
+                    // TODO: explain this is the reason why `set_current` must take by value...
+                    if (sel) {
+                        // TODO: does directory_entry.path always return absolute path?
+                        assert(sel->path().is_absolute());
+                        set_current(sel->path());
                     }
                 }
             }
