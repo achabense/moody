@@ -350,6 +350,10 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
             assert(ImGui::IsMousePosValid());
             // It turned out that, this will work well even if outside of the image...
             const ImVec2 mouse_pos = io.MousePos;
+            const ImVec2 cell_pos_raw = (mouse_pos - img_pos) / img_zoom;
+            const int celx = floor(cell_pos_raw.x);
+            const int cely = floor(cell_pos_raw.y);
+
             if (active) {
                 if (!io.KeyCtrl) {
                     img_off += io.MouseDelta;
@@ -361,16 +365,9 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
             // TODO: refine...
             // TODO: zoom window temporarily conflicts with range selection... (both use Rclick)
             if (!paste && img_zoom <= 2 && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-                const int celx = floor((mouse_pos.x - img_pos.x) / img_zoom);
-                const int cely = floor((mouse_pos.y - img_pos.y) / img_zoom);
                 if (celx >= -10 && celx < tile_size.width + 10 && cely >= -10 && cely < tile_size.height + 10) {
                     static bool toggle = true;
                     if (auto tooltip = imgui_itemtooltip(toggle)) {
-                        // int minx = std::max(celx - 20, 0);
-                        // int miny = std::max(cely - 20, 0);
-                        // int maxx = std::min(celx + 20, tile_size.width);
-                        // int maxy = std::min(cely + 20, tile_size.height);
-
                         // TODO: simplify...
                         assert(tile_size.width >= 40);
                         assert(tile_size.height >= 40);
@@ -405,23 +402,14 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
             // TODO: precedence against left-clicking?
             if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
                 // ctrl.pause = true;
-                const int celx = floor((mouse_pos.x - img_pos.x) / img_zoom);
-                const int cely = floor((mouse_pos.y - img_pos.y) / img_zoom);
-
                 sel.select_0.x = std::clamp(celx, 0, tile_size.width - 1);
                 sel.select_0.y = std::clamp(cely, 0, tile_size.height - 1);
             }
             if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-                const int celx = floor((mouse_pos.x - img_pos.x) / img_zoom);
-                const int cely = floor((mouse_pos.y - img_pos.y) / img_zoom);
-
                 sel.select_1.x = std::clamp(celx, 0, tile_size.width - 1);
                 sel.select_1.y = std::clamp(cely, 0, tile_size.height - 1);
             }
             if (paste) {
-                const int celx = floor((mouse_pos.x - img_pos.x) / img_zoom);
-                const int cely = floor((mouse_pos.y - img_pos.y) / img_zoom);
-
                 // TODO: can width<paste.width here?
                 paste_beg.x = std::clamp(celx, 0, tile_size.width - paste->width());
                 paste_beg.y = std::clamp(cely, 0, tile_size.height - paste->height());
@@ -434,14 +422,13 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
 
             // TODO (temp) moved here to avoid affecting other utils (which rely on img_pos)
             if (imgui_scrolling()) {
-                const ImVec2 cellidx = (mouse_pos - img_pos) / img_zoom;
                 if (imgui_scrolldown() && img_zoom != 1) {
                     img_zoom /= 2;
                 }
                 if (imgui_scrollup() && img_zoom != 8) {
                     img_zoom *= 2;
                 }
-                img_off = (mouse_pos - cellidx * img_zoom) - canvas_pos;
+                img_off = (mouse_pos - cell_pos_raw * img_zoom) - canvas_pos;
                 img_off.x = round(img_off.x);
                 img_off.y = round(img_off.y); // TODO: is rounding correct?
             }

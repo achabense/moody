@@ -494,34 +494,36 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
             ImGui::BeginDisabled();
         }
 
-        // TODO: support different rand mode here ("density" and "exact")
-        // TODO: still unstable between partition switches...
-        // TODO: the range should be scoped by locks... so, what should rcount be?
-        static int rcount = 0.5 * par.k();
-        const int freec = legacy::count_free(par, locked); // TODO: still wasteful...
+        // TODO: refine (better names etc)...
+        static bool exact_mode = false;
 
-        ImGui::SetNextItemWidth(FixedItemWidth);
-        imgui_int_slider("##Quantity", &rcount, 0, par.k());
-        rcount = std::clamp(rcount, 0, freec);
+        if (ImGui::Button(std::format("Mode = {}###Mode", exact_mode ? "Exact" : "Dens ").c_str())) {
+            exact_mode = !exact_mode;
+        }
 
         // TODO: imgui_innerx...
         ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
-        if (imgui_enterbutton("Randomize")) {
-            out = legacy::randomize(subset, target, locked, global_mt19937(), rcount, rcount);
-        }
-        ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
-        if (imgui_enterbutton("Shuffle")) {
-            out = legacy::shuffle(subset, target, locked, global_mt19937());
-        }
+        if (exact_mode) {
+            // TODO: support different rand mode here ("density" and "exact")
+            // TODO: still unstable between partition switches...
+            // TODO: the range should be scoped by locks... so, what should rcount be?
+            static int rcount = 0.5 * par.k();
+            const int freec = legacy::count_free(par, locked); // TODO: still wasteful...
 
-        {
-            // TODO; experimental...
+            ImGui::SetNextItemWidth(FixedItemWidth);
+            imgui_int_slider("##Quantity", &rcount, 0, par.k());
+            rcount = std::clamp(rcount, 0, freec);
+            ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+            if (imgui_enterbutton("Randomize")) {
+                out = legacy::randomize(subset, target, locked, global_mt19937(), rcount, rcount);
+            }
+        } else {
             ImGui::SetNextItemWidth(FixedItemWidth);
             static float density = 0.5;
             ImGui::SliderFloat("##Density", &density, 0, 1, std::format("Around {}", round(density * par.k())).c_str(),
                                ImGuiSliderFlags_NoInput);
             ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
-            if (imgui_enterbutton("Randomize(V2)")) {
+            if (imgui_enterbutton("Randomize")) {
                 out = legacy::randomize_v2(subset, target, locked, global_mt19937(), density);
             }
         }
@@ -539,6 +541,10 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
             [&] { out = legacy::act_perm::prev(subset, target, locked); },
             [&] { out = legacy::act_perm::next(subset, target, locked); },
             [&] { out = legacy::act_perm::last(subset, target, locked); });
+        ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
+        if (imgui_enterbutton("Shuffle")) {
+            out = legacy::shuffle(subset, target, locked, global_mt19937());
+        }
 
         // TODO: (temp) new line begins here...
         // TODO: enhance might be stricter than necessary...
@@ -690,9 +696,13 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
                     // TODO: reconsider how to deal with conflicts... (especially via masking rule...)
                     legacy::ruleT r = target;
                     if (ImGui::GetIO().KeyCtrl) {
-                        legacy::copy(group, mask, r);
+                        for (legacy::codeT c : group) {
+                            r[c] = mask[c];
+                        }
                     } else {
-                        legacy::flip(group, r);
+                        for (legacy::codeT c : group) {
+                            r[c] = !r[c];
+                        }
                     }
                     out = r;
                 }

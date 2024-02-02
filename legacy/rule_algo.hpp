@@ -268,19 +268,6 @@ namespace legacy {
         }
     };
 
-    // TODO: (flip & copy) inline... or at least move elsewhere...
-    inline void flip(const groupT& group, ruleT& rule) {
-        for (codeT c : group) {
-            rule[c] = !rule[c];
-        }
-    }
-
-    inline void copy(const groupT& group, const ruleT& source, ruleT& dest) {
-        for (codeT c : group) {
-            dest[c] = source[c];
-        }
-    }
-
     inline auto scan(const partitionT& par, const ruleT_masked& rule, const lockT& locked) {
         struct counterT {
             int free_0 = 0, free_1 = 0;
