@@ -95,27 +95,48 @@ struct fileT {
     }
 
     // TODO: how to combine with file-nav (into a single window)?
-    // TODO: add a way to show sync-ness...  ¡ý
-    std::optional<legacy::ruleT> display(/*const legacy::ruleT& test_sync*/) {
+    std::optional<legacy::ruleT> display(const legacy::ruleT& test_sync) {
+        static const bool wrap = true; // TODO: (temporarily const)
+
         std::optional<legacy::ruleT> out;
-        bool hit = false;
+        bool hit = false; // TODO: also sync on window appearing?
         const int total = m_rules.size();
 
         if (total != 0) {
+            const bool in_sync = test_sync == m_rules[pointing_at];
+
             ImGui::BeginGroup();
-            // TODO: iter_pair uses enter-button and has scrolling logic...
-            // Are these operations preferable?
             iter_pair(
                 "<|", "prev", "next", "|>",                                              //
                 [&] { hit = true, pointing_at = 0; },                                    //
                 [&] { hit = true, pointing_at = std::max(0, pointing_at - 1); },         //
                 [&] { hit = true, pointing_at = std::min(total - 1, pointing_at + 1); }, //
-                [&] { hit = true, pointing_at = total - 1; });
+                [&] { hit = true, pointing_at = total - 1; }, false, false);
             ImGui::SameLine();
             ImGui::Text("Total:%d At:%d", total, pointing_at + 1);
+            if (!in_sync) {
+                ImGui::SameLine();
+                imgui_str(" (click to sync)");
+            }
             ImGui::EndGroup();
+            if (!in_sync && ImGui::IsItemHovered()) {
+                const ImVec2 pos_min = ImGui::GetItemRectMin();
+                const ImVec2 pos_max = ImGui::GetItemRectMax();
+                ImGui::GetWindowDrawList()->AddRectFilled(pos_min, pos_max, IM_COL32(0, 255, 0, 30));
+            }
+
             if (ImGui::IsItemClicked()) {
                 hit = true;
+            }
+
+            // TODO: (temp) without ImGuiFocusedFlags_ChildWindows, clicking the child window will invalidate this.
+            if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
+                if (imgui_keypressed(ImGuiKey_UpArrow, true)) {
+                    hit = true, pointing_at = std::max(0, pointing_at - 1);
+                }
+                if (imgui_keypressed(ImGuiKey_DownArrow, true)) {
+                    hit = true, pointing_at = std::min(total - 1, pointing_at + 1);
+                }
             }
         } else {
             ImGui::Text("Not found");
@@ -124,13 +145,19 @@ struct fileT {
         const bool focus = hit;
 
         ImGui::Separator();
-        if (auto child = imgui_childwindow("Child")) {
+
+        if (auto child = imgui_childwindow("Child", {}, 0,
+                                           wrap ? ImGuiWindowFlags_None : ImGuiWindowFlags_HorizontalScrollbar)) {
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
             // TODO: refine line-no logic (line-no or id-no)?
             for (int l = 1; const auto& [has_rule, id, text] : m_lines) {
                 ImGui::TextDisabled("%3d ", l++);
                 ImGui::SameLine();
-                imgui_strwrapped(text);
+                if (wrap) {
+                    imgui_strwrapped(text);
+                } else {
+                    imgui_str(text);
+                }
                 if (has_rule) {
                     if (id == pointing_at) {
                         const ImVec2 pos_min = ImGui::GetItemRectMin();
@@ -170,16 +197,16 @@ class file_nav_v2 {
     bool m_open = false;
 
 public:
-    void display(rule_recorder& recorder) {
+    std::optional<legacy::ruleT> display(const legacy::ruleT& test_sync) {
+        std::optional<legacy::ruleT> out;
+
         if (m_file) {
             assert(m_open);
             ImGui::SetNextWindowSize({720, 400}, ImGuiCond_FirstUseEver);
-            ImGui::SetNextWindowSizeConstraints(ImVec2(300, 100), ImVec2(FLT_MAX, FLT_MAX));
+            ImGui::SetNextWindowSizeConstraints(ImVec2(400, 200), ImVec2(FLT_MAX, FLT_MAX));
             if (auto window = imgui_window((cpp17_u8string(m_file->m_path) + "###File_").c_str(), &m_open,
                                            ImGuiWindowFlags_NoSavedSettings)) {
-                if (auto out = m_file->display()) {
-                    recorder.take(*out);
-                }
+                out = m_file->display(test_sync);
             }
         }
 
@@ -193,6 +220,8 @@ public:
             m_file.emplace(*sel);
             m_open = true;
         }
+
+        return out;
     }
 };
 
@@ -261,7 +290,10 @@ int main(int argc, char** argv) {
         const legacy::ruleT rule = recorder.current();
 
         if (auto window = imgui_window("File nav")) {
-            nav.display(recorder);
+            if (auto out = nav.display(rule)) {
+                recorder.take(*out);
+                // TODO: `locked` can be broken by irrelevant rules...
+            }
         }
 
         if (auto window = imgui_window("Constraints", ImGuiWindowFlags_AlwaysAutoResize)) {

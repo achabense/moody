@@ -184,11 +184,11 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
     auto show_tile = [&] {
         // TODO: refine "resize" gui and logic...
         static char input_width[20]{}, input_height[20]{};
-        const float s = ImGui::GetStyle().ItemInnerSpacing.x;
         {
             const auto filter = [](ImGuiInputTextCallbackData* data) -> int {
                 return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
             };
+            const float s = ImGui::GetStyle().ItemInnerSpacing.x;
             const float w = (ImGui::CalcItemWidth() - s) / 2;
             ImGui::SetNextItemWidth(w);
             ImGui::InputTextWithHint("##Width", "width", input_width, 20, ImGuiInputTextFlags_CallbackCharFilter,
@@ -201,6 +201,10 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
         }
         const bool resize = ImGui::Button("Resize");
 
+        ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
+        const bool fit = ImGui::Button("Fit"); // TODO: size preview?
+        // TODO: or fit with zoom=[1/2/4/8] (4 buttons)?
+
         // TODO: move elsewhere in the gui?
         ImGui::Text("Width:%d,Height:%d,Gen:%d,Density:%.4f", runner.tile().width(), runner.tile().height(),
                     runner.gen(), float(legacy::count(runner.tile())) / runner.tile().area());
@@ -210,19 +214,7 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
         ImGui::SameLine();
         const bool center = ImGui::Button("Center");
         ImGui::SameLine();
-        imgui_str("Zoom");
-        assert(img_zoom == 1 || img_zoom == 2 || img_zoom == 4 || img_zoom == 8);
-        for (const int z : {1, 2, 4, 8}) {
-            ImGui::SameLine(0, s);
-            // TODO: avoid usage of format...
-            if (ImGui::RadioButton(std::format("{}##Z{}", z, z).c_str(), img_zoom == z)) {
-                img_off = {8, 8}; // TODO: temporarily intentional...
-                img_zoom = z;
-            }
-        }
-
-        ImGui::SameLine();
-        const bool fit = ImGui::Button("Fit"); // TODO: size preview?
+        ImGui::Text("Zoom:%d", img_zoom);
         // TODO: select all, unselect button...
 
         if (paste) {
@@ -420,7 +412,6 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
                 }
             }
 
-            // TODO (temp) moved here to avoid affecting other utils (which rely on img_pos)
             if (imgui_scrolling()) {
                 if (imgui_scrolldown() && img_zoom != 1) {
                     img_zoom /= 2;

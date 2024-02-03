@@ -127,9 +127,10 @@ const int FixedItemWidth = 220;
 // TODO: support rollbacking locks?
 // TODO: for editing opt, support in-lock and outof-lock mode?
 
-// TODO: allow/disallow scrolling...
+// TODO: reconsider binding and scrolling logic...
 inline void iter_pair(const char* tag_first, const char* tag_prev, const char* tag_next, const char* tag_last,
-                      auto act_first, auto act_prev, auto act_next, auto act_last) {
+                      auto act_first, auto act_prev, auto act_next, auto act_last, bool allow_binding = true,
+                      bool allow_scrolling = true) {
     if (ImGui::Button(tag_first)) {
         act_first();
     }
@@ -137,15 +138,26 @@ inline void iter_pair(const char* tag_first, const char* tag_prev, const char* t
     ImGui::SameLine();
     ImGui::BeginGroup();
     // TODO: _Left, _Right to toggle?
-    if (imgui_enterbutton(tag_prev)) {
-        act_prev();
+    if (allow_binding) {
+        if (imgui_enterbutton(tag_prev)) {
+            act_prev();
+        }
+        ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+        if (imgui_enterbutton(tag_next)) {
+            act_next();
+        }
+    } else {
+        if (ImGui::Button(tag_prev)) {
+            act_prev();
+        }
+        ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+        if (ImGui::Button(tag_next)) {
+            act_next();
+        }
     }
-    ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
-    if (imgui_enterbutton(tag_next)) {
-        act_next();
-    }
+
     ImGui::EndGroup();
-    if (ImGui::IsItemHovered()) {
+    if (allow_scrolling && ImGui::IsItemHovered()) {
         if (imgui_scrollup()) {
             act_prev();
         } else if (imgui_scrolldown()) {
