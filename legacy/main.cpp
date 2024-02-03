@@ -123,6 +123,9 @@ int main(int argc, char** argv) {
         // TODO: refine sync logic...
         const legacy::ruleT rule = recorder.current();
 
+        // TODO: this should be controlled by load_rule ...
+        ImGui::SetNextWindowSize({720, 400}, ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSizeConstraints(ImVec2(400, 200), ImVec2(FLT_MAX, FLT_MAX));
         if (auto window = imgui_window("File nav")) {
             if (auto out = load_rule(rule)) {
                 recorder.take(*out);

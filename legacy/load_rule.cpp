@@ -90,7 +90,7 @@ struct fileT {
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
             // TODO: refine line-no logic (line-no or id-no)?
             for (int l = 1; const auto& [has_rule, id, text] : m_lines) {
-                ImGui::TextDisabled("%3d ", l++);
+                ImGui::TextDisabled("%2d ", l++);
                 ImGui::SameLine();
                 if (wrap) {
                     imgui_strwrapped(text);
@@ -129,42 +129,35 @@ struct fileT {
     }
 };
 
-class file_nav_v2 {
-    file_nav m_nav;
-    std::optional<fileT> m_file;
-    bool m_open = false;
+std::optional<legacy::ruleT> load_rule(const legacy::ruleT& test_sync) {
+    static file_nav nav;
+    static std::optional<fileT> file;
 
-public:
-    std::optional<legacy::ruleT> display(const legacy::ruleT& test_sync) {
-        std::optional<legacy::ruleT> out;
+    std::optional<legacy::ruleT> out;
 
-        if (m_file) {
-            assert(m_open);
-            ImGui::SetNextWindowSize({720, 400}, ImGuiCond_FirstUseEver);
-            ImGui::SetNextWindowSizeConstraints(ImVec2(400, 200), ImVec2(FLT_MAX, FLT_MAX));
-            if (auto window = imgui_window((cpp17_u8string(m_file->m_path) + "###File_").c_str(), &m_open,
-                                           ImGuiWindowFlags_NoSavedSettings)) {
-                out = m_file->display(test_sync);
+    bool close = false;
+    if (file) {
+        if (ImGui::Selectable((cpp17_u8string(file->m_path) + "###Close").c_str())) {
+            close = true;
+        }
+
+        out = file->display(test_sync);
+    } else {
+        if (auto sel = nav.display()) {
+            file.emplace(*sel);
+            if (file->m_rules.empty()) {
+                file.reset();
+                logger::log_temp(1000ms, "No rules"); // TODO: better msg...
             }
         }
-
-        // TODO: whether to support opening multiple files?
-        if (!m_open) {
-            m_file.reset();
-        }
-
-        // TODO: better layout...
-        if (auto sel = m_nav.display()) {
-            m_file.emplace(*sel);
-            m_open = true;
-        }
-
-        return out;
     }
-};
 
-std::optional<legacy::ruleT> load_rule(const legacy::ruleT& test_sync) {
-    static file_nav_v2 nav;
+    if (close) {
+        file.reset();
+    }
 
-    return nav.display(test_sync);
+    // TODO: whether to support opening multiple files?
+    // TODO: better layout...
+
+    return out;
 }
