@@ -235,6 +235,9 @@ public:
     }
 };
 
+// TODO: `file_nav` (and <filesystem>/... headers) should also be moved to load_rule.cpp
+// (need to deal with `add_special_path` dependency...)
+
 // TODO: recheck...
 // TODO: able to create/append/open file?
 class file_nav {

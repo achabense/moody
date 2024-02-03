@@ -83,6 +83,9 @@
     <ClCompile Include="edit_tile.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="load_rule.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

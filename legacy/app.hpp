@@ -60,6 +60,8 @@ public:
 std::optional<std::pair<legacy::ruleT, legacy::lockT>> static_constraints();
 std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lockT& locked, const code_image& icons);
 
+std::optional<legacy::ruleT> load_rule(const legacy::ruleT& test_sync);
+
 void edit_tile(const legacy::ruleT& target, legacy::lockT& locked, tile_image& img);
 
 // Never empty.
