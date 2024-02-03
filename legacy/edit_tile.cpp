@@ -201,9 +201,20 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
         }
         const bool resize = ImGui::Button("Resize");
 
+        // TODO: refine...
+        bool fit = false;
         ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
-        const bool fit = ImGui::Button("Fit"); // TODO: size preview?
-        // TODO: or fit with zoom=[1/2/4/8] (4 buttons)?
+        imgui_str("Fit with zoom");
+        ImGui::SameLine(), imgui_str("="), ImGui::SameLine(); // TODO: About sameline() and ' '...
+        for (int z : {1, 2, 4, 8}) {
+            if (z != 1) {
+                ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+            }
+            if (ImGui::Button(std::to_string(z).c_str())) {
+                img_zoom = z;
+                fit = true;
+            }
+        }
 
         // TODO: move elsewhere in the gui?
         ImGui::Text("Width:%d,Height:%d,Gen:%d,Density:%.4f", runner.tile().width(), runner.tile().height(),

@@ -50,7 +50,6 @@ struct fileT {
         if (total != 0) {
             const bool in_sync = test_sync == m_rules[pointing_at];
 
-            ImGui::BeginGroup();
             iter_pair(
                 "<|", "prev", "next", "|>",                                              //
                 [&] { hit = true, pointing_at = 0; },                                    //
@@ -58,12 +57,7 @@ struct fileT {
                 [&] { hit = true, pointing_at = std::min(total - 1, pointing_at + 1); }, //
                 [&] { hit = true, pointing_at = total - 1; }, false, false);
             ImGui::SameLine();
-            ImGui::Text("Total:%d At:%d", total, pointing_at + 1);
-            if (!in_sync) {
-                ImGui::SameLine();
-                imgui_str(" (click to sync)");
-            }
-            ImGui::EndGroup();
+            ImGui::Text("Total:%d At:%d %s", total, pointing_at + 1, !in_sync ? "(click to sync)" : "");
             if (!in_sync && ImGui::IsItemHovered()) {
                 const ImVec2 pos_min = ImGui::GetItemRectMin();
                 const ImVec2 pos_max = ImGui::GetItemRectMax();

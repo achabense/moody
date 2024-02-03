@@ -29,14 +29,13 @@ void show_target_rule(const legacy::ruleT& target, rule_recorder& recorder) {
     ImGui::SameLine();
     if (ImGui::Button("Copy")) {
         ImGui::SetClipboardText(rule_str.c_str());
-        logger::log_temp(300ms, "Copied");
+        // logger::log_temp(300ms, "Copied"); // TODO: find better ways to show feedback.
     }
     ImGui::SameLine();
+    // TODO: redesign paste util (-> load_rule.cpp)
     if (ImGui::Button("Paste")) {
-        // TODO: redesign... (especially, should not replace directly?)
         if (const char* text = ImGui::GetClipboardText()) {
             auto result = legacy::extract_rules(text);
-            // TODO: copied from the main function...
             if (!result.empty()) {
                 logger::log_temp(500ms, "found {} rules", result.size());
                 recorder.replace(std::move(result));
@@ -47,19 +46,19 @@ void show_target_rule(const legacy::ruleT& target, rule_recorder& recorder) {
         // else...
     }
 
-    // TODO: re-implement file-saving?
-    imgui_str(rule_str);
-
-    // TODO: better layout...
-    ImGui::Separator();
+    ImGui::SameLine();
     // TODO: +1 is clumsy
     ImGui::AlignTextToFramePadding();
+    ImGui::SameLine(), imgui_str("|"), ImGui::SameLine(); // TODO: About sameline() and ' '...
     ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1);
     ImGui::SameLine();
     iter_pair(
         "<|", "prev", "next", "|>", //
         [&] { recorder.set_first(); }, [&] { recorder.set_prev(); }, [&] { recorder.set_next(); },
         [&] { recorder.set_last(); });
+
+    // TODO: re-implement file-saving?
+    imgui_str(rule_str);
 }
 
 // TODO: are there portable ways to convert argv to a valid filesystem::path (without messing up
