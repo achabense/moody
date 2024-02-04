@@ -214,12 +214,12 @@ public:
 
     // TODO: replace XXXms with variables... (or enums...)
     template <class... U>
-    static void log_temp(std::chrono::milliseconds ms, std::format_string<const U&...> fmt, const U&... args) noexcept {
+    static void add_msg(std::chrono::milliseconds ms, std::format_string<const U&...> fmt, const U&... args) noexcept {
         m_tempstrs.emplace_back(std::format(fmt, args...), ms);
     }
 
     // TODO: this might combine with itemtooltip...
-    static void tempwindow() {
+    static void display() {
         if (!m_tempstrs.empty()) {
             ImGui::BeginTooltip();
             auto pos = m_tempstrs.begin();
@@ -418,6 +418,6 @@ inline std::vector<char> load_binary(const std::filesystem::path& path, int max_
         }
     }
     // TODO: refine msg?
-    logger::log_temp(300ms, "Cannot load");
+    logger::add_msg(300ms, "Cannot load");
     return {};
 }

@@ -153,7 +153,7 @@ struct selectT {
 void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img) {
     // TODO: (temp) these variables become static after moving code in main into this function...
     // which is not ideal...
-    static initT init{.size{.width = 480, .height = 360}, .seed = 0, .density = 0.5};
+    static initT init{.size{.width = 500, .height = 400}, .seed = 0, .density = 0.5};
     static torusT runner(init);
     assert(init.size == runner.tile().size());
 
@@ -446,7 +446,7 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
                     // TODO: or ask whether to resize runner.tile?
                     paste.emplace(legacy::from_RLE_str(text, tile_size));
                 } catch (const std::exception& err) {
-                    logger::log_temp(2500ms, "{}", err.what());
+                    logger::add_msg(2500ms, "{}", err.what());
                 }
             }
         }

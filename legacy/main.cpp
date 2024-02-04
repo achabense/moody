@@ -29,7 +29,7 @@ void show_target_rule(const legacy::ruleT& target, rule_recorder& recorder) {
     ImGui::SameLine();
     if (ImGui::Button("Copy")) {
         ImGui::SetClipboardText(rule_str.c_str());
-        // logger::log_temp(300ms, "Copied"); // TODO: find better ways to show feedback.
+        // logger::add_msg(300ms, "Copied"); // TODO: find better ways to show feedback.
     }
     ImGui::SameLine();
     // TODO: redesign paste util (-> load_rule.cpp)
@@ -37,10 +37,10 @@ void show_target_rule(const legacy::ruleT& target, rule_recorder& recorder) {
         if (const char* text = ImGui::GetClipboardText()) {
             auto result = legacy::extract_rules(text);
             if (!result.empty()) {
-                logger::log_temp(500ms, "found {} rules", result.size());
+                logger::add_msg(500ms, "found {} rules", result.size());
                 recorder.replace(std::move(result));
             } else {
-                logger::log_temp(300ms, "found nothing");
+                logger::add_msg(300ms, "found nothing");
             }
         }
         // else...
@@ -124,9 +124,9 @@ int main(int argc, char** argv) {
         const legacy::ruleT rule = recorder.current();
 
         // TODO: this should be controlled by load_rule ...
-        ImGui::SetNextWindowSize({720, 400}, ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize({600, 400}, ImGuiCond_FirstUseEver);
         ImGui::SetNextWindowSizeConstraints(ImVec2(400, 200), ImVec2(FLT_MAX, FLT_MAX));
-        if (auto window = imgui_window("File nav")) {
+        if (auto window = imgui_window("Load rule")) {
             if (auto out = load_rule(rule)) {
                 recorder.take(*out);
                 // TODO: `locked` can be broken by irrelevant rules...
@@ -179,7 +179,7 @@ int main(int argc, char** argv) {
             }
         }
 
-        logger::tempwindow();
+        logger::display();
         end_frame();
     }
 

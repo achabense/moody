@@ -129,6 +129,9 @@ struct fileT {
     }
 };
 
+// TODO: reset scroll-y for new files...
+// TODO: show the last opened file in file-nav?
+
 std::optional<legacy::ruleT> load_rule(const legacy::ruleT& test_sync) {
     static file_nav nav;
     static std::optional<fileT> file;
@@ -137,6 +140,7 @@ std::optional<legacy::ruleT> load_rule(const legacy::ruleT& test_sync) {
 
     bool close = false;
     if (file) {
+        // TODO: the path (& file_nav's) should be copyable...
         if (ImGui::Selectable((cpp17_u8string(file->m_path) + "###Close").c_str())) {
             close = true;
         }
@@ -147,7 +151,7 @@ std::optional<legacy::ruleT> load_rule(const legacy::ruleT& test_sync) {
             file.emplace(*sel);
             if (file->m_rules.empty()) {
                 file.reset();
-                logger::log_temp(1000ms, "No rules"); // TODO: better msg...
+                logger::add_msg(1000ms, "No rules"); // TODO: better msg...
             }
         }
     }

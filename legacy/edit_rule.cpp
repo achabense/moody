@@ -564,7 +564,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
             if (legacy::compatible(subset, target, locked)) {
                 out = legacy::approximate(subset, target, locked);
             } else {
-                logger::log_temp(300ms, "Incompatible ... TODO"); // TODO refine...
+                logger::add_msg(300ms, "Incompatible ... TODO"); // TODO refine...
             }
         }
         ImGui::SameLine();
