@@ -7,22 +7,19 @@
 // TODO: explain...
 // #define ENABLE_START_GEN
 
-// TODO (temp) there was a `use_seed` in the class.
-// It is useless, as to get non-repeatable data range-select based fill can do exactly the same thing.
-
-// About float: there is only ImGui::SliderFloat, so use float for convenience.
-// TODO: define imgui_sliderdouble in app_imgui.hpp?
-struct initT {
-    legacy::tileT::sizeT size;
-    uint32_t seed;
-    float density; // ∈ [0.0f, 1.0f]
-};
-
 class torusT {
     legacy::tileT m_tile, m_side;
     int m_gen;
 
 public:
+    // About float: there is only ImGui::SliderFloat, so use float for convenience.
+    // TODO: define imgui_sliderdouble in app_imgui.hpp?
+    struct initT {
+        legacy::tileT::sizeT size;
+        uint32_t seed;
+        float density; // ∈ [0.0f, 1.0f]
+    };
+
     explicit torusT(const initT& init) : m_tile(init.size), m_side(init.size), m_gen(0) { restart(init); }
 
     // TODO: reconsider whether to expose non-const tile...
@@ -153,7 +150,7 @@ struct selectT {
 void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img) {
     // TODO: (temp) these variables become static after moving code in main into this function...
     // which is not ideal...
-    static initT init{.size{.width = 500, .height = 400}, .seed = 0, .density = 0.5};
+    static torusT::initT init{.size{.width = 500, .height = 400}, .seed = 0, .density = 0.5};
     static torusT runner(init);
     assert(init.size == runner.tile().size());
 
@@ -191,12 +188,12 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
             const float s = ImGui::GetStyle().ItemInnerSpacing.x;
             const float w = (ImGui::CalcItemWidth() - s) / 2;
             ImGui::SetNextItemWidth(w);
-            ImGui::InputTextWithHint("##Width", "width", input_width, 20, ImGuiInputTextFlags_CallbackCharFilter,
-                                     filter);
+            ImGui::InputTextWithHint("##Width", "width", input_width, std::size(input_width),
+                                     ImGuiInputTextFlags_CallbackCharFilter, filter);
             ImGui::SameLine(0, s);
             ImGui::SetNextItemWidth(w);
-            ImGui::InputTextWithHint("##Height", "height", input_height, 20, ImGuiInputTextFlags_CallbackCharFilter,
-                                     filter);
+            ImGui::InputTextWithHint("##Height", "height", input_height, std::size(input_height),
+                                     ImGuiInputTextFlags_CallbackCharFilter, filter);
             ImGui::SameLine(0, s);
         }
         const bool resize = ImGui::Button("Resize");
@@ -269,19 +266,19 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
         }
         if (resize) {
             // TODO: support using current screen/tilesize/zoom?
-            int iwidth = 0, iheight = 0;
-            const auto [ptr, ec] = std::from_chars(input_width, input_width + 20, iwidth);
-            const auto [ptr2, ec2] = std::from_chars(input_height, input_height + 20, iheight);
-            if (ec == std::errc{} && ec2 == std::errc{}) {
+            int w = 0, h = 0;
+            if (std::from_chars(input_width, std::end(input_width), w).ec == std::errc{} &&
+                std::from_chars(input_height, std::end(input_height), h).ec == std::errc{}) {
                 img_off = {0, 0};
-                img_zoom = 1; // <-- TODO: whether to reset zoom here?
-                const legacy::tileT::sizeT size = size_clamped(iwidth, iheight);
+                img_zoom = 1;
+                const legacy::tileT::sizeT size = size_clamped(w, h);
                 if (init.size != size) {
                     init.size = size;
                     runner.restart(init);
                 }
             }
-            // else ...
+            // TODO: what to do else?
+
             input_width[0] = '\0';
             input_height[0] = '\0';
         }
@@ -412,8 +409,11 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
                 sel.select_1.x = std::clamp(celx, 0, tile_size.width - 1);
                 sel.select_1.y = std::clamp(cely, 0, tile_size.height - 1);
             }
+
+            // TODO: refactor away this block...
+            // TODO: the logic will be simplified if invisible button goes before the image...
             if (paste) {
-                // TODO: can width<paste.width here?
+                assert(paste->width() <= tile_size.width && paste->height() <= tile_size.height);
                 paste_beg.x = std::clamp(celx, 0, tile_size.width - paste->width());
                 paste_beg.y = std::clamp(cely, 0, tile_size.height - paste->height());
 
@@ -459,7 +459,7 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
                 legacy::clear_inside(runner.tile(), range, 0);
             }
             if (imgui_keypressed(ImGuiKey_Equal, false)) {
-                // TODO: specify density etc... or share with tileT_filler?
+                // TODO: specify density etc...
                 legacy::random_fill(runner.tile(), global_mt19937(), 0.5, range);
             }
             // TODO: redesign keyboard ctrl...
@@ -501,18 +501,14 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
             ImGui::Checkbox("Pause2", &ctrl.pause2);
             ImGui::EndDisabled();
             ImGui::SameLine();
-            // ↑ TODO: better visual?
-            // ↓ TODO: imgui_repeatbutton?
             ImGui::PushButtonRepeat(true);
-            // TODO: should allow keyboard control...
-
             // TODO: visual feedback...
             if (ImGui::Button("+1")) {
                 extra = 1;
             }
             ImGui::SameLine();
-            // TODO: is this usage of ### correct?
-            // (Correct, but usage of format might be a bad idea here...)
+            // TODO: +p is not quite useful if not paused...
+            // TODO: The usage of format looks wasteful...
             if (ImGui::Button(std::format("+p({})###+p", ctrl.actual_pace()).c_str())) {
                 extra = ctrl.actual_pace();
             }
@@ -540,19 +536,18 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
         ImGui::SameLine();
         ImGui::BeginGroup();
         {
-            if (int seed = init.seed; imgui_int_slider("Seed (0~99)", &seed, 0, 99)) {
+            if (int seed = init.seed; imgui_int_slider("Init seed (0~99)", &seed, 0, 99)) {
                 init.seed = seed;
                 should_restart = true;
             }
 
             // TODO: integer(ratio) density?
-            if (ImGui::SliderFloat("Init density (0~1)", &init.density, 0.0f, 1.0f, "%.3f", ImGuiSliderFlags_NoInput)) {
+            if (ImGui::SliderFloat("Init density (0~1)", &init.density, 0.0f, 1.0f, "%.2f", ImGuiSliderFlags_NoInput)) {
                 should_restart = true;
             }
         }
         ImGui::EndGroup();
 
-        // TODO: enable/disable keyboard ctrl (enable by default)
         // TODO: redesign keyboard ctrl...
         if (imgui_keypressed(ImGuiKey_1, true)) {
             ctrl.gap_frame = std::max(ctrl.gap_min, ctrl.gap_frame - 1);
@@ -570,7 +565,7 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
         if ((ctrl.pause2 || !ImGui::GetIO().WantCaptureKeyboard) && ImGui::IsKeyPressed(ImGuiKey_Space, false)) {
             ctrl.pause = !ctrl.pause;
         }
-        // TODO: temp (this function turns out to be necessary...)
+        // Run by keystroke turns out to be necessary. (TODO: For example ...)
         if (imgui_keypressed(ImGuiKey_M, true)) {
             if (ctrl.pause) {
                 extra = ctrl.actual_pace();
@@ -589,6 +584,9 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
         ctrl.rule = rule;
         should_restart = true;
         ctrl.pause = false; // TODO: this should be configurable...
+        // ctrl.pace = 1;   // TODO: whether to reset these values?
+        // init.seed = 0;
+        // init.density = 0.5;
     }
     if (should_restart) {
         runner.restart(init);
