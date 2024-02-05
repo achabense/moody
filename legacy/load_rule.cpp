@@ -1,3 +1,4 @@
+// TODO: not used in this source file...
 #ifndef IMGUI_DEFINE_MATH_OPERATORS
 #define IMGUI_DEFINE_MATH_OPERATORS
 #endif
@@ -141,9 +142,12 @@ std::optional<legacy::ruleT> load_rule(const legacy::ruleT& test_sync) {
     bool close = false;
     if (file) {
         // TODO: the path (& file_nav's) should be copyable...
-        if (ImGui::Selectable((cpp17_u8string(file->m_path) + "###Close").c_str())) {
+
+        // TODO (temp) selectable looks good but is easy to click by mistake...
+        if (ImGui::SmallButton("Close")) {
             close = true;
         }
+        imgui_str(cpp17_u8string(file->m_path));
 
         out = file->display(test_sync);
     } else {

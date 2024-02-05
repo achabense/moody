@@ -6,262 +6,256 @@
 
 #include "app.hpp"
 
-// TODO: should not belong to namespace legacy...
-namespace legacy {
-    class subset_selector {
-        subsetT current;
+class subset_selector {
+    legacy::subsetT current;
 
-        struct termT {
-            const char* title;
-            subsetT set;
-            bool selected = false;
-            bool includes_cur = false;
-            bool disabled = false; // current & set -> empty.
-            const char* description = nullptr;
+    struct termT {
+        const char* title;
+        legacy::subsetT set;
+        bool selected = false;
+        bool includes_cur = false;
+        bool disabled = false; // current & set -> empty.
+        const char* description = nullptr;
+    };
+
+    using termT_vec = std::vector<termT>;
+
+    termT_vec terms_ignore; // TODO: rename...
+    termT_vec terms_native;
+    termT_vec terms_misc;
+    termT_vec terms_hex;
+    // TODO: about the plan to support user-defined subsets...
+
+    void for_each_term(auto fn) {
+        for (termT_vec* terms : {&terms_ignore, &terms_native, &terms_misc, &terms_hex}) {
+            for (termT& t : *terms) {
+                fn(t);
+            }
+        }
+    }
+
+    void reset_current() {
+        current = legacy::subsetT::universalT{};
+
+        for_each_term([&](termT& t) {
+            assert(!t.disabled || !t.selected); // disabled -> !selected
+            if (t.selected) {
+                current = current & t.set;
+            }
+        });
+
+        assert(!current.empty());
+
+        for_each_term([&](termT& t) {
+            t.includes_cur = t.set.includes(current);
+            assert(!t.selected || t.includes_cur); // selected -> includes_cur
+            // TODO: involves a lot of unneeded calculations...
+            t.disabled = !t.includes_cur && (t.set & current).empty();
+        });
+    }
+
+public:
+    subset_selector() : current(legacy::subsetT::universalT{}) {
+        using namespace legacy::recipes;
+        // TODO: add some tests after the construction...
+
+        terms_ignore.emplace_back("q", make_subset({mp_ignore_q}));
+        terms_ignore.emplace_back("w", make_subset({mp_ignore_w}));
+        terms_ignore.emplace_back("e", make_subset({mp_ignore_e}));
+        terms_ignore.emplace_back("a", make_subset({mp_ignore_a}));
+        terms_ignore.emplace_back("s", make_subset({mp_ignore_s}, mask_zero)); // TODO (temp) As opposed to S'...
+        terms_ignore.emplace_back("d", make_subset({mp_ignore_d}));
+        terms_ignore.emplace_back("z", make_subset({mp_ignore_z}));
+        terms_ignore.emplace_back("x", make_subset({mp_ignore_x}));
+        terms_ignore.emplace_back("c", make_subset({mp_ignore_c}));
+
+        // TODO: temp...
+        terms_ignore.emplace_back("S'", make_subset({mp_ignore_s}, mask_identity));
+        terms_ignore.emplace_back("Hex", make_subset({mp_hex_ignore}));
+        // TODO: or define mp_von_ignore?
+        terms_ignore.emplace_back("Von", make_subset({mp_ignore_q, mp_ignore_e, mp_ignore_z, mp_ignore_c}));
+        terms_ignore.emplace_back("Dual", make_subset({mp_dual}, mask_identity)); // <-------
+
+        terms_native.emplace_back("All", make_subset({mp_refl_wsx, mp_refl_qsc}));
+        terms_native.emplace_back("|", make_subset({mp_refl_wsx}));
+        terms_native.emplace_back("-", make_subset({mp_refl_asd}));
+        terms_native.emplace_back("\\", make_subset({mp_refl_qsc}));
+        terms_native.emplace_back("/", make_subset({mp_refl_esz}));
+        terms_native.emplace_back("C2", make_subset({mp_C2}));
+        terms_native.emplace_back("C4", make_subset({mp_C4})); // TODO: add explanations in the gui
+
+        terms_misc.emplace_back("'C8'", make_subset({mp_C8}));
+        terms_misc.emplace_back("Tot", make_subset({mp_C8, mp_tot_exc_s}));
+        terms_misc.emplace_back("Tot(+s)", make_subset({mp_C8, mp_tot_inc_s}));
+        terms_misc.emplace_back("Hex_Tot", make_subset({mp_hex_C6, mp_hex_tot_exc_s}));
+        terms_misc.emplace_back("Hex_Tot(+s)", make_subset({mp_hex_C6, mp_hex_tot_inc_s}));
+
+        terms_hex.emplace_back("All", make_subset({mp_hex_refl_asd, mp_hex_refl_aq}));
+        terms_hex.emplace_back("a-d", make_subset({mp_hex_refl_asd}));
+        terms_hex.emplace_back("q-c", make_subset({mp_hex_refl_qsc}));
+        terms_hex.emplace_back("w-x", make_subset({mp_hex_refl_wsx}));
+        terms_hex.emplace_back("a|q", make_subset({mp_hex_refl_aq}));
+        terms_hex.emplace_back("q|w", make_subset({mp_hex_refl_qw}));
+        terms_hex.emplace_back("w|d", make_subset({mp_hex_refl_wd}));
+
+        terms_hex.emplace_back("C2", make_subset({mp_hex_C2}));
+        terms_hex.emplace_back("C3", make_subset({mp_hex_C3}));
+        terms_hex.emplace_back("C6", make_subset({mp_hex_C6}));
+
+        reset_current();
+    }
+
+    legacy::subsetT& select_subset(const legacy::ruleT& target, const legacy::lockT& locked) {
+        bool need_reset = false;
+        const float r = ImGui::GetFrameHeight();
+        const ImVec2 sqr{r, r};
+
+        // TODO: tooltip...
+        // TODO: recheck id & tid logic... (& imagebutton)
+        auto check = [&, id = 0](termT& term, const ImVec2& size) mutable {
+            // TODO: change color when hovered?
+            // bool hovered = false;
+            ImGui::PushID(id++);
+            if (!term.disabled) {
+                if (ImGui::InvisibleButton("Check", size)) {
+                    term.selected = !term.selected;
+                    // TODO: No need to reset if the newly selected term already included current.
+                    need_reset = true;
+
+                    // TODO: need to recheck all invisible buttons etc if to enable Navigation.
+                    // e.g. RenderNavHighlight
+                }
+                // hovered = ImGui::IsItemHovered();
+            } else {
+                ImGui::Dummy(size);
+            }
+            ImGui::PopID();
+
+            // TODO: explain coloring scheme; redesign if necessary (especially ring col)
+            // TODO: find better color for "disabled"/incompatible etc... currently too ugly.
+            const ImU32 cen_col = term.selected       ? ImGui::GetColorU32(ImGuiCol_ButtonHovered)
+                                  : term.includes_cur ? ImGui::GetColorU32(ImGuiCol_FrameBg)
+                                  : term.disabled     ? IM_COL32(150, 0, 0, 255)
+                                                      : IM_COL32_BLACK;
+            const ImU32 ring_col = term.set.contains(target)              ? IM_COL32(0, 255, 0, 255)
+                                   : compatible(term.set, target, locked) ? IM_COL32(0, 100, 0, 255)
+                                                                          : IM_COL32(255, 0, 0, 255);
+
+            const ImVec2 pos_min = ImGui::GetItemRectMin();
+            const ImVec2 pos_max = ImGui::GetItemRectMax();
+            assert(pos_min + size == pos_max);
+            assert(size.x > 8 && size.y > 8);
+            ImGui::GetWindowDrawList()->AddRectFilled(pos_min + ImVec2(4, 4), pos_max - ImVec2(4, 4), cen_col);
+            ImGui::GetWindowDrawList()->AddRect(pos_min, pos_max, ring_col);
         };
 
-        using termT_vec = std::vector<termT>;
+        // TODO: the layout is still horrible...
+        const ImGuiTableFlags flags_outer = ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit;
+        const ImGuiTableFlags flags_inner =
+            ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoHostExtendX;
 
-        termT_vec terms_ignore;
-        termT_vec terms_native;
-        termT_vec terms_misc;
-        termT_vec terms_hex;
-        // TODO: about the plan to support user-defined subsets...
-
-        void for_each_term(auto fn) {
-            for (termT_vec* terms : {&terms_ignore, &terms_native, &terms_misc, &terms_hex}) {
-                for (termT& t : *terms) {
-                    fn(t);
-                }
-            }
-        }
-
-        void reset_current() {
-            current = subsetT::universalT{};
-
-            for_each_term([&](termT& t) {
-                assert(!t.disabled || !t.selected); // disabled -> !selected
-                if (t.selected) {
-                    current = current & t.set;
-                }
-            });
-
-            assert(!current.empty());
-
-            for_each_term([&](termT& t) {
-                t.includes_cur = t.set.includes(current);
-                assert(!t.selected || t.includes_cur); // selected -> includes_cur
-                // TODO: involves a lot of unneeded calculations...
-                t.disabled = !t.includes_cur && (t.set & current).empty();
-            });
-        }
-
-    public:
-        subset_selector() : current(subsetT::universalT{}) {
-            // TODO: add some tests after the construction...
-
-            terms_ignore.emplace_back("q", make_subset({mp_ignore_q}));
-            terms_ignore.emplace_back("w", make_subset({mp_ignore_w}));
-            terms_ignore.emplace_back("e", make_subset({mp_ignore_e}));
-            terms_ignore.emplace_back("a", make_subset({mp_ignore_a}));
-            terms_ignore.emplace_back("s", make_subset({mp_ignore_s}, mask_zero)); // TODO (temp) As opposed to S'...
-            terms_ignore.emplace_back("d", make_subset({mp_ignore_d}));
-            terms_ignore.emplace_back("z", make_subset({mp_ignore_z}));
-            terms_ignore.emplace_back("x", make_subset({mp_ignore_x}));
-            terms_ignore.emplace_back("c", make_subset({mp_ignore_c}));
-
-            // TODO: temp...
-            terms_ignore.emplace_back("S'", make_subset({mp_ignore_s}, mask_identity));
-            terms_ignore.emplace_back("Hex", make_subset({mp_hex_ignore}));
-            // TODO: or define mp_von_ignore?
-            terms_ignore.emplace_back("Von", make_subset({mp_ignore_q, mp_ignore_e, mp_ignore_z, mp_ignore_c}));
-
-            terms_native.emplace_back("All", make_subset({mp_refl_wsx, mp_refl_qsc}));
-            terms_native.emplace_back("|", make_subset({mp_refl_wsx}));
-            terms_native.emplace_back("-", make_subset({mp_refl_asd}));
-            terms_native.emplace_back("\\", make_subset({mp_refl_qsc}));
-            terms_native.emplace_back("/", make_subset({mp_refl_esz}));
-            terms_native.emplace_back("C2", make_subset({mp_C2}));
-            terms_native.emplace_back("C4", make_subset({mp_C4})); // TODO: add explanations in the gui
-
-            terms_misc.emplace_back("'C8'", make_subset({mp_C8}));
-            terms_misc.emplace_back("Tot", make_subset({mp_C8, mp_tot_exc_s}));
-            terms_misc.emplace_back("Tot(+s)", make_subset({mp_C8, mp_tot_inc_s}));
-
-            terms_misc.emplace_back("Dual", make_subset({mp_dual}, mask_identity)); // <-------
-
-            terms_misc.emplace_back("Hex_Tot", make_subset({mp_hex_C6, mp_hex_tot_exc_s}));
-            terms_misc.emplace_back("Hex_Tot(+s)", make_subset({mp_hex_C6, mp_hex_tot_inc_s}));
-
-            terms_hex.emplace_back("All", make_subset({mp_hex_refl_asd, mp_hex_refl_aq}));
-            terms_hex.emplace_back("a-d", make_subset({mp_hex_refl_asd}));
-            terms_hex.emplace_back("q-c", make_subset({mp_hex_refl_qsc}));
-            terms_hex.emplace_back("w-x", make_subset({mp_hex_refl_wsx}));
-            terms_hex.emplace_back("a|q", make_subset({mp_hex_refl_aq}));
-            terms_hex.emplace_back("q|w", make_subset({mp_hex_refl_qw}));
-            terms_hex.emplace_back("w|d", make_subset({mp_hex_refl_wd}));
-
-            terms_hex.emplace_back("C2", make_subset({mp_hex_C2}));
-            terms_hex.emplace_back("C3", make_subset({mp_hex_C3}));
-            terms_hex.emplace_back("C6", make_subset({mp_hex_C6}));
-
-            reset_current();
-        }
-
-        subsetT& select_subset(const ruleT& target, const lockT& locked) {
-            bool need_reset = false;
-            const float r = ImGui::GetFrameHeight();
-            const ImVec2 sqr{r, r};
-
-            // TODO: tooltip...
-            // TODO: recheck id & tid logic... (& imagebutton)
-            auto check = [&, id = 0](termT& term, const ImVec2& size) mutable {
-                // TODO: change color when hovered?
-                // bool hovered = false;
-                ImGui::PushID(id++);
-                if (!term.disabled) {
-                    if (ImGui::InvisibleButton("Check", size)) {
-                        term.selected = !term.selected;
-                        // TODO: No need to reset if the newly selected term already included current.
-                        need_reset = true;
-
-                        // TODO: need to recheck all invisible buttons etc if to enable Navigation.
-                        // e.g. RenderNavHighlight
+        if (ImGui::BeginTable("Checklists", 2, flags_outer)) {
+            auto checklist = [&](termT_vec& terms, const char* label) {
+                if (ImGui::BeginTable(label, terms.size(), flags_inner)) {
+                    ImGui::TableNextRow();
+                    for (termT& t : terms) {
+                        ImGui::TableNextColumn();
+                        imgui_str(t.title);
+                        check(t, sqr);
                     }
-                    // hovered = ImGui::IsItemHovered();
-                } else {
-                    ImGui::Dummy(size);
+                    ImGui::EndTable();
                 }
-                ImGui::PopID();
-
-                // TODO: explain coloring scheme; redesign if necessary (especially ring col)
-                // TODO: find better color for "disabled"/incompatible etc... currently too ugly.
-                const ImU32 cen_col = term.selected       ? ImGui::GetColorU32(ImGuiCol_ButtonHovered)
-                                      : term.includes_cur ? ImGui::GetColorU32(ImGuiCol_FrameBg)
-                                      : term.disabled     ? IM_COL32(150, 0, 0, 255)
-                                                          : IM_COL32_BLACK;
-                const ImU32 ring_col = term.set.contains(target)              ? IM_COL32(0, 255, 0, 255)
-                                       : compatible(term.set, target, locked) ? IM_COL32(0, 100, 0, 255)
-                                                                              : IM_COL32(255, 0, 0, 255);
-
-                const ImVec2 pos_min = ImGui::GetItemRectMin();
-                const ImVec2 pos_max = ImGui::GetItemRectMax();
-                assert(pos_min.x + size.x == pos_max.x);
-                assert(pos_min.y + size.y == pos_max.y);
-                assert(size.x > 8 && size.y > 8);
-                ImGui::GetWindowDrawList()->AddRectFilled(pos_min + ImVec2(4, 4), pos_max - ImVec2(4, 4), cen_col);
-                ImGui::GetWindowDrawList()->AddRect(pos_min, pos_max, ring_col);
             };
 
-            // TODO: the layout is still horrible...
-            const ImGuiTableFlags flags_outer =
-                ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoHostExtendX;
-            const ImGuiTableFlags flags_inner =
-                ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoHostExtendX;
+            {
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                imgui_str("Ignore");
 
-            if (ImGui::BeginTable("Checklists", 2, flags_outer)) {
-                auto checklist = [&](termT_vec& terms, const char* label) {
-                    if (ImGui::BeginTable(label, terms.size(), flags_inner)) {
-                        ImGui::TableNextRow();
-                        for (termT& t : terms) {
-                            ImGui::TableNextColumn();
-                            imgui_str(t.title);
-                            check(t, sqr);
-                        }
-                        ImGui::EndTable();
-                    }
-                };
-
-                {
+                ImGui::TableNextColumn();
+                if (ImGui::BeginTable("Checklist##Ignore", 1, flags_inner)) {
                     ImGui::TableNextRow();
-                    ImGui::TableNextColumn();
-                    imgui_str("Ignore");
+                    // TODO: for terms_ignore, use smaller button instead?
+                    // const ImVec2 sqr_small{floor(r * 0.9f), floor(r * 0.9f)};
 
+                    // TODO: slightly confusing; light color should represent "take-into-account" instead of
+                    // "ignore" Is this solvable by applying specific coloring scheme?
                     ImGui::TableNextColumn();
-                    if (ImGui::BeginTable("Checklist##Ignore", 1, flags_inner)) {
-                        ImGui::TableNextRow();
-                        // TODO: for terms_ignore, use smaller button instead?
-                        // const ImVec2 sqr_small{floor(r * 0.9f), floor(r * 0.9f)};
+                    ImGui::BeginGroup();
+                    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1, 1)); // TODO: too tight...
+                    for (int l = 0; l < 3; ++l) {
+                        check(terms_ignore[l * 3 + 0], sqr);
+                        ImGui::SameLine();
+                        check(terms_ignore[l * 3 + 1], sqr);
+                        ImGui::SameLine();
+                        check(terms_ignore[l * 3 + 2], sqr);
+                    }
+                    ImGui::PopStyleVar();
+                    ImGui::EndGroup();
 
-                        // TODO: slightly confusing; light color should represent "take-into-account" instead of
-                        // "ignore" Is this solvable by applying specific coloring scheme?
-                        ImGui::TableNextColumn();
+                    // TODO (temp) experimental and unstable...
+                    for (int i = 9; i < terms_ignore.size(); ++i) {
+                        ImGui::SameLine();
                         ImGui::BeginGroup();
-                        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1, 1)); // TODO: too tight...
-                        for (int l = 0; l < 3; ++l) {
-                            check(terms_ignore[l * 3 + 0], sqr);
-                            ImGui::SameLine();
-                            check(terms_ignore[l * 3 + 1], sqr);
-                            ImGui::SameLine();
-                            check(terms_ignore[l * 3 + 2], sqr);
-                        }
-                        ImGui::PopStyleVar();
+                        imgui_str(terms_ignore[i].title);
+                        check(terms_ignore[i], sqr);
                         ImGui::EndGroup();
-
-                        // TODO (temp) experimental and unstable...
-                        for (int i = 9; i < terms_ignore.size(); ++i) {
-                            ImGui::SameLine();
-                            ImGui::BeginGroup();
-                            imgui_str(terms_ignore[i].title);
-                            check(terms_ignore[i], sqr);
-                            ImGui::EndGroup();
-                        }
-
-                        ImGui::EndTable();
                     }
+
+                    ImGui::EndTable();
                 }
-
-                {
-                    ImGui::TableNextRow();
-                    ImGui::TableNextColumn();
-                    imgui_str("Native");
-
-                    ImGui::TableNextColumn();
-                    checklist(terms_native, "Checklist##Native");
-                }
-
-                {
-                    ImGui::TableNextRow();
-                    ImGui::TableNextColumn();
-                    imgui_str("Misc");
-
-                    ImGui::TableNextColumn();
-                    checklist(terms_misc, "Checklist##Misc");
-                }
-
-                {
-                    ImGui::TableNextRow();
-                    ImGui::TableNextColumn();
-                    imgui_str("qw-    q w\n"
-                              "asd ~ a s d\n"
-                              "-xc    x c");
-
-                    ImGui::TableNextColumn();
-                    checklist(terms_hex, "Checklist##Hex");
-                }
-
-                ImGui::EndTable();
             }
 
-            // TODO: or just clear on a per-line basis?
-            // TODO: better layout... or right-click menu?
-            ImGui::SameLine();
-            if (ImGui::Button("Clear")) {
-                for_each_term([&](termT& t) {
-                    if (t.selected) {
-                        t.selected = false;
-                        need_reset = true;
-                    }
-                });
+            {
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                imgui_str("Native");
+
+                ImGui::TableNextColumn();
+                checklist(terms_native, "Checklist##Native");
             }
 
-            if (need_reset) {
-                reset_current();
+            {
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                imgui_str("Misc");
+
+                ImGui::TableNextColumn();
+                checklist(terms_misc, "Checklist##Misc");
             }
-            return current;
+
+            {
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                imgui_str("qw-    q w\n"
+                          "asd ~ a s d\n"
+                          "-xc    x c");
+
+                ImGui::TableNextColumn();
+                checklist(terms_hex, "Checklist##Hex");
+            }
+
+            ImGui::EndTable();
         }
-    };
-} // namespace legacy
+
+        // TODO: or just clear on a per-line basis?
+        // TODO: better layout... or right-click menu?
+        ImGui::SameLine();
+        if (ImGui::Button("Clear")) {
+            for_each_term([&](termT& t) {
+                if (t.selected) {
+                    t.selected = false;
+                    need_reset = true;
+                }
+            });
+        }
+
+        if (need_reset) {
+            reset_current();
+        }
+        return current;
+    }
+};
 
 // TODO: rename; redesign...
 std::optional<std::pair<legacy::ruleT, legacy::lockT>> static_constraints() {
@@ -378,7 +372,7 @@ std::optional<std::pair<legacy::ruleT, legacy::lockT>> static_constraints() {
 std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lockT& locked, const code_image& icons) {
     std::optional<legacy::ruleT> out;
 
-    static legacy::subset_selector selector;
+    static subset_selector selector;
 
     // TODO: non-const for set_mask. this is conceptually unsafe as it also allows assignments...
     // TODO: move mask selection logic into selector as well?

@@ -116,6 +116,7 @@ struct ctrlT {
     }
 };
 
+// TODO: support 1*1 selection?
 // TODO: explain...
 struct selectT {
     // []
@@ -163,8 +164,6 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
     static legacy::tileT::posT paste_beg{0, 0}; // dbegin for copy... (TODO: this is confusing...)
 
     static selectT sel{};
-
-    // TODO: add a menu somewhere...
 
     // TODO: let right+ctrl move selected area?
 
@@ -455,7 +454,6 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
                 ImGui::SetClipboardText(legacy::to_RLE_str(ctrl.rule, runner.tile(), range).c_str());
             }
             if (imgui_keypressed(ImGuiKey_Backspace, false) || imgui_keypressed(ImGuiKey_X, false)) {
-                // TODO: 0/1.../ agar...
                 legacy::clear_inside(runner.tile(), range, 0);
             }
             if (imgui_keypressed(ImGuiKey_Equal, false)) {
@@ -484,6 +482,25 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
                     cap.swap(cap2);
                 }
             }
+
+            // TODO: support a menu somewhere...
+            // (context menu works poorly with rbutton selection...)
+#if 0
+            if (ImGui::BeginPopupContextItem()) {
+                if (ImGui::MenuItem("Clear selected", "del")) { // 0/1
+                }
+                if (ImGui::MenuItem("Clear outside", "0")) { // 0/1
+                }
+                // randomize-density...
+                if (ImGui::MenuItem("Randomize", "+")) {
+                }
+                if (ImGui::MenuItem("Copy", "c")) {
+                }
+                if (ImGui::MenuItem("Capture", "p")) {
+                }
+                ImGui::EndPopup();
+            }
+#endif
         }
     };
 
