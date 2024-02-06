@@ -22,7 +22,7 @@ static void end_frame();
 // TODO: Right-click must either to open a submenu, or to toggle on/off the tooltip.
 // TODO: Generalize typical behavior patterns to find new rules.
 
-void show_target_rule(const legacy::ruleT& target, rule_recorder& recorder) {
+void show_target_rule(const legacy::ruleT& target, recorderT& recorder) {
     const std::string rule_str = to_MAP_str(target);
 
     ImGui::AlignTextToFramePadding();
@@ -33,6 +33,7 @@ void show_target_rule(const legacy::ruleT& target, rule_recorder& recorder) {
         // logger::add_msg(300ms, "Copied"); // TODO: find better ways to show feedback.
     }
     ImGui::SameLine();
+#if 0
     // TODO: redesign paste util (-> load_rule.cpp)
     if (ImGui::Button("Paste")) {
         if (const char* text = ImGui::GetClipboardText()) {
@@ -46,6 +47,7 @@ void show_target_rule(const legacy::ruleT& target, rule_recorder& recorder) {
         }
         // else...
     }
+#endif
 
     ImGui::SameLine();
     // TODO: +1 is clumsy
@@ -110,9 +112,7 @@ int main(int argc, char** argv) {
     // ImGui::GetIO().Fonts->AddFontFromFileTTF(R"(C:\*redacted*\Desktop\Deng.ttf)", 13, nullptr,
     //                                          ImGui::GetIO().Fonts->GetGlyphRangesChineseFull());
 
-    // TODO: (temp) sync point is being {recorder.current(), locked}...
-    rule_recorder recorder; // rule ~ current...
-    legacy::lockT locked{};
+    recorderT recorder;
 
     // TODO: dtors(SDL_DestroyTexture) are being called after clear(SDL_Quit)
     code_image icons;
@@ -121,24 +121,23 @@ int main(int argc, char** argv) {
     while (begin_frame()) {
         ImGui::ShowDemoWindow(); // TODO: remove (or comment-out) this when all done...
 
-        // TODO: refine sync logic...
-        const legacy::ruleT rule = recorder.current();
+        legacy::moldT current = recorder.current();
+        bool update = false;
 
         // TODO: this should be controlled by load_rule ...
         ImGui::SetNextWindowSize({600, 400}, ImGuiCond_FirstUseEver);
         ImGui::SetNextWindowSizeConstraints(ImVec2(400, 200), ImVec2(FLT_MAX, FLT_MAX));
         if (auto window = imgui_window("Load rule")) {
-            if (auto out = load_rule(rule)) {
-                recorder.take(*out);
-                // TODO: `locked` can be broken by irrelevant rules...
+            if (auto out = load_rule(current.rule)) {
+                current.set_rule(*out); // TODO (temp) As external source may make the old lock meaningless.
+                update = true;
             }
         }
 
         if (auto window = imgui_window("Constraints", ImGuiWindowFlags_AlwaysAutoResize)) {
             if (auto out = static_constraints()) {
-                auto& [rule, lock] = *out;
-                recorder.take(rule); // TODO: (temp) will be used at next frame...
-                locked = lock;
+                current = *out;
+                update = true;
             }
         }
 
@@ -152,19 +151,22 @@ int main(int argc, char** argv) {
             // TODO: change color when is too fps is too low...
             ImGui::Text("(%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
 
-            show_target_rule(rule, recorder);
+            // TODO: as current may have been changed by static_constraints, `current` may have been out-of-sync with
+            // recorder at this frame... Does this matter?
+            show_target_rule(current.rule, recorder); // TODO: inline...
+
             ImGui::Separator();
 
             if (ImGui::BeginTable("Layout", 2, ImGuiTableFlags_Resizable)) {
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
                 if (auto child = imgui_childwindow("Rul")) {
-                    // TODO: let lock be dealt with like rule... (modifications are returned by value)
-                    if (auto out = edit_rule(rule, locked, icons)) {
-                        recorder.take(*out); // TODO: `edit_tile` uses the old rule at this frame...
-                                             // does this matter?
+                    if (auto out = edit_rule(current, icons)) {
+                        current = *out;
+                        update = true;
                     }
 
+                    // TODO: this may be broken by introduction of moldT...
                     // TODO: This is used to pair with enter key and is somewhat broken...
                     // TODO: should enter set_next first?
                     if (imgui_keypressed(ImGuiKey_Apostrophe, false)) {
@@ -174,10 +176,17 @@ int main(int argc, char** argv) {
                 ImGui::TableNextColumn();
                 // TODO: it seems this childwindow is not necessary?
                 if (auto child = imgui_childwindow("Til")) {
-                    edit_tile(rule, locked, img);
+                    if (auto out = edit_tile(current.rule, img)) {
+                        current.lock = *out;
+                        update = true;
+                    }
                 }
                 ImGui::EndTable();
             }
+        }
+
+        if (update) {
+            recorder.update(current);
         }
 
         logger::display();

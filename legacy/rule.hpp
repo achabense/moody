@@ -34,8 +34,17 @@ namespace legacy {
         }
 
         template <class T>
-        using map_to = std::array<T, 512>;
+        class map_to {
+            std::array<T, 512> m_map{};
 
+        public:
+            constexpr const T& operator[](codeT code) const { return m_map[code]; }
+            constexpr T& operator[](codeT code) { return m_map[code]; }
+
+            constexpr void fill(const T& val) { m_map.fill(val); }
+            constexpr friend bool operator==(const map_to&, const map_to&) = default;
+        };
+#
         // TODO: rename to bpos_*?
         enum bposE : int { env_q = 0, env_w, env_e, env_a, env_s, env_d, env_z, env_x, env_c };
     };
@@ -80,6 +89,7 @@ namespace legacy {
     } // namespace _misc::tests
 #endif
 
+    // TODO: inherit from codeT::map_to<bool>?
     // Map codeT to the value `s` become at next generation.
     class ruleT {
         codeT::map_to<bool> m_map{};
@@ -122,9 +132,27 @@ namespace legacy {
         });
     }
 
-    // TODO: the lockT will become meaningless on irrelevant rule switch (clipboard/file...)
-    using lockT = codeT::map_to<bool>;
+    // TODO: explain moldT and set_rule...
+    struct moldT {
+        using lockT = codeT::map_to<bool>;
 
+        ruleT rule{};
+        lockT lock{};
+
+        void set_rule(const ruleT& r) {
+            for_each_code(code) {
+                if (lock[code] && r[code] != rule[code]) {
+                    lock = {};
+                    break;
+                }
+            }
+            rule = r;
+        }
+
+        friend bool operator==(const moldT&, const moldT&) = default;
+    };
+
+    // TODO: should be able to compress lockT as well...
     class compressT {
         std::array<uint8_t, 64> bits; // as bitset.
     public:
@@ -197,6 +225,8 @@ namespace legacy {
         }
         return str;
     }
+
+    // TODO: to/from moldT...
 
     namespace _misc {
         inline const std::regex& regex_MAP_str() {

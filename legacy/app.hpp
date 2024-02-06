@@ -57,21 +57,22 @@ public:
     }
 };
 
-std::optional<std::pair<legacy::ruleT, legacy::lockT>> static_constraints();
-std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lockT& locked, const code_image& icons);
+std::optional<legacy::moldT> static_constraints();
+std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_image& icons);
 
+// TODO: should be able to load lock as well... (->optional<pair<ruleT,optional<lockT>>>)
 std::optional<legacy::ruleT> load_rule(const legacy::ruleT& test_sync);
 
-void edit_tile(const legacy::ruleT& target, legacy::lockT& locked, tile_image& img);
+std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_image& img);
 
 // Never empty.
-// TODO: (gui) whether to support random-access mode?
-class rule_recorder {
-    std::vector<legacy::compressT> m_record;
+// TODO: re-apply compression...
+class recorderT {
+    std::vector<legacy::moldT> m_record;
     int m_pos;
 
 public:
-    rule_recorder() {
+    recorderT() {
         m_record.emplace_back(legacy::game_of_life());
         m_pos = 0;
     }
@@ -81,23 +82,16 @@ public:
     // [0, size() - 1]
     int pos() const { return m_pos; }
 
-    // TODO: look for better names...
-    // TODO: reconsider what should be done when already exists in the whole vec...
-    void take(const legacy::ruleT& rule) {
-        legacy::compressT cmpr(rule);
-        if (cmpr != m_record[m_pos]) {
-            m_record.push_back(cmpr);
+    void update(const legacy::moldT& mold) {
+        if (mold != m_record[m_pos]) {
+            m_record.push_back(mold);
             m_pos = m_record.size() - 1;
         }
     }
 
-    // void replace_current(const legacy::ruleT& rule) { //
-    //     m_record[m_pos] = legacy::compressT(rule);
-    // }
-
-    legacy::ruleT current() const {
+    legacy::moldT current() const {
         assert(m_pos >= 0 && m_pos < size());
-        return static_cast<legacy::ruleT>(m_record[m_pos]);
+        return m_record[m_pos];
     }
 
     void set_pos(int pos) { //
@@ -107,19 +101,6 @@ public:
     void set_prev() { set_pos(m_pos - 1); }
     void set_first() { set_pos(0); }
     void set_last() { set_pos(size() - 1); }
-
-    // TODO: reconsider m_pos logic...
-    // void append(const std::vector<legacy::compressT>& vec) { //
-    //     m_record.insert(m_record.end(), vec.begin(), vec.end());
-    // }
-
-    void replace(std::vector<legacy::compressT>&& vec) {
-        if (!vec.empty()) {
-            m_record.swap(vec);
-            m_pos = 0;
-        }
-        // else???
-    }
 };
 
 // TODO: rename...

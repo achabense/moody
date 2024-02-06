@@ -126,9 +126,7 @@ namespace legacy {
             // m_k is now the number of groups in the partition.
 
             std::vector<int> count(m_k, 0);
-            for (int j : m_map) {
-                ++count[j];
-            }
+            for_each_code(code) { ++count[m_map[code]]; }
 
             std::vector<int> pos(m_k, 0);
             for (int j = 1; j < m_k; ++j) {
@@ -268,7 +266,8 @@ namespace legacy {
         }
     };
 
-    inline auto scan(const partitionT& par, const ruleT_masked& rule, const lockT& locked) {
+    // TODO: redesign param...
+    inline auto scan(const partitionT& par, const ruleT_masked& rule, const moldT::lockT& lock) {
         struct counterT {
             int free_0 = 0, free_1 = 0;
             int locked_0 = 0, locked_1 = 0;
@@ -285,7 +284,7 @@ namespace legacy {
         std::vector<counterT> vec(par.k());
         par.for_each_group([&](int j, const groupT& group) {
             for (codeT code : group) {
-                if (locked[code]) {
+                if (lock[code]) {
                     rule[code] ? ++vec[j].locked_1 : ++vec[j].locked_0;
                 } else {
                     rule[code] ? ++vec[j].free_1 : ++vec[j].free_0;
@@ -295,22 +294,23 @@ namespace legacy {
         return vec;
     }
 
-    inline bool any_locked(const lockT& locked, const groupT& group) {
-        return std::ranges::any_of(group, [&locked](codeT code) { return locked[code]; });
+    inline bool any_locked(const moldT::lockT& lock, const groupT& group) {
+        return std::ranges::any_of(group, [&lock](codeT code) { return lock[code]; });
     }
 
-    inline bool all_locked(const lockT& locked, const groupT& group) {
-        return std::ranges::all_of(group, [&locked](codeT code) { return locked[code]; });
+    inline bool all_locked(const moldT::lockT& lock, const groupT& group) {
+        return std::ranges::all_of(group, [&lock](codeT code) { return lock[code]; });
     }
 
-    inline bool none_locked(const lockT& locked, const groupT& group) {
-        return std::ranges::none_of(group, [&locked](codeT code) { return locked[code]; });
+    inline bool none_locked(const moldT::lockT& lock, const groupT& group) {
+        return std::ranges::none_of(group, [&lock](codeT code) { return lock[code]; });
     }
 
-    inline int count_free(const partitionT& par, const lockT& locked) {
+    // TODO: used in `edit_rule`; avoidable if scan early...
+    inline int count_free(const partitionT& par, const moldT::lockT& lock) {
         int free = 0;
         par.for_each_group([&](const groupT& group) {
-            if (none_locked(locked, group)) {
+            if (none_locked(lock, group)) {
                 ++free;
             }
         });
@@ -318,30 +318,34 @@ namespace legacy {
     }
 
     // TODO: too strict?
-    inline void enhance(const subsetT& subset, const ruleT& rule, lockT& locked) {
-        assert(subset.contains(rule));
+    // TODO: add nodiscard? the function name looks like in-place modification...
+    // or redesign params...
+    inline moldT::lockT enhance_lock(const subsetT& subset, const moldT& mold) {
+        assert(subset.contains(mold.rule));
 
+        moldT::lockT lock{};
         subset.get_par().for_each_group([&](const groupT& group) {
-            if (any_locked(locked, group)) {
+            if (any_locked(mold.lock, group)) {
                 for (codeT code : group) {
-                    locked[code] = true;
+                    lock[code] = true;
                 }
             }
         });
+        return lock;
     }
 
-    inline bool compatible(const subsetT& subset, const ruleT& rule, const lockT& locked) {
+    inline bool compatible(const subsetT& subset, const moldT& mold) {
         if (subset.empty()) {
             return false;
         }
 
-        const ruleT_masked r = subset.get_mask() ^ rule;
+        const ruleT_masked r = subset.get_mask() ^ mold.rule;
         codeT::map_to<int> record;
         record.fill(2);
 
         const equivT& eq = subset.get_par().get_eq();
         for_each_code(code) {
-            if (locked[code]) {
+            if (mold.lock[code]) {
                 int& rep = record[eq.headof(code)];
                 if (rep == 2) {
                     rep = r[code];
@@ -353,15 +357,15 @@ namespace legacy {
         return true;
     }
 
-    inline ruleT approximate(const subsetT& subset, const ruleT& rule, const lockT& locked) {
-        assert(compatible(subset, rule, locked));
+    inline ruleT approximate(const subsetT& subset, const moldT& mold) {
+        assert(compatible(subset, mold));
 
         const maskT& mask = subset.get_mask();
         const partitionT& par = subset.get_par();
 
-        ruleT_masked r = mask ^ rule;
+        ruleT_masked r = mask ^ mold.rule;
         par.for_each_group([&](const groupT& group) {
-            const auto fnd = std::ranges::find_if(group, [&locked](codeT code) { return locked[code]; });
+            const auto fnd = std::ranges::find_if(group, [&](codeT code) { return mold.lock[code]; });
             const bool b = fnd != group.end() ? r[*fnd] : r[group[0]];
             for (codeT code : group) {
                 r[code] = b;
@@ -378,21 +382,20 @@ namespace legacy {
     // Also, it might be helpful to support "in-lock" redispatch. For example, to dial to find potentially related
     // patterns...
     // Directly invert the locks, or add a flag in redispatch?
-    inline ruleT redispatch(const subsetT& subset, const ruleT& rule, const lockT& locked,
-                            std::invocable<bool*, bool*> auto fn) {
-        assert(subset.contains(rule));
+    inline ruleT redispatch(const subsetT& subset, const moldT& mold, std::invocable<bool*, bool*> auto fn) {
+        assert(subset.contains(mold.rule));
 
         const maskT& mask = subset.get_mask();
         const partitionT& par = subset.get_par();
 
-        ruleT_masked r = mask ^ rule;
+        ruleT_masked r = mask ^ mold.rule;
 
         // `seq` is not a codeT::map_to<bool>.
         assert(par.k() <= 512);
         std::array<bool, 512> seq{};
         int z = 0;
         par.for_each_group([&](const groupT& group) {
-            if (none_locked(locked, group)) {
+            if (none_locked(mold.lock, group)) {
                 seq[z] = r[group[0]];
                 ++z;
             }
@@ -402,7 +405,7 @@ namespace legacy {
 
         z = 0;
         par.for_each_group([&](const groupT& group) {
-            if (none_locked(locked, group)) {
+            if (none_locked(mold.lock, group)) {
                 for (codeT code : group) {
                     r[code] = seq[z];
                 }
@@ -414,10 +417,10 @@ namespace legacy {
     }
 
     // TODO: count_min denotes free groups now; whether to switch to total groups (at least in the gui part)?
-    inline ruleT randomize(const subsetT& subset, const ruleT& rule, const lockT& locked, std::mt19937& rand,
-                           int count_min, int count_max /* not used, subject to future extension */) {
+    inline ruleT randomize(const subsetT& subset, const moldT& mold, std::mt19937& rand, int count_min,
+                           int count_max /* not used, subject to future extension */) {
         assert(count_max == count_min);
-        return redispatch(subset, rule, locked, [&rand, count_min](bool* begin, bool* end) {
+        return redispatch(subset, mold, [&rand, count_min](bool* begin, bool* end) {
             int c = std::clamp(count_min, 0, int(end - begin));
             std::fill(begin, end, 0);
             std::fill_n(begin, c, 1);
@@ -425,13 +428,12 @@ namespace legacy {
         });
     }
 
-    inline ruleT shuffle(const subsetT& subset, const ruleT& rule, const lockT& locked, std::mt19937& rand) {
-        return redispatch(subset, rule, locked, [&rand](bool* begin, bool* end) { std::shuffle(begin, end, rand); });
+    inline ruleT shuffle(const subsetT& subset, const moldT& mold, std::mt19937& rand) {
+        return redispatch(subset, mold, [&rand](bool* begin, bool* end) { std::shuffle(begin, end, rand); });
     }
 
-    inline ruleT randomize_v2(const subsetT& subset, const ruleT& rule, const lockT& locked, std::mt19937& rand,
-                              double density) {
-        return redispatch(subset, rule, locked, [&rand, density](bool* begin, bool* end) {
+    inline ruleT randomize_v2(const subsetT& subset, const moldT& mold, std::mt19937& rand, double density) {
+        return redispatch(subset, mold, [&rand, density](bool* begin, bool* end) {
             std::bernoulli_distribution dist(std::clamp(density, 0.0, 1.0));
             std::generate(begin, end, [&] { return dist(rand); });
         });
@@ -439,16 +441,16 @@ namespace legacy {
 
     // TODO: rename to [set_]first / ...
     struct act_int {
-        static ruleT first(const subsetT& subset, const ruleT& rule, const lockT& locked) {
-            return redispatch(subset, rule, locked, [](bool* begin, bool* end) { std::fill(begin, end, 0); });
+        static ruleT first(const subsetT& subset, const moldT& mold) {
+            return redispatch(subset, mold, [](bool* begin, bool* end) { std::fill(begin, end, 0); });
         }
 
-        static ruleT last(const subsetT& subset, const ruleT& rule, const lockT& locked) {
-            return redispatch(subset, rule, locked, [](bool* begin, bool* end) { std::fill(begin, end, 1); });
+        static ruleT last(const subsetT& subset, const moldT& mold) {
+            return redispatch(subset, mold, [](bool* begin, bool* end) { std::fill(begin, end, 1); });
         }
 
-        static ruleT next(const subsetT& subset, const ruleT& rule, const lockT& locked) {
-            return redispatch(subset, rule, locked, [](bool* begin, bool* end) {
+        static ruleT next(const subsetT& subset, const moldT& mold) {
+            return redispatch(subset, mold, [](bool* begin, bool* end) {
                 // 11...0 -> 00...1; stop at 111...1 (last())
                 bool* first_0 = std::find(begin, end, 0);
                 if (first_0 != end) {
@@ -458,8 +460,8 @@ namespace legacy {
             });
         }
 
-        static ruleT prev(const subsetT& subset, const ruleT& rule, const lockT& locked) {
-            return redispatch(subset, rule, locked, [](bool* begin, bool* end) {
+        static ruleT prev(const subsetT& subset, const moldT& mold) {
+            return redispatch(subset, mold, [](bool* begin, bool* end) {
                 // 00...1 -> 11...0; stop at 000...0 (first())
                 bool* first_1 = std::find(begin, end, 1);
                 if (first_1 != end) {
@@ -475,24 +477,24 @@ namespace legacy {
     // (TODO: rephrase) As to CTAD vs make_XXX..., here is pitfall for using std::reverse_iterator directly.
     // https://quuxplusone.github.io/blog/2022/08/02/reverse-iterator-ctad/
     struct act_perm {
-        static ruleT first(const subsetT& subset, const ruleT& rule, const lockT& locked) {
-            return redispatch(subset, rule, locked, [](bool* begin, bool* end) {
+        static ruleT first(const subsetT& subset, const moldT& mold) {
+            return redispatch(subset, mold, [](bool* begin, bool* end) {
                 int c = std::count(begin, end, 1);
                 std::fill(begin, end, 0);
                 std::fill_n(begin, c, 1);
             });
         }
 
-        static ruleT last(const subsetT& subset, const ruleT& rule, const lockT& locked) {
-            return redispatch(subset, rule, locked, [](bool* begin, bool* end) {
+        static ruleT last(const subsetT& subset, const moldT& mold) {
+            return redispatch(subset, mold, [](bool* begin, bool* end) {
                 int c = std::count(begin, end, 1);
                 std::fill(begin, end, 0);
                 std::fill_n(end - c, c, 1);
             });
         }
 
-        static ruleT next(const subsetT& subset, const ruleT& rule, const lockT& locked) {
-            return redispatch(subset, rule, locked, [](bool* begin, bool* end) {
+        static ruleT next(const subsetT& subset, const moldT& mold) {
+            return redispatch(subset, mold, [](bool* begin, bool* end) {
                 // Stop at 000...111 (last())
                 if (std::find(std::find(begin, end, 1), end, 0) == end) {
                     return;
@@ -502,8 +504,8 @@ namespace legacy {
             });
         }
 
-        static ruleT prev(const subsetT& subset, const ruleT& rule, const lockT& locked) {
-            return redispatch(subset, rule, locked, [](bool* begin, bool* end) {
+        static ruleT prev(const subsetT& subset, const moldT& mold) {
+            return redispatch(subset, mold, [](bool* begin, bool* end) {
                 // Stop at 111...000 (first())
                 if (std::find(std::find(begin, end, 0), end, 1) == end) {
                     return;
@@ -514,36 +516,18 @@ namespace legacy {
         }
     };
 
-} // namespace legacy
-
-// TODO: define xxxT = {rule, locked}?
-namespace legacy {
-    // TODO: should mirror conversions (and lr/ud/... if there are to be) modify locks as well?
-
+    // TODO: support other transformations (lr/ud etc)?
     // TODO: proper name...
-    inline ruleT mirror(const ruleT& rule) {
-        ruleT mir{};
+    inline moldT mirror(const moldT& mold) {
+        moldT mir{};
         for_each_code(code) {
             const codeT codex = codeT(~code & 511);
-            const bool flip = get_s(codex) != rule[codex];
-            mir[code] = flip ? !get_s(code) : get_s(code);
+            const bool flip = get_s(codex) != mold.rule[codex];
+            mir.rule[code] = flip ? !get_s(code) : get_s(code);
+            mir.lock[code] = mold.lock[codex];
         }
         return mir;
     }
-
-    inline ruleT mirror_v2(const ruleT& rule, lockT& locked) {
-        ruleT rule_mir{};
-        lockT locked_mir{};
-        for_each_code(code) {
-            const codeT codex = codeT(~code & 511);
-            const bool flip = get_s(codex) != rule[codex];
-            rule_mir[code] = flip ? !get_s(code) : get_s(code);
-            locked_mir[code] = locked[codex];
-        }
-        locked = locked_mir;
-        return rule_mir;
-    }
-
 } // namespace legacy
 
 namespace legacy {

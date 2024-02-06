@@ -148,7 +148,9 @@ struct selectT {
 };
 
 // TODO: redesign...
-void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img) {
+std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_image& img) {
+    std::optional<legacy::moldT::lockT> out = std::nullopt;
+
     // TODO: (temp) these variables become static after moving code in main into this function...
     // which is not ideal...
     static torusT::initT init{.size{.width = 500, .height = 400}, .seed = 0, .density = 0.5};
@@ -470,10 +472,10 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
                 // TODO: support specifying padding area...
                 legacy::tileT cap(range.size()), cap2(range.size());
                 legacy::copy(cap, {0, 0}, runner.tile(), range);
-                locked = {};
+                legacy::moldT::lockT lock{};
                 auto rulx = [&](legacy::codeT code) {
-                    locked[code] = true;
-                    return ctrl.rule[code];
+                    lock[code] = true;
+                    return ctrl.rule[code]; // TODO: ctrl.rule or rule param?
                 };
                 // TODO: how to decide generation?
                 for (int g = 0; g < 50; ++g) {
@@ -481,6 +483,7 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
                     cap.apply(rulx, cap2);
                     cap.swap(cap2);
                 }
+                out = lock;
             }
 
             // TODO: support a menu somewhere...
@@ -609,4 +612,6 @@ void edit_tile(const legacy::ruleT& rule, legacy::lockT& locked, tile_image& img
         runner.restart(init);
     }
     ctrl.run(runner, extra); // TODO: able to result in low fps...
+
+    return out;
 }

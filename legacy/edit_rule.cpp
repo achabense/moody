@@ -105,7 +105,7 @@ public:
         reset_current();
     }
 
-    legacy::subsetT& select_subset(const legacy::ruleT& target, const legacy::lockT& locked) {
+    legacy::subsetT& select_subset(const legacy::moldT& mold) {
         bool need_reset = false;
         const float r = ImGui::GetFrameHeight();
         const ImVec2 sqr{r, r};
@@ -137,9 +137,9 @@ public:
                                   : term.includes_cur ? ImGui::GetColorU32(ImGuiCol_FrameBg)
                                   : term.disabled     ? IM_COL32(150, 0, 0, 255)
                                                       : IM_COL32_BLACK;
-            const ImU32 ring_col = term.set.contains(target)              ? IM_COL32(0, 255, 0, 255)
-                                   : compatible(term.set, target, locked) ? IM_COL32(0, 100, 0, 255)
-                                                                          : IM_COL32(255, 0, 0, 255);
+            const ImU32 ring_col = term.set.contains(mold.rule) ? IM_COL32(0, 255, 0, 255)
+                                   : compatible(term.set, mold) ? IM_COL32(0, 100, 0, 255)
+                                                                : IM_COL32(255, 0, 0, 255);
 
             const ImVec2 pos_min = ImGui::GetItemRectMin();
             const ImVec2 pos_max = ImGui::GetItemRectMax();
@@ -258,7 +258,7 @@ public:
 };
 
 // TODO: rename; redesign...
-std::optional<std::pair<legacy::ruleT, legacy::lockT>> static_constraints() {
+std::optional<legacy::moldT> static_constraints() {
     enum stateE { Any, F, T, F_Cond, T_Cond }; // TODO: rename; explain
     const int r = 9;
     static stateE board[r][r]{/*Any...*/};
@@ -322,8 +322,7 @@ std::optional<std::pair<legacy::ruleT, legacy::lockT>> static_constraints() {
     ImGui::PopStyleVar();
 
     if (hit) {
-        legacy::ruleT rule{}; // recorder::current?
-        legacy::lockT locked{};
+        legacy::moldT mold{};
         for (int y = 1; y < r - 1; ++y) {
             for (int x = 1; x < r - 1; ++x) {
                 if (board[y][x] != F && board[y][x] != T) {
@@ -354,29 +353,29 @@ std::optional<std::pair<legacy::ruleT, legacy::lockT>> static_constraints() {
                     imbue(env.z, board[y + 1][x - 1]);
                     imbue(env.x, board[y + 1][x]);
                     imbue(env.c, board[y + 1][x + 1]);
-                    rule[legacy::encode(env)] = board[y][x] == F ? 0 : 1;
-                    locked[legacy::encode(env)] = true;
+                    mold.rule[legacy::encode(env)] = board[y][x] == F ? 0 : 1;
+                    mold.lock[legacy::encode(env)] = true;
                 }
             }
         }
-        return {{rule, locked}};
+        return mold;
     }
     return std::nullopt;
 }
 
 // TODO: there must be an [obvious] way to support "dial" mode.
-// TODO: ideally, `locked` doesn't belong to editor...
-// TODO: should be a class... how to decouple? ...
-// TODO: the target and lock belongs to a single sync point...
-// It's undesirable to return new rule while doing in-place modification on the lock...
-std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lockT& locked, const code_image& icons) {
-    std::optional<legacy::ruleT> out;
+std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_image& icons) {
+    std::optional<legacy::moldT> out;
+    auto return_rule = [&out, &mold](const legacy::ruleT& rule) { out.emplace(rule, mold.lock); };
+    auto return_lock = [&out, &mold](const legacy::moldT::lockT& lock) { out.emplace(mold.rule, lock); };
+    auto return_mold = [&out](const legacy::moldT& mold) { out.emplace(mold); };
+    // TODO: these setters look awkward...
 
     static subset_selector selector;
 
     // TODO: non-const for set_mask. this is conceptually unsafe as it also allows assignments...
     // TODO: move mask selection logic into selector as well?
-    legacy::subsetT& subset = selector.select_subset(target, locked);
+    legacy::subsetT& subset = selector.select_subset(mold);
     assert(!subset.empty());
     const legacy::partitionT& par = subset.get_par();
 
@@ -452,7 +451,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
         ImGui::SameLine();
         if (mask_tag == 3) {
             if (ImGui::Button("Take current rule")) {
-                mask_custom = {target};
+                mask_custom = {mold.rule};
             }
             mask_tooltip(mask_custom, mask_descriptions[3]);
         } else {
@@ -475,7 +474,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
 
     // TODO: make what to do obvious when !mask_avail !redispatch_avail etc...
     const bool mask_avail = subset.set_mask(mask);
-    const bool redispatch_avail = mask_avail && subset.contains(target);
+    const bool redispatch_avail = mask_avail && subset.contains(mold.rule);
 
     // TODO: this is disabling all the operations, including mirror, clear-lock etc...
     // What can be allowed when the selected mask doesn't belong to the set?
@@ -502,14 +501,14 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
             // TODO: still unstable between partition switches...
             // TODO: the range should be scoped by locks... so, what should rcount be?
             static int rcount = 0.5 * par.k();
-            const int freec = legacy::count_free(par, locked); // TODO: still wasteful...
+            const int freec = legacy::count_free(par, mold.lock); // TODO: still wasteful...
 
             ImGui::SetNextItemWidth(FixedItemWidth);
             imgui_int_slider("##Quantity", &rcount, 0, par.k());
             rcount = std::clamp(rcount, 0, freec);
             ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
             if (imgui_enterbutton("Randomize")) {
-                out = legacy::randomize(subset, target, locked, global_mt19937(), rcount, rcount);
+                return_rule(legacy::randomize(subset, mold, global_mt19937(), rcount, rcount));
             }
         } else {
             ImGui::SetNextItemWidth(FixedItemWidth);
@@ -518,32 +517,32 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
                                ImGuiSliderFlags_NoInput);
             ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
             if (imgui_enterbutton("Randomize")) {
-                out = legacy::randomize_v2(subset, target, locked, global_mt19937(), density);
+                return_rule(legacy::randomize_v2(subset, mold, global_mt19937(), density));
             }
         }
 
         iter_pair(
             "<00..", "dec", "inc", "11..>", //
-            [&] { out = legacy::act_int::first(subset, target, locked); },
-            [&] { out = legacy::act_int::prev(subset, target, locked); },
-            [&] { out = legacy::act_int::next(subset, target, locked); },
-            [&] { out = legacy::act_int::last(subset, target, locked); });
+            [&] { return_rule(legacy::act_int::first(subset, mold)); },
+            [&] { return_rule(legacy::act_int::prev(subset, mold)); },
+            [&] { return_rule(legacy::act_int::next(subset, mold)); },
+            [&] { return_rule(legacy::act_int::last(subset, mold)); });
         ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
         iter_pair(
             "<1.0.", "pprev", "pnext", "0.1.>", //
-            [&] { out = legacy::act_perm::first(subset, target, locked); },
-            [&] { out = legacy::act_perm::prev(subset, target, locked); },
-            [&] { out = legacy::act_perm::next(subset, target, locked); },
-            [&] { out = legacy::act_perm::last(subset, target, locked); });
+            [&] { return_rule(legacy::act_perm::first(subset, mold)); },
+            [&] { return_rule(legacy::act_perm::prev(subset, mold)); },
+            [&] { return_rule(legacy::act_perm::next(subset, mold)); },
+            [&] { return_rule(legacy::act_perm::last(subset, mold)); });
         ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
         if (imgui_enterbutton("Shuffle")) {
-            out = legacy::shuffle(subset, target, locked, global_mt19937());
+            return_rule(legacy::shuffle(subset, mold, global_mt19937()));
         }
 
         // TODO: (temp) new line begins here...
         // TODO: enhance might be stricter than necessary...
-        if (ImGui::Button("Enhance locks")) {
-            legacy::enhance(subset, target, locked);
+        if (ImGui::Button("Enhance lock")) {
+            return_lock(legacy::enhance_lock(subset, mold));
         }
         if (!redispatch_avail) {
             ImGui::EndDisabled();
@@ -551,12 +550,12 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
 
         ImGui::SameLine();
         if (ImGui::Button("Clear locks")) {
-            locked = {};
+            return_lock({});
         }
         ImGui::SameLine();
         if (ImGui::Button("Approximate")) {
-            if (legacy::compatible(subset, target, locked)) {
-                out = legacy::approximate(subset, target, locked);
+            if (legacy::compatible(subset, mold)) {
+                return_rule(legacy::approximate(subset, mold));
             } else {
                 logger::add_msg(300ms, "Incompatible ... TODO"); // TODO refine...
             }
@@ -564,7 +563,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
         ImGui::SameLine();
         // TODO: move elsewhere
         if (ImGui::Button("Mir")) {
-            out = legacy::mirror_v2(target, locked);
+            return_mold(legacy::mirror(mold));
         }
     }
 
@@ -573,8 +572,8 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
         const char labels[2][3]{{'-', chr_0, '\0'}, {'-', chr_1, '\0'}};
 
         // TODO: find a better name for `ruleT_masked` and the variables...
-        const legacy::ruleT_masked masked = mask ^ target;
-        const auto scanlist = legacy::scan(par, masked, locked);
+        const legacy::ruleT_masked masked = mask ^ mold.rule;
+        const auto scanlist = legacy::scan(par, masked, mold.lock);
         {
             // TODO: add more statistics... e.g. full vs partial lock...
             const int c_group = par.k();
@@ -639,9 +638,11 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
                 }
 
                 if (button_hover && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+                    legacy::moldT::lockT lock = mold.lock;
                     for (auto code : group) {
-                        locked[code] = !has_lock; // TODO: not reversible; is this ok?
+                        lock[code] = !has_lock; // TODO: not reversible; is this ok?
                     }
+                    return_lock(lock);
                 }
                 ImGui::SameLine();
                 imgui_strdisabled("?");
@@ -669,7 +670,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
                             ImGui::SameLine();
                             ImGui::AlignTextToFramePadding();
                             imgui_str(labels[masked[code]]);
-                            if (locked[code]) {
+                            if (mold.lock[code]) {
                                 ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() - ImVec2(2, 2),
                                                                     ImGui::GetItemRectMax() + ImVec2(2, 2), -1);
                             }
@@ -688,7 +689,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
                 if (button_hit) {
                     // TODO: document this behavior... (keyctrl->resolve conflicts)
                     // TODO: reconsider how to deal with conflicts... (especially via masking rule...)
-                    legacy::ruleT r = target;
+                    legacy::ruleT r = mold.rule;
                     if (ImGui::GetIO().KeyCtrl) {
                         for (legacy::codeT c : group) {
                             r[c] = mask[c];
@@ -698,7 +699,7 @@ std::optional<legacy::ruleT> edit_rule(const legacy::ruleT& target, legacy::lock
                             r[c] = !r[c];
                         }
                     }
-                    out = r;
+                    return_rule(r);
                 }
             });
             ImGui::PopStyleVar(2);
