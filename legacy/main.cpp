@@ -22,6 +22,44 @@ static void end_frame();
 // TODO: Right-click must either to open a submenu, or to toggle on/off the tooltip.
 // TODO: Generalize typical behavior patterns to find new rules.
 
+// Never empty.
+// TODO: re-apply compression...
+class recorderT {
+    std::vector<legacy::moldT> m_record;
+    int m_pos;
+
+public:
+    recorderT() {
+        m_record.emplace_back(legacy::game_of_life());
+        m_pos = 0;
+    }
+
+    int size() const { return m_record.size(); }
+
+    // [0, size() - 1]
+    int pos() const { return m_pos; }
+
+    void update(const legacy::moldT& mold) {
+        if (mold != m_record[m_pos]) {
+            m_record.push_back(mold);
+            m_pos = m_record.size() - 1;
+        }
+    }
+
+    legacy::moldT current() const {
+        assert(m_pos >= 0 && m_pos < size());
+        return m_record[m_pos];
+    }
+
+    void set_pos(int pos) { //
+        m_pos = std::clamp(pos, 0, size() - 1);
+    }
+    void set_next() { set_pos(m_pos + 1); }
+    void set_prev() { set_pos(m_pos - 1); }
+    void set_first() { set_pos(0); }
+    void set_last() { set_pos(size() - 1); }
+};
+
 void show_target_rule(const legacy::ruleT& target, recorderT& recorder) {
     const std::string rule_str = to_MAP_str(target);
 
@@ -85,7 +123,7 @@ int main(int argc, char** argv) {
             return buf;
         };
 
-        file_nav::add_special_path(std::filesystem::u8path(path), "Exe path");
+        file_nav_add_special_path(std::filesystem::u8path(path), "Exe path");
 
         // Avoid "imgui.ini" (and maybe also "imgui_log.txt") sprinkling everywhere.
         // TODO: IniFilename and LogFilename should be unconditionally fixed (even if not using
@@ -94,7 +132,7 @@ int main(int argc, char** argv) {
         ImGui::GetIO().LogFilename = strdup(path + "imgui_log.txt");
 
         // TODO: remove when finished...
-        file_nav::add_special_path(R"(C:\*redacted*\Desktop\rulelists_new)", "Temp");
+        file_nav_add_special_path(R"(C:\*redacted*\Desktop\rulelists_new)", "Temp");
     }
 
     // TODO: rephrase...

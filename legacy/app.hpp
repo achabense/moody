@@ -1,8 +1,14 @@
 #pragma once
 
+#include <chrono>
+#include <filesystem>
+#include <fstream>
+
 #include "app_imgui.hpp"
 #include "rule.hpp"
 #include "tile.hpp"
+
+using namespace std::chrono_literals;
 
 inline std::mt19937& global_mt19937() {
     static std::mt19937 rand(time(0));
@@ -60,54 +66,19 @@ public:
 std::optional<legacy::moldT> static_constraints();
 std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_image& icons);
 
+// TODO: this workaround is ugly...
+// (and this implicitly relying on title being a string-literal... `additionals` stores pointers directly...)
+bool file_nav_add_special_path(std::filesystem::path p, const char* title);
+
 // TODO: should be able to load lock as well... (->optional<pair<ruleT,optional<lockT>>>)
 std::optional<legacy::ruleT> load_rule(const legacy::ruleT& test_sync);
 
 std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_image& img);
 
-// Never empty.
-// TODO: re-apply compression...
-class recorderT {
-    std::vector<legacy::moldT> m_record;
-    int m_pos;
-
-public:
-    recorderT() {
-        m_record.emplace_back(legacy::game_of_life());
-        m_pos = 0;
-    }
-
-    int size() const { return m_record.size(); }
-
-    // [0, size() - 1]
-    int pos() const { return m_pos; }
-
-    void update(const legacy::moldT& mold) {
-        if (mold != m_record[m_pos]) {
-            m_record.push_back(mold);
-            m_pos = m_record.size() - 1;
-        }
-    }
-
-    legacy::moldT current() const {
-        assert(m_pos >= 0 && m_pos < size());
-        return m_record[m_pos];
-    }
-
-    void set_pos(int pos) { //
-        m_pos = std::clamp(pos, 0, size() - 1);
-    }
-    void set_next() { set_pos(m_pos + 1); }
-    void set_prev() { set_pos(m_pos - 1); }
-    void set_first() { set_pos(0); }
-    void set_last() { set_pos(size() - 1); }
-};
-
 // TODO: rename...
 const int FixedItemWidth = 220;
 
 // TODO: support rollbacking diff rules?
-// TODO: support rollbacking locks?
 // TODO: for editing opt, support in-lock and outof-lock mode?
 
 // TODO: reconsider binding and scrolling logic...
@@ -151,5 +122,46 @@ inline void iter_pair(const char* tag_first, const char* tag_prev, const char* t
     ImGui::SameLine();
     if (ImGui::Button(tag_last)) {
         act_last();
+    }
+};
+
+class logger {
+    // TODO: refine...
+    struct temp_str {
+        using clock = std::chrono::steady_clock;
+        std::string str;
+        clock::time_point deadline;
+
+        temp_str(std::string&& str, std::chrono::milliseconds ms) : str(std::move(str)), deadline(clock::now() + ms) {}
+
+        // TODO: better be expired(now=clock::now) return now>=deadline;
+        bool expired() const { return clock::now() >= deadline; }
+    };
+
+    static inline std::vector<temp_str> m_tempstrs{};
+
+public:
+    logger() = delete;
+
+    // TODO: replace XXXms with variables... (or enums...)
+    template <class... U>
+    static void add_msg(std::chrono::milliseconds ms, std::format_string<const U&...> fmt, const U&... args) noexcept {
+        m_tempstrs.emplace_back(std::format(fmt, args...), ms);
+    }
+
+    // TODO: this might combine with itemtooltip...
+    static void display() {
+        if (!m_tempstrs.empty()) {
+            ImGui::BeginTooltip();
+            auto pos = m_tempstrs.begin();
+            for (auto& temp : m_tempstrs) {
+                imgui_str(temp.str);
+                if (!temp.expired()) {
+                    *pos++ = std::move(temp);
+                }
+            }
+            m_tempstrs.erase(pos, m_tempstrs.end());
+            ImGui::EndTooltip();
+        }
     }
 };
