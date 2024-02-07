@@ -60,48 +60,6 @@ public:
     void set_last() { set_pos(size() - 1); }
 };
 
-void show_target_rule(const legacy::ruleT& target, recorderT& recorder) {
-    const std::string rule_str = to_MAP_str(target);
-
-    ImGui::AlignTextToFramePadding();
-    imgui_str("[Current rule]");
-    ImGui::SameLine();
-    if (ImGui::Button("Copy")) {
-        ImGui::SetClipboardText(rule_str.c_str());
-        // logger::add_msg(300ms, "Copied"); // TODO: find better ways to show feedback.
-    }
-    ImGui::SameLine();
-#if 0
-    // TODO: redesign paste util (-> load_rule.cpp)
-    if (ImGui::Button("Paste")) {
-        if (const char* text = ImGui::GetClipboardText()) {
-            auto result = legacy::extract_rules(text);
-            if (!result.empty()) {
-                logger::add_msg(500ms, "found {} rules", result.size());
-                recorder.replace(std::move(result));
-            } else {
-                logger::add_msg(300ms, "found nothing");
-            }
-        }
-        // else...
-    }
-#endif
-
-    ImGui::SameLine();
-    // TODO: +1 is clumsy
-    ImGui::AlignTextToFramePadding();
-    ImGui::SameLine(), imgui_str("|"), ImGui::SameLine(); // TODO: About sameline() and ' '...
-    ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1);
-    ImGui::SameLine();
-    iter_pair(
-        "<|", "prev", "next", "|>", //
-        [&] { recorder.set_first(); }, [&] { recorder.set_prev(); }, [&] { recorder.set_next(); },
-        [&] { recorder.set_last(); });
-
-    // TODO: re-implement file-saving?
-    imgui_str(rule_str);
-}
-
 // TODO: are there portable ways to convert argv to a valid filesystem::path (without messing up
 // encodings)?
 int main(int argc, char** argv) {
@@ -186,12 +144,29 @@ int main(int argc, char** argv) {
         ImGui::SetNextWindowPos(viewport->WorkPos);
         ImGui::SetNextWindowSize(viewport->WorkSize);
         if (auto window = imgui_window("Main", flags)) {
-            // TODO: change color when is too fps is too low...
             ImGui::Text("(%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
 
-            // TODO: as current may have been changed by static_constraints, `current` may have been out-of-sync with
+            // TODO: as `current` may have been changed by static_constraints, `current` may have been out-of-sync with
             // recorder at this frame... Does this matter?
-            show_target_rule(current.rule, recorder); // TODO: inline...
+            {
+                const std::string rule_str = legacy::to_MAP_str(current.rule);
+
+                // TODO: better gui logic for copy... find ways to show feedback
+                if (ImGui::Button("Copy")) {
+                    ImGui::SetClipboardText(rule_str.c_str());
+                }
+                ImGui::SameLine();
+                imgui_str(rule_str);
+
+                // TODO: +1 is clumsy
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1);
+                ImGui::SameLine();
+                iter_pair(
+                    "<|", "prev", "next", "|>", //
+                    [&] { recorder.set_first(); }, [&] { recorder.set_prev(); }, [&] { recorder.set_next(); },
+                    [&] { recorder.set_last(); });
+            }
 
             ImGui::Separator();
 
@@ -204,7 +179,6 @@ int main(int argc, char** argv) {
                         update = true;
                     }
 
-                    // TODO: this may be broken by introduction of moldT...
                     // TODO: This is used to pair with enter key and is somewhat broken...
                     // TODO: should enter set_next first?
                     if (imgui_keypressed(ImGuiKey_Apostrophe, false)) {
@@ -229,6 +203,17 @@ int main(int argc, char** argv) {
 
         logger::display();
         end_frame();
+
+        {
+            // Added as an extra assurance for the framerate.
+            // (Normally `SDL_RENDERER_PRESENTVSYNC` is enough to guarantee a moderate framerate.)
+            static Uint64 next = 0;
+            const Uint64 now = SDL_GetTicks64();
+            if (now < next) {
+                SDL_Delay(next - now);
+            }
+            next = SDL_GetTicks64() + 10;
+        }
     }
 
     clear();

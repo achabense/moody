@@ -539,8 +539,7 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
             }
 
             // TODO: Gap-frame shall be really timer-based...
-            ImGui::SliderInt("Gap Frame (0~20)", &ctrl.gap_frame, ctrl.gap_min, ctrl.gap_max, "%d",
-                             ImGuiSliderFlags_NoInput);
+            imgui_int_slider("Gap Frame (0~20)", &ctrl.gap_frame, ctrl.gap_min, ctrl.gap_max);
 
 #ifdef ENABLE_START_GEN
             imgui_int_slider("Start gen (0~200)", &ctrl.start_from, ctrl.start_min, ctrl.start_max);

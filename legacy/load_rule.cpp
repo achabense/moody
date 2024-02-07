@@ -181,6 +181,7 @@ bool file_nav_add_special_path(std::filesystem::path p, const char* title) {
     return file_nav::add_special_path(std::move(p), title);
 }
 
+#if 0
 // TODO: path must be a regular file...
 // TODO: fileT loading may be better of going through load_binary...
 inline std::vector<char> load_binary(const std::filesystem::path& path, int max_size) {
@@ -200,15 +201,17 @@ inline std::vector<char> load_binary(const std::filesystem::path& path, int max_
     logger::add_msg(300ms, "Cannot load");
     return {};
 }
+#endif
 
 // TODO: should support clipboard paste in similar ways...
+// TODO: support saving into file? (without relying on the clipboard)
 // TODO: support in-memory loadings. (e.g. tutorial about typical ways to find interesting rules)
 
 // TODO: refine...
 struct fileT {
+    static constexpr int null_id = -1;
     struct lineT {
-        bool has_rule;
-        int id; // valid if has_rule.
+        int id;
         std::string text;
     };
 
@@ -221,19 +224,21 @@ struct fileT {
     fileT(std::filesystem::path path) : m_path(std::move(path)) {
         std::ifstream ifs(m_path);
         std::string line;
-
         int id = 0;
-        // TODO: MSVC shows a warning here... can getline safely deal with moved-from string?
+
         while (std::getline(ifs, line)) {
             auto extr = legacy::extract_rules(line);
             bool has_rule = !extr.empty();
-            m_lines.emplace_back(has_rule, has_rule ? id++ : 0, std::move(line));
+            // (wontfix) intentionally not moving `line`, as otherwise MSVC will give a moved-from warning.
+            m_lines.emplace_back(has_rule ? id++ : null_id, line);
             if (has_rule) {
                 m_rules.push_back(extr[0]);
                 // TODO: (how&) whether to support more fine-grained (in-line) rule-location?
                 // (only the first rule in each line is being recognized... (so `extract_rules` is wasteful)
             }
         }
+
+        assert(id == m_rules.size());
     }
 
     // TODO: how to combine with file-nav (into a single window)?
@@ -255,6 +260,7 @@ struct fileT {
                 [&] { hit = true, pointing_at = total - 1; }, false, false);
             ImGui::SameLine();
             ImGui::Text("Total:%d At:%d %s", total, pointing_at + 1, !in_sync ? "(click to sync)" : "");
+            // TODO: what if there are popups?
             if (!in_sync && ImGui::IsItemHovered()) {
                 const ImVec2 pos_min = ImGui::GetItemRectMin();
                 const ImVec2 pos_max = ImGui::GetItemRectMax();
@@ -286,7 +292,7 @@ struct fileT {
                                            wrap ? ImGuiWindowFlags_None : ImGuiWindowFlags_HorizontalScrollbar)) {
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
             // TODO: refine line-no logic (line-no or id-no)?
-            for (int l = 1; const auto& [has_rule, id, text] : m_lines) {
+            for (int l = 1; const auto& [id, text] : m_lines) {
                 ImGui::TextDisabled("%2d ", l++);
                 ImGui::SameLine();
                 if (wrap) {
@@ -294,7 +300,7 @@ struct fileT {
                 } else {
                     imgui_str(text);
                 }
-                if (has_rule) {
+                if (id != null_id) {
                     if (id == pointing_at) {
                         const ImVec2 pos_min = ImGui::GetItemRectMin();
                         const ImVec2 pos_max = ImGui::GetItemRectMax();
