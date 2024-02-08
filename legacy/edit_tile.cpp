@@ -2,13 +2,46 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #endif
 
+// TODO: is it possible to drop tile_image dependency in app.hpp? (so only edit_tile.cpp need to include tile.hpp)
+
 #include "app.hpp"
 
 // TODO: explain...
 // #define ENABLE_START_GEN
 
+static void run_torus(legacy::tileT& tile, legacy::tileT& temp, const std::invocable<legacy::codeT> auto& rule) {
+    assert(&tile != &temp);
+
+    tile.gather(tile, tile, tile, tile, tile, tile, tile, tile);
+    tile.apply(rule, temp);
+    tile.swap(temp);
+}
+
+static legacy::moldT::lockT dynamic_constraints(legacy::tileT tile, const legacy::ruleT& rule, const int limit = 30) {
+    legacy::tileT temp(tile.size());
+    legacy::moldT::lockT lock{};
+
+    // TODO: support more stopping modes?
+    // This is good at capturing oscillators/spaceships (while still possible to miss something under a low `limit`)
+    // However, for the rules with interesting "texture"s (but no typical oscillators etc) this tends to make a full
+    // lock, which is not useful...
+
+    // Loop until there has been `limit` generations without newly invoked mappings.
+    for (int g = limit; g > 0; --g) {
+        run_torus(tile, temp, [&](legacy::codeT code) {
+            if (!lock[code]) {
+                g = limit;
+                lock[code] = true;
+            }
+            return rule[code];
+        });
+    }
+
+    return lock;
+}
+
 class torusT {
-    legacy::tileT m_tile, m_side;
+    legacy::tileT m_tile, m_temp;
     int m_gen;
 
 public:
@@ -20,7 +53,7 @@ public:
         float density; // ∈ [0.0f, 1.0f]
     };
 
-    explicit torusT(const initT& init) : m_tile(init.size), m_side(init.size), m_gen(0) { restart(init); }
+    explicit torusT(const initT& init) : m_tile(init.size), m_temp(init.size), m_gen(0) { restart(init); }
 
     // TODO: reconsider whether to expose non-const tile...
     legacy::tileT& tile() { return m_tile; }
@@ -29,7 +62,7 @@ public:
 
     void restart(const initT& init) {
         m_tile.resize(init.size);
-        m_side.resize(init.size);
+        m_temp.resize(init.size);
 
         std::mt19937 rand(init.seed);
         legacy::random_fill(m_tile, rand, init.density);
@@ -39,10 +72,7 @@ public:
 
     void run(const legacy::ruleT& rule, int count = 1) {
         for (int c = 0; c < count; ++c) {
-            m_tile.gather(m_tile, m_tile, m_tile, m_tile, m_tile, m_tile, m_tile, m_tile);
-            m_tile.apply(rule, m_side);
-            m_tile.swap(m_side);
-
+            run_torus(m_tile, m_temp, rule);
             ++m_gen;
         }
     }
@@ -59,14 +89,14 @@ public:
             return;
         }
 
-        assert(m_side.size() == m_tile.size());
+        assert(m_temp.size() == m_tile.size());
         for (int y = 0; y < height; ++y) {
             const bool* source = m_tile.line((y + dy) % height);
-            bool* dest = m_side.line(y);
+            bool* dest = m_temp.line(y);
             std::copy_n(source, width, dest);
             std::rotate(dest, dest + dx, dest + width);
         }
-        m_tile.swap(m_side);
+        m_tile.swap(m_temp);
     }
 };
 
@@ -467,23 +497,12 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
                 legacy::clear_outside(runner.tile(), range, 0);
             }
 
-            // TODO: refine capturing...
             if (imgui_keypressed(ImGuiKey_P, false)) {
-                // TODO: support specifying padding area...
-                legacy::tileT cap(range.size()), cap2(range.size());
+                // TODO: support specifying padding area?
+                legacy::tileT cap(range.size());
                 legacy::copy(cap, {0, 0}, runner.tile(), range);
-                legacy::moldT::lockT lock{};
-                auto rulx = [&](legacy::codeT code) {
-                    lock[code] = true;
-                    return ctrl.rule[code]; // TODO: ctrl.rule or rule param?
-                };
-                // TODO: how to decide generation?
-                for (int g = 0; g < 50; ++g) {
-                    cap.gather(cap, cap, cap, cap, cap, cap, cap, cap);
-                    cap.apply(rulx, cap2);
-                    cap.swap(cap2);
-                }
-                out = lock;
+                // TODO: should be rule param instead?
+                out = dynamic_constraints(std::move(cap), ctrl.rule);
             }
 
             // TODO: support a menu somewhere...

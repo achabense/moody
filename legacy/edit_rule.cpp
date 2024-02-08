@@ -238,6 +238,7 @@ public:
             ImGui::EndTable();
         }
 
+        // TODO: this is currently being hidden by outer-table's extending behavior...
         // TODO: or just clear on a per-line basis?
         // TODO: better layout... or right-click menu?
         ImGui::SameLine();

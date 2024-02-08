@@ -268,6 +268,9 @@ namespace legacy {
         std::string_view prefix{}, suffix{};
     };
 
+    // TODO: ?? unpaired rules tend to mean the locks are unknown/not cared about. In these cases it might
+    // b better to try to fit the rule into current mold, and break lock if not fitting...
+
     // TODO: or return optional<{ruleT,optional<lockT>}>?
     // Extract moldT from text. Rules unpaired with lock data are treated as moldT with empty lock.
     inline extrT extract_MAP_str(const char* begin, const char* end) {
