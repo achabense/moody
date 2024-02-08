@@ -220,21 +220,18 @@ struct fileT {
     std::vector<legacy::compressT> m_rules;
     int pointing_at = 0; // valid if !m_rules.empty().
 
-    // TODO: whether to throw if not found?
     fileT(std::filesystem::path path) : m_path(std::move(path)) {
         std::ifstream ifs(m_path);
-        std::string line;
         int id = 0;
 
+        std::string line;
         while (std::getline(ifs, line)) {
-            auto extr = legacy::extract_rules(line);
-            bool has_rule = !extr.empty();
-            // (wontfix) intentionally not moving `line`, as otherwise MSVC will give a moved-from warning.
-            m_lines.emplace_back(has_rule ? id++ : null_id, line);
-            if (has_rule) {
-                m_rules.push_back(extr[0]);
+            const auto extr = legacy::extract_MAP_str(line).mold;
+            m_lines.emplace_back(extr.has_value() ? id++ : null_id, std::move(line));
+            if (extr.has_value()) {
+                m_rules.push_back(legacy::compress(*extr));
                 // TODO: (how&) whether to support more fine-grained (in-line) rule-location?
-                // (only the first rule in each line is being recognized... (so `extract_rules` is wasteful)
+                // (only the first pack in each line is being recognized...
             }
         }
 
@@ -242,7 +239,7 @@ struct fileT {
     }
 
     // TODO: how to combine with file-nav (into a single window)?
-    std::optional<legacy::ruleT> display(const legacy::ruleT& test_sync) {
+    std::optional<legacy::moldT> display(const legacy::moldT& test_sync) {
         static const bool wrap = true; // TODO: (temporarily const)
 
         std::optional<legacy::ruleT> out;
@@ -250,7 +247,7 @@ struct fileT {
         const int total = m_rules.size();
 
         if (total != 0) {
-            const bool in_sync = test_sync == m_rules[pointing_at];
+            const bool in_sync = test_sync == legacy::decompress(m_rules[pointing_at]); // TODO: looks expensive...
 
             iter_pair(
                 "<|", "prev", "next", "|>",                                              //
@@ -325,7 +322,7 @@ struct fileT {
 
         if (hit) {
             assert(pointing_at >= 0 && pointing_at < total);
-            return m_rules[pointing_at];
+            return legacy::decompress(m_rules[pointing_at]);
         } else {
             return std::nullopt;
         }
@@ -335,11 +332,11 @@ struct fileT {
 // TODO: reset scroll-y for new files...
 // TODO: show the last opened file in file-nav?
 
-std::optional<legacy::ruleT> load_rule(const legacy::ruleT& test_sync) {
+std::optional<legacy::moldT> load_rule(const legacy::moldT& test_sync) {
     static file_nav nav;
     static std::optional<fileT> file;
 
-    std::optional<legacy::ruleT> out;
+    std::optional<legacy::moldT> out;
 
     bool close = false;
     if (file) {

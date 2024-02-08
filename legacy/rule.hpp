@@ -89,7 +89,6 @@ namespace legacy {
     } // namespace _misc::tests
 #endif
 
-    // TODO: inherit from codeT::map_to<bool>?
     // Map codeT to the value `s` become at next generation.
     class ruleT {
         codeT::map_to<bool> m_map{};
@@ -132,48 +131,48 @@ namespace legacy {
         });
     }
 
-    // TODO: explain moldT and set_rule...
+    // TODO: explain...
     struct moldT {
         using lockT = codeT::map_to<bool>;
 
         ruleT rule{};
         lockT lock{};
 
-        void set_rule(const ruleT& r) {
-            for_each_code(code) {
-                if (lock[code] && r[code] != rule[code]) {
-                    lock = {};
-                    break;
-                }
-            }
-            rule = r;
-        }
-
         friend bool operator==(const moldT&, const moldT&) = default;
     };
 
-    // TODO: should be able to compress lockT as well...
-    class compressT {
-        std::array<uint8_t, 64> bits; // as bitset.
-    public:
-        explicit compressT(const ruleT& rule) : bits{} {
-            for_each_code(code) { bits[code / 8] |= rule[code] << (code % 8); }
-        }
+    // TODO: rename...
+    // TODO: add test...
+    struct compressT {
+        std::array<uint8_t, 64> bits_rule{}, bits_lock{}; // as bitset.
 
-        /*implicit*/ operator ruleT() const {
-            return make_rule([&](codeT code) -> bool { return (bits[code / 8] >> (code % 8)) & 1; });
-        }
-
-        friend bool operator==(const compressT& l, const compressT& r) = default;
-
+        friend bool operator==(const compressT&, const compressT&) = default;
         struct hashT {
             size_t operator()(const compressT& cmpr) const {
                 // ~ not UB.
-                const char* data = reinterpret_cast<const char*>(cmpr.bits.data());
-                return std::hash<std::string_view>{}(std::string_view(data, 64));
+                return std::hash<std::string_view>{}(
+                    std::string_view(reinterpret_cast<const char*>(&cmpr), sizeof(cmpr)));
             }
         };
     };
+
+    inline compressT compress(const moldT& mold) {
+        compressT cmpr{};
+        for_each_code(code) {
+            cmpr.bits_rule[code / 8] |= mold.rule[code] << (code % 8);
+            cmpr.bits_lock[code / 8] |= mold.lock[code] << (code % 8);
+        }
+        return cmpr;
+    }
+
+    inline moldT decompress(const compressT& cmpr) {
+        moldT mold{};
+        for_each_code(code) {
+            mold.rule[code] = (cmpr.bits_rule[code / 8] >> (code % 8)) & 1;
+            mold.lock[code] = (cmpr.bits_lock[code / 8] >> (code % 8)) & 1;
+        }
+        return mold;
+    }
 
     namespace _misc {
         inline char to_base64(uint8_t b6) {
@@ -205,48 +204,34 @@ namespace legacy {
                 return 63;
             }
         }
-    } // namespace _misc
 
-    // Convert ruleT to an "MAP rule" string.
-    // TODO: recheck... is `MAP_rule` a suitable name?
-    inline std::string to_MAP_str(const ruleT& rule) {
-        // MAP rule uses a different coding scheme.
-        bool MAP_rule[512]{};
-        for_each_code(code) {
-            const auto [q, w, e, a, s, d, z, x, c] = decode(code);
-            MAP_rule[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1] = rule[code];
-        }
-        const auto get = [&MAP_rule](int i) { return i < 512 ? MAP_rule[i] : 0; };
-        std::string str = "MAP";
-        for (int i = 0; i < 512; i += 6) {
-            const uint8_t b6 = (get(i + 5) << 0) | (get(i + 4) << 1) | (get(i + 3) << 2) | (get(i + 2) << 3) |
-                               (get(i + 1) << 4) | (get(i + 0) << 5);
-            str += _misc::to_base64(b6);
-        }
-        return str;
-    }
-
-    // TODO: to/from moldT...
-
-    namespace _misc {
-        inline const std::regex& regex_MAP_str() {
-            static_assert((512 + 5) / 6 == 86);
-            static const std::regex reg{"MAP[a-zA-Z0-9+/]{86}", std::regex_constants::optimize};
-            return reg;
+        // TODO: refine impl...
+        // TODO: explain the encoding scheme... (about `data`)
+        inline void append_base64(std::string& str, const auto& source /* ruleT or lockT */) {
+            bool data[512]{}; // Re-encoded as if bpos_q = 8, ... bpos_c = 0.
+            for_each_code(code) {
+                const auto [q, w, e, a, s, d, z, x, c] = decode(code);
+                data[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1] = source[code];
+            }
+            const auto get = [&data](int i) { return i < 512 ? data[i] : 0; };
+            for (int i = 0; i < 512; i += 6) {
+                const uint8_t b6 = (get(i + 5) << 0) | (get(i + 4) << 1) | (get(i + 3) << 2) | (get(i + 2) << 3) |
+                                   (get(i + 1) << 4) | (get(i + 0) << 5);
+                str += to_base64(b6);
+            }
         }
 
-        inline ruleT from_MAP_str(const std::string& map_str) {
-            assert(std::regex_match(map_str, regex_MAP_str()));
-            bool MAP_rule[512]{};
-            auto put = [&MAP_rule](int i, bool b) {
+        inline void load_base64(std::string_view str, auto& dest /* ruleT or lockT */) {
+            bool data[512]{}; // Re-encoded as if bpos_q = 8, ... bpos_c = 0.
+            auto put = [&data](int i, bool b) {
                 if (i < 512) {
-                    MAP_rule[i] = b;
+                    data[i] = b;
                 }
             };
 
-            int chp = 3; // skip "MAP"
+            int chp = 0;
             for (int i = 0; i < 512; i += 6) {
-                const uint8_t b6 = _misc::from_base64(map_str[chp++]);
+                const uint8_t b6 = from_base64(str[chp++]);
                 put(i + 5, (b6 >> 0) & 1);
                 put(i + 4, (b6 >> 1) & 1);
                 put(i + 3, (b6 >> 2) & 1);
@@ -255,50 +240,88 @@ namespace legacy {
                 put(i + 0, (b6 >> 5) & 1);
             }
 
-            return make_rule([&MAP_rule](codeT code) -> bool {
+            for_each_code(code) {
                 const auto [q, w, e, a, s, d, z, x, c] = decode(code);
-                return MAP_rule[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1];
-            });
+                dest[code] = data[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1];
+            }
         }
     } // namespace _misc
 
+    // Convert ruleT to an "MAP rule" string.
+    inline std::string to_MAP_str(const ruleT& rule) {
+        std::string str = "MAP";
+        _misc::append_base64(str, rule);
+        return str;
+    }
+
+    inline std::string to_MAP_str(const moldT& mold) {
+        std::string str = "MAP";
+        _misc::append_base64(str, mold.rule);
+        str += " [";
+        _misc::append_base64(str, mold.lock);
+        str += "]";
+        return str;
+    }
+
+    struct extrT {
+        std::optional<moldT> mold{};
+        std::string_view prefix{}, suffix{};
+    };
+
+    // TODO: or return optional<{ruleT,optional<lockT>}>?
+    // Extract moldT from text. Rules unpaired with lock data are treated as moldT with empty lock.
+    inline extrT extract_MAP_str(const char* begin, const char* end) {
+        extrT extr{};
+
+        static_assert((512 + 5) / 6 == 86);
+        //                                1                  2       3
+        static const std::regex regex{"MAP([a-zA-Z0-9+/]{86})( \\[([a-zA-Z0-9+/]{86})\\])?",
+                                      std::regex_constants::optimize};
+
+        if (std::cmatch match; std::regex_search(begin, end, match, regex)) {
+            extr.prefix = {match.prefix().first, match.prefix().second};
+            extr.suffix = {match.suffix().first, match.suffix().second};
+
+            ruleT rule{};
+            _misc::load_base64({match[1].first, match[1].second}, rule);
+            extr.mold.emplace(rule);
+            if (match[3].matched) {
+                _misc::load_base64({match[3].first, match[3].second}, extr.mold->lock);
+            }
+        } else {
+            extr.prefix = {begin, end};
+            extr.suffix = {};
+        }
+
+        return extr;
+    }
+
+    inline extrT extract_MAP_str(std::span<const char> data) {
+        return extract_MAP_str(data.data(), data.data() + data.size());
+    }
+
 #ifndef NDEBUG
+    // TODO: extend test coverage to affixed/with-lock cases etc...
     namespace _misc::tests {
         // https://golly.sourceforge.io/Help/Algorithms/QuickLife.html
         // > So, Conway's Life (B3/S23) encoded as a MAP rule is:
         // > rule = MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA
         inline const bool test_MAP_str = [] {
-            const char* gol_str =
+            const std::string_view gol_str =
                 "MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA";
             const ruleT gol = game_of_life();
-            assert(std::regex_match(gol_str, regex_MAP_str()));
-            assert(gol_str == to_MAP_str(gol));
-            assert(from_MAP_str(gol_str) == gol);
+            assert(to_MAP_str(gol) == gol_str);
+
+            const auto [mold, prefix, suffix] = extract_MAP_str(gol_str);
+            assert(prefix == "");
+            assert(suffix == "");
+            assert(mold);
+            assert(mold->rule == gol);
+            assert(mold->lock == moldT::lockT{});
+
             return true;
         }();
     } // namespace _misc::tests
 #endif
-
-    inline std::vector<compressT> extract_rules(const char* begin, const char* end) {
-        std::vector<compressT> rules;
-
-        std::cmatch match;
-        while (std::regex_search(begin, end, match, _misc::regex_MAP_str())) {
-            compressT rule(_misc::from_MAP_str(match[0]));
-            if (rules.empty() || rules.back() != rule) {
-                rules.push_back(rule);
-            }
-            begin = match.suffix().first;
-        }
-        return rules;
-    }
-
-    inline std::vector<compressT> extract_rules(std::span<const char> data) {
-        return extract_rules(data.data(), data.data() + data.size());
-    }
-
-    inline std::vector<compressT> extract_rules(const char* str) { //
-        return extract_rules(str, str + strlen(str));
-    }
 
 } // namespace legacy

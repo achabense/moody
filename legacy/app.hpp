@@ -70,8 +70,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
 // (and this implicitly relying on title being a string-literal... `additionals` stores pointers directly...)
 bool file_nav_add_special_path(std::filesystem::path p, const char* title);
 
-// TODO: should be able to load lock as well... (->optional<pair<ruleT,optional<lockT>>>)
-std::optional<legacy::ruleT> load_rule(const legacy::ruleT& test_sync);
+std::optional<legacy::moldT> load_rule(const legacy::moldT& test_sync);
 
 std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_image& img);
 
