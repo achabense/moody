@@ -108,11 +108,11 @@ public:
     legacy::subsetT& select_subset(const legacy::moldT& mold) {
         bool need_reset = false;
         const float r = ImGui::GetFrameHeight();
-        const ImVec2 sqr{r, r};
 
+        // TODO: drop mutable id... use manually specified ids
         // TODO: tooltip...
         // TODO: recheck id & tid logic... (& imagebutton)
-        auto check = [&, id = 0](termT& term, const ImVec2& size) mutable {
+        auto check = [&, id = 0, size = ImVec2{r, r}](termT& term) mutable {
             // TODO: change color when hovered?
             // bool hovered = false;
             ImGui::PushID(id++);
@@ -161,7 +161,7 @@ public:
                     for (termT& t : terms) {
                         ImGui::TableNextColumn();
                         imgui_str(t.title);
-                        check(t, sqr);
+                        check(t);
                     }
                     ImGui::EndTable();
                 }
@@ -175,20 +175,17 @@ public:
                 ImGui::TableNextColumn();
                 if (ImGui::BeginTable("Checklist##Ignore", 1, flags_inner)) {
                     ImGui::TableNextRow();
-                    // TODO: for terms_ignore, use smaller button instead?
-                    // const ImVec2 sqr_small{floor(r * 0.9f), floor(r * 0.9f)};
-
                     // TODO: slightly confusing; light color should represent "take-into-account" instead of
                     // "ignore" Is this solvable by applying specific coloring scheme?
                     ImGui::TableNextColumn();
                     ImGui::BeginGroup();
                     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1, 1)); // TODO: too tight...
                     for (int l = 0; l < 3; ++l) {
-                        check(terms_ignore[l * 3 + 0], sqr);
+                        check(terms_ignore[l * 3 + 0]);
                         ImGui::SameLine();
-                        check(terms_ignore[l * 3 + 1], sqr);
+                        check(terms_ignore[l * 3 + 1]);
                         ImGui::SameLine();
-                        check(terms_ignore[l * 3 + 2], sqr);
+                        check(terms_ignore[l * 3 + 2]);
                     }
                     ImGui::PopStyleVar();
                     ImGui::EndGroup();
@@ -198,7 +195,7 @@ public:
                         ImGui::SameLine();
                         ImGui::BeginGroup();
                         imgui_str(terms_ignore[i].title);
-                        check(terms_ignore[i], sqr);
+                        check(terms_ignore[i]);
                         ImGui::EndGroup();
                     }
 

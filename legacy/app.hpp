@@ -2,7 +2,6 @@
 
 #include <chrono>
 #include <filesystem>
-#include <fstream>
 
 #include "app_imgui.hpp"
 #include "rule.hpp"

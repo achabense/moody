@@ -3,7 +3,6 @@
 #include <charconv>
 #include <format> // TODO: utils...
 #include <random> // TODO: utils...
-#include <span>
 
 #include "rule.hpp"
 
@@ -12,7 +11,6 @@ namespace legacy {
 
     // TODO: explain layout.
     // TODO: add assertions about emptiness...
-    // TODO: define posT pair as rangeT?
     class tileT {
     public:
         struct posT {
@@ -29,12 +27,17 @@ namespace legacy {
             return {.x = pos.x + size.width, .y = pos.y + size.height};
         }
 
-        // TODO: add assertions?
         struct rangeT {
             posT begin, end; // [)
-            int width() const { return end.x - begin.x; }
-            int height() const { return end.y - begin.y; }
-            sizeT size() const { return {.width = end.x - begin.x, .height = end.y - begin.y}; }
+            int width() const {
+                assert(begin.x <= end.x);
+                return end.x - begin.x;
+            }
+            int height() const {
+                assert(begin.y <= end.y);
+                return end.y - begin.y;
+            }
+            sizeT size() const { return {.width = width(), .height = height()}; }
         };
 
     private:

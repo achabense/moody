@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <optional>
 #include <regex>
 #include <span>
 #include <string>

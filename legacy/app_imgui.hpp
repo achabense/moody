@@ -25,12 +25,6 @@ inline void imgui_str(std::string_view str) { //
     ImGui::TextUnformatted(str.data(), str.data() + str.size());
 }
 
-// TODO: whether to apply std::format here?
-// template <class... U>
-// inline void imgui_strfmt(std::format_string<const U&...> fmt, const U&... args) {
-//     imgui_str(std::format(fmt, args...));
-// }
-
 inline void imgui_strwrapped(std::string_view str) {
     ImGui::PushTextWrapPos(0.0f);
     imgui_str(str);
