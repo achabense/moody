@@ -1,23 +1,10 @@
 #pragma once
 
+#include <algorithm>
+#include <string>
+
 #include "imgui.h"
 #include "imgui_internal.h" // TODO: record dependency...
-
-// Not necessary?
-#if 0
-// TODO: it seems explicit u8 encoding guarantee is not strictly needed in this project?
-// - Assert that ordinary string literals are encoded with utf-8.
-// - u8"..." is not used in this project, as it becomes `char8_t[]` after C++20 (which is not usable).
-// - TODO: document ways to pass this check (/utf-8 etc; different compilers)...
-inline void assert_utf8_encoding() {
-    constexpr auto a = std::to_array("中文");
-    constexpr auto b = std::to_array(u8"中文");
-
-    static_assert(std::equal(a.begin(), a.end(), b.begin(), b.end(), [](auto l, auto r) {
-        return static_cast<unsigned char>(l) == static_cast<unsigned char>(r);
-    }));
-}
-#endif
 
 // Unlike ImGui::TextWrapped, doesn't take fmt str...
 // TODO: the name is awful...

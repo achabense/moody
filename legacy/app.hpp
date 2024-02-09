@@ -1,13 +1,28 @@
 #pragma once
 
 #include <chrono>
-#include <filesystem>
 
 #include "app_imgui.hpp"
 #include "rule.hpp"
 #include "tile.hpp"
 
 using namespace std::chrono_literals;
+
+// Not necessary?
+#if 0
+// TODO: it seems explicit u8 encoding guarantee is not strictly needed in this project?
+// - Assert that ordinary string literals are encoded with utf-8.
+// - u8"..." is not used in this project, as it becomes `char8_t[]` after C++20 (which is not usable).
+// - TODO: document ways to pass this check (/utf-8 etc; different compilers)...
+inline void assert_utf8_encoding() {
+    constexpr auto a = std::to_array("中文");
+    constexpr auto b = std::to_array(u8"中文");
+
+    static_assert(std::equal(a.begin(), a.end(), b.begin(), b.end(), [](auto l, auto r) {
+        return static_cast<unsigned char>(l) == static_cast<unsigned char>(r);
+    }));
+}
+#endif
 
 inline std::mt19937& global_mt19937() {
     static std::mt19937 rand(time(0));
@@ -62,12 +77,12 @@ public:
     }
 };
 
+// TODO: make `static_constraints` a part of `edit_rule`?
 std::optional<legacy::moldT> static_constraints();
 std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_image& icons);
 
 // TODO: this workaround is ugly...
-// (and this implicitly relying on title being a string-literal... `additionals` stores pointers directly...)
-bool file_nav_add_special_path(std::filesystem::path p, const char* title);
+bool file_nav_add_special_path(const char* u8path, const char* title);
 
 std::optional<legacy::moldT> load_rule(const legacy::moldT& test_sync);
 

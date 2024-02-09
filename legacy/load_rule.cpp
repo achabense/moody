@@ -3,6 +3,7 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #endif
 
+#include <filesystem>
 #include <fstream>
 
 #include "app.hpp"
@@ -13,6 +14,10 @@
 //   `filesystem.path.string()`?)
 static std::string cpp17_u8string(const std::filesystem::path& p) {
     return reinterpret_cast<const char*>(p.u8string().c_str());
+}
+
+static std::filesystem::path cpp17_u8path(const char* path) { //
+    return std::filesystem::u8path(path);
 }
 
 // TODO: recheck...
@@ -87,9 +92,9 @@ public:
 
     // TODO: refine...
     inline static std::vector<std::pair<path, std::string>> additionals;
-    static bool add_special_path(path p, const char* title) { //
+    static bool add_special_path(const char* u8path, const char* title) { //
         std::error_code ec{};
-        p = std::filesystem::canonical(p, ec);
+        path p = std::filesystem::canonical(cpp17_u8path(u8path), ec);
         if (!ec) {
             additionals.emplace_back(std::move(p), title);
             return true;
@@ -120,7 +125,7 @@ public:
                                              ImGuiInputTextFlags_EnterReturnsTrue)) {
                     // TODO: is the usage of / correct?
                     // TODO: is this still ok when !valid?
-                    set_current(current / std::filesystem::u8path(buf_path));
+                    set_current(current / cpp17_u8path(buf_path));
                     buf_path[0] = '\0';
                 }
                 for (const auto& [path, title] : additionals) {
@@ -179,8 +184,8 @@ public:
     }
 };
 
-bool file_nav_add_special_path(std::filesystem::path p, const char* title) {
-    return file_nav::add_special_path(std::move(p), title);
+bool file_nav_add_special_path(const char* u8path, const char* title) {
+    return file_nav::add_special_path(u8path, title);
 }
 
 #if 0

@@ -20,7 +20,6 @@ static bool begin_frame();
 static void end_frame();
 
 // TODO: Right-click must either to open a submenu, or to toggle on/off the tooltip.
-// TODO: Generalize typical behavior patterns to find new rules.
 
 // Never empty.
 class recorderT {
@@ -62,9 +61,9 @@ private:
     }
 };
 
-// TODO: are there portable ways to convert argv to a valid filesystem::path (without messing up
-// encodings)?
-int main(int argc, char** argv) {
+// The encoding of `argv` cannot be relied upon, see:
+// https://stackoverflow.com/questions/5408730/what-is-the-encoding-of-argv
+int main(int, char**) {
     init();
     {
         char* base_path = SDL_GetBasePath();
@@ -73,8 +72,11 @@ int main(int argc, char** argv) {
             exit(EXIT_FAILURE);
         }
 
+        file_nav_add_special_path(base_path, "Exe path");
+        // TODO: remove when finished...
+        file_nav_add_special_path(R"(C:\*redacted*\Desktop\rulelists_new)", "Temp");
+
         const std::string path = base_path;
-        assert(path.ends_with('\\') || path.ends_with('/'));
         SDL_free(base_path);
 
         const auto strdup = [](const std::string& str) {
@@ -83,23 +85,15 @@ int main(int argc, char** argv) {
             return buf;
         };
 
-        file_nav_add_special_path(std::filesystem::u8path(path), "Exe path");
-
-        // Avoid "imgui.ini" (and maybe also "imgui_log.txt") sprinkling everywhere.
-        // TODO: IniFilename and LogFilename should be unconditionally fixed (even if not using
-        // base-path) (wontfix) These memory leaks are negligible.
+        // Freeze the absolute path of "imgui.ini" and "imgui_log.txt".
+        // (wontfix) These memory leaks are negligible.
+        assert(path.ends_with('\\') || path.ends_with('/'));
         ImGui::GetIO().IniFilename = strdup(path + "imgui.ini");
         ImGui::GetIO().LogFilename = strdup(path + "imgui_log.txt");
-
-        // TODO: remove when finished...
-        file_nav_add_special_path(R"(C:\*redacted*\Desktop\rulelists_new)", "Temp");
     }
 
-    // TODO: rephrase...
-    // Currently the program doesn't attempt to deal with navigation mode.
-    // The controls and program-defined widgets are not taking nav-mode compatiblity into consideration.
-    // ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // X
-    // ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // X
+    // TODO: Currently the controls of the program are poorly designed, and are especially not taking
+    // navigation mode into consideration...
     assert(!(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_NavEnableKeyboard));
     assert(!(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_NavEnableGamepad));
 
@@ -157,11 +151,22 @@ int main(int argc, char** argv) {
                 if (ImGui::Button("Copy&lock")) {
                     ImGui::SetClipboardText(legacy::to_MAP_str(current).c_str());
                 }
+                ImGui::SameLine();
                 // TODO: better gui logic for copy... find ways to show feedback
                 if (ImGui::Button("Copy")) {
                     ImGui::SetClipboardText(rule_str.c_str());
                 }
                 ImGui::SameLine();
+                // TODO: (temp) added back; remove when pasting is supported by load_rule...
+                if (ImGui::Button("Paste")) {
+                    if (const char* str = ImGui::GetClipboardText()) {
+                        if (auto out = legacy::extract_MAP_str(std::string_view(str)).mold) {
+                            current = *out;
+                            update = true;
+                        }
+                    }
+                }
+
                 imgui_str(rule_str);
 
                 // TODO: +1 is clumsy
