@@ -264,6 +264,43 @@ namespace legacy {
         }
     };
 
+#if 0
+    // TODO: apply scanlist-based strategy?
+    class scanT {
+        struct counterT {
+            // 0/1 means masked value.
+            int free_0 = 0, free_1 = 0;
+            int lock_0 = 0, lock_1 = 0;
+
+            bool any_locked() const { return lock_0 || lock_1; }
+            bool all_locked() const { return !free_0 && !free_1; }
+            bool none_locked() const { return !any_locked(); }
+        };
+
+        std::vector<counterT> vec;
+
+    public:
+        scanT(const subsetT& subset, const moldT& mold) {
+            const maskT& mask = subset.get_mask();
+            const partitionT& par = subset.get_par();
+            const ruleT_masked r = mask ^ mold.rule;
+
+            vec.resize(par.k());
+            par.for_each_group([&](int j, const groupT& group) {
+                for (codeT code : group) {
+                    if (mold.lock[code]) {
+                        r[code] ? ++vec[j].lock_1 : ++vec[j].lock_0;
+                    } else {
+                        r[code] ? ++vec[j].free_1 : ++vec[j].free_0;
+                    }
+                }
+            });
+        }
+
+        int count_free() const { return std::ranges::count_if(vec, &counterT::none_locked); }
+    };
+#endif
+
     // TODO: redesign param...
     inline auto scan(const partitionT& par, const ruleT_masked& rule, const moldT::lockT& lock) {
         struct counterT {
