@@ -77,14 +77,12 @@ public:
     }
 };
 
-// TODO: make `static_constraints` a part of `edit_rule`?
-std::optional<legacy::moldT> static_constraints();
-std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_image& icons);
 
 // TODO: this workaround is ugly...
 bool file_nav_add_special_path(const char* u8path, const char* title);
-
 std::optional<legacy::moldT> load_rule(const legacy::moldT& test_sync);
+
+std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_image& icons);
 
 std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_image& img);
 

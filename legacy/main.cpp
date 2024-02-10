@@ -126,13 +126,6 @@ int main(int, char**) {
             }
         }
 
-        if (auto window = imgui_window("Constraints", ImGuiWindowFlags_AlwaysAutoResize)) {
-            if (auto out = static_constraints()) {
-                current = *out;
-                update = true;
-            }
-        }
-
         const ImGuiWindowFlags flags =
             ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus;
         const ImGuiViewport* viewport = ImGui::GetMainViewport();

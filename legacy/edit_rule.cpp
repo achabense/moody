@@ -6,6 +6,9 @@
 
 #include "app.hpp"
 
+// TODO: currently poorly designed; redesign to re-enable this feature when suitable...
+// #define ENABLE_STATIC_CONSTRAINTS
+
 class subset_selector {
     legacy::subsetT current;
 
@@ -84,7 +87,7 @@ public:
         terms_native.emplace_back("C2", make_subset({mp_C2}));
         terms_native.emplace_back("C4", make_subset({mp_C4})); // TODO: add explanations in the gui
 
-        terms_misc.emplace_back("'C8'", make_subset({mp_C8}));
+        // terms_misc.emplace_back("'C8'", make_subset({mp_C8})); // TODO: whether to support this?
         terms_misc.emplace_back("Tot", make_subset({mp_C8, mp_tot_exc_s}));
         terms_misc.emplace_back("Tot(+s)", make_subset({mp_C8, mp_tot_inc_s}));
         terms_misc.emplace_back("Hex_Tot", make_subset({mp_hex_C6, mp_hex_tot_exc_s}));
@@ -107,20 +110,36 @@ public:
 
     legacy::subsetT& select_subset(const legacy::moldT& mold) {
         bool need_reset = false;
-        const float r = ImGui::GetFrameHeight();
+        auto set_select = [&need_reset](termT& t, bool sel) {
+            if (t.selected != sel) {
+                t.selected = sel;
+                need_reset = true;
+            }
+        };
+
+        if (ImGui::Button("Clear")) {
+            for_each_term([&](termT& t) { set_select(t, false); });
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Recognize")) {
+            for_each_term([&](termT& t) {
+                set_select(t, t.set.contains(mold.rule));
+                // TODO: (wontfix) still relying on `reset_current` which doesn't utilize that mold.rule belongs to
+                // the result...
+            });
+        }
 
         // TODO: drop mutable id... use manually specified ids
         // TODO: tooltip...
         // TODO: recheck id & tid logic... (& imagebutton)
-        auto check = [&, id = 0, size = ImVec2{r, r}](termT& term) mutable {
+        auto check = [&, id = 0, r = ImGui::GetFrameHeight()](termT& term) mutable {
+            const ImVec2 size{r, r};
             // TODO: change color when hovered?
             // bool hovered = false;
             ImGui::PushID(id++);
             if (!term.disabled) {
                 if (ImGui::InvisibleButton("Check", size)) {
-                    term.selected = !term.selected;
-                    // TODO: No need to reset if the newly selected term already included current.
-                    need_reset = true;
+                    set_select(term, !term.selected);
 
                     // TODO: need to recheck all invisible buttons etc if to enable Navigation.
                     // e.g. RenderNavHighlight
@@ -235,19 +254,6 @@ public:
             ImGui::EndTable();
         }
 
-        // TODO: this is currently being hidden by outer-table's extending behavior...
-        // TODO: or just clear on a per-line basis?
-        // TODO: better layout... or right-click menu?
-        ImGui::SameLine();
-        if (ImGui::Button("Clear")) {
-            for_each_term([&](termT& t) {
-                if (t.selected) {
-                    t.selected = false;
-                    need_reset = true;
-                }
-            });
-        }
-
         if (need_reset) {
             reset_current();
         }
@@ -255,8 +261,8 @@ public:
     }
 };
 
-// TODO: rename; redesign...
-std::optional<legacy::moldT> static_constraints() {
+#ifdef ENABLE_STATIC_CONSTRAINTS
+static std::optional<legacy::moldT> static_constraints() {
     enum stateE { Any, F, T, F_Cond, T_Cond }; // TODO: rename; explain
     const int r = 9;
     static stateE board[r][r]{/*Any...*/};
@@ -360,6 +366,7 @@ std::optional<legacy::moldT> static_constraints() {
     }
     return std::nullopt;
 }
+#endif // ENABLE_STATIC_CONSTRAINTS
 
 // TODO: there must be an [obvious] way to support "dial" mode.
 std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_image& icons) {
@@ -563,6 +570,17 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         if (ImGui::Button("Mir")) {
             return_mold(legacy::mirror(mold));
         }
+
+#ifdef ENABLE_STATIC_CONSTRAINTS
+        ImGui::SameLine();
+        ImGui::Button("Static");
+        if (ImGui::BeginPopupContextItem(0, ImGuiPopupFlags_MouseButtonLeft)) {
+            if (auto out = static_constraints()) {
+                return_mold(*out);
+            }
+            ImGui::EndPopup();
+        }
+#endif
     }
 
     // TODO: support filtering?
