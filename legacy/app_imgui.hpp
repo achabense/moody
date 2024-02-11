@@ -141,10 +141,13 @@ public:
 
     explicit imgui_itemtooltip(bool& toggle) {
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
-            if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+            // TODO: still have slight control conflicts...
+            if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Right)) {
                 toggle = !toggle;
             }
             if (toggle) {
+                // TODO: wrap according to actual tooltip contents...
+                // imgui_str("Double right click to turn on/off the tooltip");
                 ImGui::BeginTooltip();
                 begun = true;
             }

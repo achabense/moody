@@ -396,7 +396,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             static bool toggle = true;
             if (auto tooltip = imgui_itemtooltip(toggle)) {
                 ImGui::PushTextWrapPos(280); // TODO: how to decide wrap pos properly?
-                imgui_str("Right click to turn on/off the tooltip");
                 imgui_str(description);
                 imgui_str(to_MAP_str(mask));
                 ImGui::PopTextWrapPos();
@@ -673,7 +672,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                     }
                     static bool toggle = true;
                     if (auto tooltip = imgui_itemtooltip(toggle)) {
-                        imgui_str("Right click to turn on/off the tooltip");
                         ImGui::Text("Group size: %d", (int)group.size());
                         const int max_to_show = 40;
                         for (int x = 0; auto code : group) {

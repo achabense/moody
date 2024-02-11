@@ -419,9 +419,7 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
                         assert(maxx - minx == 40 && maxy - miny == 40);
 
                         const int w = maxx - minx, h = maxy - miny;
-                        ImGui::PushTextWrapPos(200);
-                        imgui_str("Right click to turn on/off the tooltip");
-                        ImGui::PopTextWrapPos();
+                        imgui_str("Zoom:4"); // TODO: (temp)
                         ImGui::Image(img.texture(), ImVec2(40 * 4, 40 * 4),
                                      {(float)minx / tile_size.width, (float)miny / tile_size.height},
                                      {(float)maxx / tile_size.width, (float)maxy / tile_size.height});

@@ -116,13 +116,16 @@ int main(int, char**) {
         legacy::moldT current = recorder.current();
         bool update = false;
 
-        // TODO: this should be controlled by load_rule ...
-        ImGui::SetNextWindowSize({600, 400}, ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSizeConstraints(ImVec2(400, 200), ImVec2(FLT_MAX, FLT_MAX));
-        if (auto window = imgui_window("Load rule")) {
-            if (auto out = load_rule(current)) {
-                current = *out;
-                update = true;
+        static bool load = true;
+        if (load) {
+            // TODO: this should be controlled by load_rule ...
+            ImGui::SetNextWindowSize({600, 400}, ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowSizeConstraints(ImVec2(400, 200), ImVec2(FLT_MAX, FLT_MAX));
+            if (auto window = imgui_window("Load rule", &load, ImGuiWindowFlags_NoCollapse)) {
+                if (auto out = load_rule(current)) {
+                    current = *out;
+                    update = true;
+                }
             }
         }
 
@@ -157,6 +160,13 @@ int main(int, char**) {
                             current = *out;
                             update = true;
                         }
+                    }
+                }
+
+                if (!load) {
+                    ImGui::SameLine();
+                    if (ImGui::Button("Load")) {
+                        load = true;
                     }
                 }
 
