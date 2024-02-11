@@ -1,7 +1,5 @@
 #pragma once
 
-#include <random>
-
 #include "rule.hpp"
 
 namespace legacy {
@@ -799,10 +797,10 @@ namespace legacy {
 
     } // namespace recipes
 
-#ifndef NDEBUG
+#ifdef ENABLE_TESTS
       // TODO: add more tests for subsetT... (e.g. iso inclusion etc...)
-    namespace _misc::tests {
-        inline const bool test_ignore_s_and_self_cmpl = [] {
+    namespace _tests {
+        inline const testT test_ignore_s_and_self_cmpl = [] {
             subsetT sc = make_subset({mp_ignore_s}, mask_zero) & make_subset({mp_dual}, mask_identity);
 
             // 2024/1/20 2AM
@@ -826,9 +824,8 @@ namespace legacy {
             assert(sc.contains(copy_from(env_z)));
             assert(sc.contains(copy_from(env_x)));
             assert(sc.contains(copy_from(env_c)));
-            return true;
-        }();
-    } // namespace _misc::tests
-#endif
+        };
+    }  // namespace _tests
+#endif // ENABLE_TESTS
 
 } //  namespace legacy

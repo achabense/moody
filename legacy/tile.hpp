@@ -2,7 +2,6 @@
 
 #include <charconv>
 #include <format> // TODO: utils...
-#include <random> // TODO: utils...
 
 #include "rule.hpp"
 
@@ -224,10 +223,10 @@ namespace legacy {
         }
     };
 
-#ifndef NDEBUG
-    namespace _misc::tests {
+#ifdef ENABLE_TESTS
+    namespace _tests {
         // TODO: enhance this test?
-        inline const bool test_tileT = [] {
+        inline const testT test_tileT = [] {
             const tileT::sizeT size{1, 1};
             tileT t_q(size), t_w(size), t_e(size);
             tileT t_a(size), t_s(size), t_d(size);
@@ -246,10 +245,9 @@ namespace legacy {
                 t_s.apply(gol, dest);
                 assert(dest.line(0)[0] == gol(code));
             }
-            return true;
-        }();
-    } // namespace _misc::tests
-#endif
+        };
+    }  // namespace _tests
+#endif // ENABLE_TESTS
 
     // TODO: std::optional<range>/nullopt for full-range?
     // (or just ptr/nullptr...)
@@ -291,9 +289,8 @@ namespace legacy {
             copy<mode>(dest, dbegin, source, source.range());
         }
 
-        // TODO: add param const...
-        // TODO: is the algo correct?
-        // TODO: explain why not using bernoulli_distribution
+        // TODO: Trying to guarantee that the result is independent of std implementation...
+        // Is this worthwhile? Fall back to bernoulli_distribution instead?
         inline void random_fill(tileT& tile, std::mt19937& rand, double density, const tileT::rangeT& range) {
             const uint32_t c = std::mt19937::max() * std::clamp(density, 0.0, 1.0);
             tile.for_each_line(range, [&](std::span<bool> line) { //
@@ -479,17 +476,17 @@ namespace legacy {
         return tile;
     }
 
-#ifndef NDEBUG
+#ifdef ENABLE_TESTS
     // TODO: update when from_RLE_str accepts x = ... line...
-    namespace _misc::tests {
-        inline const bool test_RLE_str = [] {
+    namespace _tests {
+        inline const testT test_RLE_str = [] {
             tileT tile({.width = 32, .height = 60});
             // TODO: better source of rand...
             std::mt19937 rand{};
             random_fill(tile, rand, 0.5);
             assert(tile == from_RLE_str(to_RLE_str(tile), tile.size()));
-            return true;
-        }();
-    } // namespace _misc::tests
-#endif
+        };
+    }  // namespace _tests
+#endif // ENABLE_TESTS
+
 } // namespace legacy

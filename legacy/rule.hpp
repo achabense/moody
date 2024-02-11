@@ -4,19 +4,35 @@
 #include <array>
 #include <cassert>
 #include <optional>
+#include <random>
 #include <regex>
 #include <span>
 #include <string>
 #include <vector>
 
+// TODO: refine tests...
+#ifndef NDEBUG
+#define ENABLE_TESTS
+#endif // !NDEBUG
+
+// TODO: recheck c-style casts...
 // TODO: recheck captures in the form of [&]...
 // TODO: tell apart precondition and impl assertion...
 
-// TODO: remove the `T` suffix? initially they were for things like `codeT code`...
 // TODO: bool might not be a good idea...
 // For example, bool is allowed to have padding bits, so memcmp may not apply...
 
 namespace legacy {
+
+#ifdef ENABLE_TESTS
+    namespace _tests {
+        struct testT {
+            inline static std::mt19937 rand{(uint32_t)time(0)};
+            testT(const auto& fn) noexcept { fn(); }
+        };
+    }  // namespace _tests
+#endif // ENABLE_TESTS
+
     // The environment around `s`.
     // (The variables are named after the keys in the qwerty keyboard.)
     struct envT {
@@ -50,6 +66,9 @@ namespace legacy {
         enum bposE : int { env_q = 0, env_w, env_e, env_a, env_s, env_d, env_z, env_x, env_c };
     };
 
+    // TODO: whether to apply functional version? void for_each_code(const std::invocable<codeT> auto& fn)
+    // for_each_code is widely used, and functional for_each_code will generally result in longer code...
+
     // (`name` must not be modified within the loop body)
 #define for_each_code(name) for (::legacy::codeT name{.val = 0}; name.val < 512; ++name.val)
 
@@ -81,14 +100,13 @@ namespace legacy {
         return (code >> codeT::env_s) & 1;
     }
 
-#ifndef NDEBUG
-    namespace _misc::tests {
-        inline const bool test_codeT = [] {
+#ifdef ENABLE_TESTS
+    namespace _tests {
+        inline const testT test_codeT = [] {
             for_each_code(code) { assert(encode(decode(code)) == code); }
-            return true;
-        }();
-    } // namespace _misc::tests
-#endif
+        };
+    }  // namespace _tests
+#endif // ENABLE_TESTS
 
     // Map codeT to the value `s` become at next generation.
     class ruleT {
@@ -174,6 +192,19 @@ namespace legacy {
         }
         return mold;
     }
+
+#ifdef ENABLE_TESTS
+    namespace _tests {
+        inline const testT test_compressT = [] {
+            moldT mold{};
+            for_each_code(code) {
+                mold.rule[code] = testT::rand() & 1;
+                mold.lock[code] = testT::rand() & 1;
+            }
+            assert(decompress(compress(mold)) == mold);
+        };
+    }  // namespace _tests
+#endif // ENABLE_TESTS
 
     namespace _misc {
         inline char to_base64(uint8_t b6) {
@@ -304,28 +335,56 @@ namespace legacy {
         return extract_MAP_str(data.data(), data.data() + data.size());
     }
 
-#ifndef NDEBUG
+#ifdef ENABLE_TESTS
     // TODO: extend test coverage to affixed/with-lock cases etc...
-    namespace _misc::tests {
+    namespace _tests {
         // https://golly.sourceforge.io/Help/Algorithms/QuickLife.html
         // > So, Conway's Life (B3/S23) encoded as a MAP rule is:
         // > rule = MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA
-        inline const bool test_MAP_str = [] {
-            const std::string_view gol_str =
-                "MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA";
-            const ruleT gol = game_of_life();
-            assert(to_MAP_str(gol) == gol_str);
+        inline const testT test_MAP_str = [] {
+            {
+                const std::string_view str = "...";
+                const auto [extr, prefix, suffix] = extract_MAP_str(str);
+                assert(!extr);
+                assert(prefix == "...");
+                assert(suffix == "");
+            }
 
-            const auto [mold, prefix, suffix] = extract_MAP_str(gol_str);
-            assert(prefix == "");
-            assert(suffix == "");
-            assert(mold);
-            assert(mold->rule == gol);
-            assert(mold->lock == moldT::lockT{});
+            {
+                const std::string_view gol_str =
+                    "MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA";
+                const ruleT gol = game_of_life();
+                assert(to_MAP_str(gol) == gol_str);
 
-            return true;
-        }();
-    } // namespace _misc::tests
-#endif
+                const auto [extr, prefix, suffix] = extract_MAP_str(gol_str);
+                assert(prefix == "");
+                assert(suffix == "");
+                assert(extr);
+                assert(extr->rule == gol);
+                assert(extr->lock == moldT::lockT{});
+            }
+
+            {
+                moldT mold{};
+                for_each_code(code) {
+                    mold.rule[code] = testT::rand() & 1;
+                    mold.lock[code] = testT::rand() & 1;
+                }
+                const std::string rule_only = "(prefix)" + to_MAP_str(mold.rule) + "(suffix)";
+                const std::string whole = "(prefix)" + to_MAP_str(mold) + "(suffix)";
+
+                const auto [extr1, prefix1, suffix1] = extract_MAP_str(rule_only);
+                const auto [extr2, prefix2, suffix2] = extract_MAP_str(whole);
+
+                assert(extr1 && extr2);
+                assert(prefix1 == "(prefix)" && prefix2 == "(prefix)");
+                assert(suffix1 == "(suffix)" && suffix2 == "(suffix)");
+                assert(extr1->rule == mold.rule);
+                assert(extr1->lock == moldT::lockT{});
+                assert(*extr2 == mold);
+            }
+        };
+    }  // namespace _tests
+#endif // ENABLE_TESTS
 
 } // namespace legacy
