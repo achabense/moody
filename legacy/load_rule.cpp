@@ -216,10 +216,9 @@ inline std::vector<char> load_binary(const std::filesystem::path& path, int max_
 
 // TODO: refine...
 struct fileT {
-    static constexpr int null_id = -1;
     struct lineT {
-        int id;
         std::string text;
+        std::optional<int> id = std::nullopt; // TODO: (temp) special value or optional?
     };
 
     std::filesystem::path m_path;
@@ -227,22 +226,27 @@ struct fileT {
     std::vector<legacy::compressT> m_rules;
     int pointing_at = 0; // valid if !m_rules.empty().
 
-    fileT(std::filesystem::path path) : m_path(std::move(path)) {
-        std::ifstream ifs(m_path);
-        int id = 0;
+    // TODO: It is easy to locate all rules in a text span via `extract_MAP_str`.
+    // However there are no easy ways to locate or highlight (only) the rule across the lines in the gui.
+    // See: https://github.com/ocornut/imgui/issues/2313
+    // So, currently the program only recognizes the first rule for each line, and highlights the whole line if
+    // the line contains a rule.
 
-        std::string line;
-        while (std::getline(ifs, line)) {
-            const auto extr = legacy::extract_MAP_str(line).mold;
-            m_lines.emplace_back(extr.has_value() ? id++ : null_id, std::move(line));
+    static void append(std::vector<lineT>& lines, std::vector<legacy::compressT>& rules, std::istream& is) {
+        std::string text;
+        while (std::getline(is, text)) {
+            const auto extr = legacy::extract_MAP_str(text).mold;
+            lineT& line = lines.emplace_back(std::move(text));
             if (extr.has_value()) {
-                m_rules.push_back(legacy::compress(*extr));
-                // TODO: (how&) whether to support more fine-grained (in-line) rule-location?
-                // (only the first pack in each line is being recognized...
+                rules.push_back(legacy::compress(*extr));
+                line.id = rules.size() - 1;
             }
         }
+    }
 
-        assert(id == m_rules.size());
+    fileT(std::filesystem::path path) : m_path(std::move(path)) {
+        std::ifstream ifs(m_path);
+        append(m_lines, m_rules, ifs);
     }
 
     // TODO: how to combine with file-nav (into a single window)?
@@ -296,7 +300,7 @@ struct fileT {
                                            wrap ? ImGuiWindowFlags_None : ImGuiWindowFlags_HorizontalScrollbar)) {
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
             // TODO: refine line-no logic (line-no or id-no)?
-            for (int l = 1; const auto& [id, text] : m_lines) {
+            for (int l = 1; const auto& [text, id] : m_lines) {
                 ImGui::TextDisabled("%2d ", l++);
                 ImGui::SameLine();
                 if (wrap) {
@@ -304,7 +308,7 @@ struct fileT {
                 } else {
                     imgui_str(text);
                 }
-                if (id != null_id) {
+                if (id.has_value()) {
                     if (id == pointing_at) {
                         const ImVec2 pos_min = ImGui::GetItemRectMin();
                         const ImVec2 pos_max = ImGui::GetItemRectMax();
@@ -318,7 +322,7 @@ struct fileT {
                         const ImVec2 pos_max = ImGui::GetItemRectMax();
                         ImGui::GetWindowDrawList()->AddRectFilled(pos_min, pos_max, IM_COL32(0, 255, 0, 30));
                         if (ImGui::IsItemClicked()) {
-                            pointing_at = id;
+                            pointing_at = *id;
                             hit = true;
                         }
                     }

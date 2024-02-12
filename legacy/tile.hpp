@@ -94,11 +94,8 @@ namespace legacy {
         int height() const { return m_size.height; }
         int area() const { return m_size.width * m_size.height; }
 
-        // TODO: pass by value or const&? (mainly for consistency...)
-        // TODO: rename to all_range?
         rangeT range() const { return {{0, 0}, {.x = m_size.width, .y = m_size.height}}; }
-        // TODO: put `assert` into verify_range directly?
-        bool verify_range(const rangeT& range) const {
+        bool has_range(const rangeT& range) const {
             const auto& [begin, end] = range;
             return 0 <= begin.x && begin.x <= end.x && end.x <= m_size.width && //
                    0 <= begin.y && begin.y <= end.y && end.y <= m_size.height;
@@ -126,7 +123,7 @@ namespace legacy {
 
         // TODO: avoid code duplication...
         void for_each_line(const rangeT& range, auto fn) {
-            assert(verify_range(range));
+            assert(has_range(range));
             const auto& [begin, end] = range;
             for (int y = begin.y; y < end.y; ++y) {
                 bool* ln = line(y);
@@ -139,7 +136,7 @@ namespace legacy {
         }
 
         void for_each_line(const rangeT& range, auto fn) const {
-            assert(verify_range(range));
+            assert(has_range(range));
             const auto& [begin, end] = range;
             for (int y = begin.y; y < end.y; ++y) {
                 const bool* ln = line(y);
@@ -207,7 +204,6 @@ namespace legacy {
             }
         }
 
-        // TODO: refine...
         friend bool operator==(const tileT& l, const tileT& r) {
             if (l.m_size != r.m_size) {
                 return false;
@@ -225,16 +221,15 @@ namespace legacy {
 
 #ifdef ENABLE_TESTS
     namespace _tests {
-        // TODO: enhance this test?
         inline const testT test_tileT = [] {
             const tileT::sizeT size{1, 1};
+
             tileT t_q(size), t_w(size), t_e(size);
             tileT t_a(size), t_s(size), t_d(size);
             tileT t_z(size), t_x(size), t_c(size);
-
             tileT dest(size);
 
-            const ruleT gol = game_of_life();
+            const ruleT rule = make_rule([](codeT) { return testT::rand() & 1; });
             for_each_code(code) {
                 const auto [q, w, e, a, s, d, z, x, c] = decode(code);
                 t_q.line(0)[0] = q, t_w.line(0)[0] = w, t_e.line(0)[0] = e;
@@ -242,19 +237,19 @@ namespace legacy {
                 t_z.line(0)[0] = z, t_x.line(0)[0] = x, t_c.line(0)[0] = c;
 
                 t_s.gather(t_q, t_w, t_e, t_a, t_d, t_z, t_x, t_c);
-                t_s.apply(gol, dest);
-                assert(dest.line(0)[0] == gol(code));
+                t_s.apply(rule, dest);
+                assert(dest.line(0)[0] == rule(code));
             }
         };
     }  // namespace _tests
 #endif // ENABLE_TESTS
 
-    // TODO: std::optional<range>/nullopt for full-range?
-    // (or just ptr/nullptr...)
+    using rangeT_opt = std::optional<tileT::rangeT>;
+
     inline namespace tileT_utils {
-        inline int count(const tileT& tile) {
+        inline int count(const tileT& tile, const rangeT_opt& range = {}) {
             int c = 0;
-            tile.for_each_line(tile.range(), [&c](std::span<const bool> line) {
+            tile.for_each_line(range.value_or(tile.range()), [&c](std::span<const bool> line) {
                 for (bool v : line) {
                     c += v;
                 }
@@ -265,11 +260,13 @@ namespace legacy {
         // TODO: is this "copy" or "paste"???
         enum class copyE { Value, Or, Xor };
         template <copyE mode = copyE::Value>
-        inline void copy(tileT& dest, tileT::posT dbegin, const tileT& source, const tileT::rangeT& range) {
+        inline void copy(tileT& dest, tileT::posT dbegin, const tileT& source, const rangeT_opt& srange_ = {}) {
             assert(&source != &dest);
-            assert(dest.verify_range({dbegin, dbegin + range.size()}));
 
-            source.for_each_line(range, [&dest, &dbegin](int y, std::span<const bool> line) {
+            const tileT::rangeT srange = srange_.value_or(source.range());
+            assert(dest.has_range({dbegin, dbegin + srange.size()}));
+
+            source.for_each_line(srange, [&dest, &dbegin](int y, std::span<const bool> line) {
                 bool* d = dest.line(dbegin.y + y) + dbegin.x;
                 for (bool v : line) {
                     if constexpr (mode == copyE::Value) {
@@ -284,31 +281,22 @@ namespace legacy {
             });
         }
 
-        template <copyE mode = copyE::Value>
-        inline void copy(tileT& dest, tileT::posT dbegin, const tileT& source) {
-            copy<mode>(dest, dbegin, source, source.range());
-        }
-
         // TODO: Trying to guarantee that the result is independent of std implementation...
         // Is this worthwhile? Fall back to bernoulli_distribution instead?
-        inline void random_fill(tileT& tile, std::mt19937& rand, double density, const tileT::rangeT& range) {
+        inline void random_fill(tileT& tile, std::mt19937& rand, double density, const rangeT_opt& range = {}) {
             const uint32_t c = std::mt19937::max() * std::clamp(density, 0.0, 1.0);
-            tile.for_each_line(range, [&](std::span<bool> line) { //
+            tile.for_each_line(range.value_or(tile.range()), [&](std::span<bool> line) { //
                 std::ranges::generate(line, [&] { return rand() < c; });
             });
         }
 
-        inline void random_fill(tileT& tile, std::mt19937& rand, double density) {
-            random_fill(tile, rand, density, tile.range());
-        }
-
-        inline void clear_inside(tileT& tile, const tileT::rangeT& range, bool v) {
+        inline void clear_inside(tileT& tile, const tileT::rangeT& range /* Required */, bool v = 0) {
             tile.for_each_line(range, [v](std::span<bool> line) { std::ranges::fill(line, v); });
         }
 
         // TODO: mixture of tile.range() and range arg looks confusing... rename.
-        inline void clear_outside(tileT& tile, const tileT::rangeT& range, bool v) {
-            assert(tile.verify_range(range));
+        inline void clear_outside(tileT& tile, const tileT::rangeT& range /* Required */, bool v = 0) {
+            assert(tile.has_range(range));
             tile.for_each_line(tile.range(), [&](int y, std::span<bool> line) {
                 if (y < range.begin.y || y >= range.end.y) {
                     std::ranges::fill(line, v);
@@ -339,15 +327,12 @@ namespace legacy {
 #endif
     } // namespace tileT_utils
 
-    // TODO: As to pattern modification:
-    // clipboard-based copy/paste is wasteful... enable in-memory mode (tileT-based)...
-
     // https://conwaylife.com/wiki/Run_Length_Encoded
-    inline std::string to_RLE_str(const tileT& tile, const tileT::rangeT& range) {
+    inline std::string to_RLE_str(const tileT& tile, const rangeT_opt& range = {}) {
         // (wontfix) consecutive '$'s are not combined.
         std::string str;
         int last_nl = 0;
-        tile.for_each_line(range, [&str, &last_nl](int y, std::span<const bool> line) {
+        tile.for_each_line(range.value_or(tile.range()), [&str, &last_nl](int y, std::span<const bool> line) {
             if (y != 0) {
                 str += '$';
             }
@@ -380,17 +365,10 @@ namespace legacy {
         return str;
     }
 
-    inline std::string to_RLE_str(const tileT& tile) { //
-        return to_RLE_str(tile, tile.range());
-    }
-
-    inline std::string to_RLE_str(const ruleT& rule, const tileT& tile, const tileT::rangeT& range) {
+    inline std::string to_RLE_str(const ruleT& rule, const tileT& tile, const rangeT_opt& range_ = {}) {
+        const tileT::rangeT range = range_.value_or(tile.range());
         return std::format("x = {}, y = {}, rule = {}\n{}!", range.width(), range.height(), to_MAP_str(rule),
                            to_RLE_str(tile, range));
-    }
-
-    inline std::string to_RLE_str(const ruleT& rule, const tileT& tile) { //
-        return to_RLE_str(rule, tile, tile.range());
     }
 
     // TODO: whether to skip lines leading with '#'?

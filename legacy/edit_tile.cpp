@@ -484,7 +484,7 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
                 ImGui::SetClipboardText(legacy::to_RLE_str(ctrl.rule, runner.tile(), range).c_str());
             }
             if (imgui_keypressed(ImGuiKey_Backspace, false) || imgui_keypressed(ImGuiKey_X, false)) {
-                legacy::clear_inside(runner.tile(), range, 0);
+                legacy::clear_inside(runner.tile(), range);
             }
             if (imgui_keypressed(ImGuiKey_Equal, false)) {
                 // TODO: specify density etc...
@@ -492,7 +492,7 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
             }
             // TODO: redesign keyboard ctrl...
             if (imgui_keypressed(ImGuiKey_0, false)) {
-                legacy::clear_outside(runner.tile(), range, 0);
+                legacy::clear_outside(runner.tile(), range);
             }
 
             if (imgui_keypressed(ImGuiKey_P, false)) {
