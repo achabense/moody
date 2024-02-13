@@ -451,7 +451,7 @@ namespace legacy {
 
     // TODO: count_min denotes free groups now; whether to switch to total groups (at least in the gui part)?
     inline ruleT randomize(const subsetT& subset, const moldT& mold, std::mt19937& rand, int count_min,
-                           int count_max /* not used, subject to future extension */) {
+                           [[maybe_unused]] int count_max /* not used, subject to future extension */) {
         assert(count_max == count_min);
         return redispatch(subset, mold, [&rand, count_min](bool* begin, bool* end) {
             int c = std::clamp(count_min, 0, int(end - begin));
@@ -566,15 +566,17 @@ namespace legacy {
 namespace legacy {
     // A mapperT defines a rule that maps each codeT to another codeT.
     // Specifically, mapperT{q2=q,w2=w,...} maps any codeT to the same value.
-    struct mapperT {
+    class mapperT {
         enum takeE { v0, v1, q, w, e, a, s, d, z, x, c, nq, nw, ne, na, ns, nd, nz, nx, nc };
         takeE q2, w2, e2;
         takeE a2, s2, d2;
         takeE z2, x2, c2;
 
-        constexpr mapperT(std::string_view str) {
+    public:
+        consteval mapperT(std::string_view str) {
             // TODO: assert format ([01]|!?[qweasdzxc]){9}...
-            const char *pos = str.data(), *end = pos + str.size();
+            const char* pos = str.data();
+            [[maybe_unused]] const char* end = pos + str.size();
             auto take2 = [&]() -> takeE {
                 assert(pos != end);
                 bool neg = false;

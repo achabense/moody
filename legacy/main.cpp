@@ -13,7 +13,11 @@
 
 #include "app.hpp"
 
-// TODO (temp) the logics are extracted and modified from imgui's "example_sdl2_sdlrenderer2"...
+[[noreturn]] static void resource_failure() {
+    printf("Error: %s", SDL_GetError());
+    exit(EXIT_FAILURE);
+}
+
 static void init();
 static void clear();
 static bool begin_frame();
@@ -68,8 +72,7 @@ int main(int, char**) {
     {
         char* base_path = SDL_GetBasePath();
         if (!base_path) {
-            printf("Error: %s", SDL_GetError());
-            exit(EXIT_FAILURE);
+            resource_failure();
         }
 
         file_nav_add_special_path(base_path, "Exe path");
@@ -81,7 +84,7 @@ int main(int, char**) {
 
         const auto strdup = [](const std::string& str) {
             char* buf = new char[str.size() + 1];
-            strcpy(buf, str.c_str());
+            std::copy_n(str.c_str(), str.size() + 1, buf);
             return buf;
         };
 
@@ -242,8 +245,7 @@ static void init() {
 
     // Setup SDL
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0) {
-        printf("Error: %s", SDL_GetError());
-        exit(EXIT_FAILURE);
+        resource_failure();
     }
 
     // IME: "Input Method Editor"
@@ -256,14 +258,12 @@ static void init() {
     const SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     window = SDL_CreateWindow("Rule editor", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
     if (!window) {
-        printf("Error: %s", SDL_GetError());
-        exit(EXIT_FAILURE);
+        resource_failure();
     }
 
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
     if (!renderer) {
-        printf("Error: %s", SDL_GetError());
-        exit(EXIT_FAILURE);
+        resource_failure();
     }
 
     // Setup Dear ImGui context
@@ -330,8 +330,7 @@ static SDL_Texture* create_texture(SDL_PixelFormatEnum format, SDL_TextureAccess
 
     SDL_Texture* texture = SDL_CreateTexture(renderer, format, access, w, h);
     if (!texture) {
-        printf("Error: %s", SDL_GetError());
-        exit(EXIT_FAILURE);
+        resource_failure();
     }
     return texture;
 }
@@ -359,8 +358,7 @@ ImTextureID tile_image::update(const legacy::tileT& tile) {
     // TODO: when will pitch != m_w * sizeof(Uint32)?
     const bool succ = SDL_LockTexture(cast(m_texture), nullptr, &pixels, &pitch) == 0;
     if (!succ) {
-        printf("Error: %s", SDL_GetError());
-        exit(EXIT_FAILURE);
+        resource_failure();
     }
 
     tile.for_each_line(tile.range(), [&](int y, std::span<const bool> line) {
@@ -387,8 +385,8 @@ code_image::code_image() {
     // Uint32 pixels[512][3][3]; // "Function uses XXX bytes of stack"
     std::unique_ptr<Uint32[][3][3]> pixels(new Uint32[512][3][3]);
     for_each_code(code) {
-        const auto [q, w, e, a, s, d, z, x, c] = legacy::decode(code);
-        const bool fill[3][3] = {{q, w, e}, {a, s, d}, {z, x, c}};
+        const legacy::envT env = legacy::decode(code);
+        const bool fill[3][3] = {{env.q, env.w, env.e}, {env.a, env.s, env.d}, {env.z, env.x, env.c}};
         for (int y = 0; y < 3; ++y) {
             for (int x = 0; x < 3; ++x) {
                 pixels[code][y][x] = fill[y][x] ? IM_COL32_WHITE : IM_COL32_BLACK;

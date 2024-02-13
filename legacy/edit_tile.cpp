@@ -136,7 +136,6 @@ struct ctrlT {
 
         if (extra != 0) {
             runner.run(rule, extra);
-            extra = 0;
         }
         if (!pause && !pause2) {
             if (ImGui::GetFrameCount() % (gap_frame + 1) == 0) {
@@ -416,11 +415,11 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
                         if (maxy > tile_size.height) {
                             miny = tile_size.height - 40, maxy = tile_size.height;
                         }
-                        assert(maxx - minx == 40 && maxy - miny == 40);
 
                         const int w = maxx - minx, h = maxy - miny;
+                        assert(w == 40 && h == 40);
                         imgui_str("Zoom:4"); // TODO: (temp)
-                        ImGui::Image(img.texture(), ImVec2(40 * 4, 40 * 4),
+                        ImGui::Image(img.texture(), ImVec2(w * 4, h * 4),
                                      {(float)minx / tile_size.width, (float)miny / tile_size.height},
                                      {(float)maxx / tile_size.width, (float)maxy / tile_size.height});
                     }

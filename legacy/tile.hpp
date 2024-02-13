@@ -370,7 +370,7 @@ namespace legacy {
             bool v = 0;
             auto flush = [&] {
                 if (c != 0) {
-                    if (str.size() > last_nl + 60) {
+                    if (std::ssize(str) > last_nl + 60) {
                         str += '\n';
                         last_nl = str.size();
                     }

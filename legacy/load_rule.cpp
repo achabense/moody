@@ -12,12 +12,22 @@
 // - It turns out that there are still a lot of messy encoding problems even if "/utf-8" is specified.
 //   (For example, how is `exception.what()` encoded? What does `path` expects from `string`? And what about
 //   `filesystem.path.string()`?)
+
+// (wontfix) After wasting so much time, I'd rather afford the extra copy than bothering with "more efficient"
+// implementations any more.
+
 static std::string cpp17_u8string(const std::filesystem::path& p) {
-    return reinterpret_cast<const char*>(p.u8string().c_str());
+    const auto u8string = p.u8string();
+    return std::string(u8string.begin(), u8string.end());
 }
 
-static std::filesystem::path cpp17_u8path(const char* path) { //
-    return std::filesystem::u8path(path);
+// As to why not using `filesystem::u8path`:
+// There is no standard way to shut the compiler up for a [[deprecated]] warning.
+// As to making an `std::u8string` first, see:
+// https://stackoverflow.com/questions/57603013/how-to-safely-convert-const-char-to-const-char8-t-in-c20
+// In short, in C++20 it's impossible to get `char8_t*` from `char*` without copy and in a well-defined way.
+static std::filesystem::path cpp17_u8path(const std::string_view path) { //
+    return std::filesystem::path(std::u8string(path.begin(), path.end()));
 }
 
 // TODO: recheck...
@@ -65,7 +75,7 @@ class file_nav {
             files.swap(p_files);
 
             expired = clock::now() + 3000ms;
-        } catch (const std::exception& what) {
+        } catch (const std::exception&) {
             // TODO: report error... what encoding?
         }
     }
@@ -75,7 +85,7 @@ class file_nav {
             try {
                 collect(current, dirs, files);
                 expired = clock::now() + 3000ms;
-            } catch (const std::exception& what) {
+            } catch (const std::exception&) {
                 // TODO: report error... what encoding?
                 valid = false;
                 dirs.clear();
@@ -144,7 +154,7 @@ public:
                     const std::filesystem::directory_entry* sel = nullptr;
                     for (const auto& entry : dirs) {
                         // TODO: cache str?
-                        const auto str = cpp17_u8string(entry.path().filename());
+                        const std::string str = cpp17_u8string(entry.path().filename());
                         if (ImGui::Selectable(str.c_str())) {
                             sel = &entry;
                         }
@@ -164,7 +174,7 @@ public:
                 if (auto child = imgui_childwindow("Files")) {
                     bool has = false;
                     for (const auto& entry : files) {
-                        const auto str = cpp17_u8string(entry.path().filename());
+                        const std::string str = cpp17_u8string(entry.path().filename());
                         if (str.find(buf_filter) != str.npos) {
                             has = true;
                             if (ImGui::Selectable(str.c_str())) {
@@ -253,7 +263,6 @@ struct fileT {
     std::optional<legacy::moldT> display(const legacy::moldT& test_sync) {
         static const bool wrap = true; // TODO: (temporarily const)
 
-        std::optional<legacy::ruleT> out;
         bool hit = false; // TODO: also sync on window appearing?
         const int total = m_rules.size();
 

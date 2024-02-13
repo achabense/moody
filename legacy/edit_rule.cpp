@@ -210,7 +210,7 @@ public:
                     ImGui::EndGroup();
 
                     // TODO (temp) experimental and unstable...
-                    for (int i = 9; i < terms_ignore.size(); ++i) {
+                    for (int i = 9; i < std::ssize(terms_ignore); ++i) {
                         ImGui::SameLine();
                         ImGui::BeginGroup();
                         imgui_str(terms_ignore[i].title);
@@ -403,8 +403,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         };
 
         // TODO: should not be here?
-        constexpr auto make_id = [](legacy::codeT::bposE bpos) {
-            return legacy::make_rule([bpos](legacy::codeT c) { return legacy::get(c, bpos); });
+        constexpr auto make_id = [](legacy::codeT::bposE bpos) -> legacy::maskT {
+            return {legacy::make_rule([bpos](legacy::codeT c) { return legacy::get(c, bpos); })};
         };
         static const legacy::maskT mask_ids[]{
             make_id(legacy::codeT::env_q), make_id(legacy::codeT::env_w), make_id(legacy::codeT::env_e),
