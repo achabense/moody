@@ -480,6 +480,14 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
             }
         }
         if (const auto range = sel.range(); range.height() > 1 || range.width() > 1) {
+            // TODO: what if the right mouse is still pressed?
+            if (imgui_keypressed(ImGuiKey_S, false)) {
+                const auto [begin, end] = legacy::bounding_box(runner.tile(), range);
+                if (begin != end) {
+                    sel.select_0 = begin;
+                    sel.select_1 = {.x = end.x - 1, .y = end.y - 1};
+                }
+            }
             if (imgui_keypressed(ImGuiKey_C, false) || imgui_keypressed(ImGuiKey_X, false)) {
                 ImGui::SetClipboardText(legacy::to_RLE_str(ctrl.rule, runner.tile(), range).c_str());
             }

@@ -26,6 +26,7 @@ namespace legacy {
             return {.x = pos.x + size.width, .y = pos.y + size.height};
         }
 
+        // TODO: whether to consider ranges like {[0,0],[0,100]} to be valid empty range?
         struct rangeT {
             posT begin, end; // [)
             int width() const {
@@ -307,9 +308,37 @@ namespace legacy {
             });
         }
 
-#if 0
-        tileT::rangeT shrink(const tileT& tile, const tileT::rangeT& range, bool v);
+        inline tileT::rangeT bounding_box(const tileT& tile, const tileT::rangeT& range /* Required */, bool v = 0) {
+            // About the usage of std::string:
+            // 1. I hate std::vector<bool>.
+            // 2. There is no std::find_last in C++20. (https://en.cppreference.com/w/cpp/algorithm/ranges/find_last)
+            std::string has_nv_x(range.width(), false);
+            std::string has_nv_y(range.height(), false);
 
+            tile.for_each_line(range, [&](int y, std::span<const bool> line) {
+                for (int x = 0; const bool b : line) {
+                    if (b != v) {
+                        has_nv_x[x] = true;
+                        has_nv_y[y] = true;
+                    }
+                    ++x;
+                }
+            });
+
+            const auto first_nv_x = has_nv_x.find_first_of(true);
+            const auto npos = std::string::npos;
+            if (first_nv_x != npos) {
+                const auto first_nv_y = has_nv_y.find_first_of(true);
+                const auto last_nv_x = has_nv_x.find_last_of(true);
+                const auto last_nv_y = has_nv_y.find_last_of(true);
+                assert(first_nv_y != npos && last_nv_x != npos && last_nv_y != npos);
+                return {.begin{.x = int(range.begin.x + first_nv_x), .y = int(range.begin.y + first_nv_y)},
+                        .end{.x = int(range.begin.x + last_nv_x + 1), .y = int(range.begin.y + last_nv_y + 1)}};
+            } else {
+                return {};
+            }
+        }
+#if 0
         inline int count_diff(const tileT& l, const tileT& r);
 
         // TODO: is the name meaningful?
