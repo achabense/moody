@@ -1,3 +1,6 @@
+// For reference see "example_sdl2_sdlrenderer2/main.cpp":
+// https://github.com/ocornut/imgui/blob/master/examples/example_sdl2_sdlrenderer2/main.cpp
+
 // Unfortunately, SDL2-renderer backend doesn't support docking features...
 // https://github.com/ocornut/imgui/issues/5835
 
@@ -16,14 +19,20 @@
 static SDL_Window* window = nullptr;
 static SDL_Renderer* renderer = nullptr;
 
-static SDL_Texture* create_texture(SDL_PixelFormatEnum format, SDL_TextureAccess access, int w, int h) {
+static SDL_Texture* create_texture(SDL_TextureAccess access, int w, int h) {
     assert(window && renderer);
 
-    SDL_Texture* texture = SDL_CreateTexture(renderer, format, access, w, h);
+    // Using the same pixel format as the one in "imgui_impl_sdlrenderer2.cpp".
+    SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888, access, w, h);
     if (!texture) {
         resource_failure();
     }
     return texture;
+}
+
+static Uint32 color_for(bool b) {
+    // Guaranteed to work under SDL_PIXELFORMAT_XXXX8888.
+    return b ? -1 /* White */ : 0 /* Black*/;
 }
 
 ImTextureID tile_image::update(const legacy::tileT& tile) {
@@ -34,23 +43,19 @@ ImTextureID tile_image::update(const legacy::tileT& tile) {
 
         m_w = tile.width();
         m_h = tile.height();
-        // TODO: pixel format might be problematic...
-        // ~ To make IM_COL32 work, what format should be specified?
-        m_texture = create_texture(SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STREAMING, m_w, m_h);
+        m_texture = create_texture(SDL_TEXTUREACCESS_STREAMING, m_w, m_h);
     }
 
     void* pixels = nullptr;
     int pitch = 0;
-    // TODO: when will pitch != m_w * sizeof(Uint32)?
-    const bool succ = SDL_LockTexture(static_cast<SDL_Texture*>(m_texture), nullptr, &pixels, &pitch) == 0;
-    if (!succ) {
+    if (SDL_LockTexture(static_cast<SDL_Texture*>(m_texture), nullptr, &pixels, &pitch) != 0) {
         resource_failure();
     }
 
     tile.for_each_line(tile.range(), [&](int y, std::span<const bool> line) {
         Uint32* p = (Uint32*)((char*)pixels + pitch * y);
         for (bool v : line) {
-            *p++ = v ? IM_COL32_WHITE : IM_COL32_BLACK;
+            *p++ = color_for(v);
         }
     });
 
@@ -67,15 +72,15 @@ tile_image::~tile_image() {
 
 code_image::code_image() {
     const int width = 3, height = 3 * 512;
-    m_texture = create_texture(SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, width, height);
-    // Uint32 pixels[512][3][3]; // "Function uses XXX bytes of stack"
+    m_texture = create_texture(SDL_TEXTUREACCESS_STATIC, width, height);
+    // Using heap allocation to avoid "Function uses XXX bytes of stack" warning.
     std::unique_ptr<Uint32[][3][3]> pixels(new Uint32[512][3][3]);
     for_each_code(code) {
         const legacy::envT env = legacy::decode(code);
         const bool fill[3][3] = {{env.q, env.w, env.e}, {env.a, env.s, env.d}, {env.z, env.x, env.c}};
         for (int y = 0; y < 3; ++y) {
             for (int x = 0; x < 3; ++x) {
-                pixels[code][y][x] = fill[y][x] ? IM_COL32_WHITE : IM_COL32_BLACK;
+                pixels[code][y][x] = color_for(fill[y][x]);
             }
         }
     }
@@ -117,9 +122,21 @@ int main(int, char**) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
 
+    // TODO: Currently the controls of the program are poorly designed, and are especially not taking
+    // navigation mode into consideration...
+    assert(!(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_NavEnableKeyboard));
+    assert(!(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_NavEnableGamepad));
+
+    // Setup Dear ImGui style
+    ImGui::StyleColorsDark();
+
     // Setup Platform/Renderer backends
     ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
     ImGui_ImplSDLRenderer2_Init(renderer);
+
+    // TODO: works but blurry, and how to apply in project?
+    // ImGui::GetIO().Fonts->AddFontFromFileTTF(R"(C:\Windows\Fonts\Deng.ttf)", 13, nullptr,
+    //                                          ImGui::GetIO().Fonts->GetGlyphRangesChineseFull());
 
     {
         char* base_path = SDL_GetBasePath();
@@ -141,23 +158,12 @@ int main(int, char**) {
         };
 
         // Freeze the absolute path of "imgui.ini" and "imgui_log.txt".
-        // (wontfix) These memory leaks are negligible.
+        // (wontfix) These memory leaks are intentional, as in this case I don't want to care about
+        // when to delete them...
         assert(path.ends_with('\\') || path.ends_with('/'));
         ImGui::GetIO().IniFilename = strdup(path + "imgui.ini");
         ImGui::GetIO().LogFilename = strdup(path + "imgui_log.txt");
     }
-
-    // TODO: Currently the controls of the program are poorly designed, and are especially not taking
-    // navigation mode into consideration...
-    assert(!(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_NavEnableKeyboard));
-    assert(!(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_NavEnableGamepad));
-
-    // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
-
-    // TODO: works but blurry, and how to apply in project?
-    // ImGui::GetIO().Fonts->AddFontFromFileTTF(R"(C:\*redacted*\Desktop\Deng.ttf)", 13, nullptr,
-    //                                          ImGui::GetIO().Fonts->GetGlyphRangesChineseFull());
 
     auto begin_frame = [] {
         SDL_Event event;
@@ -182,10 +188,14 @@ int main(int, char**) {
 
     auto end_frame = [] {
         ImGui::Render();
-        // TODO: is this necessary?
-        ImGuiIO& io = ImGui::GetIO();
+        const ImGuiIO& io = ImGui::GetIO();
         SDL_RenderSetScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
-        // SDL_RenderClear(renderer); // TODO: really ignorable? (the app uses a full-screen window)
+
+        // `SDL_RenderClear` seems not necessary, as the program uses full-screen window.
+        // (Kept as it does no harm.)
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderClear(renderer);
+
         ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
         SDL_RenderPresent(renderer);
     };
@@ -199,7 +209,7 @@ int main(int, char**) {
             end_frame();
 
             // Added as an extra assurance for the framerate.
-            // (Normally `SDL_RENDERER_PRESENTVSYNC` is enough to guarantee a moderate framerate.)
+            // (Normally `SDL_RENDERER_PRESENTVSYNC` should be enough to guarantee a moderate framerate.)
             static Uint64 next = 0;
             const Uint64 now = SDL_GetTicks64();
             if (now < next) {
