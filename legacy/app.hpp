@@ -86,6 +86,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
 std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_image& img);
 
 // TODO: better name...
+// TODO: or add back to main.cpp? or directly define in this header?
 void frame(const code_image& icons, tile_image& img);
 
 // TODO: rename...
