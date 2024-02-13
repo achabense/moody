@@ -77,7 +77,6 @@ public:
     }
 };
 
-
 // TODO: this workaround is ugly...
 bool file_nav_add_special_path(const char* u8path, const char* title);
 std::optional<legacy::moldT> load_rule(const legacy::moldT& test_sync);
@@ -86,11 +85,15 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
 
 std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_image& img);
 
+// TODO: better name...
+void frame(const code_image& icons, tile_image& img);
+
 // TODO: rename...
 const int FixedItemWidth = 220;
 
 // TODO: support rollbacking diff rules?
 // TODO: for editing opt, support in-lock and outof-lock mode?
+// TODO: Right-click must either to open a submenu, or to toggle on/off the tooltip.
 
 // TODO: reconsider binding and scrolling logic...
 inline void iter_pair(const char* tag_first, const char* tag_prev, const char* tag_next, const char* tag_last,

@@ -1,8 +1,3 @@
-// TODO: not used in this source file...
-#ifndef IMGUI_DEFINE_MATH_OPERATORS
-#define IMGUI_DEFINE_MATH_OPERATORS
-#endif
-
 // Unfortunately, SDL2-renderer backend doesn't support docking features...
 // https://github.com/ocornut/imgui/issues/5835
 
@@ -22,48 +17,6 @@ static void init();
 static void clear();
 static bool begin_frame();
 static void end_frame();
-
-// TODO: Right-click must either to open a submenu, or to toggle on/off the tooltip.
-
-// Never empty.
-class recorderT {
-    std::vector<legacy::compressT> m_record;
-    int m_pos;
-
-public:
-    recorderT() {
-        m_record.push_back(legacy::compress({legacy::game_of_life()}));
-        m_pos = 0;
-    }
-
-    int size() const { return m_record.size(); }
-
-    // [0, size() - 1]
-    int pos() const { return m_pos; }
-
-    void update(const legacy::moldT& mold) {
-        const legacy::compressT cmpr = legacy::compress(mold);
-        if (cmpr != m_record[m_pos]) {
-            m_record.push_back(cmpr);
-            set_last();
-        }
-    }
-
-    legacy::moldT current() const {
-        assert(m_pos >= 0 && m_pos < size());
-        return legacy::decompress(m_record[m_pos]);
-    }
-
-    void set_next() { set_pos(m_pos + 1); }
-    void set_prev() { set_pos(m_pos - 1); }
-    void set_first() { set_pos(0); }
-    void set_last() { set_pos(size() - 1); }
-
-private:
-    void set_pos(int pos) { //
-        m_pos = std::clamp(pos, 0, size() - 1);
-    }
-};
 
 // The encoding of `argv` cannot be relied upon, see:
 // https://stackoverflow.com/questions/5408730/what-is-the-encoding-of-argv
@@ -107,129 +60,24 @@ int main(int, char**) {
     // ImGui::GetIO().Fonts->AddFontFromFileTTF(R"(C:\*redacted*\Desktop\Deng.ttf)", 13, nullptr,
     //                                          ImGui::GetIO().Fonts->GetGlyphRangesChineseFull());
 
-    recorderT recorder;
+    {
+        code_image icons;
+        tile_image img;
 
-    // TODO: dtors(SDL_DestroyTexture) are being called after clear(SDL_Quit)
-    code_image icons;
-    tile_image img;
+        while (begin_frame()) {
+            frame(icons, img);
+            end_frame();
 
-    while (begin_frame()) {
-        ImGui::ShowDemoWindow(); // TODO: remove (or comment-out) this when all done...
-
-        legacy::moldT current = recorder.current();
-        bool update = false;
-
-        static bool load = true;
-        if (load) {
-            // TODO: this should be controlled by load_rule ...
-            ImGui::SetNextWindowSize({600, 400}, ImGuiCond_FirstUseEver);
-            ImGui::SetNextWindowSizeConstraints(ImVec2(400, 200), ImVec2(FLT_MAX, FLT_MAX));
-            if (auto window = imgui_window("Load rule", &load, ImGuiWindowFlags_NoCollapse)) {
-                if (auto out = load_rule(current)) {
-                    current = *out;
-                    update = true;
-                }
-            }
-        }
-
-        const ImGuiWindowFlags flags =
-            ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus;
-        const ImGuiViewport* viewport = ImGui::GetMainViewport();
-
-        ImGui::SetNextWindowPos(viewport->WorkPos);
-        ImGui::SetNextWindowSize(viewport->WorkSize);
-        if (auto window = imgui_window("Main", flags)) {
-            ImGui::Text("(%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
-
-            // TODO: as `current` may have been changed by static_constraints, `current` may have been out-of-sync with
-            // recorder at this frame... Does this matter?
             {
-                const std::string rule_str = legacy::to_MAP_str(current.rule);
-
-                // TODO: temp...
-                if (ImGui::Button("Copy&lock")) {
-                    ImGui::SetClipboardText(legacy::to_MAP_str(current).c_str());
+                // Added as an extra assurance for the framerate.
+                // (Normally `SDL_RENDERER_PRESENTVSYNC` is enough to guarantee a moderate framerate.)
+                static Uint64 next = 0;
+                const Uint64 now = SDL_GetTicks64();
+                if (now < next) {
+                    SDL_Delay(next - now);
                 }
-                ImGui::SameLine();
-                // TODO: better gui logic for copy... find ways to show feedback
-                if (ImGui::Button("Copy")) {
-                    ImGui::SetClipboardText(rule_str.c_str());
-                }
-                ImGui::SameLine();
-                // TODO: (temp) added back; remove when pasting is supported by load_rule...
-                if (ImGui::Button("Paste")) {
-                    if (const char* str = ImGui::GetClipboardText()) {
-                        if (auto out = legacy::extract_MAP_str(std::string_view(str)).mold) {
-                            current = *out;
-                            update = true;
-                        }
-                    }
-                }
-
-                if (!load) {
-                    ImGui::SameLine();
-                    if (ImGui::Button("Load")) {
-                        load = true;
-                    }
-                }
-
-                imgui_str(rule_str);
-
-                // TODO: +1 is clumsy
-                ImGui::AlignTextToFramePadding();
-                ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1);
-                ImGui::SameLine();
-                iter_pair(
-                    "<|", "prev", "next", "|>", //
-                    [&] { recorder.set_first(); }, [&] { recorder.set_prev(); }, [&] { recorder.set_next(); },
-                    [&] { recorder.set_last(); });
+                next = SDL_GetTicks64() + 10;
             }
-
-            ImGui::Separator();
-
-            if (ImGui::BeginTable("Layout", 2, ImGuiTableFlags_Resizable)) {
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                if (auto child = imgui_childwindow("Rul")) {
-                    if (auto out = edit_rule(current, icons)) {
-                        current = *out;
-                        update = true;
-                    }
-
-                    // TODO: This is used to pair with enter key and is somewhat broken...
-                    // TODO: should enter set_next first?
-                    if (imgui_keypressed(ImGuiKey_Apostrophe, false)) {
-                        recorder.set_prev();
-                    }
-                }
-                ImGui::TableNextColumn();
-                // TODO: it seems this childwindow is not necessary?
-                if (auto child = imgui_childwindow("Til")) {
-                    if (auto out = edit_tile(current.rule, img)) {
-                        current.lock = *out;
-                        update = true;
-                    }
-                }
-                ImGui::EndTable();
-            }
-        }
-
-        if (update) {
-            recorder.update(current);
-        }
-
-        logger::display();
-        end_frame();
-
-        {
-            // Added as an extra assurance for the framerate.
-            // (Normally `SDL_RENDERER_PRESENTVSYNC` is enough to guarantee a moderate framerate.)
-            static Uint64 next = 0;
-            const Uint64 now = SDL_GetTicks64();
-            if (now < next) {
-                SDL_Delay(next - now);
-            }
-            next = SDL_GetTicks64() + 10;
         }
     }
 
