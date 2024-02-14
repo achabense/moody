@@ -9,7 +9,7 @@
 // TODO: explain...
 // #define ENABLE_START_GEN
 
-static void run_torus(legacy::tileT& tile, legacy::tileT& temp, const std::invocable<legacy::codeT> auto& rule) {
+static void run_torus(legacy::tileT& tile, legacy::tileT& temp, const legacy::rule_like auto& rule) {
     assert(&tile != &temp);
 
     tile.gather(tile, tile, tile, tile, tile, tile, tile, tile);
@@ -464,7 +464,6 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
             }
         }
 
-        // TODO: "shrink selection" utility?
         if (imgui_keypressed(ImGuiKey_A, false)) {
             sel.toggle_select_all(tile_size);
         }

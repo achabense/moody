@@ -76,8 +76,8 @@ code_image::code_image() {
     // Using heap allocation to avoid "Function uses XXX bytes of stack" warning.
     std::unique_ptr<Uint32[][3][3]> pixels(new Uint32[512][3][3]);
     for_each_code(code) {
-        const legacy::envT env = legacy::decode(code);
-        const bool fill[3][3] = {{env.q, env.w, env.e}, {env.a, env.s, env.d}, {env.z, env.x, env.c}};
+        const legacy::situT situ = legacy::decode(code);
+        const bool fill[3][3] = {{situ.q, situ.w, situ.e}, {situ.a, situ.s, situ.d}, {situ.z, situ.x, situ.c}};
         for (int y = 0; y < 3; ++y) {
             for (int x = 0; x < 3; ++x) {
                 pixels[code][y][x] = color_for(fill[y][x]);

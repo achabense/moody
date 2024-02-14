@@ -608,8 +608,8 @@ namespace legacy {
         }
 
         constexpr codeT operator()(codeT code) const {
-            const envT env = decode(code);
-            const bool qweasdzxc[9]{env.q, env.w, env.e, env.a, env.s, env.d, env.z, env.x, env.c};
+            const situT situ = decode(code);
+            const bool qweasdzxc[9]{situ.q, situ.w, situ.e, situ.a, situ.s, situ.d, situ.z, situ.x, situ.c};
             const auto take = [&qweasdzxc](takeE t) -> bool {
                 if (t == v0) {
                     return 0;
@@ -817,15 +817,15 @@ namespace legacy {
 
             using enum codeT::bposE;
             assert(!sc.empty());
-            assert(sc.contains(copy_from(env_q)));
-            assert(sc.contains(copy_from(env_w)));
-            assert(sc.contains(copy_from(env_e)));
-            assert(sc.contains(copy_from(env_a)));
-            assert(!sc.contains(copy_from(env_s))); // identity rule doesn't belong to ignore_s.
-            assert(sc.contains(copy_from(env_d)));
-            assert(sc.contains(copy_from(env_z)));
-            assert(sc.contains(copy_from(env_x)));
-            assert(sc.contains(copy_from(env_c)));
+            assert(sc.contains(copy_from(bpos_q)));
+            assert(sc.contains(copy_from(bpos_w)));
+            assert(sc.contains(copy_from(bpos_e)));
+            assert(sc.contains(copy_from(bpos_a)));
+            assert(!sc.contains(copy_from(bpos_s))); // identity rule doesn't belong to ignore_s.
+            assert(sc.contains(copy_from(bpos_d)));
+            assert(sc.contains(copy_from(bpos_z)));
+            assert(sc.contains(copy_from(bpos_x)));
+            assert(sc.contains(copy_from(bpos_c)));
         };
     }  // namespace _tests
 #endif // ENABLE_TESTS

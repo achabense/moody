@@ -334,9 +334,7 @@ static std::optional<legacy::moldT> static_constraints() {
                 }
 
                 for_each_code(code) {
-                    // TODO: (temp) Eh, took a while to find the [...,x,...] error...
-                    // auto [q, w, e, a, s, d, z, X, c] = decode(code);
-                    legacy::envT env = decode(code);
+                    legacy::situT situ = legacy::decode(code);
                     auto imbue = [](bool& b, stateE state) {
                         if (state == F || state == F_Cond) {
                             b = 0;
@@ -346,19 +344,19 @@ static std::optional<legacy::moldT> static_constraints() {
                         }
                     };
 
-                    imbue(env.q, board[y - 1][x - 1]);
-                    imbue(env.w, board[y - 1][x]);
-                    imbue(env.e, board[y - 1][x + 1]);
+                    imbue(situ.q, board[y - 1][x - 1]);
+                    imbue(situ.w, board[y - 1][x]);
+                    imbue(situ.e, board[y - 1][x + 1]);
 
-                    imbue(env.a, board[y][x - 1]);
-                    imbue(env.s, board[y][x]);
-                    imbue(env.d, board[y][x + 1]);
+                    imbue(situ.a, board[y][x - 1]);
+                    imbue(situ.s, board[y][x]);
+                    imbue(situ.d, board[y][x + 1]);
 
-                    imbue(env.z, board[y + 1][x - 1]);
-                    imbue(env.x, board[y + 1][x]);
-                    imbue(env.c, board[y + 1][x + 1]);
-                    mold.rule[legacy::encode(env)] = board[y][x] == F ? 0 : 1;
-                    mold.lock[legacy::encode(env)] = true;
+                    imbue(situ.z, board[y + 1][x - 1]);
+                    imbue(situ.x, board[y + 1][x]);
+                    imbue(situ.c, board[y + 1][x + 1]);
+                    mold.rule[legacy::encode(situ)] = board[y][x] == F ? 0 : 1;
+                    mold.lock[legacy::encode(situ)] = true;
                 }
             }
         }
@@ -407,9 +405,9 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             return {legacy::make_rule([bpos](legacy::codeT c) { return legacy::get(c, bpos); })};
         };
         static const legacy::maskT mask_ids[]{
-            make_id(legacy::codeT::env_q), make_id(legacy::codeT::env_w), make_id(legacy::codeT::env_e),
-            make_id(legacy::codeT::env_a), make_id(legacy::codeT::env_s), make_id(legacy::codeT::env_d),
-            make_id(legacy::codeT::env_z), make_id(legacy::codeT::env_x), make_id(legacy::codeT::env_c)};
+            make_id(legacy::codeT::bpos_q), make_id(legacy::codeT::bpos_w), make_id(legacy::codeT::bpos_e),
+            make_id(legacy::codeT::bpos_a), make_id(legacy::codeT::bpos_s), make_id(legacy::codeT::bpos_d),
+            make_id(legacy::codeT::bpos_z), make_id(legacy::codeT::bpos_x), make_id(legacy::codeT::bpos_c)};
         static int id_tag = 4; // s...
 
         static legacy::maskT mask_custom{{}};

@@ -181,8 +181,7 @@ namespace legacy {
             std::copy_n(x._line(1) + 1, width, _line(height + 1) + 1);
         }
 
-        // TODO: use is_invocable_r instead?
-        void apply(const std::invocable<codeT> auto& rule, tileT& dest) const {
+        void apply(const rule_like auto& rule, tileT& dest) const {
             // There is supposed to be a call to `gather` before calling `apply`.
             // (Which is untestable and must be guaranteed by the callers.)
 

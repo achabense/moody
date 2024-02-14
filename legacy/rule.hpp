@@ -19,9 +19,6 @@
 // TODO: recheck captures in the form of [&]...
 // TODO: tell apart precondition and impl assertion...
 
-// TODO: bool might not be a good idea...
-// For example, bool is allowed to have padding bits, so memcmp may not apply...
-
 namespace legacy {
 
 #ifdef ENABLE_TESTS
@@ -33,16 +30,20 @@ namespace legacy {
     }  // namespace _tests
 #endif // ENABLE_TESTS
 
-    // The environment around `s`.
+    // TODO: make the state of the cell strongly-typed (and maybe not use bool as underlying type)?
+    // (This will entails a lot of casts but will make the concepts clearer)
+    // enum class cellT : bool {};
+
+    // The state of `s` and its neighbors.
     // (The variables are named after the keys in the qwerty keyboard.)
-    struct envT {
+    struct situT {
         bool q, w, e;
         bool a, s, d;
         bool z, x, c;
     };
 
     // TODO: remove remaining direct use of "512"...
-    // Encode envT to an integer.
+    // `situT` encoded as an integer.
     struct codeT {
         int val;
         constexpr /*implicit*/ operator int() const {
@@ -62,8 +63,7 @@ namespace legacy {
             constexpr friend bool operator==(const map_to&, const map_to&) = default;
         };
 #
-        // TODO: rename to bpos_*?
-        enum bposE : int { env_q = 0, env_w, env_e, env_a, env_s, env_d, env_z, env_x, env_c };
+        enum bposE : int { bpos_q = 0, bpos_w, bpos_e, bpos_a, bpos_s, bpos_d, bpos_z, bpos_x, bpos_c };
     };
 
     // TODO: whether to apply functional version? void for_each_code(const std::invocable<codeT> auto& fn)
@@ -72,23 +72,23 @@ namespace legacy {
     // (`name` must not be modified within the loop body)
 #define for_each_code(name) for (::legacy::codeT name{.val = 0}; name.val < 512; ++name.val)
 
-    constexpr codeT encode(const envT& env) {
+    constexpr codeT encode(const situT& situ) {
         // ~ bool is implicitly promoted to int.
         // clang-format off
         using enum codeT::bposE;
-        const int code = (env.q << env_q) | (env.w << env_w) | (env.e << env_e) |
-                         (env.a << env_a) | (env.s << env_s) | (env.d << env_d) |
-                         (env.z << env_z) | (env.x << env_x) | (env.c << env_c);
+        const int code = (situ.q << bpos_q) | (situ.w << bpos_w) | (situ.e << bpos_e) |
+                         (situ.a << bpos_a) | (situ.s << bpos_s) | (situ.d << bpos_d) |
+                         (situ.z << bpos_z) | (situ.x << bpos_x) | (situ.c << bpos_c);
         // clang-format on
         assert(code >= 0 && code < 512);
         return codeT{code};
     }
 
-    constexpr envT decode(codeT code) {
+    constexpr situT decode(codeT code) {
         using enum codeT::bposE;
-        const bool q = (code >> env_q) & 1, w = (code >> env_w) & 1, e = (code >> env_e) & 1;
-        const bool a = (code >> env_a) & 1, s = (code >> env_s) & 1, d = (code >> env_d) & 1;
-        const bool z = (code >> env_z) & 1, x = (code >> env_x) & 1, c = (code >> env_c) & 1;
+        const bool q = (code >> bpos_q) & 1, w = (code >> bpos_w) & 1, e = (code >> bpos_e) & 1;
+        const bool a = (code >> bpos_a) & 1, s = (code >> bpos_s) & 1, d = (code >> bpos_d) & 1;
+        const bool z = (code >> bpos_z) & 1, x = (code >> bpos_x) & 1, c = (code >> bpos_c) & 1;
         return {q, w, e, a, s, d, z, x, c};
     }
 
@@ -97,7 +97,7 @@ namespace legacy {
     }
 
     constexpr bool get_s(codeT code) { //
-        return (code >> codeT::env_s) & 1;
+        return (code >> codeT::bpos_s) & 1;
     }
 
 #ifdef ENABLE_TESTS
@@ -108,7 +108,7 @@ namespace legacy {
     }  // namespace _tests
 #endif // ENABLE_TESTS
 
-    // Map codeT to the value `s` become at next generation.
+    // Map `codeT` to the value `s` become at next generation.
     class ruleT {
         codeT::map_to<bool> m_map{};
 
@@ -121,6 +121,11 @@ namespace legacy {
         constexpr friend bool operator==(const ruleT&, const ruleT&) = default;
     };
 
+    template <class T>
+    concept rule_like = std::is_invocable_r_v<bool, T, codeT>;
+
+    static_assert(rule_like<ruleT>);
+
     // TODO: rename...
     // TODO: Document that this is not the only situation that flicking effect can occur...
     inline bool will_flick(const ruleT& rule) {
@@ -129,7 +134,7 @@ namespace legacy {
         return rule[all_0] == 1 && rule[all_1] == 0;
     }
 
-    inline constexpr ruleT make_rule(const auto& fn) {
+    inline constexpr ruleT make_rule(const rule_like auto& fn) {
         ruleT rule{};
         for_each_code(code) { rule[code] = fn(code); }
         return rule;
@@ -161,7 +166,6 @@ namespace legacy {
     };
 
     // TODO: rename...
-    // TODO: add test...
     struct compressT {
         std::array<uint8_t, 64> bits_rule{}, bits_lock{}; // as bitset.
 
@@ -336,7 +340,6 @@ namespace legacy {
     }
 
 #ifdef ENABLE_TESTS
-    // TODO: extend test coverage to affixed/with-lock cases etc...
     namespace _tests {
         // https://golly.sourceforge.io/Help/Algorithms/QuickLife.html
         // > So, Conway's Life (B3/S23) encoded as a MAP rule is:
