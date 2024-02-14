@@ -559,7 +559,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             if (legacy::compatible(subset, mold)) {
                 return_rule(legacy::approximate(subset, mold));
             } else {
-                logger::add_msg(300ms, "Incompatible ... TODO"); // TODO refine...
+                messenger::add_msg("Incompatible ..."); // TODO refine...
             }
         }
         ImGui::SameLine();

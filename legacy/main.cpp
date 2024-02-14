@@ -35,7 +35,7 @@ static Uint32 color_for(bool b) {
     return b ? -1 /* White */ : 0 /* Black*/;
 }
 
-ImTextureID tile_image::update(const legacy::tileT& tile) {
+void tile_image::update(const legacy::tileT& tile) {
     if (!m_texture || m_w != tile.width() || m_h != tile.height()) {
         if (m_texture) {
             SDL_DestroyTexture(static_cast<SDL_Texture*>(m_texture));
@@ -60,8 +60,6 @@ ImTextureID tile_image::update(const legacy::tileT& tile) {
     });
 
     SDL_UnlockTexture(static_cast<SDL_Texture*>(m_texture));
-
-    return m_texture;
 }
 
 tile_image::~tile_image() {

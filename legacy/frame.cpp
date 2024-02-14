@@ -35,15 +35,14 @@ public:
     void set_last() { set_pos(size() - 1); }
 
 private:
-    void set_pos(int pos) { //
-        m_pos = std::clamp(pos, 0, size() - 1);
-    }
+    void set_pos(int pos) { m_pos = std::clamp(pos, 0, size() - 1); }
 };
 
 void frame(const code_image& icons, tile_image& img) {
     static recorderT recorder;
 
     ImGui::ShowDemoWindow(); // TODO: remove (or comment-out) this when all done...
+    messenger::display();
 
     legacy::moldT current = recorder.current();
     bool update = false;
@@ -146,6 +145,4 @@ void frame(const code_image& icons, tile_image& img) {
     if (update) {
         recorder.update(current);
     }
-
-    logger::display();
 }

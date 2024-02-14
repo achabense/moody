@@ -339,7 +339,9 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
         drawlist->AddRectFilled(canvas_pos, canvas_pos + canvas_size, IM_COL32(20, 20, 20, 255));
 
         if (!paste) {
-            drawlist->AddImage(img.update(runner.tile()), img_pos, img_pos + img_size);
+            img.update(runner.tile());
+
+            drawlist->AddImage(img.texture(), img_pos, img_pos + img_size);
         } else {
             // TODO: displays poorly with miniwindow...
 
@@ -352,11 +354,10 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
             legacy::tileT temp(paste->size()); // TODO: wasteful...
             legacy::copy(temp, {0, 0}, runner.tile(), range);
             legacy::copy<legacy::copyE::Or>(runner.tile(), paste_beg, *paste);
-
-            drawlist->AddImage(img.update(runner.tile()), img_pos, img_pos + img_size);
-
+            img.update(runner.tile());
             legacy::copy(runner.tile(), paste_beg, temp);
 
+            drawlist->AddImage(img.texture(), img_pos, img_pos + img_size);
             const ImVec2 paste_min = img_pos + ImVec2(range.begin.x, range.begin.y) * img_zoom;
             const ImVec2 paste_max = img_pos + ImVec2(range.end.x, range.end.y) * img_zoom;
             drawlist->AddRectFilled(paste_min, paste_max, IM_COL32(255, 0, 0, 60));
@@ -473,7 +474,7 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
                     // TODO: or ask whether to resize runner.tile?
                     paste.emplace(legacy::from_RLE_str(text, tile_size));
                 } catch (const std::exception& err) {
-                    logger::add_msg(2500ms, "{}", err.what());
+                    messenger::add_msg("{}", err.what());
                 }
             }
         }

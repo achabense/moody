@@ -6,14 +6,11 @@
 #include "rule.hpp"
 #include "tile.hpp"
 
-using namespace std::chrono_literals;
-
-// Not necessary?
 #if 0
-// TODO: it seems explicit u8 encoding guarantee is not strictly needed in this project?
-// - Assert that ordinary string literals are encoded with utf-8.
-// - u8"..." is not used in this project, as it becomes `char8_t[]` after C++20 (which is not usable).
-// - TODO: document ways to pass this check (/utf-8 etc; different compilers)...
+// Enforce that ordinary string literals are encoded with utf-8.
+// This requires certain compiler flags to be set (e.g. `/utf-8` in MSVC).
+// Currently not necessary, as the program is not using non-ascii characters.
+// (u8"..." is not usable in this project, as it becomes `char8_t[]` since C++20.)
 inline void assert_utf8_encoding() {
     constexpr auto a = std::to_array("中文");
     constexpr auto b = std::to_array(u8"中文");
@@ -23,6 +20,9 @@ inline void assert_utf8_encoding() {
     }));
 }
 #endif
+
+using std::chrono_literals::operator""ms;
+using clockT = std::chrono::steady_clock;
 
 inline std::mt19937& global_mt19937() {
     static std::mt19937 rand(time(0));
@@ -42,7 +42,7 @@ public:
     tile_image() : m_w{}, m_h{}, m_texture{nullptr} {}
 
     ~tile_image();
-    ImTextureID update(const legacy::tileT& tile);
+    void update(const legacy::tileT& tile);
 
     ImTextureID texture() const { return m_texture; }
 };
@@ -140,43 +140,36 @@ inline void iter_pair(const char* tag_first, const char* tag_prev, const char* t
     }
 };
 
-class logger {
-    // TODO: refine...
-    struct temp_str {
-        using clock = std::chrono::steady_clock;
-        std::string str;
-        clock::time_point deadline;
-
-        temp_str(std::string&& str, std::chrono::milliseconds ms) : str(std::move(str)), deadline(clock::now() + ms) {}
-
-        // TODO: better be expired(now=clock::now) return now>=deadline;
-        bool expired() const { return clock::now() >= deadline; }
-    };
-
-    static inline std::vector<temp_str> m_tempstrs{};
+// TODO: better name...
+class messenger {
+    inline static std::vector<std::string> m_strs{};
 
 public:
-    logger() = delete;
+    messenger() = delete;
 
-    // TODO: replace XXXms with variables... (or enums...)
     template <class... U>
-    static void add_msg(std::chrono::milliseconds ms, std::format_string<const U&...> fmt, const U&... args) noexcept {
-        m_tempstrs.emplace_back(std::format(fmt, args...), ms);
+    static void add_msg(std::format_string<const U&...> fmt, const U&... args) noexcept {
+        m_strs.emplace_back(std::format(fmt, args...));
     }
 
-    // TODO: this might combine with itemtooltip...
     static void display() {
-        if (!m_tempstrs.empty()) {
-            ImGui::BeginTooltip();
-            auto pos = m_tempstrs.begin();
-            for (auto& temp : m_tempstrs) {
-                imgui_str(temp.str);
-                if (!temp.expired()) {
-                    *pos++ = std::move(temp);
+        static bool opened = false;
+
+        if (!opened && !m_strs.empty()) {
+            ImGui::OpenPopup("Message");
+            opened = true;
+        }
+
+        if (opened) {
+            if (ImGui::BeginPopup("Message")) {
+                for (const std::string& str : m_strs) {
+                    imgui_str(str);
                 }
+                ImGui::EndPopup();
+            } else {
+                m_strs.clear();
+                opened = false;
             }
-            m_tempstrs.erase(pos, m_tempstrs.end());
-            ImGui::EndTooltip();
         }
     }
 };

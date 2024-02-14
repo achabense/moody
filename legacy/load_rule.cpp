@@ -35,7 +35,6 @@ static std::filesystem::path cpp17_u8path(const std::string_view path) { //
 class file_nav {
     using path = std::filesystem::path;
     using entries = std::vector<std::filesystem::directory_entry>;
-    using clock = std::chrono::steady_clock;
 
     char buf_path[200]{};
     char buf_filter[20]{".txt"};
@@ -45,7 +44,7 @@ class file_nav {
     path current;       // Canonical path.
     entries dirs, files;
 
-    clock::time_point expired = {}; // TODO: better name...
+    clockT::time_point expired = {}; // TODO: better name...
 
     static void collect(const path& p, entries& dirs, entries& files) {
         dirs.clear();
@@ -74,17 +73,17 @@ class file_nav {
             dirs.swap(p_dirs);
             files.swap(p_files);
 
-            expired = clock::now() + 3000ms;
+            expired = clockT::now() + 3000ms;
         } catch (const std::exception&) {
             // TODO: report error... what encoding?
         }
     }
 
     void refresh_if_valid() {
-        if (valid && clock::now() > expired) {
+        if (valid && clockT::now() > expired) {
             try {
                 collect(current, dirs, files);
-                expired = clock::now() + 3000ms;
+                expired = clockT::now() + 3000ms;
             } catch (const std::exception&) {
                 // TODO: report error... what encoding?
                 valid = false;
@@ -215,7 +214,7 @@ inline std::vector<char> load_binary(const std::filesystem::path& path, int max_
         }
     }
     // TODO: refine msg?
-    logger::add_msg(300ms, "Cannot load");
+    messenger::add_msg("Cannot load");
     return {};
 }
 #endif
@@ -374,7 +373,7 @@ std::optional<legacy::moldT> load_rule(const legacy::moldT& test_sync) {
             file.emplace(*sel);
             if (file->m_rules.empty()) {
                 file.reset();
-                logger::add_msg(1000ms, "No rules"); // TODO: better msg...
+                messenger::add_msg("No rules"); // TODO: better msg...
             }
         }
     }
