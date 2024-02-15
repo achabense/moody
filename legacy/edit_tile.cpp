@@ -5,9 +5,6 @@
 #include "app.hpp"
 #include "tile.hpp"
 
-// TODO: explain...
-// #define ENABLE_START_GEN
-
 static void update(tile_image& img, const legacy::tileT& tile) {
     img.update(tile.width(), tile.height(), [&tile](int y) { return tile.line(y); });
 }
@@ -117,11 +114,6 @@ struct ctrlT {
         return pace;
     }
 
-#ifdef ENABLE_START_GEN
-    static constexpr int start_min = 0, start_max = 200;
-    int start_from = 0;
-#endif // ENABLE_START_GEN
-
     // TODO: redesign?
     static constexpr int gap_min = 0, gap_max = 20;
     int gap_frame = 0;
@@ -130,13 +122,6 @@ struct ctrlT {
     bool pause2 = false; // TODO: explain...
 
     void run(torusT& runner, int extra = 0) const {
-#ifdef ENABLE_START_GEN
-        if (runner.gen() < start_from) {
-            runner.run(rule, start_from - runner.gen());
-            return;
-        }
-#endif // ENABLE_START_GEN
-
         if (extra != 0) {
             runner.run(rule, extra);
         }
@@ -232,10 +217,6 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
 
             // TODO: Gap-frame shall be really timer-based...
             imgui_int_slider("Gap Frame (0~20)", &ctrl.gap_frame, ctrl.gap_min, ctrl.gap_max);
-
-#ifdef ENABLE_START_GEN
-            imgui_int_slider("Start gen (0~200)", &ctrl.start_from, ctrl.start_min, ctrl.start_max);
-#endif // ENABLE_START_GEN
 
             imgui_int_slider("Pace (1~20)", &ctrl.pace, ctrl.pace_min, ctrl.pace_max);
             ImGui::AlignTextToFramePadding();
