@@ -45,8 +45,7 @@ class torusT {
     int m_gen;
 
 public:
-    // About float: there is only ImGui::SliderFloat, so use float for convenience.
-    // TODO: define imgui_sliderdouble in app_imgui.hpp?
+    // Using float (instead of double) as there is only ImGui::SliderFloat.
     struct initT {
         legacy::tileT::sizeT size;
         uint32_t seed;
@@ -189,6 +188,15 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
     bool should_restart = false;
     int extra = 0;
 
+    if (ctrl.rule != rule) {
+        ctrl.rule = rule;
+        should_restart = true;
+        ctrl.pause = false; // TODO: this should be configurable...
+        // ctrl.pace = 1;   // TODO: whether to reset these values?
+        // init.seed = 0;
+        // init.density = 0.5;
+    }
+
     auto edit_ctrl = [&] {
         ImGui::BeginGroup();
         {
@@ -233,7 +241,6 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
                 should_restart = true;
             }
 
-            // TODO: integer(ratio) density?
             if (ImGui::SliderFloat("Init density (0~1)", &init.density, 0.0f, 1.0f, "%.2f", ImGuiSliderFlags_NoInput)) {
                 should_restart = true;
             }
@@ -303,11 +310,11 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
         ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
         imgui_str("Fit with zoom");
         ImGui::SameLine(), imgui_str("="), ImGui::SameLine(); // TODO: About sameline() and ' '...
-        for (int z : {1, 2, 4, 8}) {
+        for (const float r = ImGui::GetFrameHeight(); int z : {1, 2, 4, 8}) {
             if (z != 1) {
                 ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
             }
-            if (ImGui::Button(std::to_string(z).c_str())) {
+            if (ImGui::Button(std::to_string(z).c_str(), {r, r})) {
                 img_zoom = z;
                 fit = true;
             }
@@ -332,23 +339,13 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
             }
         }
 
-        const ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
-        const ImVec2 canvas_size = ImGui::GetContentRegionAvail();
-
-        // TODO: this can be negative wtf... investigate...
-        // TODO: (regression?) some key ctrls are skipped by this...
-        if (canvas_size.x <= 0 || canvas_size.y <= 0) {
-            // TODO: show something when fit/etc are hit?
-            ctrl.pause2 = true;
-            // ImGui::Text("canvas: x=%f y=%f", canvas_size.x,canvas_size.y);
-            return;
-        }
-        // TODO: or like this?
-        // const ImVec2 canvas_size = [] {
-        //     // Values of GetContentRegionAvail() can be negative...
-        //     ImVec2 size = ImGui::GetContentRegionAvail();
-        //     return ImVec2(std::max(size.x, 50.0f), std::max(size.y, 50.0f));
-        // }();
+        const ImVec2 canvas_size = [] {
+            // Values of GetContentRegionAvail() can be negative...
+            ImVec2 size = ImGui::GetContentRegionAvail();
+            return ImVec2(std::max(size.x, 100.0f), std::max(size.y, 50.0f));
+        }();
+        const ImVec2 canvas_min = ImGui::GetCursorScreenPos();
+        const ImVec2 canvas_max = canvas_min + canvas_size;
 
         // TODO: the constraint is arbitrary; are there more sensible ways to decide size constraint?
         const auto size_clamped = [](int width, int height) {
@@ -402,16 +399,17 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
             img_off.y = floor(img_off.y); // TODO: is flooring correct?
         }
 
-        const ImVec2 img_pos = canvas_pos + img_off;
+        const ImVec2 img_min = canvas_min + img_off;
+        const ImVec2 img_max = img_min + img_size;
 
         ImDrawList* const drawlist = ImGui::GetWindowDrawList();
-        drawlist->PushClipRect(canvas_pos, canvas_pos + canvas_size);
-        drawlist->AddRectFilled(canvas_pos, canvas_pos + canvas_size, IM_COL32(20, 20, 20, 255));
+        drawlist->PushClipRect(canvas_min, canvas_max);
+        drawlist->AddRectFilled(canvas_min, canvas_max, IM_COL32(20, 20, 20, 255));
 
         if (!paste) {
             update(img, runner.tile());
 
-            drawlist->AddImage(img.texture(), img_pos, img_pos + img_size);
+            drawlist->AddImage(img.texture(), img_min, img_max);
         } else {
             // TODO: displays poorly with miniwindow...
 
@@ -427,21 +425,23 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
             update(img, runner.tile());
             legacy::copy(runner.tile(), paste_beg, temp);
 
-            drawlist->AddImage(img.texture(), img_pos, img_pos + img_size);
-            const ImVec2 paste_min = img_pos + ImVec2(range.begin.x, range.begin.y) * img_zoom;
-            const ImVec2 paste_max = img_pos + ImVec2(range.end.x, range.end.y) * img_zoom;
+            drawlist->AddImage(img.texture(), img_min, img_max);
+            const ImVec2 paste_min = img_min + ImVec2(range.begin.x, range.begin.y) * img_zoom;
+            const ImVec2 paste_max = img_min + ImVec2(range.end.x, range.end.y) * img_zoom;
             drawlist->AddRectFilled(paste_min, paste_max, IM_COL32(255, 0, 0, 60));
         }
 
         if (const auto range = sel.range(); range.width() > 1 || range.height() > 1) {
-            const ImVec2 sel_min = img_pos + ImVec2(range.begin.x, range.begin.y) * img_zoom;
-            const ImVec2 sel_max = img_pos + ImVec2(range.end.x, range.end.y) * img_zoom;
+            const ImVec2 sel_min = img_min + ImVec2(range.begin.x, range.begin.y) * img_zoom;
+            const ImVec2 sel_max = img_min + ImVec2(range.end.x, range.end.y) * img_zoom;
             drawlist->AddRectFilled(sel_min, sel_max, IM_COL32(0, 255, 0, 40));
             drawlist->AddRect(sel_min, sel_max, IM_COL32(0, 255, 0, 160));
         }
         drawlist->PopClipRect();
 
         ImGui::InvisibleButton("Canvas", canvas_size);
+        assert(ImGui::GetItemRectMin() == canvas_min && ImGui::GetItemRectMax() == canvas_max);
+
         const bool active = ImGui::IsItemActive();
         ctrl.pause2 = paste || active; // TODO: won't work if |= active... should ctrl.run clear pause2?
         if (ImGui::IsItemHovered()) {
@@ -451,7 +451,7 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
             assert(ImGui::IsMousePosValid());
             // It turned out that, this will work well even if outside of the image...
             const ImVec2 mouse_pos = io.MousePos;
-            const ImVec2 cell_pos_raw = (mouse_pos - img_pos) / img_zoom;
+            const ImVec2 cell_pos_raw = (mouse_pos - img_min) / img_zoom;
             const int celx = floor(cell_pos_raw.x);
             const int cely = floor(cell_pos_raw.y);
 
@@ -529,7 +529,7 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
                 if (imgui_scrollup() && img_zoom != 8) {
                     img_zoom *= 2;
                 }
-                img_off = (mouse_pos - cell_pos_raw * img_zoom) - canvas_pos;
+                img_off = (mouse_pos - cell_pos_raw * img_zoom) - canvas_min;
                 img_off.x = round(img_off.x);
                 img_off.y = round(img_off.y); // TODO: is rounding correct?
             }
@@ -576,7 +576,6 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
                 // TODO: support specifying padding area?
                 legacy::tileT cap(range.size());
                 legacy::copy(cap, {0, 0}, runner.tile(), range);
-                // TODO: should be rule param instead?
                 out = dynamic_constraints(std::move(cap), ctrl.rule);
             }
 
@@ -606,15 +605,6 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
     show_tile();
     ImGui::PopItemWidth();
 
-    // TODO: (temp) this part was outside of begin_frame/end_frame...
-    if (ctrl.rule != rule) {
-        ctrl.rule = rule;
-        should_restart = true;
-        ctrl.pause = false; // TODO: this should be configurable...
-        // ctrl.pace = 1;   // TODO: whether to reset these values?
-        // init.seed = 0;
-        // init.density = 0.5;
-    }
     if (should_restart) {
         runner.restart(init);
     }
