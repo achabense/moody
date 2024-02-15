@@ -199,6 +199,92 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
 
     static selectT sel{};
 
+    // TODO: not robust
+    // ~ runner.restart(...) shall not happen before rendering.
+    bool should_restart = false;
+    int extra = 0;
+
+    auto edit_ctrl = [&] {
+        ImGui::BeginGroup();
+        {
+            ImGui::Checkbox("Pause", &ctrl.pause);
+            ImGui::SameLine();
+            ImGui::BeginDisabled();
+            ImGui::Checkbox("Pause2", &ctrl.pause2);
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+            ImGui::PushButtonRepeat(true);
+            // TODO: visual feedback...
+            if (ImGui::Button("+1")) {
+                extra = 1;
+            }
+            ImGui::SameLine();
+            // TODO: +p is not quite useful if not paused...
+            // TODO: The usage of format looks wasteful...
+            if (ImGui::Button(std::format("+p({})###+p", ctrl.actual_pace()).c_str())) {
+                extra = ctrl.actual_pace();
+            }
+            ImGui::PopButtonRepeat();
+            ImGui::SameLine();
+            if (ImGui::Button("Restart") || imgui_keypressed(ImGuiKey_R, false)) {
+                should_restart = true;
+            }
+
+            // TODO: Gap-frame shall be really timer-based...
+            imgui_int_slider("Gap Frame (0~20)", &ctrl.gap_frame, ctrl.gap_min, ctrl.gap_max);
+
+#ifdef ENABLE_START_GEN
+            imgui_int_slider("Start gen (0~200)", &ctrl.start_from, ctrl.start_min, ctrl.start_max);
+#endif // ENABLE_START_GEN
+
+            imgui_int_slider("Pace (1~20)", &ctrl.pace, ctrl.pace_min, ctrl.pace_max);
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("(Actual pace: %d)", ctrl.actual_pace());
+            ImGui::SameLine();
+            ImGui::Checkbox("anti-flick", &ctrl.anti_flick);
+        }
+        ImGui::EndGroup();
+        ImGui::SameLine();
+        ImGui::BeginGroup();
+        {
+            if (int seed = init.seed; imgui_int_slider("Init seed (0~99)", &seed, 0, 99)) {
+                init.seed = seed;
+                should_restart = true;
+            }
+
+            // TODO: integer(ratio) density?
+            if (ImGui::SliderFloat("Init density (0~1)", &init.density, 0.0f, 1.0f, "%.2f", ImGuiSliderFlags_NoInput)) {
+                should_restart = true;
+            }
+        }
+        ImGui::EndGroup();
+
+        // TODO: redesign keyboard ctrl...
+        if (imgui_keypressed(ImGuiKey_1, true)) {
+            ctrl.gap_frame = std::max(ctrl.gap_min, ctrl.gap_frame - 1);
+        }
+        if (imgui_keypressed(ImGuiKey_2, true)) {
+            ctrl.gap_frame = std::min(ctrl.gap_max, ctrl.gap_frame + 1);
+        }
+        if (imgui_keypressed(ImGuiKey_3, true)) {
+            ctrl.pace = std::max(ctrl.pace_min, ctrl.pace - 1);
+        }
+        if (imgui_keypressed(ImGuiKey_4, true)) {
+            ctrl.pace = std::min(ctrl.pace_max, ctrl.pace + 1);
+        }
+        // TODO: explain... apply to other ctrls?
+        if ((ctrl.pause2 || !ImGui::GetIO().WantCaptureKeyboard) && ImGui::IsKeyPressed(ImGuiKey_Space, false)) {
+            ctrl.pause = !ctrl.pause;
+        }
+        // Run by keystroke turns out to be necessary. (TODO: For example ...)
+        if (imgui_keypressed(ImGuiKey_M, true)) {
+            if (ctrl.pause) {
+                extra = ctrl.actual_pace();
+            }
+            ctrl.pause = true;
+        }
+    };
+
     // TODO: let right+ctrl move selected area?
 
     // TODO: set pattern as init state? what if size is already changed?
@@ -531,92 +617,6 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
                 ImGui::EndPopup();
             }
 #endif
-        }
-    };
-
-    // TODO: not robust
-    // ~ runner.restart(...) shall not happen before rendering.
-    bool should_restart = false;
-    int extra = 0;
-
-    auto edit_ctrl = [&] {
-        ImGui::BeginGroup();
-        {
-            ImGui::Checkbox("Pause", &ctrl.pause);
-            ImGui::SameLine();
-            ImGui::BeginDisabled();
-            ImGui::Checkbox("Pause2", &ctrl.pause2);
-            ImGui::EndDisabled();
-            ImGui::SameLine();
-            ImGui::PushButtonRepeat(true);
-            // TODO: visual feedback...
-            if (ImGui::Button("+1")) {
-                extra = 1;
-            }
-            ImGui::SameLine();
-            // TODO: +p is not quite useful if not paused...
-            // TODO: The usage of format looks wasteful...
-            if (ImGui::Button(std::format("+p({})###+p", ctrl.actual_pace()).c_str())) {
-                extra = ctrl.actual_pace();
-            }
-            ImGui::PopButtonRepeat();
-            ImGui::SameLine();
-            if (ImGui::Button("Restart") || imgui_keypressed(ImGuiKey_R, false)) {
-                should_restart = true;
-            }
-
-            // TODO: Gap-frame shall be really timer-based...
-            imgui_int_slider("Gap Frame (0~20)", &ctrl.gap_frame, ctrl.gap_min, ctrl.gap_max);
-
-#ifdef ENABLE_START_GEN
-            imgui_int_slider("Start gen (0~200)", &ctrl.start_from, ctrl.start_min, ctrl.start_max);
-#endif // ENABLE_START_GEN
-
-            imgui_int_slider("Pace (1~20)", &ctrl.pace, ctrl.pace_min, ctrl.pace_max);
-            ImGui::AlignTextToFramePadding();
-            ImGui::Text("(Actual pace: %d)", ctrl.actual_pace());
-            ImGui::SameLine();
-            ImGui::Checkbox("anti-flick", &ctrl.anti_flick);
-        }
-        ImGui::EndGroup();
-        ImGui::SameLine();
-        ImGui::BeginGroup();
-        {
-            if (int seed = init.seed; imgui_int_slider("Init seed (0~99)", &seed, 0, 99)) {
-                init.seed = seed;
-                should_restart = true;
-            }
-
-            // TODO: integer(ratio) density?
-            if (ImGui::SliderFloat("Init density (0~1)", &init.density, 0.0f, 1.0f, "%.2f", ImGuiSliderFlags_NoInput)) {
-                should_restart = true;
-            }
-        }
-        ImGui::EndGroup();
-
-        // TODO: redesign keyboard ctrl...
-        if (imgui_keypressed(ImGuiKey_1, true)) {
-            ctrl.gap_frame = std::max(ctrl.gap_min, ctrl.gap_frame - 1);
-        }
-        if (imgui_keypressed(ImGuiKey_2, true)) {
-            ctrl.gap_frame = std::min(ctrl.gap_max, ctrl.gap_frame + 1);
-        }
-        if (imgui_keypressed(ImGuiKey_3, true)) {
-            ctrl.pace = std::max(ctrl.pace_min, ctrl.pace - 1);
-        }
-        if (imgui_keypressed(ImGuiKey_4, true)) {
-            ctrl.pace = std::min(ctrl.pace_max, ctrl.pace + 1);
-        }
-        // TODO: explain... apply to other ctrls?
-        if ((ctrl.pause2 || !ImGui::GetIO().WantCaptureKeyboard) && ImGui::IsKeyPressed(ImGuiKey_Space, false)) {
-            ctrl.pause = !ctrl.pause;
-        }
-        // Run by keystroke turns out to be necessary. (TODO: For example ...)
-        if (imgui_keypressed(ImGuiKey_M, true)) {
-            if (ctrl.pause) {
-                extra = ctrl.actual_pace();
-            }
-            ctrl.pause = true;
         }
     };
 
