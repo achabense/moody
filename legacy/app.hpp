@@ -1,10 +1,11 @@
 #pragma once
 
 #include <chrono>
+#include <format>
+#include <functional>
 
 #include "app_imgui.hpp"
 #include "rule.hpp"
-#include "tile.hpp"
 
 #if 0
 // Enforce that ordinary string literals are encoded with utf-8.
@@ -29,8 +30,8 @@ inline std::mt19937& global_mt19937() {
     return rand;
 }
 
-// TODO: redesign (especially as some functions are moved to main.cpp,
-// which makes the rest methods a bit confusing...)
+// TODO: look for better names for tile_image, code_image, edit_tile (and edit_tile.cpp)
+// (especially as "tile.hpp" is now hidden as impl details for "edit_tile.cpp")
 class tile_image {
     int m_w, m_h;
     ImTextureID m_texture;
@@ -42,7 +43,8 @@ public:
     tile_image() : m_w{}, m_h{}, m_texture{nullptr} {}
 
     ~tile_image();
-    void update(const legacy::tileT& tile);
+    // TODO: explain
+    void update(int w, int h, std::function<const bool*(int)> getline);
 
     ImTextureID texture() const { return m_texture; }
 };

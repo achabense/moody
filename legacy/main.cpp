@@ -35,29 +35,30 @@ static Uint32 color_for(bool b) {
     return b ? -1 /* White */ : 0 /* Black*/;
 }
 
-void tile_image::update(const legacy::tileT& tile) {
-    if (!m_texture || m_w != tile.width() || m_h != tile.height()) {
+void tile_image::update(const int w, const int h, std::function<const bool*(int)> getline) {
+    if (!m_texture || m_w != w || m_h != h) {
         if (m_texture) {
             SDL_DestroyTexture(static_cast<SDL_Texture*>(m_texture));
         }
 
-        m_w = tile.width();
-        m_h = tile.height();
+        m_w = w;
+        m_h = h;
         m_texture = create_texture(SDL_TEXTUREACCESS_STREAMING, m_w, m_h);
     }
 
+    assert(m_texture && m_w == w && m_h == h);
     void* pixels = nullptr;
     int pitch = 0;
     if (SDL_LockTexture(static_cast<SDL_Texture*>(m_texture), nullptr, &pixels, &pitch) != 0) {
         resource_failure();
     }
 
-    tile.for_each_line(tile.range(), [&](int y, std::span<const bool> line) {
+    for (int y = 0; y < h; ++y) {
         Uint32* p = (Uint32*)((char*)pixels + pitch * y);
-        for (bool v : line) {
+        for (bool v : std::span(getline(y), w)) {
             *p++ = color_for(v);
         }
-    });
+    }
 
     SDL_UnlockTexture(static_cast<SDL_Texture*>(m_texture));
 }

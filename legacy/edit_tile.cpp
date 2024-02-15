@@ -2,12 +2,15 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #endif
 
-// TODO: is it possible to drop tile_image dependency in app.hpp? (so only edit_tile.cpp need to include tile.hpp)
-
 #include "app.hpp"
+#include "tile.hpp"
 
 // TODO: explain...
 // #define ENABLE_START_GEN
+
+static void update(tile_image& img, const legacy::tileT& tile) {
+    img.update(tile.width(), tile.height(), [&tile](int y) { return tile.line(y); });
+}
 
 static void run_torus(legacy::tileT& tile, legacy::tileT& temp, const legacy::rule_like auto& rule) {
     assert(&tile != &temp);
@@ -339,7 +342,7 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
         drawlist->AddRectFilled(canvas_pos, canvas_pos + canvas_size, IM_COL32(20, 20, 20, 255));
 
         if (!paste) {
-            img.update(runner.tile());
+            update(img, runner.tile());
 
             drawlist->AddImage(img.texture(), img_pos, img_pos + img_size);
         } else {
@@ -354,7 +357,7 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
             legacy::tileT temp(paste->size()); // TODO: wasteful...
             legacy::copy(temp, {0, 0}, runner.tile(), range);
             legacy::copy<legacy::copyE::Or>(runner.tile(), paste_beg, *paste);
-            img.update(runner.tile());
+            update(img, runner.tile());
             legacy::copy(runner.tile(), paste_beg, temp);
 
             drawlist->AddImage(img.texture(), img_pos, img_pos + img_size);
