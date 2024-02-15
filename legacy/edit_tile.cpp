@@ -167,11 +167,16 @@ struct selectT {
 std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_image& img) {
     std::optional<legacy::moldT::lockT> out = std::nullopt;
 
-    // TODO: (temp) these variables become static after moving code in main into this function...
-    // which is not ideal...
+    // TODO: the constraint is arbitrary; are there more sensible ways to decide size constraint?
+    // TODO: the min size should not be so restrictive (64, 64)...
+    const auto size_clamped = [](int width, int height) {
+        return legacy::tileT::sizeT{.width = std::clamp(width, 64, 1200), .height = std::clamp(height, 64, 1200)};
+    };
+
     static torusT::initT init{.size{.width = 500, .height = 400}, .seed = 0, .density = 0.5};
     static torusT runner(init);
     assert(init.size == runner.tile().size());
+    assert(init.size == size_clamped(init.size.width, init.size.height));
 
     static ctrlT ctrl{.rule = rule, .pace = 1, .anti_flick = true, .gap_frame = 0, .pause = false};
 
@@ -197,7 +202,34 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
         // init.density = 0.5;
     }
 
+    static ImVec2 last_known_canvas_size{100, 100}; // TODO: make std::optional?
+
     auto edit_ctrl = [&] {
+        // TODO: redesign keyboard ctrl...
+        if (imgui_keypressed(ImGuiKey_1, true)) {
+            ctrl.gap_frame = std::max(ctrl.gap_min, ctrl.gap_frame - 1);
+        }
+        if (imgui_keypressed(ImGuiKey_2, true)) {
+            ctrl.gap_frame = std::min(ctrl.gap_max, ctrl.gap_frame + 1);
+        }
+        if (imgui_keypressed(ImGuiKey_3, true)) {
+            ctrl.pace = std::max(ctrl.pace_min, ctrl.pace - 1);
+        }
+        if (imgui_keypressed(ImGuiKey_4, true)) {
+            ctrl.pace = std::min(ctrl.pace_max, ctrl.pace + 1);
+        }
+        // TODO: explain... apply to other ctrls?
+        if ((ctrl.pause2 || !ImGui::GetIO().WantCaptureKeyboard) && ImGui::IsKeyPressed(ImGuiKey_Space, false)) {
+            ctrl.pause = !ctrl.pause;
+        }
+        // Run by keystroke turns out to be necessary. (TODO: For example ...)
+        if (imgui_keypressed(ImGuiKey_M, true)) {
+            if (ctrl.pause) {
+                extra = ctrl.actual_pace();
+            }
+            ctrl.pause = true;
+        }
+
         ImGui::BeginGroup();
         {
             ImGui::Checkbox("Pause", &ctrl.pause);
@@ -244,33 +276,68 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
             if (ImGui::SliderFloat("Init density (0~1)", &init.density, 0.0f, 1.0f, "%.2f", ImGuiSliderFlags_NoInput)) {
                 should_restart = true;
             }
+            static char input_width[20]{}, input_height[20]{};
+            {
+                const auto filter = [](ImGuiInputTextCallbackData* data) -> int {
+                    return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
+                };
+                const float s = ImGui::GetStyle().ItemInnerSpacing.x;
+                const float w = (ImGui::CalcItemWidth() - s) / 2;
+                ImGui::SetNextItemWidth(w);
+                ImGui::InputTextWithHint("##Width", "width", input_width, std::size(input_width),
+                                         ImGuiInputTextFlags_CallbackCharFilter, filter);
+                ImGui::SameLine(0, s);
+                ImGui::SetNextItemWidth(w);
+                ImGui::InputTextWithHint("##Height", "height", input_height, std::size(input_height),
+                                         ImGuiInputTextFlags_CallbackCharFilter, filter);
+                ImGui::SameLine(0, s);
+            }
+
+            // TODO: to avoid spanning:
+            // ImGui::Selectable(title.c_str(), false, 0, ImGui::CalcTextSize(title.c_str(), title.c_str() +
+            // title.size(), false)
+            // But `Selectable` does `CalcTextSize` in itself. Are there native ways to do without re-calculation?
+            const std::string title = std::format("Size ({}, {})", runner.tile().width(), runner.tile().height());
+            if (ImGui::Selectable(title.c_str())) {
+                // TODO: support using current screen/tilesize/zoom?
+                int w = 0, h = 0;
+                if (std::from_chars(input_width, std::end(input_width), w).ec == std::errc{} &&
+                    std::from_chars(input_height, std::end(input_height), h).ec == std::errc{}) {
+                    img_off = {0, 0};
+                    img_zoom = 1;
+                    const legacy::tileT::sizeT size = size_clamped(w, h);
+                    if (init.size != size) {
+                        init.size = size;
+                        runner.restart(init); // TODO: about vs setting should_restart...
+                    }
+                }
+                // TODO: what to do else?
+                input_width[0] = '\0';
+                input_height[0] = '\0';
+            }
+
+            ImGui::AlignTextToFramePadding();
+            imgui_str("Fit with zoom");
+            ImGui::SameLine(), imgui_str("="), ImGui::SameLine(); // TODO: About sameline() and ' '...
+            for (const float r = ImGui::GetFrameHeight(); int z : {1, 2, 4, 8}) {
+                if (z != 1) {
+                    ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+                }
+                if (ImGui::Button(std::to_string(z).c_str(), {r, r})) {
+                    img_zoom = z;
+                    img_off = {0, 0};
+
+                    // TODO: explain that `last_known_canvas_size` works well...
+                    const legacy::tileT::sizeT size = size_clamped((int)last_known_canvas_size.x / img_zoom,
+                                                                   (int)last_known_canvas_size.y / img_zoom);
+                    if (init.size != size) {
+                        init.size = size;
+                        runner.restart(init);
+                    }
+                }
+            }
         }
         ImGui::EndGroup();
-
-        // TODO: redesign keyboard ctrl...
-        if (imgui_keypressed(ImGuiKey_1, true)) {
-            ctrl.gap_frame = std::max(ctrl.gap_min, ctrl.gap_frame - 1);
-        }
-        if (imgui_keypressed(ImGuiKey_2, true)) {
-            ctrl.gap_frame = std::min(ctrl.gap_max, ctrl.gap_frame + 1);
-        }
-        if (imgui_keypressed(ImGuiKey_3, true)) {
-            ctrl.pace = std::max(ctrl.pace_min, ctrl.pace - 1);
-        }
-        if (imgui_keypressed(ImGuiKey_4, true)) {
-            ctrl.pace = std::min(ctrl.pace_max, ctrl.pace + 1);
-        }
-        // TODO: explain... apply to other ctrls?
-        if ((ctrl.pause2 || !ImGui::GetIO().WantCaptureKeyboard) && ImGui::IsKeyPressed(ImGuiKey_Space, false)) {
-            ctrl.pause = !ctrl.pause;
-        }
-        // Run by keystroke turns out to be necessary. (TODO: For example ...)
-        if (imgui_keypressed(ImGuiKey_M, true)) {
-            if (ctrl.pause) {
-                extra = ctrl.actual_pace();
-            }
-            ctrl.pause = true;
-        }
     };
 
     // TODO: let right+ctrl move selected area?
@@ -286,50 +353,9 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
     // TODO: "periodical tile" feature is generally not too useful without boundless space, and torus is
     // enough for visual feedback.
     auto show_tile = [&] {
-        // TODO: refine "resize" gui and logic...
-        static char input_width[20]{}, input_height[20]{};
-        {
-            const auto filter = [](ImGuiInputTextCallbackData* data) -> int {
-                return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
-            };
-            const float s = ImGui::GetStyle().ItemInnerSpacing.x;
-            const float w = (ImGui::CalcItemWidth() - s) / 2;
-            ImGui::SetNextItemWidth(w);
-            ImGui::InputTextWithHint("##Width", "width", input_width, std::size(input_width),
-                                     ImGuiInputTextFlags_CallbackCharFilter, filter);
-            ImGui::SameLine(0, s);
-            ImGui::SetNextItemWidth(w);
-            ImGui::InputTextWithHint("##Height", "height", input_height, std::size(input_height),
-                                     ImGuiInputTextFlags_CallbackCharFilter, filter);
-            ImGui::SameLine(0, s);
-        }
-        const bool resize = ImGui::Button("Resize");
-
-        // TODO: refine...
-        bool fit = false;
-        ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
-        imgui_str("Fit with zoom");
-        ImGui::SameLine(), imgui_str("="), ImGui::SameLine(); // TODO: About sameline() and ' '...
-        for (const float r = ImGui::GetFrameHeight(); int z : {1, 2, 4, 8}) {
-            if (z != 1) {
-                ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
-            }
-            if (ImGui::Button(std::to_string(z).c_str(), {r, r})) {
-                img_zoom = z;
-                fit = true;
-            }
-        }
-
-        // TODO: move elsewhere in the gui?
-        ImGui::Text("Width:%d,Height:%d,Gen:%d,Density:%.4f", runner.tile().width(), runner.tile().height(),
-                    runner.gen(), float(legacy::count(runner.tile())) / runner.tile().area());
-        // TODO: canvas size, tile size, selected size, paste size...
-
         const bool corner = ImGui::Button("Corner"); // TODO: move elsewhere...
         ImGui::SameLine();
         const bool center = ImGui::Button("Center");
-        ImGui::SameLine();
-        ImGui::Text("Zoom:%d", img_zoom);
         // TODO: select all, unselect button...
 
         if (paste) {
@@ -339,6 +365,11 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
             }
         }
 
+        // TODO: move elsewhere in the gui?
+        ImGui::Text("Width:%d,Height:%d,Gen:%d,Density:%.4f", runner.tile().width(), runner.tile().height(),
+                    runner.gen(), float(legacy::count(runner.tile())) / runner.tile().area());
+        // TODO: canvas size, tile size, selected size, paste size...
+
         const ImVec2 canvas_size = [] {
             // Values of GetContentRegionAvail() can be negative...
             ImVec2 size = ImGui::GetContentRegionAvail();
@@ -346,39 +377,7 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
         }();
         const ImVec2 canvas_min = ImGui::GetCursorScreenPos();
         const ImVec2 canvas_max = canvas_min + canvas_size;
-
-        // TODO: the constraint is arbitrary; are there more sensible ways to decide size constraint?
-        const auto size_clamped = [](int width, int height) {
-            return legacy::tileT::sizeT{.width = std::clamp(width, 64, 1200), .height = std::clamp(height, 64, 1200)};
-        };
-        if (fit) {
-            img_off = {0, 0};
-
-            const legacy::tileT::sizeT size =
-                size_clamped((int)canvas_size.x / img_zoom, (int)canvas_size.y / img_zoom);
-            if (init.size != size) {
-                init.size = size;
-                runner.restart(init);
-            }
-        }
-        if (resize) {
-            // TODO: support using current screen/tilesize/zoom?
-            int w = 0, h = 0;
-            if (std::from_chars(input_width, std::end(input_width), w).ec == std::errc{} &&
-                std::from_chars(input_height, std::end(input_height), h).ec == std::errc{}) {
-                img_off = {0, 0};
-                img_zoom = 1;
-                const legacy::tileT::sizeT size = size_clamped(w, h);
-                if (init.size != size) {
-                    init.size = size;
-                    runner.restart(init);
-                }
-            }
-            // TODO: what to do else?
-
-            input_width[0] = '\0';
-            input_height[0] = '\0';
-        }
+        last_known_canvas_size = canvas_size;
 
         // Size is fixed now:
         const legacy::tileT::sizeT tile_size = runner.tile().size(); // TODO: which (vs init.size) is better?
