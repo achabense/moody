@@ -1,13 +1,11 @@
 #pragma once
 
 #include <charconv>
-#include <format> // TODO: utils...
+#include <format>
 
 #include "rule.hpp"
 
 namespace legacy {
-    static_assert(INT_MAX >= INT32_MAX);
-
     // TODO: explain layout.
     // TODO: add assertions about emptiness...
     class tileT {
@@ -64,8 +62,7 @@ namespace legacy {
         }
         ~tileT() { delete[] m_data; }
 
-        // TODO: rephrase...
-        // conceptually write-only after this call...
+        // The line data is conceptually write-only after `resize`.
         void resize(sizeT size) {
             if (m_size != size) {
                 tileT resized(size);
@@ -113,6 +110,8 @@ namespace legacy {
         }
 
     public:
+        // TODO: at(posT)?
+
         bool* line(int y) {
             assert(y >= 0 && y < m_size.height);
             return _line(y + 1) + 1;
@@ -122,38 +121,29 @@ namespace legacy {
             return _line(y + 1) + 1;
         }
 
-        // TODO: avoid code duplication...
-        void for_each_line(const rangeT& range, const auto& fn) {
-            assert(has_range(range));
+        void for_each_line(const rangeT& range, const auto& fn) { //
+            _for_each_line(*this, range, fn);
+        }
+
+        void for_each_line(const rangeT& range, const auto& fn) const { //
+            _for_each_line(*this, range, fn);
+        }
+
+    private:
+        static void _for_each_line(auto& this_, const rangeT& range, const auto& fn) {
+            assert(this_.has_range(range));
             const auto& [begin, end] = range;
             for (int y = begin.y; y < end.y; ++y) {
-                bool* ln = line(y);
-                if constexpr (requires { fn(std::span{ln + begin.x, ln + end.x}); }) {
-                    fn(std::span{ln + begin.x, ln + end.x});
+                auto line = this_.line(y); // bool* or const bool*
+                if constexpr (requires { fn(std::span{line + begin.x, line + end.x}); }) {
+                    fn(std::span{line + begin.x, line + end.x});
                 } else {
-                    fn(y - begin.y, std::span{ln + begin.x, ln + end.x});
+                    fn(y - begin.y, std::span{line + begin.x, line + end.x});
                 }
             }
         }
-
-        void for_each_line(const rangeT& range, const auto& fn) const {
-            assert(has_range(range));
-            const auto& [begin, end] = range;
-            for (int y = begin.y; y < end.y; ++y) {
-                const bool* ln = line(y);
-                if constexpr (requires { fn(std::span{ln + begin.x, ln + end.x}); }) {
-                    fn(std::span{ln + begin.x, ln + end.x});
-                } else {
-                    fn(y - begin.y, std::span{ln + begin.x, ln + end.x});
-                }
-            }
-        }
-
-        // TODO: at(posT)?
 
     public:
-        // TODO: This could be used to support boundless space.
-        // TODO: boundless space (as well as & tiling) are no longer planned for the first release
         // TODO: const or not?
         // (The problem is that, t.gather(t,t,t,t,t,t,t,t) is intentionally a valid operation, so passing by const&
         // seems an over-promise...)
@@ -162,7 +152,7 @@ namespace legacy {
             const tileT& a, /*   *this   */ const tileT& d,
             const tileT& z, const tileT& x, const tileT& c
         ) { // clang-format on
-            // assert m_shape == *.m_shape.
+            // assert m_size == *.m_size.
             const int width = m_size.width, height = m_size.height;
 
             auto _set_lr = [width](bool* _line, bool l, bool r) {
@@ -246,120 +236,102 @@ namespace legacy {
 
     using rangeT_opt = std::optional<tileT::rangeT>;
 
-    inline namespace tileT_utils {
-        inline int count(const tileT& tile, const rangeT_opt& range = {}) {
-            int c = 0;
-            tile.for_each_line(range.value_or(tile.range()), [&c](std::span<const bool> line) {
-                for (bool v : line) {
-                    c += v;
-                }
-            });
-            return c;
-        }
-
-        // TODO: is this "copy" or "paste"???
-        enum class copyE { Value, Or, Xor };
-        template <copyE mode = copyE::Value>
-        inline void copy(tileT& dest, tileT::posT dbegin, const tileT& source, const rangeT_opt& srange_ = {}) {
-            assert(&source != &dest);
-
-            const tileT::rangeT srange = srange_.value_or(source.range());
-            assert(dest.has_range({dbegin, dbegin + srange.size()}));
-
-            source.for_each_line(srange, [&dest, &dbegin](int y, std::span<const bool> line) {
-                bool* d = dest.line(dbegin.y + y) + dbegin.x;
-                for (bool v : line) {
-                    if constexpr (mode == copyE::Value) {
-                        *d++ = v;
-                    } else if constexpr (mode == copyE::Or) {
-                        *d++ |= v;
-                    } else {
-                        static_assert(mode == copyE::Xor);
-                        *d++ ^= v;
-                    }
-                }
-            });
-        }
-
-        // TODO: Trying to guarantee that the result is independent of std implementation...
-        // Is this worthwhile? Fall back to bernoulli_distribution instead?
-        inline void random_fill(tileT& tile, std::mt19937& rand, double density, const rangeT_opt& range = {}) {
-            const uint32_t c = std::mt19937::max() * std::clamp(density, 0.0, 1.0);
-            tile.for_each_line(range.value_or(tile.range()), [&](std::span<bool> line) { //
-                std::ranges::generate(line, [&] { return rand() < c; });
-            });
-        }
-
-        inline void clear_inside(tileT& tile, const tileT::rangeT& range /* Required */, bool v = 0) {
-            tile.for_each_line(range, [v](std::span<bool> line) { std::ranges::fill(line, v); });
-        }
-
-        // TODO: mixture of tile.range() and range arg looks confusing... rename.
-        inline void clear_outside(tileT& tile, const tileT::rangeT& range /* Required */, bool v = 0) {
-            assert(tile.has_range(range));
-            tile.for_each_line(tile.range(), [&](int y, std::span<bool> line) {
-                if (y < range.begin.y || y >= range.end.y) {
-                    std::ranges::fill(line, v);
-                } else {
-                    std::fill(line.begin(), line.begin() + range.begin.x, v);
-                    std::fill(line.begin() + range.end.x, line.end(), v);
-                }
-            });
-        }
-
-        inline tileT::rangeT bounding_box(const tileT& tile, const tileT::rangeT& range /* Required */, bool v = 0) {
-            // About the usage of std::string:
-            // 1. I hate std::vector<bool>.
-            // 2. There is no std::find_last in C++20. (https://en.cppreference.com/w/cpp/algorithm/ranges/find_last)
-            std::string has_nv_x(range.width(), false);
-            std::string has_nv_y(range.height(), false);
-
-            tile.for_each_line(range, [&](int y, std::span<const bool> line) {
-                for (int x = 0; const bool b : line) {
-                    if (b != v) {
-                        has_nv_x[x] = true;
-                        has_nv_y[y] = true;
-                    }
-                    ++x;
-                }
-            });
-
-            const auto first_nv_x = has_nv_x.find_first_of(true);
-            const auto npos = std::string::npos;
-            if (first_nv_x != npos) {
-                const auto first_nv_y = has_nv_y.find_first_of(true);
-                const auto last_nv_x = has_nv_x.find_last_of(true);
-                const auto last_nv_y = has_nv_y.find_last_of(true);
-                assert(first_nv_y != npos && last_nv_x != npos && last_nv_y != npos);
-                return {.begin{.x = int(range.begin.x + first_nv_x), .y = int(range.begin.y + first_nv_y)},
-                        .end{.x = int(range.begin.x + last_nv_x + 1), .y = int(range.begin.y + last_nv_y + 1)}};
-            } else {
-                return {};
+    inline int count(const tileT& tile, const rangeT_opt& range = {}) {
+        int c = 0;
+        tile.for_each_line(range.value_or(tile.range()), [&c](std::span<const bool> line) {
+            for (bool v : line) {
+                c += v;
             }
+        });
+        return c;
+    }
+
+    // TODO: is this "copy" or "paste"???
+    enum class copyE { Value, Or, Xor };
+    template <copyE mode = copyE::Value>
+    inline void copy(tileT& dest, tileT::posT d_begin, const tileT& source, const rangeT_opt& s_range_ = {}) {
+        assert(&source != &dest);
+
+        const tileT::rangeT s_range = s_range_.value_or(source.range());
+        assert(dest.has_range({d_begin, d_begin + s_range.size()}));
+
+        source.for_each_line(s_range, [&dest, &d_begin](int y, std::span<const bool> line) {
+            bool* d = dest.line(d_begin.y + y) + d_begin.x;
+            for (bool v : line) {
+                if constexpr (mode == copyE::Value) {
+                    *d++ = v;
+                } else if constexpr (mode == copyE::Or) {
+                    *d++ |= v;
+                } else {
+                    static_assert(mode == copyE::Xor);
+                    *d++ ^= v;
+                }
+            }
+        });
+    }
+
+    // TODO: Trying to guarantee that the result is independent of std implementation...
+    // Is this worthwhile? Fall back to bernoulli_distribution instead?
+    inline void random_fill(tileT& tile, std::mt19937& rand, double density, const rangeT_opt& range = {}) {
+        const uint32_t c = std::mt19937::max() * std::clamp(density, 0.0, 1.0);
+        tile.for_each_line(range.value_or(tile.range()), [&](std::span<bool> line) { //
+            std::ranges::generate(line, [&] { return rand() < c; });
+        });
+    }
+
+    inline void clear_inside(tileT& tile, const tileT::rangeT& range /* Required */, bool v = 0) {
+        tile.for_each_line(range, [v](std::span<bool> line) { std::ranges::fill(line, v); });
+    }
+
+    // TODO: mixture of tile.range() and range arg looks confusing... rename.
+    inline void clear_outside(tileT& tile, const tileT::rangeT& range /* Required */, bool v = 0) {
+        assert(tile.has_range(range));
+        tile.for_each_line(tile.range(), [&](int y, std::span<bool> line) {
+            if (y < range.begin.y || y >= range.end.y) {
+                std::ranges::fill(line, v);
+            } else {
+                std::fill(line.begin(), line.begin() + range.begin.x, v);
+                std::fill(line.begin() + range.end.x, line.end(), v);
+            }
+        });
+    }
+
+    inline tileT::rangeT bounding_box(const tileT& tile, const tileT::rangeT& range /* Required */, bool v = 0) {
+        // About the usage of std::string:
+        // 1. I hate std::vector<bool>.
+        // 2. There is no std::find_last in C++20. (https://en.cppreference.com/w/cpp/algorithm/ranges/find_last)
+        std::string has_nv_x(range.width(), false);
+        std::string has_nv_y(range.height(), false);
+
+        tile.for_each_line(range, [&](int y, std::span<const bool> line) {
+            for (int x = 0; const bool b : line) {
+                if (b != v) {
+                    has_nv_x[x] = true;
+                    has_nv_y[y] = true;
+                }
+                ++x;
+            }
+        });
+
+        const auto first_nv_x = has_nv_x.find_first_of(true);
+        const auto npos = std::string::npos;
+        if (first_nv_x != npos) {
+            const auto first_nv_y = has_nv_y.find_first_of(true);
+            const auto last_nv_x = has_nv_x.find_last_of(true);
+            const auto last_nv_y = has_nv_y.find_last_of(true);
+            assert(first_nv_y != npos && last_nv_x != npos && last_nv_y != npos);
+            return {.begin{.x = int(range.begin.x + first_nv_x), .y = int(range.begin.y + first_nv_y)},
+                    .end{.x = int(range.begin.x + last_nv_x + 1), .y = int(range.begin.y + last_nv_y + 1)}};
+        } else {
+            return {};
         }
-#if 0
-        inline int count_diff(const tileT& l, const tileT& r);
-
-        // TODO: is the name meaningful?
-        // Return smallest sizeT ~ (>= target) && (% period == 0)
-        inline tileT::sizeT upscale(tileT::sizeT target, tileT::sizeT period) {
-            const auto upscale = [](int target, int period) { //
-                return ((target + period - 1) / period) * period;
-            };
-
-            return {.width = upscale(target.width, period.width), //
-                    .height = upscale(target.height, period.height)};
-        }
-
-        inline void piece_up(const tileT& period, tileT& target);
-#endif
-    } // namespace tileT_utils
+    }
 
     // https://conwaylife.com/wiki/Run_Length_Encoded
     inline std::string to_RLE_str(const tileT& tile, const rangeT_opt& range = {}) {
         // (wontfix) consecutive '$'s are not combined.
         std::string str;
-        int last_nl = 0;
+        size_t last_nl = 0;
         tile.for_each_line(range.value_or(tile.range()), [&str, &last_nl](int y, std::span<const bool> line) {
             if (y != 0) {
                 str += '$';
@@ -369,7 +341,7 @@ namespace legacy {
             bool v = 0;
             auto flush = [&] {
                 if (c != 0) {
-                    if (std::ssize(str) > last_nl + 60) {
+                    if (str.size() > last_nl + 60) {
                         str += '\n';
                         last_nl = str.size();
                     }
@@ -406,36 +378,41 @@ namespace legacy {
             text.remove_prefix(std::min(text.size(), text.find('\n')));
         }
 
-        auto take = [end = text.data() + text.size()](const char*& str) -> std::pair<int, char> {
-            while (str != end && (*str == '\n' || *str == '\r' || *str == ' ')) {
-                ++str;
-            }
-            if (str == end) {
-                return {1, '!'};
-            }
+        struct takerT {
+            const char *str, *end;
+            takerT(std::string_view text) : str(text.data()), end(str + text.size()) {}
 
-            int n = 1;
-            if (*str >= '1' && *str <= '9') {
-                const auto [ptr, ec] = std::from_chars(str, end, n);
-                if (ec != std::errc{} || ptr == end) {
+            std::pair<int, char> take() {
+                while (str != end && (*str == '\n' || *str == '\r' || *str == ' ')) {
+                    ++str;
+                }
+                if (str == end) {
                     return {1, '!'};
                 }
-                str = ptr;
-            }
-            assert(str != end);
-            switch (*str++) {
-            case 'b': return {n, 'b'};
-            case 'o': return {n, 'o'};
-            case '$': return {n, '$'};
-            default: return {1, '!'};
+
+                int n = 1;
+                if (*str >= '1' && *str <= '9') {
+                    const auto [ptr, ec] = std::from_chars(str, end, n);
+                    if (ec != std::errc{} || ptr == end) {
+                        return {1, '!'};
+                    }
+                    str = ptr;
+                }
+                assert(str != end);
+                switch (*str++) {
+                case 'b': return {n, 'b'};
+                case 'o': return {n, 'o'};
+                case '$': return {n, '$'};
+                default: return {1, '!'};
+                }
             }
         };
 
         long long width = 1, height = 1;
         {
             long long x = 0;
-            for (const char* str = text.data();;) {
-                const auto [n, c] = take(str);
+            for (takerT taker(text);;) {
+                const auto [n, c] = taker.take();
                 assert(n >= 0);
                 if (c == '!') {
                     break;
@@ -451,7 +428,6 @@ namespace legacy {
             width = std::max(width, x);
         }
 
-        // TODO: exceptions like this should be reported via popup?
         if (width == 1 && height == 1) {
             throw std::runtime_error("TODO... what msg? whether to throw at all?");
         }
@@ -462,8 +438,8 @@ namespace legacy {
 
         tileT tile({.width = (int)width, .height = (int)height});
         int x = 0, y = 0;
-        for (const char* str = text.data();;) {
-            const auto [n, c] = take(str);
+        for (takerT taker(text);;) {
+            const auto [n, c] = taker.take();
             if (c == '!') {
                 break;
             }
@@ -487,9 +463,7 @@ namespace legacy {
     namespace _tests {
         inline const testT test_RLE_str = [] {
             tileT tile({.width = 32, .height = 60});
-            // TODO: better source of rand...
-            std::mt19937 rand{};
-            random_fill(tile, rand, 0.5);
+            random_fill(tile, testT::rand, 0.5);
             assert(tile == from_RLE_str(to_RLE_str(tile), tile.size()));
         };
     }  // namespace _tests

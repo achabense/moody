@@ -19,6 +19,8 @@
 // TODO: recheck captures in the form of [&]...
 // TODO: tell apart precondition and impl assertion...
 
+static_assert(INT_MAX >= INT32_MAX);
+
 namespace legacy {
 
 #ifdef ENABLE_TESTS
