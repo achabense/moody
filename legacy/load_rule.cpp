@@ -44,8 +44,6 @@ class file_nav {
     path current;       // Canonical path.
     entries dirs, files;
 
-    clockT::time_point expired = {}; // TODO: better name...
-
     static void collect(const path& p, entries& dirs, entries& files) {
         dirs.clear();
         files.clear();
@@ -72,18 +70,15 @@ class file_nav {
             current.swap(p);
             dirs.swap(p_dirs);
             files.swap(p_files);
-
-            expired = clockT::now() + 3000ms;
         } catch (const std::exception&) {
             // TODO: report error... what encoding?
         }
     }
 
     void refresh_if_valid() {
-        if (valid && clockT::now() > expired) {
+        if (valid) {
             try {
                 collect(current, dirs, files);
-                expired = clockT::now() + 3000ms;
             } catch (const std::exception&) {
                 // TODO: report error... what encoding?
                 valid = false;
@@ -114,7 +109,9 @@ public:
     [[nodiscard]] std::optional<path> display() {
         std::optional<path> target = std::nullopt;
 
-        refresh_if_valid();
+        if (ImGui::SmallButton("Refresh")) {
+            refresh_if_valid();
+        }
 
         if (valid) {
             imgui_str(cpp17_u8string(current));
@@ -235,6 +232,8 @@ struct fileT {
     std::vector<legacy::compressT> m_rules;
     int pointing_at = 0; // valid if !m_rules.empty().
 
+    bool need_reset_scroll = true;
+
     // TODO: It is easy to locate all rules in a text span via `extract_MAP_str`.
     // However there are no easy ways to locate or highlight (only) the rule across the lines in the gui.
     // See: https://github.com/ocornut/imgui/issues/2313
@@ -253,15 +252,20 @@ struct fileT {
         }
     }
 
-    fileT(std::filesystem::path path) : m_path(std::move(path)) {
+    fileT(std::filesystem::path path) : m_path(std::move(path)) { reload(); }
+
+    void reload() {
+        m_lines.clear();
+        m_rules.clear();
+        pointing_at = 0;
+
         std::ifstream ifs(m_path);
         append(m_lines, m_rules, ifs);
+        need_reset_scroll = true;
     }
 
     // TODO: how to combine with file-nav (into a single window)?
     std::optional<legacy::moldT> display(const legacy::moldT& test_sync) {
-        static const bool wrap = true; // TODO: (temporarily const)
-
         bool hit = false; // TODO: also sync on window appearing?
         const int total = m_rules.size();
 
@@ -304,18 +308,18 @@ struct fileT {
 
         ImGui::Separator();
 
-        if (auto child = imgui_childwindow("Child", {}, 0,
-                                           wrap ? ImGuiWindowFlags_None : ImGuiWindowFlags_HorizontalScrollbar)) {
+        if (need_reset_scroll) {
+            ImGui::SetNextWindowScroll({0, 0});
+            need_reset_scroll = false;
+        }
+        if (auto child = imgui_childwindow("Child", {}, 0, ImGuiWindowFlags_None)) {
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
             // TODO: refine line-no logic (line-no or id-no)?
             for (int l = 1; const auto& [text, id] : m_lines) {
                 ImGui::TextDisabled("%2d ", l++);
                 ImGui::SameLine();
-                if (wrap) {
-                    imgui_strwrapped(text);
-                } else {
-                    imgui_str(text);
-                }
+                imgui_strwrapped(text);
+
                 if (id.has_value()) {
                     if (id == pointing_at) {
                         const ImVec2 pos_min = ImGui::GetItemRectMin();
@@ -348,7 +352,6 @@ struct fileT {
     }
 };
 
-// TODO: reset scroll-y for new files...
 // TODO: show the last opened file in file-nav?
 
 std::optional<legacy::moldT> load_rule(const legacy::moldT& test_sync) {
@@ -364,6 +367,11 @@ std::optional<legacy::moldT> load_rule(const legacy::moldT& test_sync) {
         // TODO (temp) selectable looks good but is easy to click by mistake...
         if (ImGui::SmallButton("Close")) {
             close = true;
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Reload")) {
+            file->reload();
+            // TODO: what if file->m_rules.empty() now?
         }
         imgui_str(cpp17_u8string(file->m_path));
 
