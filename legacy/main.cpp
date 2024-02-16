@@ -74,7 +74,7 @@ code_image::code_image() {
     m_texture = create_texture(SDL_TEXTUREACCESS_STATIC, width, height);
     // Using heap allocation to avoid "Function uses XXX bytes of stack" warning.
     std::unique_ptr<Uint32[][3][3]> pixels(new Uint32[512][3][3]);
-    for_each_code(code) {
+    legacy::for_each_code([&](legacy::codeT code) {
         const legacy::situT situ = legacy::decode(code);
         const bool fill[3][3] = {{situ.q, situ.w, situ.e}, {situ.a, situ.s, situ.d}, {situ.z, situ.x, situ.c}};
         for (int y = 0; y < 3; ++y) {
@@ -82,7 +82,7 @@ code_image::code_image() {
                 pixels[code][y][x] = color_for(fill[y][x]);
             }
         }
-    }
+    });
 
     SDL_UpdateTexture(static_cast<SDL_Texture*>(m_texture), nullptr, pixels.get(), width * sizeof(Uint32));
 }

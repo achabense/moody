@@ -66,12 +66,6 @@ namespace legacy {
         enum bposE : int { bpos_q = 0, bpos_w, bpos_e, bpos_a, bpos_s, bpos_d, bpos_z, bpos_x, bpos_c };
     };
 
-    // TODO: whether to apply functional version? void for_each_code(const std::invocable<codeT> auto& fn)
-    // for_each_code is widely used, and functional for_each_code will generally result in longer code...
-
-    // (`name` must not be modified within the loop body)
-#define for_each_code(name) for (::legacy::codeT name{.val = 0}; name.val < 512; ++name.val)
-
     constexpr codeT encode(const situT& situ) {
         // ~ bool is implicitly promoted to int.
         // clang-format off
@@ -92,6 +86,12 @@ namespace legacy {
         return {q, w, e, a, s, d, z, x, c};
     }
 
+    constexpr void for_each_code(const auto& fn) {
+        for (codeT code{.val = 0}; code.val < 512; ++code.val) {
+            fn(codeT(code));
+        }
+    }
+
     constexpr bool get(codeT code, codeT::bposE bpos) { //
         return (code >> bpos) & 1;
     }
@@ -102,8 +102,8 @@ namespace legacy {
 
 #ifdef ENABLE_TESTS
     namespace _tests {
-        inline const testT test_codeT = [] {
-            for_each_code(code) { assert(encode(decode(code)) == code); }
+        inline const testT test_codeT = [] { //
+            for_each_code([](codeT code) { assert(encode(decode(code)) == code); });
         };
     }  // namespace _tests
 #endif // ENABLE_TESTS
@@ -134,9 +134,9 @@ namespace legacy {
         return rule[all_0] == 1 && rule[all_1] == 0;
     }
 
-    inline constexpr ruleT make_rule(const rule_like auto& fn) {
+    constexpr ruleT make_rule(const rule_like auto& fn) {
         ruleT rule{};
-        for_each_code(code) { rule[code] = fn(code); }
+        for_each_code([&](codeT code) { rule[code] = fn(code); });
         return rule;
     }
 
@@ -181,19 +181,19 @@ namespace legacy {
 
     inline compressT compress(const moldT& mold) {
         compressT cmpr{};
-        for_each_code(code) {
+        for_each_code([&](codeT code) {
             cmpr.bits_rule[code / 8] |= mold.rule[code] << (code % 8);
             cmpr.bits_lock[code / 8] |= mold.lock[code] << (code % 8);
-        }
+        });
         return cmpr;
     }
 
     inline moldT decompress(const compressT& cmpr) {
         moldT mold{};
-        for_each_code(code) {
+        for_each_code([&](codeT code) {
             mold.rule[code] = (cmpr.bits_rule[code / 8] >> (code % 8)) & 1;
             mold.lock[code] = (cmpr.bits_lock[code / 8] >> (code % 8)) & 1;
-        }
+        });
         return mold;
     }
 
@@ -201,10 +201,10 @@ namespace legacy {
     namespace _tests {
         inline const testT test_compressT = [] {
             moldT mold{};
-            for_each_code(code) {
+            for_each_code([&](codeT code) {
                 mold.rule[code] = testT::rand() & 1;
                 mold.lock[code] = testT::rand() & 1;
-            }
+            });
             assert(decompress(compress(mold)) == mold);
         };
     }  // namespace _tests
@@ -245,10 +245,10 @@ namespace legacy {
         // TODO: explain the encoding scheme... (about `data`)
         inline void append_base64(std::string& str, const auto& source /* ruleT or lockT */) {
             bool data[512]{}; // Re-encoded as if bpos_q = 8, ... bpos_c = 0.
-            for_each_code(code) {
+            for_each_code([&](codeT code) {
                 const auto [q, w, e, a, s, d, z, x, c] = decode(code);
                 data[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1] = source[code];
-            }
+            });
             const auto get = [&data](int i) { return i < 512 ? data[i] : 0; };
             for (int i = 0; i < 512; i += 6) {
                 const uint8_t b6 = (get(i + 5) << 0) | (get(i + 4) << 1) | (get(i + 3) << 2) | (get(i + 2) << 3) |
@@ -276,10 +276,10 @@ namespace legacy {
                 put(i + 0, (b6 >> 5) & 1);
             }
 
-            for_each_code(code) {
+            for_each_code([&](codeT code) {
                 const auto [q, w, e, a, s, d, z, x, c] = decode(code);
                 dest[code] = data[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1];
-            }
+            });
         }
     } // namespace _misc
 
@@ -369,10 +369,10 @@ namespace legacy {
 
             {
                 moldT mold{};
-                for_each_code(code) {
+                for_each_code([&](codeT code) {
                     mold.rule[code] = testT::rand() & 1;
                     mold.lock[code] = testT::rand() & 1;
-                }
+                });
                 const std::string rule_only = "(prefix)" + to_MAP_str(mold.rule) + "(suffix)";
                 const std::string whole = "(prefix)" + to_MAP_str(mold) + "(suffix)";
 

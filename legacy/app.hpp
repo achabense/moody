@@ -98,6 +98,12 @@ const int FixedItemWidth = 220;
 // TODO: for editing opt, support in-lock and outof-lock mode?
 // TODO: Right-click must either to open a submenu, or to toggle on/off the tooltip.
 
+// TODO: better name...
+inline ImVec2 square_size() {
+    const float r = ImGui::GetFrameHeight();
+    return ImVec2(r, r);
+}
+
 // TODO: reconsider binding and scrolling logic...
 inline void iter_pair(const char* tag_first, const char* tag_prev, const char* tag_next, const char* tag_last,
                       auto act_first, auto act_prev, auto act_next, auto act_last, bool allow_binding = true,

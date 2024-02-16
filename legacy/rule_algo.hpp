@@ -3,6 +3,15 @@
 #include "rule.hpp"
 
 namespace legacy {
+    inline bool for_each_code_all_of(const auto& pred) {
+        for (codeT code{.val = 0}; code.val < 512; ++code.val) {
+            if (!pred(codeT(code))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     // TODO: better name for ruleT_masked?
     // TODO: is it safe to define maskT this way?
     // TODO: explain the meaning of maskT_result (how is a rule different from maskT)...
@@ -16,13 +25,13 @@ namespace legacy {
 
     inline ruleT_masked operator^(const maskT& mask, const ruleT& rule) {
         ruleT_masked r{};
-        for_each_code(code) { r[code] = mask[code] ^ rule[code]; }
+        for_each_code([&](codeT code) { r[code] = mask[code] ^ rule[code]; });
         return r;
     }
 
     inline ruleT operator^(const maskT& mask, const ruleT_masked& r) {
         ruleT rule{};
-        for_each_code(code) { rule[code] = mask[code] ^ r[code]; }
+        for_each_code([&](codeT code) { rule[code] = mask[code] ^ r[code]; });
         return rule;
     }
 
@@ -33,7 +42,7 @@ namespace legacy {
 
     public:
         equivT() {
-            for_each_code(code) { parof[code] = code; }
+            for_each_code([&](codeT code) { parof[code] = code; });
         }
 
         codeT headof(codeT c) const {
@@ -45,28 +54,22 @@ namespace legacy {
         }
 
         bool test(const ruleT_masked& r) const {
-            for_each_code(code) {
-                if (r[code] != r[parof[code]]) {
-                    return false;
-                }
-            }
-            return true;
+            return for_each_code_all_of([&](codeT code) { //
+                return r[code] == r[parof[code]];
+            });
         }
 
         // TODO: better names...
         void add_eq(codeT a, codeT b) { parof[headof(a)] = headof(b); }
         void add_eq(const equivT& other) {
-            for_each_code(code) { add_eq(code, other.parof[code]); }
+            for_each_code([&](codeT code) { add_eq(code, other.parof[code]); });
         }
 
         bool has_eq(codeT a, codeT b) const { return headof(a) == headof(b); }
         bool has_eq(const equivT& other) const {
-            for_each_code(code) {
-                if (!has_eq(code, other.parof[code])) {
-                    return false;
-                }
-            }
-            return true;
+            return for_each_code_all_of([&](codeT code) { //
+                return has_eq(code, other.parof[code]);
+            });
         }
     };
 
@@ -97,7 +100,7 @@ namespace legacy {
         groupT group_for(codeT code) const { return jth_group(m_map[code]); }
 
         int k() const { return m_k; }
-        void for_each_group(auto fn) const {
+        void for_each_group(const auto& fn) const {
             for (int j = 0; j < m_k; ++j) {
                 if constexpr (requires { fn(jth_group(j)); }) {
                     fn(jth_group(j));
@@ -112,17 +115,17 @@ namespace legacy {
 
             codeT::map_to<int> m;
             m.fill(-1);
-            for_each_code(code) {
+            for_each_code([&](codeT code) {
                 const codeT head = u.headof(code);
                 if (m[head] == -1) {
                     m[head] = m_k++;
                 }
                 m_map[code] = m[head];
-            }
+            });
             // m_k is now the number of groups in the partition.
 
             std::vector<int> count(m_k, 0);
-            for_each_code(code) { ++count[m_map[code]]; }
+            for_each_code([&](codeT code) { ++count[m_map[code]]; });
 
             std::vector<int> pos(m_k, 0);
             for (int j = 1; j < m_k; ++j) {
@@ -134,10 +137,10 @@ namespace legacy {
                 m_groups[j] = {pos[j], count[j]};
             }
 
-            for_each_code(code) {
+            for_each_code([&](codeT code) {
                 int j = m_map[code];
                 m_data[pos[j]++] = code;
-            }
+            });
         }
 
         // TODO: expose m_eq for `compatible`; drop this dependence when convenient...
@@ -247,13 +250,13 @@ namespace legacy {
                 }
             };
 
-            for_each_code(code) {
+            for_each_code([&](codeT code) {
                 if (!assigned[code]) {
                     assert(std::ranges::none_of(par_both.group_for(code), [&](codeT c) { return assigned[c]; }));
                     try_assign(code, 0, try_assign);
                     assert(std::ranges::all_of(par_both.group_for(code), [&](codeT c) { return assigned[c]; }));
                 }
-            }
+            });
 
             if (!a.contains(common_rule) || !b.contains(common_rule)) {
                 return {emptyT{}};
@@ -377,17 +380,17 @@ namespace legacy {
         record.fill(2);
 
         const equivT& eq = subset.get_par().get_eq();
-        for_each_code(code) {
-            if (mold.lock[code]) {
-                int& rep = record[eq.headof(code)];
-                if (rep == 2) {
-                    rep = r[code];
-                } else if (rep != r[code]) {
-                    return false;
-                }
+        return for_each_code_all_of([&](codeT code) {
+            if (!mold.lock[code]) {
+                return true;
             }
-        }
-        return true;
+
+            int& rep = record[eq.headof(code)];
+            if (rep == 2) {
+                rep = r[code];
+            }
+            return rep == r[code];
+        });
     }
 
     inline ruleT approximate(const subsetT& subset, const moldT& mold) {
@@ -553,12 +556,12 @@ namespace legacy {
     // TODO: proper name...
     inline moldT mirror(const moldT& mold) {
         moldT mir{};
-        for_each_code(code) {
+        for_each_code([&](codeT code) {
             const codeT codex = codeT(~code & 511);
             const bool flip = get_s(codex) != mold.rule[codex];
             mir.rule[code] = flip ? !get_s(code) : get_s(code);
             mir.lock[code] = mold.lock[codex];
-        }
+        });
         return mir;
     }
 } // namespace legacy
@@ -636,26 +639,20 @@ namespace legacy {
     struct mapperT_pair {
         mapperT a, b;
         bool test(const ruleT_masked& r) const {
-            for_each_code(code) {
-                if (r[a(code)] != r[b(code)]) {
-                    return false;
-                }
-            }
-            return true;
+            return for_each_code_all_of([&](codeT code) { //
+                return r[a(code)] == r[b(code)];
+            });
         }
     };
 
     inline void add_eq(equivT& eq, const mapperT_pair& mp) {
-        for_each_code(code) { eq.add_eq(mp.a(code), mp.b(code)); }
+        for_each_code([&](codeT code) { eq.add_eq(mp.a(code), mp.b(code)); });
     }
 
     inline bool has_eq(const equivT& eq, const mapperT_pair& mp) {
-        for_each_code(code) {
-            if (!eq.has_eq(mp.a(code), mp.b(code))) {
-                return false;
-            }
-        }
-        return true;
+        return for_each_code_all_of([&](codeT code) { //
+            return eq.has_eq(mp.a(code), mp.b(code));
+        });
     }
 
     // TODO: is `recipes` a proper name?
@@ -665,11 +662,7 @@ namespace legacy {
         inline constexpr maskT mask_zero{{}};
         // rule ^ mask_identity -> TODO
         // TODO: use make_rule...
-        inline constexpr maskT mask_identity{[] {
-            ruleT rule{};
-            for_each_code(code) { rule[code] = get_s(code); }
-            return rule;
-        }()};
+        inline constexpr maskT mask_identity{make_rule([](codeT code) { return get_s(code); })};
         // TODO: mask_copy_q/w/e/a/s(~mask_identity)/d/z/x/c etc?
 
         // TODO: recheck these mappers...
@@ -810,9 +803,7 @@ namespace legacy {
             // It's just that, in this situation the maskT has a strong bias, so that it's too easy to generate rules in
             // a certain direction...
             const auto copy_from = [](codeT::bposE bpos) {
-                ruleT rule{};
-                for_each_code(code) { rule[code] = get(code, bpos); }
-                return rule;
+                return make_rule([bpos](codeT code) { return get(code, bpos); });
             };
 
             using enum codeT::bposE;

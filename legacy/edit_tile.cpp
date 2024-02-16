@@ -319,11 +319,11 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
             ImGui::AlignTextToFramePadding();
             imgui_str("Fit with zoom");
             ImGui::SameLine(), imgui_str("="), ImGui::SameLine(); // TODO: About sameline() and ' '...
-            for (const float r = ImGui::GetFrameHeight(); int z : {1, 2, 4, 8}) {
+            for (const ImVec2 size = square_size(); int z : {1, 2, 4, 8}) {
                 if (z != 1) {
                     ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
                 }
-                if (ImGui::Button(std::to_string(z).c_str(), {r, r})) {
+                if (ImGui::Button(std::to_string(z).c_str(), size)) {
                     img_zoom = z;
                     img_off = {0, 0};
 

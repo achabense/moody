@@ -7,7 +7,7 @@
 #include "app.hpp"
 
 // TODO: currently poorly designed; redesign to re-enable this feature when suitable...
-// #define ENABLE_STATIC_CONSTRAINTS
+#define ENABLE_STATIC_CONSTRAINTS
 
 class subset_selector {
     legacy::subsetT current;
@@ -29,7 +29,7 @@ class subset_selector {
     termT_vec terms_hex;
     // TODO: about the plan to support user-defined subsets...
 
-    void for_each_term(auto fn) {
+    void for_each_term(const auto& fn) {
         for (termT_vec* terms : {&terms_ignore, &terms_native, &terms_misc, &terms_hex}) {
             for (termT& t : *terms) {
                 fn(t);
@@ -132,8 +132,7 @@ public:
         // TODO: drop mutable id... use manually specified ids
         // TODO: tooltip...
         // TODO: recheck id & tid logic... (& imagebutton)
-        auto check = [&, id = 0, r = ImGui::GetFrameHeight()](termT& term) mutable {
-            const ImVec2 size{r, r};
+        auto check = [&, id = 0, size = square_size()](termT& term) mutable {
             // TODO: change color when hovered?
             // bool hovered = false;
             ImGui::PushID(id++);
@@ -267,21 +266,20 @@ static std::optional<legacy::moldT> static_constraints() {
     const int r = 9;
     static stateE board[r][r]{/*Any...*/};
 
-    // modified from partition_collection check button
-    auto check = [id = 0, r = ImGui::GetFrameHeight()](stateE& state, bool enable) mutable {
-        const ImVec2 pos = ImGui::GetCursorScreenPos();
-        const ImVec2 pos_max = pos + ImVec2{r, r};
+    auto check = [id = 0, size = square_size()](stateE& state, bool enable) mutable {
+        const ImVec2 pos_min = ImGui::GetCursorScreenPos();
+        const ImVec2 pos_max = pos_min + size;
         static const ImU32 cols[5]{IM_COL32(100, 100, 100, 255), //
                                    IM_COL32(0, 0, 0, 255),       //
                                    IM_COL32(255, 255, 255, 255), //
                                    IM_COL32(80, 0, 80, 255),     //
                                    IM_COL32(200, 0, 200, 255)};
 
-        ImGui::GetWindowDrawList()->AddRectFilled(pos, pos_max, !enable ? IM_COL32(80, 80, 80, 255) : cols[state]);
-        ImGui::GetWindowDrawList()->AddRect(pos, pos_max, IM_COL32(200, 200, 200, 255));
+        ImGui::GetWindowDrawList()->AddRectFilled(pos_min, pos_max, !enable ? IM_COL32(80, 80, 80, 255) : cols[state]);
+        ImGui::GetWindowDrawList()->AddRect(pos_min, pos_max, IM_COL32(200, 200, 200, 255));
 
         ImGui::PushID(id++);
-        ImGui::InvisibleButton("Button", ImVec2{r, r});
+        ImGui::InvisibleButton("Button", size);
         if (enable && ImGui::IsItemHovered()) {
             // TODO: the ctrl is awkward here...
             if (imgui_scrollup()) {
@@ -333,7 +331,7 @@ static std::optional<legacy::moldT> static_constraints() {
                     continue;
                 }
 
-                for_each_code(code) {
+                legacy::for_each_code([&](legacy::codeT code) {
                     legacy::situT situ = legacy::decode(code);
                     auto imbue = [](bool& b, stateE state) {
                         if (state == F || state == F_Cond) {
@@ -355,9 +353,10 @@ static std::optional<legacy::moldT> static_constraints() {
                     imbue(situ.z, board[y + 1][x - 1]);
                     imbue(situ.x, board[y + 1][x]);
                     imbue(situ.c, board[y + 1][x + 1]);
+
                     mold.rule[legacy::encode(situ)] = board[y][x] == F ? 0 : 1;
                     mold.lock[legacy::encode(situ)] = true;
-                }
+                });
             }
         }
         return mold;

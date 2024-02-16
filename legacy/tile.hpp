@@ -123,7 +123,7 @@ namespace legacy {
         }
 
         // TODO: avoid code duplication...
-        void for_each_line(const rangeT& range, auto fn) {
+        void for_each_line(const rangeT& range, const auto& fn) {
             assert(has_range(range));
             const auto& [begin, end] = range;
             for (int y = begin.y; y < end.y; ++y) {
@@ -136,7 +136,7 @@ namespace legacy {
             }
         }
 
-        void for_each_line(const rangeT& range, auto fn) const {
+        void for_each_line(const rangeT& range, const auto& fn) const {
             assert(has_range(range));
             const auto& [begin, end] = range;
             for (int y = begin.y; y < end.y; ++y) {
@@ -230,7 +230,7 @@ namespace legacy {
             tileT dest(size);
 
             const ruleT rule = make_rule([](codeT) { return testT::rand() & 1; });
-            for_each_code(code) {
+            for_each_code([&](codeT code) {
                 const auto [q, w, e, a, s, d, z, x, c] = decode(code);
                 t_q.line(0)[0] = q, t_w.line(0)[0] = w, t_e.line(0)[0] = e;
                 t_a.line(0)[0] = a, t_s.line(0)[0] = s, t_d.line(0)[0] = d;
@@ -239,7 +239,7 @@ namespace legacy {
                 t_s.gather(t_q, t_w, t_e, t_a, t_d, t_z, t_x, t_c);
                 t_s.apply(rule, dest);
                 assert(dest.line(0)[0] == rule(code));
-            }
+            });
         };
     }  // namespace _tests
 #endif // ENABLE_TESTS
