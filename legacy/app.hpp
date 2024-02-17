@@ -104,6 +104,7 @@ inline ImVec2 square_size() {
     return ImVec2(r, r);
 }
 
+// TODO: button_pair widget?
 // TODO: reconsider binding and scrolling logic...
 inline void iter_pair(const char* tag_first, const char* tag_prev, const char* tag_next, const char* tag_last,
                       auto act_first, auto act_prev, auto act_next, auto act_last, bool allow_binding = true,

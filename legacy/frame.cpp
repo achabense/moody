@@ -47,12 +47,12 @@ void frame(const code_image& icons, tile_image& img) {
     legacy::moldT current = recorder.current();
     bool update = false;
 
-    static bool load = true;
-    if (load) {
+    static bool show_load = true;
+    if (show_load) {
         // TODO: this should be controlled by load_rule ...
         ImGui::SetNextWindowSize({600, 400}, ImGuiCond_FirstUseEver);
         ImGui::SetNextWindowSizeConstraints(ImVec2(400, 200), ImVec2(FLT_MAX, FLT_MAX));
-        if (auto window = imgui_window("Load rule", &load, ImGuiWindowFlags_NoCollapse)) {
+        if (auto window = imgui_window("Load rule", &show_load, ImGuiWindowFlags_NoCollapse)) {
             if (auto out = load_rule(current)) {
                 current = *out;
                 update = true;
@@ -94,10 +94,10 @@ void frame(const code_image& icons, tile_image& img) {
                 }
             }
 
-            if (!load) {
+            if (!show_load) {
                 ImGui::SameLine();
                 if (ImGui::Button("Load")) {
-                    load = true;
+                    show_load = true;
                 }
             }
 
@@ -110,7 +110,7 @@ void frame(const code_image& icons, tile_image& img) {
             iter_pair(
                 "<|", "prev", "next", "|>", //
                 [&] { recorder.set_first(); }, [&] { recorder.set_prev(); }, [&] { recorder.set_next(); },
-                [&] { recorder.set_last(); });
+                [&] { recorder.set_last(); }, false, true);
         }
 
         ImGui::Separator();
@@ -125,9 +125,11 @@ void frame(const code_image& icons, tile_image& img) {
                 }
 
                 // TODO: This is used to pair with enter key and is somewhat broken...
-                // TODO: should enter set_next first?
-                if (imgui_keypressed(ImGuiKey_Apostrophe, false)) {
+                if (imgui_keypressed(ImGuiKey_Semicolon, true)) {
                     recorder.set_prev();
+                }
+                if (imgui_keypressed(ImGuiKey_Apostrophe, true)) {
+                    recorder.set_next();
                 }
             }
             ImGui::TableNextColumn();

@@ -6,7 +6,7 @@
 
 #include "app.hpp"
 
-// TODO: currently poorly designed; redesign to re-enable this feature when suitable...
+// TODO: currently poorly designed...
 #define ENABLE_STATIC_CONSTRAINTS
 
 class subset_selector {
@@ -67,13 +67,15 @@ public:
         terms_ignore.emplace_back("w", make_subset({mp_ignore_w}));
         terms_ignore.emplace_back("e", make_subset({mp_ignore_e}));
         terms_ignore.emplace_back("a", make_subset({mp_ignore_a}));
-        terms_ignore.emplace_back("s", make_subset({mp_ignore_s}, mask_zero)); // TODO (temp) As opposed to S'...
+        terms_ignore.emplace_back("s", make_subset({mp_ignore_s}, mask_zero)).description =
+            "0->1, 1->1 or 0->0, 1->0"; // TODO: whether to place here?
         terms_ignore.emplace_back("d", make_subset({mp_ignore_d}));
         terms_ignore.emplace_back("z", make_subset({mp_ignore_z}));
         terms_ignore.emplace_back("x", make_subset({mp_ignore_x}));
         terms_ignore.emplace_back("c", make_subset({mp_ignore_c}));
 
-        terms_misc.emplace_back("S(f)", make_subset({mp_ignore_s}, mask_identity));
+        terms_misc.emplace_back("S(f)", make_subset({mp_ignore_s}, mask_identity)).description =
+            "0->0, 1->1 or 0->1, 1->0";
         terms_misc.emplace_back("Hex", make_subset({mp_hex_ignore}));
         // TODO: or define mp_von_ignore?
         terms_misc.emplace_back("Von", make_subset({mp_ignore_q, mp_ignore_e, mp_ignore_z, mp_ignore_c}));
@@ -133,6 +135,13 @@ public:
                 set_select(term, !term.selected);
             }
             ImGui::PopID();
+
+            if (term.description) {
+                static bool toggle = true;
+                if (auto tooltip = imgui_itemtooltip(toggle)) {
+                    imgui_str(term.description);
+                }
+            }
 
             // TODO: change color when hovered?
             // const bool hovered = ImGui::IsItemHovered();
@@ -249,9 +258,10 @@ public:
 
 #ifdef ENABLE_STATIC_CONSTRAINTS
 static std::optional<legacy::moldT> static_constraints() {
-    enum stateE { Any, F, T, F_Cond, T_Cond }; // TODO: rename; explain
+    enum stateE { Any, O, I, O_Cond, I_Cond }; // TODO: rename; explain
     const int r = 9;
     static stateE board[r][r]{/*Any...*/};
+    static bool cond = false;
 
     auto check = [id = 0, size = square_size()](stateE& state, bool enable) mutable {
         const ImVec2 pos_min = ImGui::GetCursorScreenPos();
@@ -267,26 +277,25 @@ static std::optional<legacy::moldT> static_constraints() {
 
         ImGui::PushID(id++);
         ImGui::InvisibleButton("Button", size);
+        ImGui::PopID();
+
         if (enable && ImGui::IsItemHovered()) {
-            // TODO: the ctrl is awkward here...
-            if (imgui_scrollup()) {
-                switch (state) {
-                case Any: state = F; break;
-                case F: state = T; break;
-                default: state = Any; break;
+            // TODO: the ctrl is still awkward...
+            if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+                state = Any;
+            } else {
+                if (imgui_scrollup()) {
+                    state = cond ? O_Cond : O;
                 }
-            }
-            if (imgui_scrolldown()) {
-                switch (state) {
-                case Any: state = F_Cond; break;
-                case F_Cond: state = T_Cond; break;
-                default: state = Any; break;
+                if (imgui_scrolldown()) {
+                    state = cond ? I_Cond : I;
                 }
             }
         }
-        ImGui::PopID();
     };
 
+    ImGui::Checkbox("Cond", &cond);
+    ImGui::SameLine();
     const bool hit = ImGui::Button("Done");
     ImGui::SameLine();
     if (ImGui::Button("Clear")) {
@@ -314,17 +323,17 @@ static std::optional<legacy::moldT> static_constraints() {
         legacy::moldT mold{};
         for (int y = 1; y < r - 1; ++y) {
             for (int x = 1; x < r - 1; ++x) {
-                if (board[y][x] != F && board[y][x] != T) {
+                if (board[y][x] != O && board[y][x] != I) {
                     continue;
                 }
 
                 legacy::for_each_code([&](legacy::codeT code) {
                     legacy::situT situ = legacy::decode(code);
                     auto imbue = [](bool& b, stateE state) {
-                        if (state == F || state == F_Cond) {
+                        if (state == O || state == O_Cond) {
                             b = 0;
                         }
-                        if (state == T || state == T_Cond) {
+                        if (state == I || state == I_Cond) {
                             b = 1;
                         }
                     };
@@ -341,7 +350,7 @@ static std::optional<legacy::moldT> static_constraints() {
                     imbue(situ.x, board[y + 1][x]);
                     imbue(situ.c, board[y + 1][x + 1]);
 
-                    mold.rule[legacy::encode(situ)] = board[y][x] == F ? 0 : 1;
+                    mold.rule[legacy::encode(situ)] = board[y][x] == O ? 0 : 1;
                     mold.lock[legacy::encode(situ)] = true;
                 });
             }
@@ -555,13 +564,20 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         }
 
 #ifdef ENABLE_STATIC_CONSTRAINTS
-        ImGui::SameLine();
-        ImGui::Button("Static");
-        if (ImGui::BeginPopupContextItem(0, ImGuiPopupFlags_MouseButtonLeft)) {
-            if (auto out = static_constraints()) {
-                return_mold(*out);
+        static bool show_static = false;
+        if (!show_static) {
+            ImGui::SameLine();
+            if (ImGui::Button("Static")) {
+                show_static = true;
             }
-            ImGui::EndPopup();
+        }
+        if (show_static) {
+            if (auto window = imgui_window("Static constraints", &show_static,
+                                           ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse)) {
+                if (auto out = static_constraints()) {
+                    return_mold(*out);
+                }
+            }
         }
 #endif
     }
@@ -670,7 +686,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                             imgui_str(labels[masked[code]]);
                             if (mold.lock[code]) {
                                 ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() - ImVec2(2, 2),
-                                                                    ImGui::GetItemRectMax() + ImVec2(2, 2), -1);
+                                                                    ImGui::GetItemRectMax() + ImVec2(2, 2),
+                                                                    IM_COL32_WHITE);
                             }
                             if (x == max_to_show) {
                                 break;
