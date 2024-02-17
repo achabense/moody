@@ -6,7 +6,7 @@
 #include <filesystem>
 #include <fstream>
 
-#include "app.hpp"
+#include "common.hpp"
 
 // - Experience in MSVC
 // - It turns out that there are still a lot of messy encoding problems even if "/utf-8" is specified.

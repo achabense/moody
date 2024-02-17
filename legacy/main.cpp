@@ -9,7 +9,7 @@
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_sdlrenderer2.h"
 
-#include "app.hpp"
+#include "common.hpp"
 
 [[noreturn]] static void resource_failure() {
     printf("Error: %s", SDL_GetError());

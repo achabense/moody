@@ -4,7 +4,7 @@
 
 #include "rule_algo.hpp"
 
-#include "app.hpp"
+#include "common.hpp"
 
 // TODO: currently poorly designed...
 #define ENABLE_STATIC_CONSTRAINTS

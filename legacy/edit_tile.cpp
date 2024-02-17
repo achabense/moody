@@ -2,8 +2,9 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #endif
 
-#include "app.hpp"
 #include "tile.hpp"
+
+#include "common.hpp"
 
 static void update(tile_image& img, const legacy::tileT& tile) {
     img.update(tile.width(), tile.height(), [&tile](int y) { return tile.line(y); });

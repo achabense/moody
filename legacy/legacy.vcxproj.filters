@@ -48,7 +48,7 @@
     <ClInclude Include="app_imgui.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="app.hpp">
+    <ClInclude Include="common.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
