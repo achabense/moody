@@ -3,15 +3,6 @@
 #include "rule.hpp"
 
 namespace legacy {
-    inline bool for_each_code_all_of(const auto& pred) {
-        for (codeT code{.val = 0}; code.val < 512; ++code.val) {
-            if (!pred(codeT(code))) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     // TODO: better name for ruleT_masked?
     // TODO: is it safe to define maskT this way?
     // TODO: explain the meaning of maskT_result (how is a rule different from maskT)...

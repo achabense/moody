@@ -94,6 +94,15 @@ namespace legacy {
         }
     }
 
+    constexpr bool for_each_code_all_of(const auto& pred) {
+        for (codeT code{.val = 0}; code.val < 512; ++code.val) {
+            if (!pred(codeT(code))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     constexpr bool get(codeT code, codeT::bposE bpos) { //
         return (code >> bpos) & 1;
     }
@@ -302,15 +311,17 @@ namespace legacy {
     }
 
     struct extrT {
-        std::optional<moldT> mold{};
+        // Acts as a variant for ruleT/moldT.
+        struct valT {
+            ruleT rule;
+            std::optional<moldT::lockT> lock;
+        };
+
+        std::optional<valT> val;
         std::string_view prefix{}, suffix{};
     };
 
-    // TODO: ?? unpaired rules tend to mean the locks are unknown/not cared about. In these cases it might
-    // b better to try to fit the rule into current mold, and break lock if not fitting...
-
-    // TODO: or return optional<{ruleT,optional<lockT>}>?
-    // Extract moldT from text. Rules unpaired with lock data are treated as moldT with empty lock.
+    // Extract ruleT or moldT from text.
     inline extrT extract_MAP_str(const char* begin, const char* end) {
         extrT extr{};
 
@@ -323,11 +334,9 @@ namespace legacy {
             extr.prefix = {match.prefix().first, match.prefix().second};
             extr.suffix = {match.suffix().first, match.suffix().second};
 
-            ruleT rule{};
-            _misc::load_base64({match[1].first, match[1].second}, rule);
-            extr.mold.emplace(rule);
+            _misc::load_base64({match[1].first, match[1].second}, extr.val.emplace().rule);
             if (match[3].matched) {
-                _misc::load_base64({match[3].first, match[3].second}, extr.mold->lock);
+                _misc::load_base64({match[3].first, match[3].second}, extr.val->lock.emplace());
             }
         } else {
             extr.prefix = {begin, end};
@@ -349,8 +358,8 @@ namespace legacy {
         inline const testT test_MAP_str = [] {
             {
                 const std::string_view str = "...";
-                const auto [extr, prefix, suffix] = extract_MAP_str(str);
-                assert(!extr);
+                const auto [val, prefix, suffix] = extract_MAP_str(str);
+                assert(!val);
                 assert(prefix == "...");
                 assert(suffix == "");
             }
@@ -361,12 +370,12 @@ namespace legacy {
                 const ruleT gol = game_of_life();
                 assert(to_MAP_str(gol) == gol_str);
 
-                const auto [extr, prefix, suffix] = extract_MAP_str(gol_str);
+                const auto [val, prefix, suffix] = extract_MAP_str(gol_str);
                 assert(prefix == "");
                 assert(suffix == "");
-                assert(extr);
-                assert(extr->rule == gol);
-                assert(extr->lock == moldT::lockT{});
+                assert(val);
+                assert(val->rule == gol);
+                assert(!val->lock);
             }
 
             {
@@ -378,15 +387,16 @@ namespace legacy {
                 const std::string rule_only = "(prefix)" + to_MAP_str(mold.rule) + "(suffix)";
                 const std::string whole = "(prefix)" + to_MAP_str(mold) + "(suffix)";
 
-                const auto [extr1, prefix1, suffix1] = extract_MAP_str(rule_only);
-                const auto [extr2, prefix2, suffix2] = extract_MAP_str(whole);
+                const auto [val1, prefix1, suffix1] = extract_MAP_str(rule_only);
+                const auto [val2, prefix2, suffix2] = extract_MAP_str(whole);
 
-                assert(extr1 && extr2);
                 assert(prefix1 == "(prefix)" && prefix2 == "(prefix)");
                 assert(suffix1 == "(suffix)" && suffix2 == "(suffix)");
-                assert(extr1->rule == mold.rule);
-                assert(extr1->lock == moldT::lockT{});
-                assert(*extr2 == mold);
+                assert(val1 && val2);
+                assert(val1->rule == mold.rule);
+                assert(!val1->lock);
+                assert(val2->rule == mold.rule);
+                assert(val2->lock == mold.lock);
             }
         };
     }  // namespace _tests

@@ -38,6 +38,20 @@ private:
     void set_pos(int pos) { m_pos = std::clamp(pos, 0, size() - 1); }
 };
 
+static void assign_val(legacy::moldT& mold, legacy::extrT::valT& val) {
+    if (val.lock) {
+        mold.lock = *val.lock;
+        mold.rule = val.rule;
+    } else {
+        // Clear the lock if val.rule doesn't fit well.
+        if (!legacy::for_each_code_all_of(
+                [&](legacy::codeT code) { return !mold.lock[code] || mold.rule[code] == val.rule[code]; })) {
+            mold.lock = {};
+        }
+        mold.rule = val.rule;
+    }
+}
+
 void frame(const code_image& icons, tile_image& img) {
     static recorderT recorder;
 
@@ -53,8 +67,8 @@ void frame(const code_image& icons, tile_image& img) {
         ImGui::SetNextWindowSize({600, 400}, ImGuiCond_FirstUseEver);
         ImGui::SetNextWindowSizeConstraints(ImVec2(400, 200), ImVec2(FLT_MAX, FLT_MAX));
         if (auto window = imgui_window("Load rule", &show_load, ImGuiWindowFlags_NoCollapse)) {
-            if (auto out = load_rule(current)) {
-                current = *out;
+            if (auto out = load_rule()) {
+                assign_val(current, *out);
                 update = true;
             }
         }
@@ -87,8 +101,8 @@ void frame(const code_image& icons, tile_image& img) {
             // TODO: (temp) added back; remove when pasting is supported by load_rule...
             if (ImGui::Button("Paste")) {
                 if (const char* str = ImGui::GetClipboardText()) {
-                    if (auto out = legacy::extract_MAP_str(std::string_view(str)).mold) {
-                        current = *out;
+                    if (auto out = legacy::extract_MAP_str(std::string_view(str)).val) {
+                        assign_val(current, *out);
                         update = true;
                     }
                 }

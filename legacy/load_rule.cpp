@@ -229,8 +229,8 @@ struct fileT {
 
     std::filesystem::path m_path;
     std::vector<lineT> m_lines;
-    std::vector<legacy::compressT> m_rules;
-    int pointing_at = 0; // valid if !m_rules.empty().
+    std::vector<legacy::extrT::valT> m_rules; // TODO: whether to do compression?
+    int pointing_at = 0;                      // valid if !m_rules.empty().
 
     bool need_reset_scroll = true;
 
@@ -240,13 +240,13 @@ struct fileT {
     // So, currently the program only recognizes the first rule for each line, and highlights the whole line if
     // the line contains a rule.
 
-    static void append(std::vector<lineT>& lines, std::vector<legacy::compressT>& rules, std::istream& is) {
+    static void append(std::vector<lineT>& lines, std::vector<legacy::extrT::valT>& rules, std::istream& is) {
         std::string text;
         while (std::getline(is, text)) {
-            const auto extr = legacy::extract_MAP_str(text).mold;
+            const auto val = legacy::extract_MAP_str(text).val;
             lineT& line = lines.emplace_back(std::move(text));
-            if (extr.has_value()) {
-                rules.push_back(legacy::compress(*extr));
+            if (val.has_value()) {
+                rules.push_back(*val);
                 line.id = rules.size() - 1;
             }
         }
@@ -264,14 +264,12 @@ struct fileT {
         need_reset_scroll = true;
     }
 
-    // TODO: how to combine with file-nav (into a single window)?
-    std::optional<legacy::moldT> display(const legacy::moldT& test_sync) {
-        bool hit = false; // TODO: also sync on window appearing?
+    std::optional<legacy::extrT::valT> display() {
+        bool hit = false; // TODO: rename...
         const int total = m_rules.size();
 
         if (total != 0) {
-            const bool in_sync = test_sync == legacy::decompress(m_rules[pointing_at]); // TODO: looks expensive...
-
+            ImGui::BeginGroup();
             iter_pair(
                 "<|", "prev", "next", "|>",                                              //
                 [&] { hit = true, pointing_at = 0; },                                    //
@@ -279,14 +277,8 @@ struct fileT {
                 [&] { hit = true, pointing_at = std::min(total - 1, pointing_at + 1); }, //
                 [&] { hit = true, pointing_at = total - 1; }, false, false);
             ImGui::SameLine();
-            ImGui::Text("Total:%d At:%d %s", total, pointing_at + 1, !in_sync ? "(click to sync)" : "");
-            // TODO: what if there are popups?
-            if (!in_sync && ImGui::IsItemHovered()) {
-                const ImVec2 pos_min = ImGui::GetItemRectMin();
-                const ImVec2 pos_max = ImGui::GetItemRectMax();
-                ImGui::GetWindowDrawList()->AddRectFilled(pos_min, pos_max, IM_COL32(0, 255, 0, 30));
-            }
-
+            ImGui::Text("Total:%d At:%d", total, pointing_at + 1);
+            ImGui::EndGroup();
             if (ImGui::IsItemClicked()) {
                 hit = true;
             }
@@ -310,6 +302,10 @@ struct fileT {
 
         if (need_reset_scroll) {
             ImGui::SetNextWindowScroll({0, 0});
+            assert(pointing_at == 0);
+            if (total != 0) {
+                hit = true; // TODO: whether to set hit in this case?
+            }
             need_reset_scroll = false;
         }
         if (auto child = imgui_childwindow("Child", {}, 0, ImGuiWindowFlags_None)) {
@@ -320,6 +316,7 @@ struct fileT {
                 ImGui::SameLine();
                 imgui_strwrapped(text);
 
+                // TODO: use different colors for ruleT/moldT?
                 if (id.has_value()) {
                     if (id == pointing_at) {
                         const ImVec2 pos_min = ImGui::GetItemRectMin();
@@ -345,7 +342,7 @@ struct fileT {
 
         if (hit) {
             assert(pointing_at >= 0 && pointing_at < total);
-            return legacy::decompress(m_rules[pointing_at]);
+            return m_rules[pointing_at];
         } else {
             return std::nullopt;
         }
@@ -354,11 +351,11 @@ struct fileT {
 
 // TODO: show the last opened file in file-nav?
 
-std::optional<legacy::moldT> load_rule(const legacy::moldT& test_sync) {
+std::optional<legacy::extrT::valT> load_rule() {
     static file_nav nav;
     static std::optional<fileT> file;
 
-    std::optional<legacy::moldT> out;
+    std::optional<legacy::extrT::valT> out;
 
     bool close = false;
     if (file) {
@@ -375,7 +372,7 @@ std::optional<legacy::moldT> load_rule(const legacy::moldT& test_sync) {
         }
         imgui_str(cpp17_u8string(file->m_path));
 
-        out = file->display(test_sync);
+        out = file->display();
     } else {
         if (auto sel = nav.display()) {
             file.emplace(*sel);

@@ -81,7 +81,9 @@ public:
 
 // TODO: this workaround is ugly...
 bool file_nav_add_special_path(const char* u8path, const char* title);
-std::optional<legacy::moldT> load_rule(const legacy::moldT& test_sync);
+
+// TODO: whether to test sync? (removed after implementing lockT/moldT differentiation)
+std::optional<legacy::extrT::valT> load_rule();
 
 std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_image& icons);
 
