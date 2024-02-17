@@ -24,13 +24,14 @@ class subset_selector {
     using termT_vec = std::vector<termT>;
 
     termT_vec terms_ignore; // TODO: rename...
-    termT_vec terms_native;
     termT_vec terms_misc;
+    termT_vec terms_native;
+    termT_vec terms_totalistic;
     termT_vec terms_hex;
     // TODO: about the plan to support user-defined subsets...
 
     void for_each_term(const auto& fn) {
-        for (termT_vec* terms : {&terms_ignore, &terms_native, &terms_misc, &terms_hex}) {
+        for (termT_vec* terms : {&terms_ignore, &terms_misc, &terms_native, &terms_totalistic, &terms_hex}) {
             for (termT& t : *terms) {
                 fn(t);
             }
@@ -72,12 +73,12 @@ public:
         terms_ignore.emplace_back("x", make_subset({mp_ignore_x}));
         terms_ignore.emplace_back("c", make_subset({mp_ignore_c}));
 
-        // TODO: temp...
-        terms_ignore.emplace_back("S'", make_subset({mp_ignore_s}, mask_identity));
-        terms_ignore.emplace_back("Hex", make_subset({mp_hex_ignore}));
+        terms_misc.emplace_back("S(f)", make_subset({mp_ignore_s}, mask_identity));
+        terms_misc.emplace_back("Hex", make_subset({mp_hex_ignore}));
         // TODO: or define mp_von_ignore?
-        terms_ignore.emplace_back("Von", make_subset({mp_ignore_q, mp_ignore_e, mp_ignore_z, mp_ignore_c}));
-        terms_ignore.emplace_back("Dual", make_subset({mp_dual}, mask_identity)); // <-------
+        terms_misc.emplace_back("Von", make_subset({mp_ignore_q, mp_ignore_e, mp_ignore_z, mp_ignore_c}));
+        terms_misc.emplace_back("Dual", make_subset({mp_dual}, mask_identity)); // Self-complementary
+        terms_misc.emplace_back("'C8'", make_subset({mp_C8}));                  // TODO: whether to expose this?
 
         terms_native.emplace_back("All", make_subset({mp_refl_wsx, mp_refl_qsc}));
         terms_native.emplace_back("|", make_subset({mp_refl_wsx}));
@@ -87,11 +88,10 @@ public:
         terms_native.emplace_back("C2", make_subset({mp_C2}));
         terms_native.emplace_back("C4", make_subset({mp_C4})); // TODO: add explanations in the gui
 
-        // terms_misc.emplace_back("'C8'", make_subset({mp_C8})); // TODO: whether to support this?
-        terms_misc.emplace_back("Tot", make_subset({mp_C8, mp_tot_exc_s}));
-        terms_misc.emplace_back("Tot(+s)", make_subset({mp_C8, mp_tot_inc_s}));
-        terms_misc.emplace_back("Hex_Tot", make_subset({mp_hex_C6, mp_hex_tot_exc_s}));
-        terms_misc.emplace_back("Hex_Tot(+s)", make_subset({mp_hex_C6, mp_hex_tot_inc_s}));
+        terms_totalistic.emplace_back("Tot", make_subset({mp_C8, mp_tot_exc_s}));
+        terms_totalistic.emplace_back("Tot(+s)", make_subset({mp_C8, mp_tot_inc_s}));
+        terms_totalistic.emplace_back("Hex_Tot", make_subset({mp_hex_C6, mp_hex_tot_exc_s}));
+        terms_totalistic.emplace_back("Hex_Tot(+s)", make_subset({mp_hex_C6, mp_hex_tot_inc_s}));
 
         terms_hex.emplace_back("All", make_subset({mp_hex_refl_asd, mp_hex_refl_aq}));
         terms_hex.emplace_back("a-d", make_subset({mp_hex_refl_asd}));
@@ -100,7 +100,6 @@ public:
         terms_hex.emplace_back("a|q", make_subset({mp_hex_refl_aq}));
         terms_hex.emplace_back("q|w", make_subset({mp_hex_refl_qw}));
         terms_hex.emplace_back("w|d", make_subset({mp_hex_refl_wd}));
-
         terms_hex.emplace_back("C2", make_subset({mp_hex_C2}));
         terms_hex.emplace_back("C3", make_subset({mp_hex_C3}));
         terms_hex.emplace_back("C6", make_subset({mp_hex_C6}));
@@ -122,32 +121,21 @@ public:
         }
         ImGui::SameLine();
         if (ImGui::Button("Recognize")) {
-            for_each_term([&](termT& t) {
-                set_select(t, t.set.contains(mold.rule));
-                // TODO: (wontfix) still relying on `reset_current` which doesn't utilize that mold.rule belongs to
-                // the result...
-            });
+            for_each_term([&](termT& t) { set_select(t, t.set.contains(mold.rule)); });
         }
 
         // TODO: drop mutable id... use manually specified ids
         // TODO: tooltip...
-        // TODO: recheck id & tid logic... (& imagebutton)
         auto check = [&, id = 0, size = square_size()](termT& term) mutable {
-            // TODO: change color when hovered?
-            // bool hovered = false;
             ImGui::PushID(id++);
-            if (!term.disabled) {
-                if (ImGui::InvisibleButton("Check", size)) {
-                    set_select(term, !term.selected);
-
-                    // TODO: need to recheck all invisible buttons etc if to enable Navigation.
-                    // e.g. RenderNavHighlight
-                }
-                // hovered = ImGui::IsItemHovered();
-            } else {
-                ImGui::Dummy(size);
+            // ImGui::PushID(&term); // TODO: is ptr id reliable? (will this possibly cause collisions?)
+            if (ImGui::InvisibleButton("Check", size) && !term.disabled) {
+                set_select(term, !term.selected);
             }
             ImGui::PopID();
+
+            // TODO: change color when hovered?
+            // const bool hovered = ImGui::IsItemHovered();
 
             // TODO: explain coloring scheme; redesign if necessary (especially ring col)
             // TODO: find better color for "disabled"/incompatible etc... currently too ugly.
@@ -188,10 +176,10 @@ public:
             {
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                imgui_str("Ignore");
+                imgui_str("Ignore&Misc");
 
                 ImGui::TableNextColumn();
-                if (ImGui::BeginTable("Checklist##Ignore", 1, flags_inner)) {
+                if (ImGui::BeginTable("Checklist##Ignore&Misc", 1, flags_inner)) {
                     ImGui::TableNextRow();
                     // TODO: slightly confusing; light color should represent "take-into-account" instead of
                     // "ignore" Is this solvable by applying specific coloring scheme?
@@ -208,12 +196,11 @@ public:
                     ImGui::PopStyleVar();
                     ImGui::EndGroup();
 
-                    // TODO (temp) experimental and unstable...
-                    for (int i = 9; i < std::ssize(terms_ignore); ++i) {
+                    for (termT& t : terms_misc) {
                         ImGui::SameLine();
                         ImGui::BeginGroup();
-                        imgui_str(terms_ignore[i].title);
-                        check(terms_ignore[i]);
+                        imgui_str(t.title);
+                        check(t);
                         ImGui::EndGroup();
                     }
 
@@ -233,18 +220,18 @@ public:
             {
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                imgui_str("Misc");
+                imgui_str("Totalistic");
 
                 ImGui::TableNextColumn();
-                checklist(terms_misc, "Checklist##Misc");
+                checklist(terms_totalistic, "Checklist##Totalistic");
             }
 
             {
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                imgui_str("qw-    q w\n"
-                          "asd ~ a s d\n"
-                          "-xc    x c");
+                imgui_str("q w -    q w\n"
+                          "a s d ~ a s d\n"
+                          "- x c    x c");
 
                 ImGui::TableNextColumn();
                 checklist(terms_hex, "Checklist##Hex");
