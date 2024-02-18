@@ -21,6 +21,12 @@ inline void assert_utf8_encoding() {
         return static_cast<unsigned char>(l) == static_cast<unsigned char>(r);
     }));
 }
+
+// Experience in MSVC
+// It turns out that there are still a lot of messy encoding problems even if `/utf-8` is specified.
+// For example, how is main's argv / fs::path.string() / exception.what() / ... encoded?
+// (Well, are there even guarantees that we can get a valid fs::path from main's argv?)
+// To make things easy the program does not try to deal with these strings.
 #endif
 
 using std::chrono_literals::operator""ms;

@@ -8,11 +8,6 @@
 
 #include "common.hpp"
 
-// - Experience in MSVC
-// - It turns out that there are still a lot of messy encoding problems even if "/utf-8" is specified.
-//   (For example, how is `exception.what()` encoded? What does `path` expects from `string`? And what about
-//   `filesystem.path.string()`?)
-
 // (wontfix) After wasting so much time, I'd rather afford the extra copy than bothering with "more efficient"
 // implementations any more.
 
@@ -70,8 +65,8 @@ class file_nav {
             current.swap(p);
             dirs.swap(p_dirs);
             files.swap(p_files);
-        } catch (const std::exception&) {
-            // TODO: report error... what encoding?
+        } catch (const std::exception& /* not used; the encoding is a mystery */) {
+            messenger::add_msg("Cannot open folder:\n{}", cpp17_u8string(p));
         }
     }
 
@@ -79,8 +74,8 @@ class file_nav {
         if (valid) {
             try {
                 collect(current, dirs, files);
-            } catch (const std::exception&) {
-                // TODO: report error... what encoding?
+            } catch (const std::exception& /* not used; the encoding is a mystery */) {
+                messenger::add_msg("Cannot refresh folder:\n{}", cpp17_u8string(current));
                 valid = false;
                 dirs.clear();
                 files.clear();
@@ -240,6 +235,8 @@ struct fileT {
     // So, currently the program only recognizes the first rule for each line, and highlights the whole line if
     // the line contains a rule.
 
+    // The content of the stream is assumed to be utf8-encoded.
+    // (If not, the rules are still likely extractable.)
     static void append(std::vector<lineT>& lines, std::vector<legacy::extrT::valT>& rules, std::istream& is) {
         std::string text;
         while (std::getline(is, text)) {
