@@ -575,25 +575,25 @@ namespace legacy {
                 assert(pos != end);
                 bool neg = false;
                 switch (*pos) {
-                case '0': ++pos; return v0;
-                case '1': ++pos; return v1;
-                case '!':
-                    ++pos;
-                    neg = true;
-                    break;
+                    case '0': ++pos; return v0;
+                    case '1': ++pos; return v1;
+                    case '!':
+                        ++pos;
+                        neg = true;
+                        break;
                 }
                 assert(pos != end);
                 switch (*pos++) {
-                case 'q': return neg ? nq : q;
-                case 'w': return neg ? nw : w;
-                case 'e': return neg ? ne : e;
-                case 'a': return neg ? na : a;
-                case 's': return neg ? ns : s;
-                case 'd': return neg ? nd : d;
-                case 'z': return neg ? nz : z;
-                case 'x': return neg ? nx : x;
-                case 'c': return neg ? nc : c;
-                default: assert(false); return v0;
+                    case 'q': return neg ? nq : q;
+                    case 'w': return neg ? nw : w;
+                    case 'e': return neg ? ne : e;
+                    case 'a': return neg ? na : a;
+                    case 's': return neg ? ns : s;
+                    case 'd': return neg ? nd : d;
+                    case 'z': return neg ? nz : z;
+                    case 'x': return neg ? nx : x;
+                    case 'c': return neg ? nc : c;
+                    default: assert(false); return v0;
                 }
             };
             q2 = take2(), w2 = take2(), e2 = take2();

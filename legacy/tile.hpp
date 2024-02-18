@@ -400,10 +400,10 @@ namespace legacy {
                 }
                 assert(str != end);
                 switch (*str++) {
-                case 'b': return {n, 'b'};
-                case 'o': return {n, 'o'};
-                case '$': return {n, '$'};
-                default: return {1, '!'};
+                    case 'b': return {n, 'b'};
+                    case 'o': return {n, 'o'};
+                    case '$': return {n, '$'};
+                    default: return {1, '!'};
                 }
             }
         };
@@ -444,15 +444,15 @@ namespace legacy {
                 break;
             }
             switch (c) {
-            case 'b':
-            case 'o':
-                std::fill_n(tile.line(y) + x, n, c == 'o');
-                x += n;
-                break;
-            case '$':
-                y += n;
-                x = 0;
-                break;
+                case 'b':
+                case 'o':
+                    std::fill_n(tile.line(y) + x, n, c == 'o');
+                    x += n;
+                    break;
+                case '$':
+                    y += n;
+                    x = 0;
+                    break;
             }
         }
         return tile;

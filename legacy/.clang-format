@@ -3,9 +3,10 @@
 BasedOnStyle:  LLVM
 
 ColumnLimit:     120
-# Only suitable for simple logics (getters etc).
+
 AllowShortFunctionsOnASingleLine: All
-AlwaysBreakTemplateDeclarations: Yes
+
+AlwaysBreakTemplateDeclarations: true
 
 AlignEscapedNewlines: Left
 
@@ -23,4 +24,5 @@ PointerAlignment: Left
 IndentAccessModifiers: false
 AccessModifierOffset: -4
 
+IndentCaseLabels: true
 AllowShortCaseLabelsOnASingleLine: true
