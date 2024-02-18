@@ -275,7 +275,7 @@ struct fileT {
                 [&] { hit = true, pointing_at = 0; },                                    //
                 [&] { hit = true, pointing_at = std::max(0, pointing_at - 1); },         //
                 [&] { hit = true, pointing_at = std::min(total - 1, pointing_at + 1); }, //
-                [&] { hit = true, pointing_at = total - 1; }, false, false);
+                [&] { hit = true, pointing_at = total - 1; }, false); // TODO: whether to allow scrolling?
             ImGui::SameLine();
             ImGui::Text("Total:%d At:%d", total, pointing_at + 1);
             ImGui::EndGroup();

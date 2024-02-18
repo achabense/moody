@@ -9,6 +9,27 @@
 // TODO: currently poorly designed...
 #define ENABLE_STATIC_CONSTRAINTS
 
+// TODO: consider other approaches (native nav etc) if possible...
+// TODO: e.g. toggle between buttons by left/right... / clear binding...
+inline bool enter_button(const char* label) {
+    static ImGuiID bind_id = 0;
+    bool ret = ImGui::Button(label);
+    const ImGuiID button_id = ImGui::GetItemID();
+    if (ret) {
+        bind_id = button_id;
+    }
+    // TODO: are there public ways (not relying on im gui_internal.h)
+    // to detect whether in disabled block?
+    if (bind_id == button_id && (GImGui->CurrentItemFlags & ImGuiItemFlags_Disabled) == 0) {
+        if (imgui_keypressed(ImGuiKey_Enter, false)) {
+            ret = true;
+        }
+        const ImU32 col = ret ? IM_COL32(128, 128, 128, 255) : IM_COL32_WHITE;
+        ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), col);
+    }
+    return ret;
+}
+
 class subset_selector {
     legacy::subsetT current;
 
@@ -504,7 +525,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             imgui_int_slider("##Quantity", &rcount, 0, par.k());
             rcount = std::clamp(rcount, 0, freec);
             ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
-            if (imgui_enterbutton("Randomize")) {
+            if (enter_button("Randomize")) {
                 return_rule(legacy::randomize(subset, mold, global_mt19937(), rcount, rcount));
             }
         } else {
@@ -513,7 +534,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             ImGui::SliderFloat("##Density", &density, 0, 1, std::format("Around {}", round(density * par.k())).c_str(),
                                ImGuiSliderFlags_NoInput);
             ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
-            if (imgui_enterbutton("Randomize")) {
+            if (enter_button("Randomize")) {
                 return_rule(legacy::randomize_v2(subset, mold, global_mt19937(), density));
             }
         }
@@ -523,16 +544,16 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             [&] { return_rule(legacy::act_int::first(subset, mold)); },
             [&] { return_rule(legacy::act_int::prev(subset, mold)); },
             [&] { return_rule(legacy::act_int::next(subset, mold)); },
-            [&] { return_rule(legacy::act_int::last(subset, mold)); });
+            [&] { return_rule(legacy::act_int::last(subset, mold)); }, true, enter_button);
         ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
         iter_pair(
             "<1.0.", "pprev", "pnext", "0.1.>", //
             [&] { return_rule(legacy::act_perm::first(subset, mold)); },
             [&] { return_rule(legacy::act_perm::prev(subset, mold)); },
             [&] { return_rule(legacy::act_perm::next(subset, mold)); },
-            [&] { return_rule(legacy::act_perm::last(subset, mold)); });
+            [&] { return_rule(legacy::act_perm::last(subset, mold)); }, true, enter_button);
         ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
-        if (imgui_enterbutton("Shuffle")) {
+        if (enter_button("Shuffle")) {
             return_rule(legacy::shuffle(subset, mold, global_mt19937()));
         }
 

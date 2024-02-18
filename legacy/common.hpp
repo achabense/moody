@@ -4,6 +4,7 @@
 #include <format>
 #include <functional>
 
+// TODO: merge the contents of app_imgui.hpp into this header?
 #include "app_imgui.hpp"
 #include "rule.hpp"
 
@@ -108,32 +109,23 @@ inline ImVec2 square_size() {
 
 // TODO: button_pair widget?
 // TODO: reconsider binding and scrolling logic...
-inline void iter_pair(const char* tag_first, const char* tag_prev, const char* tag_next, const char* tag_last,
-                      auto act_first, auto act_prev, auto act_next, auto act_last, bool allow_binding = true,
-                      bool allow_scrolling = true) {
+// TODO: (temp) exposing `middle_button` for enter-binding in `edit_rule`
+inline void iter_pair(
+    const char* tag_first, const char* tag_prev, const char* tag_next, const char* tag_last, auto act_first,
+    auto act_prev, auto act_next, auto act_last, bool allow_scrolling = true,
+    bool (*middle_button)(const char*) = [](const char* label) { return ImGui::Button(label); }) {
     if (ImGui::Button(tag_first)) {
         act_first();
     }
 
     ImGui::SameLine();
     ImGui::BeginGroup();
-    // TODO: _Left, _Right to toggle?
-    if (allow_binding) {
-        if (imgui_enterbutton(tag_prev)) {
-            act_prev();
-        }
-        ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
-        if (imgui_enterbutton(tag_next)) {
-            act_next();
-        }
-    } else {
-        if (ImGui::Button(tag_prev)) {
-            act_prev();
-        }
-        ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
-        if (ImGui::Button(tag_next)) {
-            act_next();
-        }
+    if (middle_button(tag_prev)) {
+        act_prev();
+    }
+    ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+    if (middle_button(tag_next)) {
+        act_next();
     }
 
     ImGui::EndGroup();

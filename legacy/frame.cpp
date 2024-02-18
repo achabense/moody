@@ -124,7 +124,7 @@ void frame(const code_image& icons, tile_image& img) {
             iter_pair(
                 "<|", "prev", "next", "|>", //
                 [&] { recorder.set_first(); }, [&] { recorder.set_prev(); }, [&] { recorder.set_next(); },
-                [&] { recorder.set_last(); }, false, true);
+                [&] { recorder.set_last(); });
         }
 
         ImGui::Separator();
@@ -132,7 +132,7 @@ void frame(const code_image& icons, tile_image& img) {
         if (ImGui::BeginTable("Layout", 2, ImGuiTableFlags_Resizable)) {
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            if (auto child = imgui_childwindow("Rul")) {
+            if (auto child = imgui_childwindow("Rul", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
                 if (auto out = edit_rule(current, icons)) {
                     current = *out;
                     update = true;
@@ -147,8 +147,7 @@ void frame(const code_image& icons, tile_image& img) {
                 }
             }
             ImGui::TableNextColumn();
-            // TODO: it seems this childwindow is not necessary?
-            if (auto child = imgui_childwindow("Til")) {
+            if (auto child = imgui_childwindow("Til", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
                 if (auto out = edit_tile(current.rule, img)) {
                     current.lock = *out;
                     update = true;
