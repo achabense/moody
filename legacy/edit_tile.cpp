@@ -18,16 +18,22 @@ static void run_torus(legacy::tileT& tile, legacy::tileT& temp, const legacy::ru
     tile.swap(temp);
 }
 
-static legacy::moldT::lockT dynamic_constraints(legacy::tileT tile, const legacy::ruleT& rule, const int limit = 30) {
-    legacy::tileT temp(tile.size());
+// Copy the subrange and run as a torus space, recording all invoked mappings.
+// This is good at capturing self-contained patterns (oscillators/spaceships).
+static legacy::moldT::lockT capture_closed(const legacy::tileT& source, const legacy::tileT::rangeT& range,
+                                           const legacy::ruleT& rule) {
+    legacy::tileT tile(range.size());
+    legacy::copy(tile, {0, 0}, source, range);
+
+    legacy::tileT temp(range.size());
+
     legacy::moldT::lockT lock{};
 
-    // TODO: support more stopping modes?
-    // This is good at capturing oscillators/spaceships (while still possible to miss something under a low `limit`)
-    // However, for the rules with interesting "texture"s (but no typical oscillators etc) this tends to make a full
-    // lock, which is not useful...
+    // (wontfix) It's possible that the loop fails to catch all invocations in very rare cases,
+    // due to that `limit` is not large enough.
 
     // Loop until there has been `limit` generations without newly invoked mappings.
+    const int limit = 30;
     for (int g = limit; g > 0; --g) {
         run_torus(tile, temp, [&](legacy::codeT code) {
             if (!lock[code]) {
@@ -40,6 +46,26 @@ static legacy::moldT::lockT dynamic_constraints(legacy::tileT tile, const legacy
 
     return lock;
 }
+
+// TODO: how to support open capture in the gui?
+#if 0
+// However, if the patterns is not self-contained, what happens in the copied subrange (treated as torus space)
+// is not exactly what we see in the source space.
+// Especially, for the rules with interesting "texture"s (but no typical oscillators etc), `capture_closed` tends to
+// make a full lock, which is not useful.
+// ~ We may want to record what actually happened in the range (instead of the the captured pattern) during the run of
+// the source space:
+static void capture_open(const legacy::tileT& source, legacy::tileT::rangeT range, legacy::moldT::lockT& lock) {
+    if (range.width() <= 2 || range.height() <= 2) {
+        return;
+    }
+    range.begin.x += 1;
+    range.begin.y += 1;
+    range.end.x -= 1;
+    range.end.y -= 1;
+    source.record(lock, range);
+}
+#endif
 
 class torusT {
     legacy::tileT m_tile, m_temp;
@@ -573,10 +599,7 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
             }
 
             if (imgui_keypressed(ImGuiKey_P, false)) {
-                // TODO: support specifying padding area?
-                legacy::tileT cap(range.size());
-                legacy::copy(cap, {0, 0}, runner.tile(), range);
-                out = dynamic_constraints(std::move(cap), ctrl.rule);
+                out = capture_closed(runner.tile(), range, ctrl.rule);
             }
 
             // TODO: support a menu somewhere...

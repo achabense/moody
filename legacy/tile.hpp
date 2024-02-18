@@ -194,6 +194,27 @@ namespace legacy {
             }
         }
 
+#if 0
+        // TODO: (temp) for `capture_open`.
+        void record(moldT::lockT& lock, const rangeT& range) const {
+            assert(has_range(range));
+
+            for (int _y = range.begin.y + 1; _y <= range.end.y; ++_y) {
+                const bool* _up = _line(_y - 1);
+                const bool* _cn = _line(_y);
+                const bool* _dw = _line(_y + 1);
+
+                for (int _x = range.begin.x + 1; _x <= range.end.x; ++_x) {
+                    lock[encode({
+                        _up[_x - 1], _up[_x], _up[_x + 1], //
+                        _cn[_x - 1], _cn[_x], _cn[_x + 1], //
+                        _dw[_x - 1], _dw[_x], _dw[_x + 1], //
+                    })] = true;
+                }
+            }
+        }
+#endif
+
         friend bool operator==(const tileT& l, const tileT& r) {
             if (l.m_size != r.m_size) {
                 return false;
