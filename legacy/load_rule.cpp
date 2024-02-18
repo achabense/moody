@@ -8,11 +8,13 @@
 
 #include "common.hpp"
 
+using pathT = std::filesystem::path;
+
 // (wontfix) After wasting so much time, I'd rather afford the extra copy than bothering with "more efficient"
 // implementations any more.
 
-static std::string cpp17_u8string(const std::filesystem::path& p) {
-    const auto u8string = p.u8string();
+static std::string cpp17_u8string(const pathT& path) {
+    const auto u8string = path.u8string();
     return std::string(u8string.begin(), u8string.end());
 }
 
@@ -21,29 +23,28 @@ static std::string cpp17_u8string(const std::filesystem::path& p) {
 // As to making an `std::u8string` first, see:
 // https://stackoverflow.com/questions/57603013/how-to-safely-convert-const-char-to-const-char8-t-in-c20
 // In short, in C++20 it's impossible to get `char8_t*` from `char*` without copy and in a well-defined way.
-static std::filesystem::path cpp17_u8path(const std::string_view path) { //
-    return std::filesystem::path(std::u8string(path.begin(), path.end()));
+static pathT cpp17_u8path(const std::string_view path) { //
+    return pathT(std::u8string(path.begin(), path.end()));
 }
 
 // TODO: recheck...
 // TODO: able to create/append/open file?
 class file_nav {
-    using path = std::filesystem::path;
-    using entries = std::vector<std::filesystem::directory_entry>;
+    using entryT = std::filesystem::directory_entry;
 
     char buf_path[200]{};
     char buf_filter[20]{".txt"};
 
     // TODO: is canonical path necessary?
-    bool valid = false; // The last call to `collect(current, ...)` is successful.
-    path current;       // Canonical path.
-    entries dirs, files;
+    bool m_valid = false; // The last call to `collect(current, ...)` is successful.
+    pathT m_current;      // Canonical path.
+    std::vector<entryT> m_dirs, m_files;
 
-    static void collect(const path& p, entries& dirs, entries& files) {
+    static void collect(const pathT& path, std::vector<entryT>& dirs, std::vector<entryT>& files) {
         dirs.clear();
         files.clear();
         for (const auto& entry :
-             std::filesystem::directory_iterator(p, std::filesystem::directory_options::skip_permission_denied)) {
+             std::filesystem::directory_iterator(path, std::filesystem::directory_options::skip_permission_denied)) {
             const auto status = entry.status();
             if (is_directory(status)) {
                 dirs.emplace_back(entry);
@@ -54,46 +55,46 @@ class file_nav {
         }
     }
 
-    // Intentionally pass by value.
-    void set_current(path p) {
+    // (`path` may come from `entryT.path()` in `m_dirs`.)
+    void set_current(const pathT& path) {
         try {
-            p = std::filesystem::canonical(p);
-            entries p_dirs, p_files;
+            pathT p = std::filesystem::canonical(path);
+            std::vector<entryT> p_dirs, p_files;
             collect(p, p_dirs, p_files);
 
-            valid = true;
-            current.swap(p);
-            dirs.swap(p_dirs);
-            files.swap(p_files);
+            m_valid = true;
+            m_current.swap(p);
+            m_dirs.swap(p_dirs);
+            m_files.swap(p_files);
         } catch (const std::exception& /* not used; the encoding is a mystery */) {
-            messenger::add_msg("Cannot open folder:\n{}", cpp17_u8string(p));
+            messenger::add_msg("Cannot open folder:\n{}", cpp17_u8string(path));
         }
     }
 
     void refresh_if_valid() {
-        if (valid) {
+        if (m_valid) {
             try {
-                collect(current, dirs, files);
+                collect(m_current, m_dirs, m_files);
             } catch (const std::exception& /* not used; the encoding is a mystery */) {
-                messenger::add_msg("Cannot refresh folder:\n{}", cpp17_u8string(current));
-                valid = false;
-                dirs.clear();
-                files.clear();
+                messenger::add_msg("Cannot refresh folder:\n{}", cpp17_u8string(m_current));
+                m_valid = false;
+                m_dirs.clear();
+                m_files.clear();
             }
         }
     }
 
 public:
-    file_nav(path p = std::filesystem::current_path()) {
-        valid = false;
-        set_current(std::move(p));
+    file_nav(const pathT& path = std::filesystem::current_path()) {
+        m_valid = false;
+        set_current(path);
     }
 
     // TODO: refine...
-    inline static std::vector<std::pair<path, std::string>> additionals;
+    inline static std::vector<std::pair<pathT, std::string>> additionals;
     static bool add_special_path(const char* u8path, const char* title) { //
         std::error_code ec{};
-        path p = std::filesystem::canonical(cpp17_u8path(u8path), ec);
+        pathT p = std::filesystem::canonical(cpp17_u8path(u8path), ec);
         if (!ec) {
             additionals.emplace_back(std::move(p), title);
             return true;
@@ -101,18 +102,18 @@ public:
         return false;
     }
 
-    [[nodiscard]] std::optional<path> display() {
-        std::optional<path> target = std::nullopt;
+    [[nodiscard]] std::optional<pathT> display() {
+        std::optional<pathT> target = std::nullopt;
 
         if (ImGui::SmallButton("Refresh")) {
             refresh_if_valid();
         }
 
-        if (valid) {
-            imgui_str(cpp17_u8string(current));
+        if (m_valid) {
+            imgui_str(cpp17_u8string(m_current));
         } else {
-            assert(dirs.empty() && files.empty());
-            imgui_strdisabled("(Invalid) " + cpp17_u8string(current));
+            assert(m_dirs.empty() && m_files.empty());
+            imgui_strdisabled("(Invalid) " + cpp17_u8string(m_current));
         }
 
         ImGui::Separator();
@@ -126,7 +127,7 @@ public:
                                              ImGuiInputTextFlags_EnterReturnsTrue)) {
                     // TODO: is the usage of / correct?
                     // TODO: is this still ok when !valid?
-                    set_current(current / cpp17_u8path(buf_path));
+                    set_current(m_current / cpp17_u8path(buf_path));
                     buf_path[0] = '\0';
                 }
                 for (const auto& [path, title] : additionals) {
@@ -135,22 +136,21 @@ public:
                     }
                 }
                 if (ImGui::MenuItem("..")) {
-                    set_current(current.parent_path());
+                    set_current(m_current.parent_path());
                 }
                 ImGui::Separator();
                 if (auto child = imgui_childwindow("Folders")) {
-                    if (dirs.empty()) {
+                    if (m_dirs.empty()) {
                         imgui_strdisabled("None");
                     }
-                    const std::filesystem::directory_entry* sel = nullptr;
-                    for (const auto& entry : dirs) {
+                    const entryT* sel = nullptr;
+                    for (const entryT& entry : m_dirs) {
                         // TODO: cache str?
                         const std::string str = cpp17_u8string(entry.path().filename());
                         if (ImGui::Selectable(str.c_str())) {
                             sel = &entry;
                         }
                     }
-                    // TODO: explain this is the reason why `set_current` must take by value...
                     if (sel) {
                         // TODO: does directory_entry.path always return absolute path?
                         assert(sel->path().is_absolute());
@@ -164,7 +164,7 @@ public:
                 ImGui::Separator();
                 if (auto child = imgui_childwindow("Files")) {
                     bool has = false;
-                    for (const auto& entry : files) {
+                    for (const entryT& entry : m_files) {
                         const std::string str = cpp17_u8string(entry.path().filename());
                         if (str.find(buf_filter) != str.npos) {
                             has = true;
@@ -192,7 +192,7 @@ bool file_nav_add_special_path(const char* u8path, const char* title) {
 #if 0
 // TODO: path must be a regular file...
 // TODO: fileT loading may be better of going through load_binary...
-inline std::vector<char> load_binary(const std::filesystem::path& path, int max_size) {
+inline std::vector<char> load_binary(const pathT& path, int max_size) {
     std::error_code ec{};
     const auto size = std::filesystem::file_size(path, ec);
     if (size != -1 && size < max_size) {
@@ -219,10 +219,10 @@ inline std::vector<char> load_binary(const std::filesystem::path& path, int max_
 struct fileT {
     struct lineT {
         std::string text;
-        std::optional<int> id = std::nullopt; // TODO: (temp) special value or optional?
+        std::optional<int> id = std::nullopt;
     };
 
-    std::filesystem::path m_path;
+    pathT m_path;
     std::vector<lineT> m_lines;
     std::vector<legacy::extrT::valT> m_rules; // TODO: whether to do compression?
     int pointing_at = 0;                      // valid if !m_rules.empty().
@@ -249,7 +249,7 @@ struct fileT {
         }
     }
 
-    fileT(std::filesystem::path path) : m_path(std::move(path)) { reload(); }
+    fileT(pathT path) : m_path(std::move(path)) { reload(); }
 
     void reload() {
         m_lines.clear();
@@ -307,18 +307,19 @@ struct fileT {
         }
         if (auto child = imgui_childwindow("Child", {}, 0, ImGuiWindowFlags_None)) {
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
-            // TODO: refine line-no logic (line-no or id-no)?
             for (int l = 1; const auto& [text, id] : m_lines) {
                 ImGui::TextDisabled("%2d ", l++);
                 ImGui::SameLine();
                 imgui_strwrapped(text);
 
-                // TODO: use different colors for ruleT/moldT?
                 if (id.has_value()) {
+                    const bool is_mold = m_rules[*id].lock.has_value();
+
                     if (id == pointing_at) {
                         const ImVec2 pos_min = ImGui::GetItemRectMin();
                         const ImVec2 pos_max = ImGui::GetItemRectMax();
-                        ImGui::GetWindowDrawList()->AddRectFilled(pos_min, pos_max, IM_COL32(0, 255, 0, 60));
+                        ImGui::GetWindowDrawList()->AddRectFilled(pos_min, pos_max,
+                                                                  IM_COL32(is_mold ? 196 : 0, 255, 0, 60));
                         if (!ImGui::IsItemVisible() && focus) {
                             ImGui::SetScrollHereY();
                         }
@@ -326,7 +327,8 @@ struct fileT {
                     if (ImGui::IsItemHovered()) {
                         const ImVec2 pos_min = ImGui::GetItemRectMin();
                         const ImVec2 pos_max = ImGui::GetItemRectMax();
-                        ImGui::GetWindowDrawList()->AddRectFilled(pos_min, pos_max, IM_COL32(0, 255, 0, 30));
+                        ImGui::GetWindowDrawList()->AddRectFilled(pos_min, pos_max,
+                                                                  IM_COL32(is_mold ? 196 : 0, 255, 0, 30));
                         if (ImGui::IsItemClicked()) {
                             pointing_at = *id;
                             hit = true;
@@ -358,7 +360,6 @@ std::optional<legacy::extrT::valT> load_rule() {
     if (file) {
         // TODO: the path (& file_nav's) should be copyable...
 
-        // TODO (temp) selectable looks good but is easy to click by mistake...
         if (ImGui::SmallButton("Close")) {
             close = true;
         }
@@ -385,7 +386,6 @@ std::optional<legacy::extrT::valT> load_rule() {
     }
 
     // TODO: whether to support opening multiple files?
-    // TODO: better layout...
 
     return out;
 }
