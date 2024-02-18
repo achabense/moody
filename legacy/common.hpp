@@ -171,7 +171,10 @@ public:
 
         if (opened) {
             if (ImGui::BeginPopup("Message")) {
-                for (const std::string& str : m_strs) {
+                for (bool first = true; const std::string& str : m_strs) {
+                    if (!std::exchange(first, false)) {
+                        ImGui::Separator();
+                    }
                     imgui_str(str);
                 }
                 ImGui::EndPopup();

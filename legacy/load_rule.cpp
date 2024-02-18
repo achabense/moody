@@ -5,6 +5,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 
 #include "common.hpp"
 
@@ -189,27 +190,27 @@ bool file_nav_add_special_path(const char* u8path, const char* title) {
     return file_nav::add_special_path(u8path, title);
 }
 
-#if 0
-// TODO: path must be a regular file...
-// TODO: fileT loading may be better of going through load_binary...
-inline std::vector<char> load_binary(const pathT& path, int max_size) {
+static std::optional<std::string> load_binary(const pathT& path, int max_size) {
     std::error_code ec{};
     const auto size = std::filesystem::file_size(path, ec);
     if (size != -1 && size < max_size) {
         std::ifstream file(path, std::ios::in | std::ios::binary);
         if (file) {
-            std::vector<char> data(size);
+            std::string data(size, '\0');
             file.read(data.data(), size);
             if (file && file.gcount() == size) {
                 return data;
             }
         }
     }
-    // TODO: refine msg?
-    messenger::add_msg("Cannot load");
+
+    if (size > max_size) {
+        messenger::add_msg("File too large: {} > {} (bytes)\n{}", size, max_size, cpp17_u8string(path));
+    } else {
+        messenger::add_msg("Cannot load file:\n{}", cpp17_u8string(path));
+    }
     return {};
 }
-#endif
 
 // TODO: should support clipboard paste in similar ways...
 // TODO: support saving into file? (without relying on the clipboard)
@@ -255,10 +256,12 @@ struct fileT {
         m_lines.clear();
         m_rules.clear();
         pointing_at = 0;
-
-        std::ifstream ifs(m_path);
-        append(m_lines, m_rules, ifs);
         need_reset_scroll = true;
+
+        if (auto data = load_binary(m_path, 100'000)) {
+            std::istringstream ss(std::move(*data));
+            append(m_lines, m_rules, ss);
+        }
     }
 
     std::optional<legacy::extrT::valT> display() {
@@ -305,7 +308,7 @@ struct fileT {
             }
             need_reset_scroll = false;
         }
-        if (auto child = imgui_childwindow("Child", {}, 0, ImGuiWindowFlags_None)) {
+        if (auto child = imgui_childwindow("Child")) {
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
             for (int l = 1; const auto& [text, id] : m_lines) {
                 ImGui::TextDisabled("%2d ", l++);
@@ -349,7 +352,7 @@ struct fileT {
 };
 
 // TODO: show the last opened file in file-nav?
-
+// TODO: whether to support opening multiple files?
 std::optional<legacy::extrT::valT> load_rule() {
     static file_nav nav;
     static std::optional<fileT> file;
@@ -357,6 +360,7 @@ std::optional<legacy::extrT::valT> load_rule() {
     std::optional<legacy::extrT::valT> out;
 
     bool close = false;
+    bool reload = false;
     if (file) {
         // TODO: the path (& file_nav's) should be copyable...
 
@@ -365,8 +369,7 @@ std::optional<legacy::extrT::valT> load_rule() {
         }
         ImGui::SameLine();
         if (ImGui::SmallButton("Reload")) {
-            file->reload();
-            // TODO: what if file->m_rules.empty() now?
+            reload = true;
         }
         imgui_str(cpp17_u8string(file->m_path));
 
@@ -376,7 +379,7 @@ std::optional<legacy::extrT::valT> load_rule() {
             file.emplace(*sel);
             if (file->m_rules.empty()) {
                 file.reset();
-                messenger::add_msg("No rules"); // TODO: better msg...
+                messenger::add_msg("Found no rules");
             }
         }
     }
@@ -384,8 +387,15 @@ std::optional<legacy::extrT::valT> load_rule() {
     if (close) {
         file.reset();
     }
-
-    // TODO: whether to support opening multiple files?
+    // TODO: awkward... refactor...
+    if (reload) {
+        assert(file);
+        file->reload();
+        if (file->m_rules.empty()) {
+            file.reset();
+            messenger::add_msg("Found no rules");
+        }
+    }
 
     return out;
 }
