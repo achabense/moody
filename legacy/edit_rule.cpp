@@ -6,6 +6,9 @@
 
 #include "common.hpp"
 
+// TODO: support rollbacking diff rules?
+// TODO: for editing opt, support in-lock and outof-lock mode?
+
 // TODO: currently poorly designed...
 #define ENABLE_STATIC_CONSTRAINTS
 
@@ -521,7 +524,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             static int rcount = 0.5 * par.k();
             const int freec = legacy::count_free(par, mold.lock); // TODO: still wasteful...
 
-            ImGui::SetNextItemWidth(FixedItemWidth);
+            ImGui::SetNextItemWidth(item_width);
             imgui_int_slider("##Quantity", &rcount, 0, par.k());
             rcount = std::clamp(rcount, 0, freec);
             ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
@@ -529,7 +532,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                 return_rule(legacy::randomize(subset, mold, global_mt19937(), rcount, rcount));
             }
         } else {
-            ImGui::SetNextItemWidth(FixedItemWidth);
+            ImGui::SetNextItemWidth(item_width);
             static float density = 0.5;
             ImGui::SliderFloat("##Density", &density, 0, 1, std::format("Around {}", round(density * par.k())).c_str(),
                                ImGuiSliderFlags_NoInput);

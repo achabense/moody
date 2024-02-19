@@ -100,14 +100,8 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
 // TODO: or add back to main.cpp? or directly define in this header?
 void frame(const code_image& icons, tile_image& img);
 
-// TODO: rename...
-const int FixedItemWidth = 220;
+inline const int item_width = 220;
 
-// TODO: support rollbacking diff rules?
-// TODO: for editing opt, support in-lock and outof-lock mode?
-// TODO: Right-click must either to open a submenu, or to toggle on/off the tooltip.
-
-// TODO: better name...
 inline ImVec2 square_size() {
     const float r = ImGui::GetFrameHeight();
     return ImVec2(r, r);
@@ -116,10 +110,12 @@ inline ImVec2 square_size() {
 // TODO: button_pair widget?
 // TODO: reconsider binding and scrolling logic...
 // TODO: (temp) exposing `middle_button` for enter-binding in `edit_rule`
-inline void iter_pair(
-    const char* tag_first, const char* tag_prev, const char* tag_next, const char* tag_last, auto act_first,
-    auto act_prev, auto act_next, auto act_last, bool allow_scrolling = true,
-    bool (*middle_button)(const char*) = [](const char* label) { return ImGui::Button(label); }) {
+// TODO (temp) this was defined as a lambda; workaround for a parsing error in clang...
+inline bool default_button(const char* label) { return ImGui::Button(label); }
+
+inline void iter_pair(const char* tag_first, const char* tag_prev, const char* tag_next, const char* tag_last,
+                      auto act_first, auto act_prev, auto act_next, auto act_last, bool allow_scrolling = true,
+                      bool (*middle_button)(const char*) = default_button) {
     if (ImGui::Button(tag_first)) {
         act_first();
     }

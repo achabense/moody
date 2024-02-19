@@ -623,7 +623,7 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
         }
     };
 
-    ImGui::PushItemWidth(FixedItemWidth);
+    ImGui::PushItemWidth(item_width);
     edit_ctrl();
     show_tile();
     ImGui::PopItemWidth();
