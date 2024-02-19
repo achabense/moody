@@ -568,83 +568,6 @@ namespace legacy {
         });
         return mir;
     }
-} // namespace legacy
-
-namespace legacy {
-    // A mapperT defines a rule that maps each codeT to another codeT.
-    // Specifically, mapperT{q2=q,w2=w,...} maps any codeT to the same value.
-    class mapperT {
-        enum takeE { v0, v1, q, w, e, a, s, d, z, x, c, nq, nw, ne, na, ns, nd, nz, nx, nc };
-        takeE q2, w2, e2;
-        takeE a2, s2, d2;
-        takeE z2, x2, c2;
-
-    public:
-        consteval mapperT(std::string_view str) {
-            // TODO: assert format ([01]|!?[qweasdzxc]){9}...
-            const char* pos = str.data();
-            [[maybe_unused]] const char* end = pos + str.size();
-            auto take2 = [&]() -> takeE {
-                assert(pos != end);
-                bool neg = false;
-                switch (*pos) {
-                    case '0': ++pos; return v0;
-                    case '1': ++pos; return v1;
-                    case '!':
-                        ++pos;
-                        neg = true;
-                        break;
-                }
-                assert(pos != end);
-                switch (*pos++) {
-                    case 'q': return neg ? nq : q;
-                    case 'w': return neg ? nw : w;
-                    case 'e': return neg ? ne : e;
-                    case 'a': return neg ? na : a;
-                    case 's': return neg ? ns : s;
-                    case 'd': return neg ? nd : d;
-                    case 'z': return neg ? nz : z;
-                    case 'x': return neg ? nx : x;
-                    case 'c': return neg ? nc : c;
-                    default: assert(false); return v0;
-                }
-            };
-            q2 = take2(), w2 = take2(), e2 = take2();
-            a2 = take2(), s2 = take2(), d2 = take2();
-            z2 = take2(), x2 = take2(), c2 = take2();
-        }
-
-        constexpr codeT operator()(codeT code) const {
-            const situT situ = decode(code);
-            const bool qweasdzxc[9]{situ.q, situ.w, situ.e, situ.a, situ.s, situ.d, situ.z, situ.x, situ.c};
-            const auto take = [&qweasdzxc](takeE t) -> bool {
-                if (t == v0) {
-                    return 0;
-                } else if (t == v1) {
-                    return 1;
-                } else if (t >= q && t <= c) {
-                    return qweasdzxc[t - q];
-                } else {
-                    assert(t >= nq && t <= nc);
-                    // TODO: how to silence the warning?
-                    return !qweasdzxc[t - nq];
-                }
-            };
-
-            return encode({take(q2), take(w2), take(e2), //
-                           take(a2), take(s2), take(d2), //
-                           take(z2), take(x2), take(c2)});
-        }
-    };
-
-    // A pair of mapperT defines an equivalence relation.
-    struct mapperT_pair {
-        mapperT a, b;
-    };
-
-    inline void add_eq(equivT& eq, const mapperT_pair& mp) {
-        for_each_code([&](codeT code) { eq.add_eq(mp.a(code), mp.b(code)); });
-    }
 
     // TODO: is `recipes` a proper name?
     inline namespace recipes {
@@ -655,6 +578,79 @@ namespace legacy {
         // TODO: use make_rule...
         inline constexpr maskT mask_identity{make_rule([](codeT code) { return get_s(code); })};
         // TODO: mask_copy_q/w/e/a/s(~mask_identity)/d/z/x/c etc?
+
+        // A mapperT defines a rule that maps each codeT to another codeT.
+        // Specifically, mapperT{"qweasdzxc"} maps any codeT to the same value.
+        class mapperT {
+            struct takeT {
+                enum tagE { O, I, Get, NGet };
+                tagE tag;
+                codeT::bposE bpos;
+                bool operator()(codeT code) const {
+                    switch (tag) {
+                        case O: return 0;
+                        case I: return 1;
+                        case Get: return get(code, bpos);
+                        default: assert(tag == NGet); return !get(code, bpos);
+                    }
+                }
+            };
+
+            // TODO: better name...
+            takeT q, w, e;
+            takeT a, s, d;
+            takeT z, x, c;
+
+        public:
+            // TODO: about consteval and the (obsolete) plan to support user-defined mappers / subsets...
+            consteval mapperT(const char* str) {
+                // [01]|!?[qweasdzxc]
+                auto parse = [&]() -> takeT {
+                    takeT::tagE tag = takeT::Get;
+                    switch (*str) {
+                        case '0': ++str; return {takeT::O, {}};
+                        case '1': ++str; return {takeT::I, {}};
+                        case '!':
+                            ++str;
+                            tag = takeT::NGet;
+                            break;
+                    }
+                    switch (*str++) {
+                        case 'q': return {tag, codeT::bpos_q};
+                        case 'w': return {tag, codeT::bpos_w};
+                        case 'e': return {tag, codeT::bpos_e};
+                        case 'a': return {tag, codeT::bpos_a};
+                        case 's': return {tag, codeT::bpos_s};
+                        case 'd': return {tag, codeT::bpos_d};
+                        case 'z': return {tag, codeT::bpos_z};
+                        case 'x': return {tag, codeT::bpos_x};
+                        case 'c': return {tag, codeT::bpos_c};
+                        default: throw 0;
+                    }
+                };
+                q = parse(), w = parse(), e = parse();
+                a = parse(), s = parse(), d = parse();
+                z = parse(), x = parse(), c = parse();
+                if (*str != '\0') {
+                    throw 0;
+                }
+            }
+
+            codeT operator()(codeT code) const {
+                return encode({q(code), w(code), e(code), //
+                               a(code), s(code), d(code), //
+                               z(code), x(code), c(code)});
+            }
+        };
+
+        // A pair of mapperT defines an equivalence relation.
+        struct mapperT_pair {
+            mapperT a, b;
+        };
+
+        inline void add_eq(equivT& eq, const mapperT_pair& mp) {
+            for_each_code([&](codeT code) { eq.add_eq(mp.a(code), mp.b(code)); });
+        }
 
         // TODO: recheck these mappers...
 
