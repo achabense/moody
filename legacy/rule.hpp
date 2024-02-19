@@ -70,12 +70,10 @@ namespace legacy {
 
     constexpr codeT encode(const situT& situ) {
         // ~ bool is implicitly promoted to int.
-        // clang-format off
         using enum codeT::bposE;
-        const int code = (situ.q << bpos_q) | (situ.w << bpos_w) | (situ.e << bpos_e) |
-                         (situ.a << bpos_a) | (situ.s << bpos_s) | (situ.d << bpos_d) |
+        const int code = (situ.q << bpos_q) | (situ.w << bpos_w) | (situ.e << bpos_e) | //
+                         (situ.a << bpos_a) | (situ.s << bpos_s) | (situ.d << bpos_d) | //
                          (situ.z << bpos_z) | (situ.x << bpos_x) | (situ.c << bpos_c);
-        // clang-format on
         assert(code >= 0 && code < 512);
         return codeT{code};
     }

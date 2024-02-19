@@ -29,12 +29,9 @@ namespace legacy {
     // TODO: rephrase...
     // Equivalence relation for codeT ({0...511}), in the form of union-find set.
     class equivT {
-        mutable codeT::map_to<codeT> parof;
+        friend class partitionT;
 
-    public:
-        equivT() {
-            for_each_code([&](codeT code) { parof[code] = code; });
-        }
+        mutable codeT::map_to<codeT> parof;
 
         codeT headof(codeT c) const {
             if (parof[c] == c) {
@@ -44,9 +41,31 @@ namespace legacy {
             }
         }
 
+    public:
+        equivT() {
+            for_each_code([&](codeT code) { parof[code] = code; });
+        }
+
         bool test(const ruleT_masked& r) const {
             return for_each_code_all_of([&](codeT code) { //
                 return r[code] == r[parof[code]];
+            });
+        }
+
+        bool test(const ruleT_masked& r, const moldT::lockT& lock) const {
+            codeT::map_to<int> record;
+            record.fill(-1);
+
+            return for_each_code_all_of([&](codeT code) {
+                if (!lock[code]) {
+                    return true;
+                }
+
+                int& rep = record[headof(code)];
+                if (rep == -1) {
+                    rep = r[code];
+                }
+                return rep == r[code];
             });
         }
 
@@ -74,13 +93,16 @@ namespace legacy {
         codeT::map_to<int> m_map;
         int m_k;
 
+        // TODO: (temp) without {} the compiler will give warnings;
+        // (It seems the compiler is unable to detect that m_data[0...511] is fully assigned...)
+
         // `m_data` is not a codeT::map_to<codeT>.
         // It's for storing codeT of the same group consecutively.
-        std::array<codeT, 512> m_data;
+        std::array<codeT, 512> m_data{};
         struct group_pos {
             int pos, size;
         };
-        std::vector<group_pos> m_groups;
+        std::vector<group_pos> m_groups{};
 
         groupT jth_group(int j) const {
             const auto [pos, size] = m_groups[j];
@@ -100,6 +122,11 @@ namespace legacy {
                 }
             }
         }
+
+        // TODO: (temp) these "user-declared" ctors are enough to avoid implicit moving...
+        // Avoid moving `m_data`:
+        partitionT(const partitionT&) = default;
+        partitionT& operator=(const partitionT&) = default;
 
         /*implicit*/ partitionT(const equivT& u) : m_eq(u) {
             m_k = 0;
@@ -134,9 +161,9 @@ namespace legacy {
             });
         }
 
-        // TODO: expose m_eq for `compatible`; drop this dependence when convenient...
-        const equivT& get_eq() const { return m_eq; }
         bool test(const ruleT_masked& r) const { return m_eq.test(r); }
+        bool test(const ruleT_masked& r, const moldT::lockT& lock) const { return m_eq.test(r, lock); }
+
         bool is_refinement_of(const partitionT& other) const { return other.m_eq.has_eq(m_eq); }
 
         friend partitionT operator|(const partitionT& a, const partitionT& b) {
@@ -146,7 +173,7 @@ namespace legacy {
         }
     };
 
-    // A subsetT defines a subset all possible ruleT.
+    // A subsetT defines a subset of all possible ruleT.
     // TODO: lockT is currently not a part of subsetT (but do take part in generation)
     // Extension is possible - let subsetT be ...(TODO, detailed explanation)
     class subsetT {
@@ -367,21 +394,7 @@ namespace legacy {
         }
 
         const ruleT_masked r = subset.get_mask() ^ mold.rule;
-        codeT::map_to<int> record;
-        record.fill(2);
-
-        const equivT& eq = subset.get_par().get_eq();
-        return for_each_code_all_of([&](codeT code) {
-            if (!mold.lock[code]) {
-                return true;
-            }
-
-            int& rep = record[eq.headof(code)];
-            if (rep == 2) {
-                rep = r[code];
-            }
-            return rep == r[code];
-        });
+        return subset.get_par().test(r, mold.lock);
     }
 
     inline ruleT approximate(const subsetT& subset, const moldT& mold) {
@@ -618,32 +631,19 @@ namespace legacy {
                 }
             };
 
-            // clang-format off
-            return encode({take(q2), take(w2), take(e2),
-                           take(a2), take(s2), take(d2),
+            return encode({take(q2), take(w2), take(e2), //
+                           take(a2), take(s2), take(d2), //
                            take(z2), take(x2), take(c2)});
-            // clang-format on
         }
     };
 
     // A pair of mapperT defines an equivalence relation.
     struct mapperT_pair {
         mapperT a, b;
-        bool test(const ruleT_masked& r) const {
-            return for_each_code_all_of([&](codeT code) { //
-                return r[a(code)] == r[b(code)];
-            });
-        }
     };
 
     inline void add_eq(equivT& eq, const mapperT_pair& mp) {
         for_each_code([&](codeT code) { eq.add_eq(mp.a(code), mp.b(code)); });
-    }
-
-    inline bool has_eq(const equivT& eq, const mapperT_pair& mp) {
-        return for_each_code_all_of([&](codeT code) { //
-            return eq.has_eq(mp.a(code), mp.b(code));
-        });
     }
 
     // TODO: is `recipes` a proper name?
@@ -791,8 +791,8 @@ namespace legacy {
 
             // 2024/1/20 2AM
             // There is NO problem in the algorithm.
-            // It's just that, in this situation the maskT has a strong bias, so that it's too easy to generate rules in
-            // a certain direction...
+            // It's just that, in this situation the maskT has a strong bias, so that it's too easy to generate
+            // rules in a certain direction...
             const auto copy_from = [](codeT::bposE bpos) {
                 return make_rule([bpos](codeT code) { return get(code, bpos); });
             };
