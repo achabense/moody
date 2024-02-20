@@ -268,6 +268,7 @@ namespace legacy {
                 }
             };
 
+            // TODO: this is really slow in debug mode...
             for_each_code([&](codeT code) {
                 if (!assigned[code]) {
                     assert(std::ranges::none_of(par_both.group_for(code), [&](codeT c) { return assigned[c]; }));
@@ -388,7 +389,7 @@ namespace legacy {
         return lock;
     }
 
-    // TODO: (temp) experimental... may consider the "redispatch mode" approach finally.
+    // TODO: (temp) experimental... may consider the "forging mode" approach finally.
     // Notice this is different from flipping the values of each lock[code].
     inline moldT::lockT invert_lock(const subsetT& subset, const moldT& mold) {
         assert(subset.contains(mold.rule));
@@ -427,20 +428,23 @@ namespace legacy {
                 r[code] = b;
             }
         });
+
+        // TODO: explain...
+        assert(!subset.contains(mold.rule) || (mold.rule == (mask ^ r)));
         return mask ^ r;
     }
 
-    // TODO: is `redispatch` a suitable name?
-    // Also, it might be helpful to support "in-lock" redispatch. For example, to dial to find potentially related
+    // TODO: better name...
+    // Also, it might be helpful to support "in-lock" forging. For example, to dial to find potentially related
     // patterns...
-    // Directly invert the locks, or add a flag in redispatch? (TODO: recheck `invert_lock`)
-    inline ruleT redispatch(const subsetT& subset, const moldT& mold, std::invocable<bool*, bool*> auto fn) {
-        assert(subset.contains(mold.rule));
+    // Directly invert the locks, or add a flag in `forge`? (TODO: recheck `invert_lock`)
+    inline ruleT forge_rule(const subsetT& subset, const moldT& mold, std::invocable<bool*, bool*> auto fn) {
+        assert(compatible(subset, mold));
 
         const maskT& mask = subset.get_mask();
         const partitionT& par = subset.get_par();
 
-        ruleT_masked r = mask ^ mold.rule;
+        ruleT_masked r = mask ^ approximate(subset, mold);
 
         // `seq` is not a codeT::map_to<bool>.
         assert(par.k() <= 512);
@@ -471,7 +475,9 @@ namespace legacy {
     // TODO: `count` denotes free groups now; whether to switch to total groups (at least in the gui part)?
     // TODO: (temp) there was a plan to support count_min~count_max mode finally... dropped now.
     inline ruleT randomize(const subsetT& subset, const moldT& mold, std::mt19937& rand, int count) {
-        return redispatch(subset, mold, [&rand, count](bool* begin, bool* end) {
+        assert(compatible(subset, mold));
+
+        return forge_rule(subset, mold, [&rand, count](bool* begin, bool* end) {
             int c = std::clamp(count, 0, int(end - begin));
             std::fill(begin, end, 0);
             std::fill_n(begin, c, 1);
@@ -480,28 +486,40 @@ namespace legacy {
     }
 
     inline ruleT randomize_v2(const subsetT& subset, const moldT& mold, std::mt19937& rand, double density) {
-        return redispatch(subset, mold, [&rand, density](bool* begin, bool* end) {
+        assert(compatible(subset, mold));
+
+        return forge_rule(subset, mold, [&rand, density](bool* begin, bool* end) {
             std::bernoulli_distribution dist(std::clamp(density, 0.0, 1.0));
             std::generate(begin, end, [&] { return dist(rand); });
         });
     }
 
     inline ruleT shuffle(const subsetT& subset, const moldT& mold, std::mt19937& rand) {
-        return redispatch(subset, mold, [&rand](bool* begin, bool* end) { std::shuffle(begin, end, rand); });
+        assert(subset.contains(mold.rule));
+
+        return forge_rule(subset, mold, [&rand](bool* begin, bool* end) { std::shuffle(begin, end, rand); });
     }
 
     // TODO: rename to [set_]first / ...
     struct act_int {
         static ruleT first(const subsetT& subset, const moldT& mold) {
-            return redispatch(subset, mold, [](bool* begin, bool* end) { std::fill(begin, end, 0); });
+            assert(compatible(subset, mold));
+
+            return forge_rule(subset, mold, [](bool* begin, bool* end) { std::fill(begin, end, 0); });
         }
 
         static ruleT last(const subsetT& subset, const moldT& mold) {
-            return redispatch(subset, mold, [](bool* begin, bool* end) { std::fill(begin, end, 1); });
+            assert(compatible(subset, mold));
+
+            return forge_rule(subset, mold, [](bool* begin, bool* end) { std::fill(begin, end, 1); });
         }
 
+        // TODO: next/prev should require `contains`... using compatible to make the gui part work.
         static ruleT next(const subsetT& subset, const moldT& mold) {
-            return redispatch(subset, mold, [](bool* begin, bool* end) {
+            // assert(subset.contains(mold.rule));
+            assert(compatible(subset, mold));
+
+            return forge_rule(subset, mold, [](bool* begin, bool* end) {
                 // 11...0 -> 00...1; stop at 111...1 (last())
                 bool* first_0 = std::find(begin, end, 0);
                 if (first_0 != end) {
@@ -512,7 +530,10 @@ namespace legacy {
         }
 
         static ruleT prev(const subsetT& subset, const moldT& mold) {
-            return redispatch(subset, mold, [](bool* begin, bool* end) {
+            // assert(subset.contains(mold.rule));
+            assert(compatible(subset, mold));
+
+            return forge_rule(subset, mold, [](bool* begin, bool* end) {
                 // 00...1 -> 11...0; stop at 000...0 (first())
                 bool* first_1 = std::find(begin, end, 1);
                 if (first_1 != end) {
@@ -528,8 +549,12 @@ namespace legacy {
     // (TODO: rephrase) As to CTAD vs make_XXX..., here is pitfall for using std::reverse_iterator directly.
     // https://quuxplusone.github.io/blog/2022/08/02/reverse-iterator-ctad/
     struct act_perm {
+        // TODO: should there be "set first c to be 1 and rest to be 0" util in the gui?
+
         static ruleT first(const subsetT& subset, const moldT& mold) {
-            return redispatch(subset, mold, [](bool* begin, bool* end) {
+            assert(subset.contains(mold.rule));
+
+            return forge_rule(subset, mold, [](bool* begin, bool* end) {
                 int c = std::count(begin, end, 1);
                 std::fill(begin, end, 0);
                 std::fill_n(begin, c, 1);
@@ -537,7 +562,9 @@ namespace legacy {
         }
 
         static ruleT last(const subsetT& subset, const moldT& mold) {
-            return redispatch(subset, mold, [](bool* begin, bool* end) {
+            assert(subset.contains(mold.rule));
+
+            return forge_rule(subset, mold, [](bool* begin, bool* end) {
                 int c = std::count(begin, end, 1);
                 std::fill(begin, end, 0);
                 std::fill_n(end - c, c, 1);
@@ -545,7 +572,9 @@ namespace legacy {
         }
 
         static ruleT next(const subsetT& subset, const moldT& mold) {
-            return redispatch(subset, mold, [](bool* begin, bool* end) {
+            assert(subset.contains(mold.rule));
+
+            return forge_rule(subset, mold, [](bool* begin, bool* end) {
                 // Stop at 000...111 (last())
                 if (std::find(std::find(begin, end, 1), end, 0) == end) {
                     return;
@@ -556,7 +585,9 @@ namespace legacy {
         }
 
         static ruleT prev(const subsetT& subset, const moldT& mold) {
-            return redispatch(subset, mold, [](bool* begin, bool* end) {
+            assert(subset.contains(mold.rule));
+
+            return forge_rule(subset, mold, [](bool* begin, bool* end) {
                 // Stop at 111...000 (first())
                 if (std::find(std::find(begin, end, 0), end, 1) == end) {
                     return;

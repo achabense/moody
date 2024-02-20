@@ -492,7 +492,9 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
 
     // TODO: make what to do obvious when !mask_avail !redispatch_avail etc...
     const bool mask_avail = subset.set_mask(mask);
-    const bool redispatch_avail = mask_avail && subset.contains(mold.rule);
+    const bool compatible = legacy::compatible(subset, mold);
+    const bool contained = subset.contains(mold.rule);
+    assert(!contained || compatible); // contained -> compatible
 
     // TODO: this is disabling all the operations, including mirror, clear-lock etc...
     // What can be allowed when the selected mask doesn't belong to the set?
@@ -501,7 +503,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
     }
 
     {
-        if (!redispatch_avail) {
+        if (!compatible) {
             ImGui::BeginDisabled();
         }
 
@@ -539,6 +541,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             }
         }
 
+        // TODO: act_int::prev/next should use "contained" level instead...
         iter_pair(
             "<00..", "dec", "inc", "11..>", //
             [&] { return_rule(legacy::act_int::first(subset, mold)); },
@@ -546,28 +549,39 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             [&] { return_rule(legacy::act_int::next(subset, mold)); },
             [&] { return_rule(legacy::act_int::last(subset, mold)); }, true, enter_button);
         ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
-        iter_pair(
-            "<1.0.", "pprev", "pnext", "0.1.>", //
-            [&] { return_rule(legacy::act_perm::first(subset, mold)); },
-            [&] { return_rule(legacy::act_perm::prev(subset, mold)); },
-            [&] { return_rule(legacy::act_perm::next(subset, mold)); },
-            [&] { return_rule(legacy::act_perm::last(subset, mold)); }, true, enter_button);
-        ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
-        if (enter_button("Shuffle")) {
-            return_rule(legacy::shuffle(subset, mold, global_mt19937()));
+
+        {
+            if (!contained) {
+                ImGui::BeginDisabled();
+            }
+            iter_pair(
+                "<1.0.", "pprev", "pnext", "0.1.>", //
+                [&] { return_rule(legacy::act_perm::first(subset, mold)); },
+                [&] { return_rule(legacy::act_perm::prev(subset, mold)); },
+                [&] { return_rule(legacy::act_perm::next(subset, mold)); },
+                [&] { return_rule(legacy::act_perm::last(subset, mold)); }, true, enter_button);
+            // TODO: (temp) shuffle is not more useful than randomize, but more convenient sometimes...
+            // ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
+            // if (enter_button("Shuffle")) {
+            //     return_rule(legacy::shuffle(subset, mold, global_mt19937()));
+            // }
+
+            // TODO: (temp) new line begins here...
+            // TODO: enhance might be stricter than necessary...
+            if (ImGui::Button("Enhance lock")) {
+                return_lock(legacy::enhance_lock(subset, mold));
+            }
+            ImGui::SameLine();
+            // TODO: (temp) experimental... may consider the "forging mode" approach finally.
+            if (ImGui::Button("Invert lock")) {
+                return_lock(legacy::invert_lock(subset, mold));
+            }
+            if (!contained) {
+                ImGui::EndDisabled();
+            }
         }
 
-        // TODO: (temp) new line begins here...
-        // TODO: enhance might be stricter than necessary...
-        if (ImGui::Button("Enhance lock")) {
-            return_lock(legacy::enhance_lock(subset, mold));
-        }
-        ImGui::SameLine();
-        // TODO: (temp) experimental... may consider the "redispatch mode" approach finally.
-        if (ImGui::Button("Invert lock")) {
-            return_lock(legacy::invert_lock(subset, mold));
-        }
-        if (!redispatch_avail) {
+        if (!compatible) {
             ImGui::EndDisabled();
         }
 
@@ -575,20 +589,13 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         if (ImGui::Button("Clear lock")) {
             return_lock({});
         }
-        ImGui::SameLine();
-        if (ImGui::Button("Approximate")) {
-            if (legacy::compatible(subset, mold)) {
-                return_rule(legacy::approximate(subset, mold));
-            } else {
-                messenger::add_msg("Incompatible ..."); // TODO refine...
-            }
-        }
-        ImGui::SameLine();
+        ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
         // TODO: move elsewhere
         if (ImGui::Button("Mir")) {
             return_mold(legacy::mirror(mold));
         }
 
+        // TODO: this should be independent of edit_rule now.
 #ifdef ENABLE_STATIC_CONSTRAINTS
         static bool show_static = false;
         if (!show_static) {
