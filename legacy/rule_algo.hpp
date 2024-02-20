@@ -569,13 +569,11 @@ namespace legacy {
         return mir;
     }
 
-    // TODO: is `recipes` a proper name?
-    inline namespace recipes {
+    inline namespace _make_subset {
         // TODO: explain the effects of these mask...
         // rule ^ mask_zero -> TODO
         inline constexpr maskT mask_zero{{}};
         // rule ^ mask_identity -> TODO
-        // TODO: use make_rule...
         inline constexpr maskT mask_identity{make_rule([](codeT code) { return get_s(code); })};
         // TODO: mask_copy_q/w/e/a/s(~mask_identity)/d/z/x/c etc?
 
@@ -703,10 +701,10 @@ namespace legacy {
                                        "xcd");
         inline constexpr mapperT mp_tot_exc_s("wqe"
                                               "asd"
-                                              "zxc"); // *C8 -> totalistic, excluding s
+                                              "zxc"); // swap(q,w); *C8 -> totalistic, excluding s
         inline constexpr mapperT mp_tot_inc_s("qse"
                                               "awd"
-                                              "zxc"); // *C8 -> totalistic, including s
+                                              "zxc"); // swap(w,s); *C8 -> totalistic, including s
 
         // TODO: explain. TODO: better name...
         inline constexpr mapperT mp_dual("!q!w!e"
@@ -715,13 +713,12 @@ namespace legacy {
 
         // Hexagonal emulation and emulated symmetry.
 
-        // qw-     q w
-        // asd -> a s d
-        // -xc     x c
-        // TODO: explain why 0 instead of e-z... ... is this really correct?
+        // q w -     q w
+        // a s d -> a s d
+        // - x c     x c
         inline constexpr mapperT mp_hex_ignore("qw0"
                                                "asd"
-                                               "0xc"); // ignore_(e, z)
+                                               "0xc"); // ignore_(e,z)
 
         inline constexpr mapperT mp_hex_refl_asd("xc0"
                                                  "asd"
@@ -755,20 +752,24 @@ namespace legacy {
 
         inline constexpr mapperT mp_hex_tot_exc_s("wq0"
                                                   "asd"
-                                                  "0xc"); // *C6 -> totalistic, excluding s
+                                                  "0xc"); // swap(q,w); *C6 -> totalistic, excluding s
         inline constexpr mapperT mp_hex_tot_inc_s("qs0"
                                                   "awd"
-                                                  "0xc"); // *C6 -> totalistic, including s
+                                                  "0xc"); // swap(w,s); *C6 -> totalistic, including s
 
-        // -we     w e
-        // asd -> a s d
-        // zx-     z x
+#if 0
+        // It's also valid to emulate hexagonal neighborhood by ignoring "q" and "c".
+        // However, the program is not going to support this, as it makes the program more complicated
+        // but without much benefit.
+
+        // - w e     w e
+        // a s d -> a s d
+        // z x -     z x
         inline constexpr mapperT mp_hex2_ignore("0we"
                                                 "asd"
-                                                "zx0"); // ignore_(q, c)
+                                                "zx0"); // ignore_(q,c)
+#endif
 
-        // TODO: (temp) the mappers implicitly define mapperT_pair{mapper,mp_identity}...
-        // (whether to take mapperT_pair instead?)
         inline subsetT make_subset(std::initializer_list<mapperT> mappers, const maskT& mask = mask_zero) {
             equivT eq{};
             for (const mapperT& m : mappers) {
@@ -777,12 +778,26 @@ namespace legacy {
             return subsetT{mask, eq};
         }
 
-    } // namespace recipes
+    } // namespace _make_subset
 
 #ifdef ENABLE_TESTS
-      // TODO: add more tests for subsetT... (e.g. iso inclusion etc...)
     namespace _tests {
-        inline const testT test_ignore_s_and_self_cmpl = [] {
+        inline const testT test_mappers = [] {
+            for_each_code([](codeT code) {
+                assert(mp_identity(code) == code);
+
+                for (const mapperT* m : {&mp_refl_asd, &mp_refl_wsx, &mp_refl_qsc, &mp_refl_esz, &mp_C2}) {
+                    assert((*m)((*m)(code)) == code);
+                }
+                assert(mp_C4(mp_C4(mp_C4(mp_C4(code)))) == code);
+
+                assert(mp_dual(mp_dual(code)) == code);
+
+                // ... TODO...
+            });
+        };
+
+        inline const testT test_subset_intersection = [] {
             subsetT sc = make_subset({mp_ignore_s}, mask_zero) & make_subset({mp_dual}, mask_identity);
 
             // 2024/1/20 2AM

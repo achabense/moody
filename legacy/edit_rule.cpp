@@ -84,7 +84,7 @@ class subset_selector {
 
 public:
     subset_selector() : current(legacy::subsetT::universalT{}) {
-        using namespace legacy::recipes;
+        using namespace legacy::_make_subset;
         // TODO: add some tests after the construction...
 
         terms_ignore.emplace_back("q", make_subset({mp_ignore_q}));
@@ -104,7 +104,7 @@ public:
         // TODO: or define mp_von_ignore?
         terms_misc.emplace_back("Von", make_subset({mp_ignore_q, mp_ignore_e, mp_ignore_z, mp_ignore_c}));
         terms_misc.emplace_back("Dual", make_subset({mp_dual}, mask_identity)); // Self-complementary
-        terms_misc.emplace_back("'C8'", make_subset({mp_C8}));                  // TODO: whether to expose this?
+        // terms_misc.emplace_back("'C8'", make_subset({mp_C8}));
 
         terms_native.emplace_back("All", make_subset({mp_refl_wsx, mp_refl_qsc}));
         terms_native.emplace_back("|", make_subset({mp_refl_wsx}));
