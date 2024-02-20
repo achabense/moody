@@ -526,7 +526,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             rcount = std::clamp(rcount, 0, freec);
             ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
             if (enter_button("Randomize")) {
-                return_rule(legacy::randomize(subset, mold, global_mt19937(), rcount, rcount));
+                return_rule(legacy::randomize(subset, mold, global_mt19937(), rcount));
             }
         } else {
             ImGui::SetNextItemWidth(item_width);
@@ -562,12 +562,17 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         if (ImGui::Button("Enhance lock")) {
             return_lock(legacy::enhance_lock(subset, mold));
         }
+        ImGui::SameLine();
+        // TODO: (temp) experimental... may consider the "redispatch mode" approach finally.
+        if (ImGui::Button("Invert lock")) {
+            return_lock(legacy::invert_lock(subset, mold));
+        }
         if (!redispatch_avail) {
             ImGui::EndDisabled();
         }
 
         ImGui::SameLine();
-        if (ImGui::Button("Clear locks")) {
+        if (ImGui::Button("Clear lock")) {
             return_lock({});
         }
         ImGui::SameLine();

@@ -388,6 +388,22 @@ namespace legacy {
         return lock;
     }
 
+    // TODO: (temp) experimental... may consider the "redispatch mode" approach finally.
+    // Notice this is different from flipping the values of each lock[code].
+    inline moldT::lockT invert_lock(const subsetT& subset, const moldT& mold) {
+        assert(subset.contains(mold.rule));
+
+        moldT::lockT lock{};
+        subset.get_par().for_each_group([&](const groupT& group) {
+            if (none_locked(mold.lock, group)) {
+                for (codeT code : group) {
+                    lock[code] = true;
+                }
+            }
+        });
+        return lock;
+    }
+
     inline bool compatible(const subsetT& subset, const moldT& mold) {
         if (subset.empty()) {
             return false;
@@ -414,14 +430,10 @@ namespace legacy {
         return mask ^ r;
     }
 
-    // TODO: redispatch is sometimes too strict.
-    // For example, when doing randomization/000/111, whether the current rule belongs to the subset
-    // doesn't matter much... (but what about locked groups?)
-
     // TODO: is `redispatch` a suitable name?
     // Also, it might be helpful to support "in-lock" redispatch. For example, to dial to find potentially related
     // patterns...
-    // Directly invert the locks, or add a flag in redispatch?
+    // Directly invert the locks, or add a flag in redispatch? (TODO: recheck `invert_lock`)
     inline ruleT redispatch(const subsetT& subset, const moldT& mold, std::invocable<bool*, bool*> auto fn) {
         assert(subset.contains(mold.rule));
 
@@ -456,20 +468,15 @@ namespace legacy {
         return mask ^ r;
     }
 
-    // TODO: count_min denotes free groups now; whether to switch to total groups (at least in the gui part)?
-    inline ruleT randomize(const subsetT& subset, const moldT& mold, std::mt19937& rand, int count_min,
-                           [[maybe_unused]] int count_max /* not used, subject to future extension */) {
-        assert(count_max == count_min);
-        return redispatch(subset, mold, [&rand, count_min](bool* begin, bool* end) {
-            int c = std::clamp(count_min, 0, int(end - begin));
+    // TODO: `count` denotes free groups now; whether to switch to total groups (at least in the gui part)?
+    // TODO: (temp) there was a plan to support count_min~count_max mode finally... dropped now.
+    inline ruleT randomize(const subsetT& subset, const moldT& mold, std::mt19937& rand, int count) {
+        return redispatch(subset, mold, [&rand, count](bool* begin, bool* end) {
+            int c = std::clamp(count, 0, int(end - begin));
             std::fill(begin, end, 0);
             std::fill_n(begin, c, 1);
             std::shuffle(begin, end, rand);
         });
-    }
-
-    inline ruleT shuffle(const subsetT& subset, const moldT& mold, std::mt19937& rand) {
-        return redispatch(subset, mold, [&rand](bool* begin, bool* end) { std::shuffle(begin, end, rand); });
     }
 
     inline ruleT randomize_v2(const subsetT& subset, const moldT& mold, std::mt19937& rand, double density) {
@@ -477,6 +484,10 @@ namespace legacy {
             std::bernoulli_distribution dist(std::clamp(density, 0.0, 1.0));
             std::generate(begin, end, [&] { return dist(rand); });
         });
+    }
+
+    inline ruleT shuffle(const subsetT& subset, const moldT& mold, std::mt19937& rand) {
+        return redispatch(subset, mold, [&rand](bool* begin, bool* end) { std::shuffle(begin, end, rand); });
     }
 
     // TODO: rename to [set_]first / ...

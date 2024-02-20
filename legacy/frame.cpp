@@ -34,6 +34,11 @@ public:
     void set_first() { set_pos(0); }
     void set_last() { set_pos(size() - 1); }
 
+    void clear() {
+        m_record = {m_record[m_pos]};
+        m_pos = 0;
+    }
+
 private:
     void set_pos(int pos) { m_pos = std::clamp(pos, 0, size() - 1); }
 };
@@ -125,6 +130,10 @@ void frame(const code_image& icons, tile_image& img) {
                 "<|", "prev", "next", "|>", //
                 [&] { recorder.set_first(); }, [&] { recorder.set_prev(); }, [&] { recorder.set_next(); },
                 [&] { recorder.set_last(); });
+            ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
+            if (ImGui::Button("Clear")) {
+                recorder.clear();
+            }
         }
 
         ImGui::Separator();
