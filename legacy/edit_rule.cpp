@@ -419,14 +419,11 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             }
         };
 
-        // TODO: should not be here?
-        constexpr auto make_id = [](legacy::codeT::bposE bpos) -> legacy::maskT {
-            return {legacy::make_rule([bpos](legacy::codeT c) { return legacy::get(c, bpos); })};
-        };
+        using enum legacy::codeT::bposE;
         static const legacy::maskT mask_ids[]{
-            make_id(legacy::codeT::bpos_q), make_id(legacy::codeT::bpos_w), make_id(legacy::codeT::bpos_e),
-            make_id(legacy::codeT::bpos_a), make_id(legacy::codeT::bpos_s), make_id(legacy::codeT::bpos_d),
-            make_id(legacy::codeT::bpos_z), make_id(legacy::codeT::bpos_x), make_id(legacy::codeT::bpos_c)};
+            legacy::make_mask(bpos_q), legacy::make_mask(bpos_w), legacy::make_mask(bpos_e),
+            legacy::make_mask(bpos_a), legacy::make_mask(bpos_s), legacy::make_mask(bpos_d),
+            legacy::make_mask(bpos_z), legacy::make_mask(bpos_x), legacy::make_mask(bpos_c)};
         static int id_tag = 4; // s...
 
         static legacy::maskT mask_custom{{}};

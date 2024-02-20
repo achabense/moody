@@ -561,20 +561,26 @@ namespace legacy {
     inline moldT mirror(const moldT& mold) {
         moldT mir{};
         for_each_code([&](codeT code) {
+            constexpr codeT::bposE S = codeT::bpos_s;
             const codeT codex = codeT(~code & 511);
-            const bool flip = get_s(codex) != mold.rule[codex];
-            mir.rule[code] = flip ? !get_s(code) : get_s(code);
+            const bool flip = codex.get(S) != mold.rule[codex];
+            mir.rule[code] = flip ? !code.get(S) : code.get(S);
             mir.lock[code] = mold.lock[codex];
         });
         return mir;
     }
 
     inline namespace _make_subset {
+        // TODO: better name ("make_mask" is too-general name)...
+        inline maskT make_mask(codeT::bposE bpos) {
+            return {make_rule([bpos](codeT code) { return code.get(bpos); })};
+        }
+
         // TODO: explain the effects of these mask...
         // rule ^ mask_zero -> TODO
-        inline constexpr maskT mask_zero{{}};
+        inline const maskT mask_zero{{}};
         // rule ^ mask_identity -> TODO
-        inline constexpr maskT mask_identity{make_rule([](codeT code) { return get_s(code); })};
+        inline const maskT mask_identity{make_mask(codeT::bpos_s)};
         // TODO: mask_copy_q/w/e/a/s(~mask_identity)/d/z/x/c etc?
 
         // A mapperT defines a rule that maps each codeT to another codeT.
@@ -588,8 +594,8 @@ namespace legacy {
                     switch (tag) {
                         case O: return 0;
                         case I: return 1;
-                        case Get: return get(code, bpos);
-                        default: assert(tag == NGet); return !get(code, bpos);
+                        case Get: return code.get(bpos);
+                        default: assert(tag == NGet); return !code.get(bpos);
                     }
                 }
             };
@@ -804,21 +810,17 @@ namespace legacy {
             // There is NO problem in the algorithm.
             // It's just that, in this situation the maskT has a strong bias, so that it's too easy to generate
             // rules in a certain direction...
-            const auto copy_from = [](codeT::bposE bpos) {
-                return make_rule([bpos](codeT code) { return get(code, bpos); });
-            };
-
             using enum codeT::bposE;
             assert(!sc.empty());
-            assert(sc.contains(copy_from(bpos_q)));
-            assert(sc.contains(copy_from(bpos_w)));
-            assert(sc.contains(copy_from(bpos_e)));
-            assert(sc.contains(copy_from(bpos_a)));
-            assert(!sc.contains(copy_from(bpos_s))); // identity rule doesn't belong to ignore_s.
-            assert(sc.contains(copy_from(bpos_d)));
-            assert(sc.contains(copy_from(bpos_z)));
-            assert(sc.contains(copy_from(bpos_x)));
-            assert(sc.contains(copy_from(bpos_c)));
+            assert(sc.contains(make_mask(bpos_q)));
+            assert(sc.contains(make_mask(bpos_w)));
+            assert(sc.contains(make_mask(bpos_e)));
+            assert(sc.contains(make_mask(bpos_a)));
+            assert(!sc.contains(mask_identity)); // Doesn't contain make_mask(bpos_s).
+            assert(sc.contains(make_mask(bpos_d)));
+            assert(sc.contains(make_mask(bpos_z)));
+            assert(sc.contains(make_mask(bpos_x)));
+            assert(sc.contains(make_mask(bpos_c)));
         };
     }  // namespace _tests
 #endif // ENABLE_TESTS

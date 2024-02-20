@@ -48,7 +48,7 @@ namespace legacy {
     // `situT` encoded as an integer.
     struct codeT {
         int val;
-        constexpr /*implicit*/ operator int() const {
+        /*implicit*/ operator int() const {
             assert(val >= 0 && val < 512);
             return val;
         }
@@ -58,17 +58,19 @@ namespace legacy {
             std::array<T, 512> m_map{};
 
         public:
-            constexpr const T& operator[](codeT code) const { return m_map[code]; }
-            constexpr T& operator[](codeT code) { return m_map[code]; }
+            const T& operator[](codeT code) const { return m_map[code]; }
+            T& operator[](codeT code) { return m_map[code]; }
 
-            constexpr void fill(const T& val) { m_map.fill(val); }
-            constexpr friend bool operator==(const map_to&, const map_to&) = default;
+            void fill(const T& val) { m_map.fill(val); }
+            friend bool operator==(const map_to&, const map_to&) = default;
         };
 #
         enum bposE : int { bpos_q = 0, bpos_w, bpos_e, bpos_a, bpos_s, bpos_d, bpos_z, bpos_x, bpos_c };
+
+        bool get(bposE bpos) const { return (val >> bpos) & 1; }
     };
 
-    constexpr codeT encode(const situT& situ) {
+    inline codeT encode(const situT& situ) {
         // ~ bool is implicitly promoted to int.
         using enum codeT::bposE;
         const int code = (situ.q << bpos_q) | (situ.w << bpos_w) | (situ.e << bpos_e) | //
@@ -78,35 +80,26 @@ namespace legacy {
         return codeT{code};
     }
 
-    constexpr situT decode(codeT code) {
+    inline situT decode(codeT code) {
         using enum codeT::bposE;
-        const bool q = (code >> bpos_q) & 1, w = (code >> bpos_w) & 1, e = (code >> bpos_e) & 1;
-        const bool a = (code >> bpos_a) & 1, s = (code >> bpos_s) & 1, d = (code >> bpos_d) & 1;
-        const bool z = (code >> bpos_z) & 1, x = (code >> bpos_x) & 1, c = (code >> bpos_c) & 1;
-        return {q, w, e, a, s, d, z, x, c};
+        return {code.get(bpos_q), code.get(bpos_w), code.get(bpos_e), //
+                code.get(bpos_a), code.get(bpos_s), code.get(bpos_d), //
+                code.get(bpos_z), code.get(bpos_x), code.get(bpos_c)};
     }
 
-    constexpr void for_each_code(const auto& fn) {
+    inline void for_each_code(const auto& fn) {
         for (codeT code{.val = 0}; code.val < 512; ++code.val) {
             fn(codeT(code));
         }
     }
 
-    constexpr bool for_each_code_all_of(const auto& pred) {
+    inline bool for_each_code_all_of(const auto& pred) {
         for (codeT code{.val = 0}; code.val < 512; ++code.val) {
             if (!pred(codeT(code))) {
                 return false;
             }
         }
         return true;
-    }
-
-    constexpr bool get(codeT code, codeT::bposE bpos) { //
-        return (code >> bpos) & 1;
-    }
-
-    constexpr bool get_s(codeT code) { //
-        return (code >> codeT::bpos_s) & 1;
     }
 
 #ifdef ENABLE_TESTS
@@ -122,12 +115,12 @@ namespace legacy {
         codeT::map_to<bool> m_map{};
 
     public:
-        constexpr bool operator()(codeT code) const { return m_map[code]; }
+        bool operator()(codeT code) const { return m_map[code]; }
 
-        constexpr bool operator[](codeT code) const { return m_map[code]; }
-        constexpr bool& operator[](codeT code) { return m_map[code]; }
+        bool operator[](codeT code) const { return m_map[code]; }
+        bool& operator[](codeT code) { return m_map[code]; }
 
-        constexpr friend bool operator==(const ruleT&, const ruleT&) = default;
+        friend bool operator==(const ruleT&, const ruleT&) = default;
     };
 
     template <class T>
@@ -138,12 +131,11 @@ namespace legacy {
     // TODO: rename...
     // TODO: Document that this is not the only situation that flicking effect can occur...
     inline bool will_flick(const ruleT& rule) {
-        constexpr codeT all_0 = encode({0, 0, 0, 0, 0, 0, 0, 0, 0});
-        constexpr codeT all_1 = encode({1, 1, 1, 1, 1, 1, 1, 1, 1});
+        constexpr codeT all_0{0}, all_1{511};
         return rule[all_0] == 1 && rule[all_1] == 0;
     }
 
-    constexpr ruleT make_rule(const rule_like auto& fn) {
+    inline ruleT make_rule(const rule_like auto& fn) {
         ruleT rule{};
         for_each_code([&](codeT code) { rule[code] = fn(code); });
         return rule;
