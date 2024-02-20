@@ -67,6 +67,8 @@ void frame(const code_image& icons, tile_image& img) {
     bool update = false;
 
     static bool show_load = true;
+    static bool show_static = false;
+
     if (show_load) {
         // TODO: this should be controlled by load_rule ...
         ImGui::SetNextWindowSize({600, 400}, ImGuiCond_FirstUseEver);
@@ -74,6 +76,15 @@ void frame(const code_image& icons, tile_image& img) {
         if (auto window = imgui_window("Load rule", &show_load, ImGuiWindowFlags_NoCollapse)) {
             if (auto out = load_rule()) {
                 assign_val(current, *out);
+                update = true;
+            }
+        }
+    }
+    if (show_static) {
+        if (auto window = imgui_window("Static constraints", &show_static,
+                                       ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse)) {
+            if (auto out = static_constraints()) {
+                current = *out;
                 update = true;
             }
         }
@@ -117,6 +128,13 @@ void frame(const code_image& icons, tile_image& img) {
                 ImGui::SameLine();
                 if (ImGui::Button("Load")) {
                     show_load = true;
+                }
+            }
+
+            if (!show_static) {
+                ImGui::SameLine();
+                if (ImGui::Button("Static")) {
+                    show_static = true;
                 }
             }
 

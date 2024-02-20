@@ -9,9 +9,6 @@
 // TODO: support rollbacking diff rules?
 // TODO: for editing opt, support in-lock and outof-lock mode?
 
-// TODO: currently poorly designed...
-#define ENABLE_STATIC_CONSTRAINTS
-
 // TODO: consider other approaches (native nav etc) if possible...
 // TODO: e.g. toggle between buttons by left/right... / clear binding...
 inline bool enter_button(const char* label) {
@@ -280,8 +277,7 @@ public:
     }
 };
 
-#ifdef ENABLE_STATIC_CONSTRAINTS
-static std::optional<legacy::moldT> static_constraints() {
+std::optional<legacy::moldT> static_constraints() {
     enum stateE { Any, O, I, O_Cond, I_Cond }; // TODO: rename; explain
     const int r = 9;
     static stateE board[r][r]{/*Any...*/};
@@ -383,7 +379,6 @@ static std::optional<legacy::moldT> static_constraints() {
     }
     return std::nullopt;
 }
-#endif // ENABLE_STATIC_CONSTRAINTS
 
 // TODO: there must be an [obvious] way to support "dial" mode.
 std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_image& icons) {
@@ -594,25 +589,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         if (ImGui::Button("Mir")) {
             return_mold(legacy::mirror(mold));
         }
-
-        // TODO: this should be independent of edit_rule now.
-#ifdef ENABLE_STATIC_CONSTRAINTS
-        static bool show_static = false;
-        if (!show_static) {
-            ImGui::SameLine();
-            if (ImGui::Button("Static")) {
-                show_static = true;
-            }
-        }
-        if (show_static) {
-            if (auto window = imgui_window("Static constraints", &show_static,
-                                           ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse)) {
-                if (auto out = static_constraints()) {
-                    return_mold(*out);
-                }
-            }
-        }
-#endif
     }
 
     // TODO: support filtering?
