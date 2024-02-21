@@ -269,28 +269,17 @@ struct fileT {
         const int total = m_rules.size();
 
         if (total != 0) {
-            ImGui::BeginGroup();
             iter_pair(
                 "<|", "prev", "next", "|>",                                              //
                 [&] { hit = true, pointing_at = 0; },                                    //
                 [&] { hit = true, pointing_at = std::max(0, pointing_at - 1); },         //
                 [&] { hit = true, pointing_at = std::min(total - 1, pointing_at + 1); }, //
-                [&] { hit = true, pointing_at = total - 1; }, false); // TODO: whether to allow scrolling?
+                [&] { hit = true, pointing_at = total - 1; });
             ImGui::SameLine();
             ImGui::Text("Total:%d At:%d", total, pointing_at + 1);
-            ImGui::EndGroup();
-            if (ImGui::IsItemClicked()) {
+            ImGui::SameLine();
+            if (ImGui::Button("Focus")) {
                 hit = true;
-            }
-
-            // TODO: (temp) without ImGuiFocusedFlags_ChildWindows, clicking the child window will invalidate this.
-            if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
-                if (imgui_keypressed(ImGuiKey_UpArrow, true)) {
-                    hit = true, pointing_at = std::max(0, pointing_at - 1);
-                }
-                if (imgui_keypressed(ImGuiKey_DownArrow, true)) {
-                    hit = true, pointing_at = std::min(total - 1, pointing_at + 1);
-                }
             }
         } else {
             ImGui::Text("Not found");

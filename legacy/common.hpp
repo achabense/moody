@@ -126,7 +126,7 @@ inline void iter_pair(const char* tag_first, const char* tag_prev, const char* t
     if (middle_button(tag_prev)) {
         act_prev();
     }
-    ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+    ImGui::SameLine(0, 0), imgui_str("/"), ImGui::SameLine(0, 0);
     if (middle_button(tag_next)) {
         act_next();
     }
@@ -182,3 +182,13 @@ public:
         }
     }
 };
+
+// TODO: (temp) used to test gui changes...
+inline bool debug_switch() {
+    static bool s = false;
+    if (imgui_keypressed(ImGuiKey_T, false)) {
+        s = !s;
+    }
+
+    return s;
+}

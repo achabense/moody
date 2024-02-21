@@ -459,15 +459,9 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         }
 
         ImGui::SameLine();
-        if (mask_tag == 3) {
-            if (ImGui::Button("Take current rule")) {
-                mask_custom = {mold.rule};
-            }
-            mask_tooltip(mask_custom, mask_descriptions[3]);
-        } else {
-            if (ImGui::Button("Try custom")) {
-                mask_tag = 3;
-            }
+        if (ImGui::Button("Current rule")) {
+            mask_tag = 3;
+            mask_custom = {mold.rule};
         }
 
         mask_ptr = mask_ptrs[mask_tag];
