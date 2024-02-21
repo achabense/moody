@@ -60,7 +60,7 @@ class subset_selector {
     }
 
     void reset_current() {
-        current = legacy::subsetT::universalT{};
+        current = legacy::subsetT::universal();
 
         for_each_term([&](termT& t) {
             assert(!t.disabled || !t.selected); // disabled -> !selected
@@ -79,7 +79,7 @@ class subset_selector {
     }
 
 public:
-    subset_selector() : current(legacy::subsetT::universalT{}) {
+    subset_selector() : current(legacy::subsetT::universal()) {
         using namespace legacy::_make_subset;
         // TODO: add some tests after the construction...
 

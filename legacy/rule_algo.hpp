@@ -3,12 +3,8 @@
 #include "rule.hpp"
 
 namespace legacy {
-    // TODO: better name for ruleT_masked?
-    // TODO: is it safe to define maskT this way?
-    // TODO: explain the meaning of maskT_result (how is a rule different from maskT)...
-
-    // TODO: explain these types are defined only to avoid concept misuse...
-    // A maskT is a special ruleT used to do XOR mask for other rules.
+    // A maskT is a ruleT used to do XOR mask for other rules.
+    // The result reflects how the rule is different from the masking rule.
     struct maskT : public ruleT {};
     using ruleT_masked = codeT::map_to<bool>;
 
@@ -26,7 +22,19 @@ namespace legacy {
         return rule;
     }
 
-    // TODO: rephrase...
+#ifdef ENABLE_TESTS
+    namespace _tests {
+        inline const testT test_maskT = [] {
+            const ruleT a = make_rule([](auto) { return testT::rand() & 1; });
+            const ruleT b = make_rule([](auto) { return testT::rand() & 1; });
+            const maskT a_as_mask{a}, b_as_mask{b};
+
+            assert(a == (b_as_mask ^ (b_as_mask ^ a)));
+            assert(b == (a_as_mask ^ (a_as_mask ^ b)));
+        };
+    }
+#endif // ENABLE_TESTS
+
     // Equivalence relation for codeT ({0...511}), in the form of union-find set.
     class equivT {
         friend class partitionT;
@@ -46,12 +54,14 @@ namespace legacy {
             for_each_code([&](codeT code) { parof[code] = code; });
         }
 
+        // Does `r` have the same value in each group?
         bool test(const ruleT_masked& r) const {
             return for_each_code_all_of([&](codeT code) { //
                 return r[code] == r[parof[code]];
             });
         }
 
+        // Does `r` have the same value for locked codes in each group?
         bool test(const ruleT_masked& r, const moldT::lockT& lock) const {
             codeT::map_to<int> record;
             record.fill(-1);
@@ -69,7 +79,6 @@ namespace legacy {
             });
         }
 
-        // TODO: better names...
         void add_eq(codeT a, codeT b) { parof[headof(a)] = headof(b); }
         void add_eq(const equivT& other) {
             for_each_code([&](codeT code) { add_eq(code, other.parof[code]); });
@@ -81,24 +90,27 @@ namespace legacy {
                 return has_eq(code, other.parof[code]);
             });
         }
+
+        friend equivT operator|(const equivT& a, const equivT& b) {
+            equivT c = a;
+            c.add_eq(b);
+            return c;
+        }
     };
 
     using groupT = std::span<const codeT>;
 
     class partitionT {
         equivT m_eq;
+        int m_k{}; // `m_eq` has `m_k` groups.
 
-        // TODO: explain more naturally...
-        // Map codeT to [j: its group is the jth one] encountered during the `for_each_code` scan.
-        codeT::map_to<int> m_map;
-        int m_k;
+        // Map codeT to an integer ¡Ê [0, m_k) (which represents the group the code belongs to).
+        codeT::map_to<int> m_map{};
 
-        // TODO: (temp) without {} the compiler will give warnings;
-        // (It seems the compiler is unable to detect that m_data[0...511] is fully assigned...)
-
-        // `m_data` is not a codeT::map_to<codeT>.
-        // It's for storing codeT of the same group consecutively.
+        // (Not a codeT::map_to<codeT>)
+        // Store codeT of the same group consecutively (to provide codeT span).
         std::array<codeT, 512> m_data{};
+
         struct group_pos {
             int pos, size;
         };
@@ -110,6 +122,10 @@ namespace legacy {
         }
 
     public:
+        // "User-declared" to avoid implicit moving (to avoid `m_data` being emptied):
+        partitionT(const partitionT&) = default;
+        partitionT& operator=(const partitionT&) = default;
+
         groupT group_for(codeT code) const { return jth_group(m_map[code]); }
 
         int k() const { return m_k; }
@@ -123,22 +139,15 @@ namespace legacy {
             }
         }
 
-        // TODO: (temp) these "user-declared" ctors are enough to avoid implicit moving...
-        // Avoid moving `m_data`:
-        partitionT(const partitionT&) = default;
-        partitionT& operator=(const partitionT&) = default;
-
         /*implicit*/ partitionT(const equivT& u) : m_eq(u) {
             m_k = 0;
-
-            codeT::map_to<int> m;
-            m.fill(-1);
+            m_map.fill(-1);
             for_each_code([&](codeT code) {
                 const codeT head = u.headof(code);
-                if (m[head] == -1) {
-                    m[head] = m_k++;
+                if (m_map[head] == -1) {
+                    m_map[head] = m_k++;
                 }
-                m_map[code] = m[head];
+                m_map[code] = m_map[head];
             });
             // m_k is now the number of groups in the partition.
 
@@ -166,10 +175,8 @@ namespace legacy {
 
         bool is_refinement_of(const partitionT& other) const { return other.m_eq.has_eq(m_eq); }
 
-        friend partitionT operator|(const partitionT& a, const partitionT& b) {
-            equivT ab = a.m_eq;
-            ab.add_eq(b.m_eq);
-            return partitionT(ab);
+        friend partitionT operator|(const partitionT& a, const partitionT& b) { //
+            return partitionT(a.m_eq | b.m_eq);
         }
     };
 
@@ -190,21 +197,17 @@ namespace legacy {
         std::optional<nonemptyT> m_set;
 
     public:
-        subsetT(const maskT& mask, const equivT& eq) { m_set.emplace(mask, eq); }
-        subsetT(const maskT& mask, const partitionT& par) { m_set.emplace(mask, par); }
+        explicit subsetT(const maskT& mask, const equivT& eq) { m_set.emplace(mask, eq); }
+        explicit subsetT(const maskT& mask, const partitionT& par) { m_set.emplace(mask, par); }
 
-        // TODO: replace with static ctor... static subsetT XXX();
-        struct emptyT {};
-        subsetT(emptyT) {}
-        struct universalT {};
-        subsetT(universalT) : subsetT(maskT{}, equivT{}) {}
+        explicit subsetT() : m_set{std::nullopt} {}
+        static subsetT universal() { return subsetT{maskT{}, equivT{}}; }
 
         bool empty() const { return !m_set.has_value(); }
         bool contains(const ruleT& rule) const { return m_set && m_set->contains(rule); }
         bool includes(const subsetT& other) const { return other.empty() || (m_set && m_set->includes(*other.m_set)); }
         bool equals(const subsetT& other) const { return includes(other) && other.includes(*this); }
 
-        // TODO: is !empty() precond or runtime-error?
         const maskT& get_mask() const {
             assert(!empty());
             return m_set->mask;
@@ -291,10 +294,10 @@ namespace legacy {
     inline subsetT operator&(const subsetT& a, const subsetT& b) {
         if (auto common = subsetT::common_rule(a, b)) {
             assert(!a.empty() && !b.empty());
-            return {*common, a.get_par() | b.get_par()};
+            return subsetT{*common, a.get_par() | b.get_par()};
         }
 
-        return subsetT::emptyT{};
+        return subsetT{};
     }
 
 #if 0
