@@ -111,7 +111,7 @@ public:
         }
 
         if (m_valid) {
-            imgui_str(cpp17_u8string(m_current));
+            imgui_strcopyable(cpp17_u8string(m_current), imgui_str);
         } else {
             assert(m_dirs.empty() && m_files.empty());
             imgui_strdisabled("(Invalid) " + cpp17_u8string(m_current));
@@ -313,25 +313,19 @@ struct fileT {
             for (int l = 1; const auto& [text, id] : m_lines) {
                 ImGui::TextDisabled("%2d ", l++);
                 ImGui::SameLine();
-                imgui_strwrapped(text);
+                imgui_strcopyable(text, imgui_strwrapped);
 
                 if (id.has_value()) {
                     const bool is_mold = m_rules[*id].lock.has_value();
 
                     if (id == pointing_at) {
-                        const ImVec2 pos_min = ImGui::GetItemRectMin();
-                        const ImVec2 pos_max = ImGui::GetItemRectMax();
-                        ImGui::GetWindowDrawList()->AddRectFilled(pos_min, pos_max,
-                                                                  IM_COL32(is_mold ? 196 : 0, 255, 0, 60));
+                        imgui_itemrectfilled(IM_COL32(is_mold ? 196 : 0, 255, 0, 60));
                         if (!ImGui::IsItemVisible() && focus) {
                             ImGui::SetScrollHereY();
                         }
                     }
                     if (ImGui::IsItemHovered()) {
-                        const ImVec2 pos_min = ImGui::GetItemRectMin();
-                        const ImVec2 pos_max = ImGui::GetItemRectMax();
-                        ImGui::GetWindowDrawList()->AddRectFilled(pos_min, pos_max,
-                                                                  IM_COL32(is_mold ? 196 : 0, 255, 0, 30));
+                        imgui_itemrectfilled(IM_COL32(is_mold ? 196 : 0, 255, 0, 30));
                         if (ImGui::IsItemClicked()) {
                             pointing_at = *id;
                             hit = true;
@@ -362,8 +356,6 @@ std::optional<legacy::extrT::valT> load_rule() {
     bool close = false;
     bool reload = false;
     if (file) {
-        // TODO: the path (& file_nav's) should be copyable...
-
         if (ImGui::SmallButton("Close")) {
             close = true;
         }
@@ -371,7 +363,7 @@ std::optional<legacy::extrT::valT> load_rule() {
         if (ImGui::SmallButton("Reload")) {
             reload = true;
         }
-        imgui_str(cpp17_u8string(file->m_path));
+        imgui_strcopyable(cpp17_u8string(file->m_path), imgui_str);
 
         out = file->display();
     } else {

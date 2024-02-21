@@ -28,6 +28,30 @@ inline void imgui_strdisabled(std::string_view str) {
     imgui_strcolored(ImGui::GetStyle().Colors[ImGuiCol_TextDisabled], str);
 }
 
+// TODO: some items in `edit_rule` have offsets so not applicable...
+inline void imgui_itemrect(ImU32 col) {
+    const ImVec2 pos_min = ImGui::GetItemRectMin();
+    const ImVec2 pos_max = ImGui::GetItemRectMax();
+    ImGui::GetWindowDrawList()->AddRect(pos_min, pos_max, col);
+}
+
+inline void imgui_itemrectfilled(ImU32 col) {
+    const ImVec2 pos_min = ImGui::GetItemRectMin();
+    const ImVec2 pos_max = ImGui::GetItemRectMax();
+    ImGui::GetWindowDrawList()->AddRectFilled(pos_min, pos_max, col);
+}
+
+// Using std::string as `SetClipboardText` requires C-style string.
+inline void imgui_strcopyable(const std::string& str, void (*str_func)(std::string_view)) {
+    str_func(str);
+    if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+        ImGui::SetClipboardText(str.c_str());
+        imgui_itemrect(IM_COL32_WHITE);
+    } else if (ImGui::IsItemHovered()) {
+        imgui_itemrect(IM_COL32(128, 128, 128, 255));
+    }
+}
+
 // ~ referring to ImGui::InputScalar; recheck...
 // TODO: better name; allow/disallow ++/-- by mouse scrolling?
 inline bool imgui_int_slider(const char* label, int* v, int v_min, int v_max) {

@@ -24,8 +24,7 @@ inline bool enter_button(const char* label) {
         if (imgui_keypressed(ImGuiKey_Enter, false)) {
             ret = true;
         }
-        const ImU32 col = ret ? IM_COL32(128, 128, 128, 255) : IM_COL32_WHITE;
-        ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), col);
+        imgui_itemrect(ret ? IM_COL32(128, 128, 128, 255) : IM_COL32_WHITE);
     }
     return ret;
 }
@@ -284,20 +283,18 @@ std::optional<legacy::moldT> static_constraints() {
     static bool cond = false;
 
     auto check = [id = 0, size = square_size()](stateE& state, bool enable) mutable {
-        const ImVec2 pos_min = ImGui::GetCursorScreenPos();
-        const ImVec2 pos_max = pos_min + size;
         static const ImU32 cols[5]{IM_COL32(100, 100, 100, 255), //
                                    IM_COL32(0, 0, 0, 255),       //
                                    IM_COL32(255, 255, 255, 255), //
                                    IM_COL32(80, 0, 80, 255),     //
                                    IM_COL32(200, 0, 200, 255)};
 
-        ImGui::GetWindowDrawList()->AddRectFilled(pos_min, pos_max, !enable ? IM_COL32(80, 80, 80, 255) : cols[state]);
-        ImGui::GetWindowDrawList()->AddRect(pos_min, pos_max, IM_COL32(200, 200, 200, 255));
-
         ImGui::PushID(id++);
         ImGui::InvisibleButton("Button", size);
         ImGui::PopID();
+
+        imgui_itemrectfilled(!enable ? IM_COL32(80, 80, 80, 255) : cols[state]);
+        imgui_itemrect(IM_COL32(200, 200, 200, 255));
 
         if (enable && ImGui::IsItemHovered()) {
             // TODO: the ctrl is still awkward...

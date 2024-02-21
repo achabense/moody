@@ -108,16 +108,11 @@ void frame(const code_image& icons, tile_image& img) {
         {
             const std::string rule_str = legacy::to_MAP_str(current.rule);
 
-            imgui_str(rule_str);
+            imgui_strcopyable(rule_str, imgui_str);
 
             // TODO: temp...
             if (ImGui::Button("Copy&lock")) {
                 ImGui::SetClipboardText(legacy::to_MAP_str(current).c_str());
-            }
-            ImGui::SameLine();
-            // TODO: better gui logic for copy... find ways to show feedback
-            if (ImGui::Button("Copy")) {
-                ImGui::SetClipboardText(rule_str.c_str());
             }
             ImGui::SameLine();
             // TODO: (temp) added back; remove when pasting is supported by load_rule...
