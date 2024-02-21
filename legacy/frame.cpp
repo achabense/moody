@@ -97,12 +97,18 @@ void frame(const code_image& icons, tile_image& img) {
     ImGui::SetNextWindowPos(viewport->WorkPos);
     ImGui::SetNextWindowSize(viewport->WorkSize);
     if (auto window = imgui_window("Main", flags)) {
-        ImGui::Text("(%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
+        ImGui::Checkbox("\"Load\"", &show_load);
+        ImGui::SameLine();
+        ImGui::Checkbox("\"Static\"", &show_static);
+        ImGui::SameLine();
+        ImGui::Text("    (%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
 
         // TODO: as `current` may have been changed by static_constraints, `current` may have been out-of-sync with
         // recorder at this frame... Does this matter?
         {
             const std::string rule_str = legacy::to_MAP_str(current.rule);
+
+            imgui_str(rule_str);
 
             // TODO: temp...
             if (ImGui::Button("Copy&lock")) {
@@ -123,26 +129,8 @@ void frame(const code_image& icons, tile_image& img) {
                     }
                 }
             }
-
-            if (!show_load) {
-                ImGui::SameLine();
-                if (ImGui::Button("Load")) {
-                    show_load = true;
-                }
-            }
-
-            if (!show_static) {
-                ImGui::SameLine();
-                if (ImGui::Button("Static")) {
-                    show_static = true;
-                }
-            }
-
-            imgui_str(rule_str);
-
-            // TODO: +1 is clumsy
-            ImGui::AlignTextToFramePadding();
-            ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1);
+            ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
+            ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1); // TODO: +1 is clumsy
             ImGui::SameLine();
             iter_pair(
                 "<|", "prev", "next", "|>", //

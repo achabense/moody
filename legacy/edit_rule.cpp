@@ -34,12 +34,12 @@ class subset_selector {
     legacy::subsetT current;
 
     struct termT {
-        const char* title;
-        legacy::subsetT set;
+        const char* const title;
+        const legacy::subsetT set;
+        const char* const description = nullptr;
         bool selected = false;
-        bool includes_cur = false;
+        // bool includes_cur = false; // TODO: whether to cache this?
         bool disabled = false; // current & set -> empty.
-        const char* description = nullptr;
     };
 
     using termT_vec = std::vector<termT>;
@@ -59,7 +59,7 @@ class subset_selector {
         }
     }
 
-    void reset_current() {
+    void update_current() {
         current = legacy::subsetT::universal();
 
         for_each_term([&](termT& t) {
@@ -71,10 +71,8 @@ class subset_selector {
 
         assert(!current.empty());
 
-        for_each_term([&](termT& t) {
-            t.includes_cur = t.set.includes(current);
-            assert(!t.selected || t.includes_cur); // selected -> includes_cur
-            t.disabled = !t.includes_cur && !legacy::subsetT::common_rule(t.set, current);
+        for_each_term([&](termT& t) { //
+            t.disabled = !legacy::subsetT::common_rule(t.set, current);
         });
     }
 
@@ -87,15 +85,14 @@ public:
         terms_ignore.emplace_back("w", make_subset({mp_ignore_w}));
         terms_ignore.emplace_back("e", make_subset({mp_ignore_e}));
         terms_ignore.emplace_back("a", make_subset({mp_ignore_a}));
-        terms_ignore.emplace_back("s", make_subset({mp_ignore_s}, mask_zero)).description =
-            "0->1, 1->1 or 0->0, 1->0"; // TODO: whether to place here?
+        terms_ignore.emplace_back("s", make_subset({mp_ignore_s}, mask_zero),
+                                  "0->1, 1->1 or 0->0, 1->0"); // TODO: whether to put in terms_ignore?
         terms_ignore.emplace_back("d", make_subset({mp_ignore_d}));
         terms_ignore.emplace_back("z", make_subset({mp_ignore_z}));
         terms_ignore.emplace_back("x", make_subset({mp_ignore_x}));
         terms_ignore.emplace_back("c", make_subset({mp_ignore_c}));
 
-        terms_misc.emplace_back("S(f)", make_subset({mp_ignore_s}, mask_identity)).description =
-            "0->0, 1->1 or 0->1, 1->0";
+        terms_misc.emplace_back("S(f)", make_subset({mp_ignore_s}, mask_identity), "0->0, 1->1 or 0->1, 1->0");
         terms_misc.emplace_back("Hex", make_subset({mp_hex_ignore}));
         // TODO: or define mp_von_ignore?
         terms_misc.emplace_back("Von", make_subset({mp_ignore_q, mp_ignore_e, mp_ignore_z, mp_ignore_c}));
@@ -126,24 +123,29 @@ public:
         terms_hex.emplace_back("C3", make_subset({mp_hex_C3}));
         terms_hex.emplace_back("C6", make_subset({mp_hex_C6}));
 
-        reset_current();
+        update_current();
     }
 
     legacy::subsetT& select_subset(const legacy::moldT& mold) {
-        bool need_reset = false;
-        auto set_select = [&need_reset](termT& t, bool sel) {
-            if (t.selected != sel) {
-                t.selected = sel;
-                need_reset = true;
+        {
+            // https://github.com/ocornut/imgui/issues/6902
+            const float extra_w_sameline = ImGui::GetStyle().ItemSpacing.x * 2; // Two SameLine...
+            const float extra_w_padding = ImGui::GetStyle().FramePadding.x * 4; // Two SmallButton * two sides...
+            const float extra_w = ImGui::CalcTextSize("ClearRecognize").x + extra_w_sameline + extra_w_padding;
+            ImGui::SeparatorTextEx(0, "Select subsets", nullptr, extra_w);
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Clear")) {
+                for_each_term([&](termT& t) { t.disabled = t.selected = false; });
+                update_current();
             }
-        };
-
-        if (ImGui::Button("Clear")) {
-            for_each_term([&](termT& t) { set_select(t, false); });
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Recognize")) {
-            for_each_term([&](termT& t) { set_select(t, t.set.contains(mold.rule)); });
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Recognize")) {
+                for_each_term([&](termT& t) {
+                    t.disabled = false; // Will be updated by `update_current`.
+                    t.selected = t.set.contains(mold.rule);
+                });
+                update_current();
+            }
         }
 
         // TODO: drop mutable id... use manually specified ids
@@ -152,7 +154,8 @@ public:
             ImGui::PushID(id++);
             // ImGui::PushID(&term); // TODO: is ptr id reliable? (will this possibly cause collisions?)
             if (ImGui::InvisibleButton("Check", size) && !term.disabled) {
-                set_select(term, !term.selected);
+                term.selected = !term.selected;
+                update_current();
             }
             ImGui::PopID();
 
@@ -168,10 +171,10 @@ public:
 
             // TODO: explain coloring scheme; redesign if necessary (especially ring col)
             // TODO: find better color for "disabled"/incompatible etc... currently too ugly.
-            const ImU32 cen_col = term.selected       ? ImGui::GetColorU32(ImGuiCol_ButtonHovered)
-                                  : term.includes_cur ? ImGui::GetColorU32(ImGuiCol_FrameBg)
-                                  : term.disabled     ? IM_COL32(150, 0, 0, 255)
-                                                      : IM_COL32_BLACK;
+            const ImU32 cen_col = term.selected                ? ImGui::GetColorU32(ImGuiCol_ButtonHovered)
+                                  : term.set.includes(current) ? ImGui::GetColorU32(ImGuiCol_FrameBg)
+                                  : term.disabled              ? IM_COL32(150, 0, 0, 255)
+                                                               : IM_COL32_BLACK;
             const ImU32 ring_col = term.set.contains(mold.rule) ? IM_COL32(0, 255, 0, 255)
                                    : compatible(term.set, mold) ? IM_COL32(0, 100, 0, 255)
                                                                 : IM_COL32(255, 0, 0, 255);
@@ -205,7 +208,7 @@ public:
             {
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                imgui_str("Ignore&Misc");
+                imgui_str("Ignore & Misc");
 
                 ImGui::TableNextColumn();
                 if (ImGui::BeginTable("Checklist##Ignore&Misc", 1, flags_inner)) {
@@ -269,9 +272,7 @@ public:
             ImGui::EndTable();
         }
 
-        if (need_reset) {
-            reset_current();
-        }
+        assert(!current.empty());
         return current;
     }
 };
