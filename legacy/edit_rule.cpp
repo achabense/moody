@@ -645,11 +645,18 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                 }
                 const bool button_hit = icons.button(head, zoom);
                 const bool button_hover = ImGui::IsItemHovered();
-                ImGui::SameLine();
-                ImGui::AlignTextToFramePadding();
-                imgui_str(labels[masked[head]]);
-                // (wontfix) The vertical alignment is imprecise here. For precise alignment see:
+                const float button_height = ImGui::GetItemRectSize().y;
+
+                // Precise vertical alignment:
                 // https://github.com/ocornut/imgui/issues/2064
+                const auto align_text = [](float height) {
+                    const float off = std::max(0.0f, -1.0f + (height - ImGui::GetTextLineHeight()) / 2);
+                    ImGui::SetCursorPosY(floor(ImGui::GetCursorPos().y + off));
+                };
+
+                ImGui::SameLine();
+                align_text(button_height);
+                imgui_str(labels[masked[head]]);
 
                 if (has_lock) {
                     // TODO: -> widget func... (addborder)
@@ -669,47 +676,37 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                     return_lock(lock);
                 }
                 ImGui::SameLine();
+                ImGui::PushID(j);
+                align_text(button_height);
                 imgui_strdisabled("?");
-                {
-                    // TODO: (temp) the application of imgui_itemtooltip unnecessarily brought End/Begin Disabled
-                    // to each group...
-
-                    // TODO: transparency of the tooltip is also affected if in disabled block... Is the effect
-                    // intentional / configurable?
-                    if (!mask_avail) {
-                        ImGui::EndDisabled();
-                    }
-                    static bool toggle = true;
-                    if (auto tooltip = imgui_itemtooltip(toggle)) {
-                        ImGui::Text("Group size: %d", (int)group.size());
-                        const int max_to_show = 40;
-                        for (int x = 0; auto code : group) {
-                            if (x++ % 8 != 0) {
-                                ImGui::SameLine();
-                            }
-                            // TODO: change color?
-                            // ImGui::GetStyle().Colors[ImGuiCol_Button]
-                            icons.image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
+                if (ImGui::BeginPopupContextItem("Group", ImGuiPopupFlags_MouseButtonLeft)) {
+                    ImGui::Text("Group size: %d", (int)group.size());
+                    const int max_to_show = 128;
+                    for (int x = 0; auto code : group) {
+                        if (x++ % 8 != 0) {
                             ImGui::SameLine();
-                            ImGui::AlignTextToFramePadding();
-                            imgui_str(labels[masked[code]]);
-                            if (mold.lock[code]) {
-                                ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() - ImVec2(2, 2),
-                                                                    ImGui::GetItemRectMax() + ImVec2(2, 2),
-                                                                    IM_COL32_WHITE);
-                            }
-                            if (x == max_to_show) {
-                                break;
-                            }
                         }
-                        if (group.size() > max_to_show) {
-                            imgui_str("...");
+                        // TODO: change color?
+                        // ImGui::GetStyle().Colors[ImGuiCol_Button]
+                        icons.image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
+                        ImGui::SameLine();
+                        align_text(ImGui::GetItemRectSize().y);
+                        imgui_str(labels[masked[code]]);
+                        if (mold.lock[code]) {
+                            ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() - ImVec2(2, 2),
+                                                                ImGui::GetItemRectMax() + ImVec2(2, 2), IM_COL32_WHITE);
+                        }
+                        if (x == max_to_show) {
+                            break;
                         }
                     }
-                    if (!mask_avail) {
-                        ImGui::BeginDisabled();
+                    if (group.size() > max_to_show) {
+                        imgui_str("...");
                     }
+                    ImGui::EndPopup();
                 }
+                ImGui::PopID(); // Should do after the popup.
+
                 if (button_hit) {
                     // TODO: document this behavior... (keyctrl->resolve conflicts)
                     // TODO: reconsider how to deal with conflicts... (especially via masking rule...)
