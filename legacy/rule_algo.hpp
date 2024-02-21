@@ -224,39 +224,29 @@ namespace legacy {
             return true;
         }
 
-        // TODO: finish the proof...
-        // Prove that the intersection (&) of any two subsetT (a) and (b) is still another subsetT.
-        // If (a & b) results in an empty set, it is a subsetT.
-        // Otherwise, let (p) be (a.par | b.par), and let (r) be one of the rule that belongs to (a & b).
-        // It can be shown that (a & b) == subsetT(r, p).
-        // 1. Any rule in (r, p) can be gotten by flipping some groups of (p) from (r).
-        // ...
-        // 2. For any r' != r but belongs to (a) and (b), ... look at any [codeT] of it.
-        // ...
-        friend subsetT operator&(const subsetT& a_, const subsetT& b_) {
+        // Look for a rule that both a and b contains.
+        static std::optional<maskT> common_rule(const subsetT& a_, const subsetT& b_) {
             if (a_.empty() || b_.empty()) {
-                return {emptyT{}};
+                return std::nullopt;
             }
 
             const nonemptyT &a = *a_.m_set, &b = *b_.m_set;
-            partitionT par_both = a.par | b.par;
 
             if (a.contains(b.mask)) {
-                return {b.mask, par_both};
+                return b.mask;
             } else if (b.contains(a.mask)) {
-                return {a.mask, par_both};
+                return a.mask;
             }
 
-            // Look for a rule that both a and b contains.
-            ruleT common_rule{};
+            maskT common{};
             codeT::map_to<bool> assigned{};
 
+            // TODO: this is really slow in debug mode... the complexity seems 512^2 in worst case.
             // TODO: explain try-assign will result a correct rule iff a & b != {}.
-            // TODO: analyze complexity...
             auto try_assign = [&](const codeT code, const bool v, auto& self) -> void {
                 if (!assigned[code]) {
                     assigned[code] = true;
-                    common_rule[code] = v;
+                    common[code] = v;
                     const bool masked_by_a = a.mask[code] ^ v;
                     const bool masked_by_b = b.mask[code] ^ v;
                     for (const codeT c : a.par.group_for(code)) {
@@ -268,7 +258,9 @@ namespace legacy {
                 }
             };
 
-            // TODO: this is really slow in debug mode...
+#ifndef NDEBUG
+            const partitionT par_both = a.par | b.par;
+#endif
             for_each_code([&](codeT code) {
                 if (!assigned[code]) {
                     assert(std::ranges::none_of(par_both.group_for(code), [&](codeT c) { return assigned[c]; }));
@@ -277,12 +269,33 @@ namespace legacy {
                 }
             });
 
-            if (!a.contains(common_rule) || !b.contains(common_rule)) {
-                return {emptyT{}};
+            if (!a.contains(common) || !b.contains(common)) {
+                return std::nullopt;
             }
-            return {{common_rule}, par_both};
+            return common;
         }
     };
+
+    // The intersection (&) of any two subsetT (a) and (b) is still another subsetT:
+    // If there is no common rule, then (a & b) results in an empty set.
+    // Otherwise, suppose there is a rule (r) known to belong to (a & b):
+    // Let (p) = (a.par | b.par), and (s) = subsetT(r, p), then:
+    // 1. (s) is included by (a & b), as:
+    // Any rule in (s) can be gotten by flipping some groups in (p) from (r), and as (a.par) and (b.par)
+    // are refinements of (p), the rule can also be viewed as flipping some groups in (a.par) or (b.par),
+    // so the rule also belongs to (a) and (b).
+    // 2. There cannot be a rule that belongs to (a & b) but not (s) (so (a & b) is included by (s)), as:
+    // The values of a rule in any group from (p) are inter-dependent. If the value for any codeT (c) is fixed,
+    // then the values for the group (c) belongs in (p) are also fixed accordingly.
+    // As a result, the rule must be able to be flipped by whole groups from (r), so belongs to (s)
+    inline subsetT operator&(const subsetT& a, const subsetT& b) {
+        if (auto common = subsetT::common_rule(a, b)) {
+            assert(!a.empty() && !b.empty());
+            return {*common, a.get_par() | b.get_par()};
+        }
+
+        return subsetT::emptyT{};
+    }
 
 #if 0
     // TODO: apply scanlist-based strategy?

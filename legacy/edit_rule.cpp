@@ -74,8 +74,7 @@ class subset_selector {
         for_each_term([&](termT& t) {
             t.includes_cur = t.set.includes(current);
             assert(!t.selected || t.includes_cur); // selected -> includes_cur
-            // TODO: involves a lot of unneeded calculations...
-            t.disabled = !t.includes_cur && (t.set & current).empty();
+            t.disabled = !t.includes_cur && !legacy::subsetT::common_rule(t.set, current);
         });
     }
 
