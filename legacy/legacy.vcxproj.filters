@@ -45,7 +45,7 @@
     <ClInclude Include="rule_algo.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="app_imgui.hpp">
+    <ClInclude Include="dear_imgui.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="common.hpp">

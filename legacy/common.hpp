@@ -4,8 +4,7 @@
 #include <format>
 #include <functional>
 
-// TODO: merge the contents of app_imgui.hpp into this header?
-#include "app_imgui.hpp"
+#include "dear_imgui.hpp"
 #include "rule.hpp"
 
 #if 0
