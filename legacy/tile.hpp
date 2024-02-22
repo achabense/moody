@@ -39,8 +39,8 @@ namespace legacy {
         };
 
     private:
-        sizeT m_size; // observable width and height.
-        bool* m_data; // layout: [height+2][width+2].
+        sizeT m_size; // Observable width and height.
+        bool* m_data; // Layout: [height+2][width+2].
 
     public:
         void swap(tileT& other) noexcept {
@@ -453,8 +453,8 @@ namespace legacy {
             throw std::runtime_error("TODO... what msg? whether to throw at all?");
         }
         if (width > max_size.width || height > max_size.height) {
-            throw std::runtime_error(std::format("Size too large: x = {}, y = {}\nLimit: x <= {}, y <= {}", width, height,
-                                                 max_size.width, max_size.height));
+            throw std::runtime_error(std::format("Size too large: x = {}, y = {}\nLimit: x <= {}, y <= {}", width,
+                                                 height, max_size.width, max_size.height));
         }
 
         tileT tile({.width = (int)width, .height = (int)height});
