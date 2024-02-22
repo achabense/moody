@@ -191,7 +191,7 @@ struct selectT {
 };
 
 // TODO: redesign...
-std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_image& img) {
+std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_image& img) {
     std::optional<legacy::moldT::lockT> out = std::nullopt;
 
     // TODO: the constraint is arbitrary; are there more sensible ways to decide size constraint?

@@ -271,7 +271,7 @@ public:
                 ret = true;
             }
             ImGui::SameLine();
-            iter_pair(
+            iter_group(
                 "<|", "prev", "next", "|>",                                  //
                 [&] { ret = true, m_pos = 0; },                              //
                 [&] { ret = true, m_pos = std::max(0, m_pos - 1); },         //

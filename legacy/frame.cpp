@@ -178,7 +178,7 @@ void frame(const code_image& icons, tile_image& img) {
             ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
             ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1); // TODO: +1 is clumsy
             ImGui::SameLine();
-            iter_pair(
+            iter_group(
                 "<|", "prev", "next", "|>", //
                 [&] { recorder.set_first(); }, [&] { recorder.set_prev(); }, [&] { recorder.set_next(); },
                 [&] { recorder.set_last(); });
@@ -209,7 +209,7 @@ void frame(const code_image& icons, tile_image& img) {
             }
             ImGui::TableNextColumn();
             if (auto child = imgui_ChildWindow("Til", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
-                if (auto out = edit_tile(current.rule, img)) {
+                if (auto out = apply_rule(current.rule, img)) {
                     current.lock = *out;
                     update = true;
                 }

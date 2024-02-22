@@ -528,7 +528,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         }
 
         // TODO: act_int::prev/next should use "contained" level instead...
-        iter_pair(
+        iter_group(
             "<00..", "dec", "inc", "11..>", //
             [&] { return_rule(legacy::act_int::first(subset, mold)); },
             [&] { return_rule(legacy::act_int::prev(subset, mold)); },
@@ -540,7 +540,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             if (!contained) {
                 ImGui::BeginDisabled();
             }
-            iter_pair(
+            iter_group(
                 "<1.0.", "pprev", "pnext", "0.1.>", //
                 [&] { return_rule(legacy::act_perm::first(subset, mold)); },
                 [&] { return_rule(legacy::act_perm::prev(subset, mold)); },

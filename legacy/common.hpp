@@ -36,8 +36,7 @@ inline std::mt19937& global_mt19937() {
     return rand;
 }
 
-// TODO: look for better names for tile_image, code_image, edit_tile (and edit_tile.cpp)
-// (especially as "tile.hpp" is now hidden as impl details for "edit_tile.cpp")
+// TODO: look for better names for tile_image and code_image.
 class tile_image {
     int m_w, m_h;
     ImTextureID m_texture;
@@ -85,19 +84,15 @@ public:
     }
 };
 
-// TODO: this workaround is ugly...
 bool file_nav_add_special_path(const char* u8path, const char* title);
-
-// TODO: whether to test sync? (removed after implementing lockT/moldT differentiation)
 std::optional<legacy::extrT::valT> load_rule();
 
 std::optional<legacy::moldT> static_constraints();
 std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_image& icons);
 
-std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_image& img);
+std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_image& img);
 
-// TODO: better name...
-// TODO: or add back to main.cpp? or directly define in this header?
+// TODO: eh... I find it really hard to find a sensible name for this...
 void frame(const code_image& icons, tile_image& img);
 
 inline const int item_width = 220;
@@ -107,15 +102,13 @@ inline ImVec2 square_size() {
     return ImVec2(r, r);
 }
 
-// TODO: button_pair widget?
-// TODO: reconsider binding and scrolling logic...
 // TODO: (temp) exposing `middle_button` for enter-binding in `edit_rule`
 // TODO (temp) this was defined as a lambda; workaround for a parsing error in clang...
 inline bool default_button(const char* label) { return ImGui::Button(label); }
 
-inline void iter_pair(const char* tag_first, const char* tag_prev, const char* tag_next, const char* tag_last,
-                      auto act_first, auto act_prev, auto act_next, auto act_last, bool allow_scrolling = true,
-                      bool (*middle_button)(const char*) = default_button) {
+inline void iter_group(const char* tag_first, const char* tag_prev, const char* tag_next, const char* tag_last,
+                       auto act_first, auto act_prev, auto act_next, auto act_last, bool allow_scrolling = true,
+                       bool (*middle_button)(const char*) = default_button) {
     if (ImGui::Button(tag_first)) {
         act_first();
     }
