@@ -308,8 +308,8 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
                 const auto filter = [](ImGuiInputTextCallbackData* data) -> int {
                     return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
                 };
-                const float s = ImGui::GetStyle().ItemInnerSpacing.x;
-                const float w = (ImGui::CalcItemWidth() - s) / 2;
+                const float s = imgui_ItemInnerSpacingX();
+                const float w = (ImGui::CalcItemWidth() - s) / 2; // TODO: is floor/ceil needed?
                 ImGui::SetNextItemWidth(w);
                 ImGui::InputTextWithHint("##Width", "width", input_width, std::size(input_width),
                                          ImGuiInputTextFlags_CallbackCharFilter, filter);
@@ -318,6 +318,7 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
                 ImGui::InputTextWithHint("##Height", "height", input_height, std::size(input_height),
                                          ImGuiInputTextFlags_CallbackCharFilter, filter);
                 ImGui::SameLine(0, s);
+                // TODO: awkwardly separated...
             }
 
             // TODO: to avoid spanning:
@@ -348,7 +349,7 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
             ImGui::SameLine(), imgui_Str("="), ImGui::SameLine(); // TODO: About sameline() and ' '...
             for (const ImVec2 size = square_size(); int z : {1, 2, 4, 8}) {
                 if (z != 1) {
-                    ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+                    ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                 }
                 if (ImGui::Button(std::to_string(z).c_str(), size)) {
                     img_zoom = z;

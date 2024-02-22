@@ -7,10 +7,8 @@
 #include "common.hpp"
 
 // TODO: support rollbacking diff rules?
-// TODO: for editing opt, support in-lock and outof-lock mode?
 
-// TODO: consider other approaches (native nav etc) if possible...
-// TODO: e.g. toggle between buttons by left/right... / clear binding...
+// TODO: support navigation among enter-buttons?
 inline bool enter_button(const char* label) {
     static ImGuiID bind_id = 0;
     bool ret = ImGui::Button(label);
@@ -18,7 +16,9 @@ inline bool enter_button(const char* label) {
     if (ret) {
         bind_id = button_id;
     }
-    // TODO: are there public ways (not relying on im gui_internal.h)
+    // TODO: instead of relying on Begin/EndDisabled, add click-protection
+    // on a button-by-button basis?
+    // TODO: are there public ways (not relying on imgui_internal.h)
     // to detect whether in disabled block?
     if (bind_id == button_id && (GImGui->CurrentItemFlags & ImGuiItemFlags_Disabled) == 0) {
         if (imgui_KeyPressed(ImGuiKey_Enter, false)) {
@@ -79,6 +79,7 @@ public:
     subset_selector() : current(legacy::subsetT::universal()) {
         using namespace legacy::_make_subset;
         // TODO: add some tests after the construction...
+        // TODO: add descriptions...
 
         terms_ignore.emplace_back("q", make_subset({mp_ignore_q}));
         terms_ignore.emplace_back("w", make_subset({mp_ignore_w}));
@@ -104,7 +105,7 @@ public:
         terms_native.emplace_back("\\", make_subset({mp_refl_qsc}));
         terms_native.emplace_back("/", make_subset({mp_refl_esz}));
         terms_native.emplace_back("C2", make_subset({mp_C2}));
-        terms_native.emplace_back("C4", make_subset({mp_C4})); // TODO: add explanations in the gui
+        terms_native.emplace_back("C4", make_subset({mp_C4}));
 
         terms_totalistic.emplace_back("Tot", make_subset({mp_C8, mp_tot_exc_s}));
         terms_totalistic.emplace_back("Tot(+s)", make_subset({mp_C8, mp_tot_inc_s}));
@@ -216,7 +217,7 @@ public:
                     // "ignore" Is this solvable by applying specific coloring scheme?
                     ImGui::TableNextColumn();
                     ImGui::BeginGroup();
-                    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1, 1)); // TODO: too tight...
+                    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 2));
                     for (int l = 0; l < 3; ++l) {
                         check(terms_ignore[l * 3 + 0]);
                         ImGui::SameLine();
@@ -383,7 +384,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
     auto return_rule = [&out, &mold](const legacy::ruleT& rule) { out.emplace(rule, mold.lock); };
     auto return_lock = [&out, &mold](const legacy::moldT::lockT& lock) { out.emplace(mold.rule, lock); };
     auto return_mold = [&out](const legacy::moldT& mold) { out.emplace(mold); };
-    // TODO: these setters look awkward...
 
     static subset_selector selector;
 
@@ -396,7 +396,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
     ImGui::Separator();
 
     // TODO: this part is fairly poorly designed and implemented... redesign...
-    // TODO: add more selections...
     // TODO: enable testing masking rule instead of target rule when hovered...
     const legacy::maskT* mask_ptr = nullptr;
     char chr_0 = '0', chr_1 = '1';
@@ -433,8 +432,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         ImGui::AlignTextToFramePadding();
         imgui_Str("Mask");
         for (int i = 0; i < 4; ++i) {
-            ImGui::SameLine();
-            // ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
 
             if (i != 1) {
                 if (ImGui::RadioButton(mask_labels[i], mask_tag == i)) {
@@ -476,7 +474,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
     // still this is a horrible design; need redesign...
     const legacy::maskT& mask = *mask_ptr;
 
-    // TODO: make what to do obvious when !mask_avail !redispatch_avail etc...
+    // TODO: make what to do obvious when !mask_avail etc...
     const bool mask_avail = subset.set_mask(mask);
     const bool compatible = legacy::compatible(subset, mold);
     const bool contained = subset.contains(mold.rule);
@@ -500,10 +498,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             exact_mode = !exact_mode;
         }
 
-        // TODO: imgui_innerx...
-        ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
         if (exact_mode) {
-            // TODO: support different rand mode here ("density" and "exact")
             // TODO: still unstable between partition switches...
             // TODO: the range should be scoped by locks... so, what should rcount be?
             static int rcount = 0.5 * par.k();
@@ -512,7 +508,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             ImGui::SetNextItemWidth(item_width);
             imgui_StepSliderInt("##Quantity", &rcount, 0, par.k());
             rcount = std::clamp(rcount, 0, freec);
-            ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
             if (enter_button("Randomize")) {
                 return_rule(legacy::randomize(subset, mold, global_mt19937(), rcount));
             }
@@ -521,7 +517,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             static float density = 0.5;
             ImGui::SliderFloat("##Density", &density, 0, 1, std::format("Around {}", round(density * par.k())).c_str(),
                                ImGuiSliderFlags_NoInput);
-            ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
+            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
             if (enter_button("Randomize")) {
                 return_rule(legacy::randomize_v2(subset, mold, global_mt19937(), density));
             }
@@ -650,7 +646,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                 imgui_Str(labels[masked[head]]);
 
                 if (has_lock) {
-                    // TODO: -> widget func... (addborder)
+                    // TODO: better ways to show lock?
                     const ImU32 col = scanlist[j].all_locked() ? IM_COL32_WHITE : IM_COL32(128, 128, 128, 255);
                     ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() - ImVec2(2, 2),
                                                         ImGui::GetItemRectMax() + ImVec2(2, 2), col);
@@ -670,6 +666,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                 ImGui::PushID(j);
                 align_text(button_height);
                 imgui_StrDisabled("?");
+                // TODO: still inconvenient...
+                // TODO: (regression) should be able to appear even if the `mask_avail` is false...
                 if (ImGui::BeginPopupContextItem("Group", ImGuiPopupFlags_MouseButtonLeft)) {
                     ImGui::Text("Group size: %d", (int)group.size());
                     const int max_to_show = 128;
@@ -699,6 +697,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                 ImGui::PopID(); // Should do after the popup.
 
                 if (button_hit) {
+                    // TODO: reconsider whether manual approximation is needed...
                     // TODO: document this behavior... (keyctrl->resolve conflicts)
                     // TODO: reconsider how to deal with conflicts... (especially via masking rule...)
                     legacy::ruleT r = mold.rule;

@@ -41,15 +41,19 @@ inline void imgui_StrDisabled(std::string_view str) {
 }
 
 // Using std::string as `SetClipboardText` requires C-style string.
-inline void imgui_StrCopyable(const std::string& str, void (*str_func)(std::string_view)) {
+inline void imgui_StrCopyable(const std::string& str, void (*str_func)(std::string_view),
+                              ImGuiMouseButton_ mouse_button = ImGuiMouseButton_Right) {
     str_func(str);
-    if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+    if (ImGui::IsItemClicked(mouse_button)) {
         ImGui::SetClipboardText(str.c_str());
         imgui_ItemRect(IM_COL32_WHITE);
     } else if (ImGui::IsItemHovered()) {
         imgui_ItemRect(IM_COL32(128, 128, 128, 255));
     }
 }
+
+// TODO: still clunky...
+inline float imgui_ItemInnerSpacingX() { return ImGui::GetStyle().ItemInnerSpacing.x; }
 
 // TODO: referring to ImGui::InputScalar; recheck...
 inline bool imgui_StepSliderInt(const char* label, int* v, int v_min, int v_max) {
@@ -60,7 +64,7 @@ inline bool imgui_StepSliderInt(const char* label, int* v, int v_min, int v_max)
     int v2 = *v;
 
     const float r = ImGui::GetFrameHeight();
-    const float s = ImGui::GetStyle().ItemInnerSpacing.x;
+    const float s = imgui_ItemInnerSpacingX();
     ImGui::BeginGroup();
     ImGui::PushID(label);
     ImGui::SetNextItemWidth(std::max(1.0f, ImGui::CalcItemWidth() - 2 * (r + s)));
