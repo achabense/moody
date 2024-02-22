@@ -1,8 +1,3 @@
-// TODO: not used in this source file...
-#ifndef IMGUI_DEFINE_MATH_OPERATORS
-#define IMGUI_DEFINE_MATH_OPERATORS
-#endif
-
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -216,8 +211,7 @@ static std::optional<std::string> load_binary(const pathT& path, int max_size) {
 // TODO: support saving into file? (without relying on the clipboard)
 // TODO: support in-memory loadings. (e.g. tutorial about typical ways to find interesting rules)
 
-// TODO: refine...
-struct fileT {
+class fileT {
     struct lineT {
         std::string text;
         std::optional<int> id = std::nullopt;
@@ -225,10 +219,10 @@ struct fileT {
 
     pathT m_path;
     std::vector<lineT> m_lines;
-    std::vector<legacy::extrT::valT> m_rules; // TODO: whether to do compression?
-    int pointing_at = 0;                      // valid if !m_rules.empty().
+    std::vector<legacy::extrT::valT> m_rules;
+    int m_pos = 0; // Current pos (m_rules[m_pos]), valid if !m_rules.empty().
 
-    bool need_reset_scroll = true;
+    bool restart = true;
 
     // TODO: It is easy to locate all rules in a text span via `extract_MAP_str`.
     // However there are no easy ways to locate or highlight (only) the rule across the lines in the gui.
@@ -250,13 +244,17 @@ struct fileT {
         }
     }
 
+public:
     fileT(pathT path) : m_path(std::move(path)) { reload(); }
+
+    const pathT& path() const { return m_path; }
+    bool has_rule() const { return !m_rules.empty(); }
 
     void reload() {
         m_lines.clear();
         m_rules.clear();
-        pointing_at = 0;
-        need_reset_scroll = true;
+        m_pos = 0;
+        restart = true;
 
         if (auto data = load_binary(m_path, 100'000)) {
             std::istringstream ss(std::move(*data));
@@ -265,37 +263,36 @@ struct fileT {
     }
 
     std::optional<legacy::extrT::valT> display() {
-        bool hit = false; // TODO: rename...
+        bool ret = false;
         const int total = m_rules.size();
 
         if (total != 0) {
-            iter_pair(
-                "<|", "prev", "next", "|>",                                              //
-                [&] { hit = true, pointing_at = 0; },                                    //
-                [&] { hit = true, pointing_at = std::max(0, pointing_at - 1); },         //
-                [&] { hit = true, pointing_at = std::min(total - 1, pointing_at + 1); }, //
-                [&] { hit = true, pointing_at = total - 1; });
-            ImGui::SameLine();
-            ImGui::Text("Total:%d At:%d", total, pointing_at + 1);
-            ImGui::SameLine();
             if (ImGui::Button("Focus")) {
-                hit = true;
+                ret = true;
             }
+            ImGui::SameLine();
+            iter_pair(
+                "<|", "prev", "next", "|>",                                  //
+                [&] { ret = true, m_pos = 0; },                              //
+                [&] { ret = true, m_pos = std::max(0, m_pos - 1); },         //
+                [&] { ret = true, m_pos = std::min(total - 1, m_pos + 1); }, //
+                [&] { ret = true, m_pos = total - 1; });
+            ImGui::SameLine();
+            ImGui::Text("Total:%d At:%d", total, m_pos + 1);
         } else {
-            ImGui::Text("Not found");
+            ImGui::Text("No rules");
         }
 
-        const bool focus = hit;
+        const bool focus = ret;
 
         ImGui::Separator();
 
-        if (need_reset_scroll) {
+        if (std::exchange(restart, false)) {
             ImGui::SetNextWindowScroll({0, 0});
-            assert(pointing_at == 0);
+            assert(m_pos == 0);
             if (total != 0) {
-                hit = true; // TODO: whether to set hit in this case?
+                ret = true; // TODO: whether to set ret in this case?
             }
-            need_reset_scroll = false;
         }
         if (auto child = imgui_childwindow("Child")) {
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
@@ -307,7 +304,7 @@ struct fileT {
                 if (id.has_value()) {
                     const bool is_mold = m_rules[*id].lock.has_value();
 
-                    if (id == pointing_at) {
+                    if (id == m_pos) {
                         imgui_itemrectfilled(IM_COL32(is_mold ? 196 : 0, 255, 0, 60));
                         if (!ImGui::IsItemVisible() && focus) {
                             ImGui::SetScrollHereY();
@@ -316,8 +313,8 @@ struct fileT {
                     if (ImGui::IsItemHovered()) {
                         imgui_itemrectfilled(IM_COL32(is_mold ? 196 : 0, 255, 0, 30));
                         if (ImGui::IsItemClicked()) {
-                            pointing_at = *id;
-                            hit = true;
+                            m_pos = *id;
+                            ret = true;
                         }
                     }
                 }
@@ -325,9 +322,9 @@ struct fileT {
             ImGui::PopStyleVar();
         }
 
-        if (hit) {
-            assert(pointing_at >= 0 && pointing_at < total);
-            return m_rules[pointing_at];
+        if (ret) {
+            assert(m_pos >= 0 && m_pos < total);
+            return m_rules[m_pos];
         } else {
             return std::nullopt;
         }
@@ -352,13 +349,13 @@ std::optional<legacy::extrT::valT> load_rule() {
         if (ImGui::SmallButton("Reload")) {
             reload = true;
         }
-        imgui_strcopyable(cpp17_u8string(file->m_path), imgui_str);
+        imgui_strcopyable(cpp17_u8string(file->path()), imgui_str);
 
         out = file->display();
     } else {
         if (auto sel = nav.display()) {
             file.emplace(*sel);
-            if (file->m_rules.empty()) {
+            if (!file->has_rule()) {
                 file.reset();
                 messenger::add_msg("Found no rules");
             }
@@ -372,7 +369,7 @@ std::optional<legacy::extrT::valT> load_rule() {
     if (reload) {
         assert(file);
         file->reload();
-        if (file->m_rules.empty()) {
+        if (!file->has_rule()) {
             file.reset();
             messenger::add_msg("Found no rules");
         }

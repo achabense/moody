@@ -124,13 +124,14 @@ inline void iter_pair(const char* tag_first, const char* tag_prev, const char* t
     ImGui::SameLine();
     ImGui::BeginGroup();
     if (middle_button(tag_prev)) {
+        allow_scrolling = false;
         act_prev();
     }
     ImGui::SameLine(0, 0), imgui_str("/"), ImGui::SameLine(0, 0);
     if (middle_button(tag_next)) {
+        allow_scrolling = false;
         act_next();
     }
-
     ImGui::EndGroup();
     if (allow_scrolling && ImGui::IsItemHovered()) {
         if (imgui_scrollup()) {

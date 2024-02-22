@@ -104,7 +104,7 @@ namespace legacy {
         equivT m_eq;
         int m_k{}; // `m_eq` has `m_k` groups.
 
-        // Map codeT to an integer ¡Ê [0, m_k) (which represents the group the code belongs to).
+        // Map codeT to an integer âˆˆ [0, m_k) (which represents the group the code belongs to).
         codeT::map_to<int> m_map{};
 
         // (Not a codeT::map_to<codeT>)

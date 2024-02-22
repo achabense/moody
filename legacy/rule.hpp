@@ -166,51 +166,6 @@ namespace legacy {
         friend bool operator==(const moldT&, const moldT&) = default;
     };
 
-    // TODO: rename...
-    struct compressT {
-        std::array<uint8_t, 64> bits_rule{}, bits_lock{}; // as bitset.
-
-        friend bool operator==(const compressT&, const compressT&) = default;
-        struct hashT {
-            size_t operator()(const compressT& cmpr) const {
-                // ~ not UB.
-                return std::hash<std::string_view>{}(
-                    std::string_view(reinterpret_cast<const char*>(&cmpr), sizeof(cmpr)));
-            }
-        };
-    };
-
-    inline compressT compress(const moldT& mold) {
-        compressT cmpr{};
-        for_each_code([&](codeT code) {
-            cmpr.bits_rule[code / 8] |= mold.rule[code] << (code % 8);
-            cmpr.bits_lock[code / 8] |= mold.lock[code] << (code % 8);
-        });
-        return cmpr;
-    }
-
-    inline moldT decompress(const compressT& cmpr) {
-        moldT mold{};
-        for_each_code([&](codeT code) {
-            mold.rule[code] = (cmpr.bits_rule[code / 8] >> (code % 8)) & 1;
-            mold.lock[code] = (cmpr.bits_lock[code / 8] >> (code % 8)) & 1;
-        });
-        return mold;
-    }
-
-#ifdef ENABLE_TESTS
-    namespace _tests {
-        inline const testT test_compressT = [] {
-            moldT mold{};
-            for_each_code([&](codeT code) {
-                mold.rule[code] = testT::rand() & 1;
-                mold.lock[code] = testT::rand() & 1;
-            });
-            assert(decompress(compress(mold)) == mold);
-        };
-    }  // namespace _tests
-#endif // ENABLE_TESTS
-
     namespace _misc {
         inline char to_base64(uint8_t b6) {
             if (b6 < 26) {
