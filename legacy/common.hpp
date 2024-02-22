@@ -176,6 +176,33 @@ public:
     }
 };
 
+// TODO: better name... app_helper? (is this program an "app"?)
+class helper {
+    friend void frame(const code_image&, tile_image&);
+    static inline bool enable_help = false;
+
+public:
+    static void show_help(const std::invocable<> auto& desc, bool sameline = true) {
+        if (enable_help) {
+            if (sameline) {
+                ImGui::SameLine();
+            }
+            // Modified from `HelpMarker` in "imgui_demo.cpp".
+            ImGui::TextDisabled("(?)");
+            if (ImGui::BeginItemTooltip()) {
+                ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+                desc();
+                ImGui::PopTextWrapPos();
+                ImGui::EndTooltip();
+            }
+        }
+    }
+
+    static void show_help(const char* desc, bool sameline = true) { //
+        show_help([desc] { imgui_Str(desc); }, sameline);
+    }
+};
+
 // TODO: (temp) used to test gui changes...
 inline bool debug_switch() {
     static bool s = false;

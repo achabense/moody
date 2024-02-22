@@ -148,6 +148,13 @@ void frame(const code_image& icons, tile_image& img) {
     ImGui::SetNextWindowPos(viewport->WorkPos);
     ImGui::SetNextWindowSize(viewport->WorkSize);
     if (auto window = imgui_Window("Main", flags)) {
+        if (imgui_KeyPressed(ImGuiKey_H, false)) {
+            helper::enable_help = !helper::enable_help;
+        }
+
+        ImGui::Checkbox("\"help\"", &helper::enable_help);
+        helper::show_help("Or press 'H' to toggle this mode.");
+        ImGui::SameLine();
         ImGui::Checkbox("\"Load\"", &show_load);
         ImGui::SameLine();
         ImGui::Checkbox("\"Static\"", &show_static);
@@ -160,6 +167,7 @@ void frame(const code_image& icons, tile_image& img) {
             const std::string rule_str = legacy::to_MAP_str(current.rule);
 
             imgui_StrCopyable(rule_str, imgui_Str);
+            helper::show_help("Current rule. You can right-click the text to copy to the clipboard.");
 
             // TODO: temp...
             if (ImGui::Button("Copy&lock")) {
