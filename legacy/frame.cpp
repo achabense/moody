@@ -124,7 +124,7 @@ void frame(const code_image& icons, tile_image& img) {
         // TODO: this should be controlled by load_rule ...
         ImGui::SetNextWindowSize({600, 400}, ImGuiCond_FirstUseEver);
         ImGui::SetNextWindowSizeConstraints(ImVec2(400, 200), ImVec2(FLT_MAX, FLT_MAX));
-        if (auto window = imgui_window("Load rule", &show_load, ImGuiWindowFlags_NoCollapse)) {
+        if (auto window = imgui_Window("Load rule", &show_load, ImGuiWindowFlags_NoCollapse)) {
             if (auto out = load_rule()) {
                 assign_val(current, *out);
                 update = true;
@@ -132,7 +132,7 @@ void frame(const code_image& icons, tile_image& img) {
         }
     }
     if (show_static) {
-        if (auto window = imgui_window("Static constraints", &show_static,
+        if (auto window = imgui_Window("Static constraints", &show_static,
                                        ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse)) {
             if (auto out = static_constraints()) {
                 current = *out;
@@ -147,7 +147,7 @@ void frame(const code_image& icons, tile_image& img) {
 
     ImGui::SetNextWindowPos(viewport->WorkPos);
     ImGui::SetNextWindowSize(viewport->WorkSize);
-    if (auto window = imgui_window("Main", flags)) {
+    if (auto window = imgui_Window("Main", flags)) {
         ImGui::Checkbox("\"Load\"", &show_load);
         ImGui::SameLine();
         ImGui::Checkbox("\"Static\"", &show_static);
@@ -159,7 +159,7 @@ void frame(const code_image& icons, tile_image& img) {
         {
             const std::string rule_str = legacy::to_MAP_str(current.rule);
 
-            imgui_strcopyable(rule_str, imgui_str);
+            imgui_StrCopyable(rule_str, imgui_Str);
 
             // TODO: temp...
             if (ImGui::Button("Copy&lock")) {
@@ -175,14 +175,14 @@ void frame(const code_image& icons, tile_image& img) {
                     }
                 }
             }
-            ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
+            ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
             ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1); // TODO: +1 is clumsy
             ImGui::SameLine();
             iter_pair(
                 "<|", "prev", "next", "|>", //
                 [&] { recorder.set_first(); }, [&] { recorder.set_prev(); }, [&] { recorder.set_next(); },
                 [&] { recorder.set_last(); });
-            ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
+            ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
             if (ImGui::Button("Clear")) {
                 recorder.clear();
             }
@@ -193,22 +193,22 @@ void frame(const code_image& icons, tile_image& img) {
         if (ImGui::BeginTable("Layout", 2, ImGuiTableFlags_Resizable)) {
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            if (auto child = imgui_childwindow("Rul", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
+            if (auto child = imgui_ChildWindow("Rul", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
                 if (auto out = edit_rule(current, icons)) {
                     current = *out;
                     update = true;
                 }
 
                 // TODO: This is used to pair with enter key and is somewhat broken...
-                if (imgui_keypressed(ImGuiKey_Semicolon, true)) {
+                if (imgui_KeyPressed(ImGuiKey_Semicolon, true)) {
                     recorder.set_prev();
                 }
-                if (imgui_keypressed(ImGuiKey_Apostrophe, true)) {
+                if (imgui_KeyPressed(ImGuiKey_Apostrophe, true)) {
                     recorder.set_next();
                 }
             }
             ImGui::TableNextColumn();
-            if (auto child = imgui_childwindow("Til", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
+            if (auto child = imgui_ChildWindow("Til", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
                 if (auto out = edit_tile(current.rule, img)) {
                     current.lock = *out;
                     update = true;

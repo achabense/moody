@@ -126,16 +126,16 @@ inline void iter_pair(const char* tag_first, const char* tag_prev, const char* t
         allow_scrolling = false;
         act_prev();
     }
-    ImGui::SameLine(0, 0), imgui_str("/"), ImGui::SameLine(0, 0);
+    ImGui::SameLine(0, 0), imgui_Str("/"), ImGui::SameLine(0, 0);
     if (middle_button(tag_next)) {
         allow_scrolling = false;
         act_next();
     }
     ImGui::EndGroup();
     if (allow_scrolling && ImGui::IsItemHovered()) {
-        if (imgui_scrollup()) {
+        if (imgui_MouseScrollingUp()) {
             act_prev();
-        } else if (imgui_scrolldown()) {
+        } else if (imgui_MouseScrollingDown()) {
             act_next();
         }
     }
@@ -172,7 +172,7 @@ public:
                     if (!std::exchange(first, false)) {
                         ImGui::Separator();
                     }
-                    imgui_str(str);
+                    imgui_Str(str);
                 }
                 ImGui::EndPopup();
             } else {
@@ -186,7 +186,7 @@ public:
 // TODO: (temp) used to test gui changes...
 inline bool debug_switch() {
     static bool s = false;
-    if (imgui_keypressed(ImGuiKey_T, false)) {
+    if (imgui_KeyPressed(ImGuiKey_T, false)) {
         s = !s;
     }
 

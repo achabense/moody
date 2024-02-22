@@ -233,16 +233,16 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
 
     auto edit_ctrl = [&] {
         // TODO: redesign keyboard ctrl...
-        if (imgui_keypressed(ImGuiKey_1, true)) {
+        if (imgui_KeyPressed(ImGuiKey_1, true)) {
             ctrl.gap_frame = std::max(ctrl.gap_min, ctrl.gap_frame - 1);
         }
-        if (imgui_keypressed(ImGuiKey_2, true)) {
+        if (imgui_KeyPressed(ImGuiKey_2, true)) {
             ctrl.gap_frame = std::min(ctrl.gap_max, ctrl.gap_frame + 1);
         }
-        if (imgui_keypressed(ImGuiKey_3, true)) {
+        if (imgui_KeyPressed(ImGuiKey_3, true)) {
             ctrl.pace = std::max(ctrl.pace_min, ctrl.pace - 1);
         }
-        if (imgui_keypressed(ImGuiKey_4, true)) {
+        if (imgui_KeyPressed(ImGuiKey_4, true)) {
             ctrl.pace = std::min(ctrl.pace_max, ctrl.pace + 1);
         }
         // TODO: explain... apply to other ctrls?
@@ -250,7 +250,7 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
             ctrl.pause = !ctrl.pause;
         }
         // Run by keystroke turns out to be necessary. (TODO: For example ...)
-        if (imgui_keypressed(ImGuiKey_M, true)) {
+        if (imgui_KeyPressed(ImGuiKey_M, true)) {
             if (ctrl.pause) {
                 extra = ctrl.actual_pace();
             }
@@ -278,14 +278,14 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
             }
             ImGui::PopButtonRepeat();
             ImGui::SameLine();
-            if (ImGui::Button("Restart") || imgui_keypressed(ImGuiKey_R, false)) {
+            if (ImGui::Button("Restart") || imgui_KeyPressed(ImGuiKey_R, false)) {
                 should_restart = true;
             }
 
             // TODO: Gap-frame shall be really timer-based...
-            imgui_int_slider("Gap Frame (0~20)", &ctrl.gap_frame, ctrl.gap_min, ctrl.gap_max);
+            imgui_StepSliderInt("Gap Frame (0~20)", &ctrl.gap_frame, ctrl.gap_min, ctrl.gap_max);
 
-            imgui_int_slider("Pace (1~20)", &ctrl.pace, ctrl.pace_min, ctrl.pace_max);
+            imgui_StepSliderInt("Pace (1~20)", &ctrl.pace, ctrl.pace_min, ctrl.pace_max);
             ImGui::AlignTextToFramePadding();
             ImGui::Text("(Actual pace: %d)", ctrl.actual_pace());
             ImGui::SameLine();
@@ -295,7 +295,7 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
         ImGui::SameLine();
         ImGui::BeginGroup();
         {
-            if (int seed = init.seed; imgui_int_slider("Init seed (0~99)", &seed, 0, 99)) {
+            if (int seed = init.seed; imgui_StepSliderInt("Init seed (0~99)", &seed, 0, 99)) {
                 init.seed = seed;
                 should_restart = true;
             }
@@ -344,8 +344,8 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
             }
 
             ImGui::AlignTextToFramePadding();
-            imgui_str("Fit with zoom");
-            ImGui::SameLine(), imgui_str("="), ImGui::SameLine(); // TODO: About sameline() and ' '...
+            imgui_Str("Fit with zoom");
+            ImGui::SameLine(), imgui_Str("="), ImGui::SameLine(); // TODO: About sameline() and ' '...
             for (const ImVec2 size = square_size(); int z : {1, 2, 4, 8}) {
                 if (z != 1) {
                     ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
@@ -386,7 +386,7 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
         // TODO: select all, unselect button...
 
         if (paste) {
-            ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
+            ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
             if (ImGui::Button("Drop paste")) {
                 paste.reset();
             }
@@ -494,7 +494,7 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
             if (!paste && img_zoom <= 2 && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
                 if (celx >= -10 && celx < tile_size.width + 10 && cely >= -10 && cely < tile_size.height + 10) {
                     static bool toggle = true;
-                    if (auto tooltip = imgui_itemtooltip(toggle)) {
+                    if (auto tooltip = imgui_ItemTooltip(toggle)) {
                         // TODO: simplify...
                         assert(tile_size.width >= 40);
                         assert(tile_size.height >= 40);
@@ -515,7 +515,7 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
 
                         const int w = maxx - minx, h = maxy - miny;
                         assert(w == 40 && h == 40);
-                        imgui_str("Zoom:4"); // TODO: (temp)
+                        imgui_Str("Zoom:4"); // TODO: (temp)
                         ImGui::Image(img.texture(), ImVec2(w * 4, h * 4),
                                      {(float)minx / tile_size.width, (float)miny / tile_size.height},
                                      {(float)maxx / tile_size.width, (float)maxy / tile_size.height});
@@ -548,11 +548,11 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
                 }
             }
 
-            if (imgui_scrolling()) {
-                if (imgui_scrolldown() && img_zoom != 1) {
+            if (imgui_MouseScrolling()) {
+                if (imgui_MouseScrollingDown() && img_zoom != 1) {
                     img_zoom /= 2;
                 }
-                if (imgui_scrollup() && img_zoom != 8) {
+                if (imgui_MouseScrollingUp() && img_zoom != 8) {
                     img_zoom *= 2;
                 }
                 img_off = (mouse_pos - cell_pos_raw * img_zoom) - canvas_min;
@@ -561,10 +561,10 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
             }
         }
 
-        if (imgui_keypressed(ImGuiKey_A, false)) {
+        if (imgui_KeyPressed(ImGuiKey_A, false)) {
             sel.toggle_select_all(tile_size);
         }
-        if (imgui_keypressed(ImGuiKey_V, false)) {
+        if (imgui_KeyPressed(ImGuiKey_V, false)) {
             if (const char* text = ImGui::GetClipboardText()) {
                 try {
                     // TODO: or ask whether to resize runner.tile?
@@ -576,29 +576,29 @@ std::optional<legacy::moldT::lockT> edit_tile(const legacy::ruleT& rule, tile_im
         }
         if (const auto range = sel.range(); range.height() > 1 || range.width() > 1) {
             // TODO: what if the right mouse is still pressed?
-            if (imgui_keypressed(ImGuiKey_S, false)) {
+            if (imgui_KeyPressed(ImGuiKey_S, false)) {
                 const auto [begin, end] = legacy::bounding_box(runner.tile(), range);
                 if (begin != end) {
                     sel.select_0 = begin;
                     sel.select_1 = {.x = end.x - 1, .y = end.y - 1};
                 }
             }
-            if (imgui_keypressed(ImGuiKey_C, false) || imgui_keypressed(ImGuiKey_X, false)) {
+            if (imgui_KeyPressed(ImGuiKey_C, false) || imgui_KeyPressed(ImGuiKey_X, false)) {
                 ImGui::SetClipboardText(legacy::to_RLE_str(ctrl.rule, runner.tile(), range).c_str());
             }
-            if (imgui_keypressed(ImGuiKey_Backspace, false) || imgui_keypressed(ImGuiKey_X, false)) {
+            if (imgui_KeyPressed(ImGuiKey_Backspace, false) || imgui_KeyPressed(ImGuiKey_X, false)) {
                 legacy::clear_inside(runner.tile(), range);
             }
-            if (imgui_keypressed(ImGuiKey_Equal, false)) {
+            if (imgui_KeyPressed(ImGuiKey_Equal, false)) {
                 // TODO: specify density etc...
                 legacy::random_fill(runner.tile(), global_mt19937(), 0.5, range);
             }
             // TODO: redesign keyboard ctrl...
-            if (imgui_keypressed(ImGuiKey_0, false)) {
+            if (imgui_KeyPressed(ImGuiKey_0, false)) {
                 legacy::clear_outside(runner.tile(), range);
             }
 
-            if (imgui_keypressed(ImGuiKey_P, false)) {
+            if (imgui_KeyPressed(ImGuiKey_P, false)) {
                 out = capture_closed(runner.tile(), range, ctrl.rule);
             }
 

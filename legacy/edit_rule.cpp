@@ -21,10 +21,10 @@ inline bool enter_button(const char* label) {
     // TODO: are there public ways (not relying on im gui_internal.h)
     // to detect whether in disabled block?
     if (bind_id == button_id && (GImGui->CurrentItemFlags & ImGuiItemFlags_Disabled) == 0) {
-        if (imgui_keypressed(ImGuiKey_Enter, false)) {
+        if (imgui_KeyPressed(ImGuiKey_Enter, false)) {
             ret = true;
         }
-        imgui_itemrect(ret ? IM_COL32(128, 128, 128, 255) : IM_COL32_WHITE);
+        imgui_ItemRect(ret ? IM_COL32(128, 128, 128, 255) : IM_COL32_WHITE);
     }
     return ret;
 }
@@ -160,8 +160,8 @@ public:
 
             if (term.description) {
                 static bool toggle = true;
-                if (auto tooltip = imgui_itemtooltip(toggle)) {
-                    imgui_str(term.description);
+                if (auto tooltip = imgui_ItemTooltip(toggle)) {
+                    imgui_Str(term.description);
                 }
             }
 
@@ -197,7 +197,7 @@ public:
                     ImGui::TableNextRow();
                     for (termT& t : terms) {
                         ImGui::TableNextColumn();
-                        imgui_str(t.title);
+                        imgui_Str(t.title);
                         check(t);
                     }
                     ImGui::EndTable();
@@ -207,7 +207,7 @@ public:
             {
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                imgui_str("Ignore & Misc");
+                imgui_Str("Ignore & Misc");
 
                 ImGui::TableNextColumn();
                 if (ImGui::BeginTable("Checklist##Ignore&Misc", 1, flags_inner)) {
@@ -230,7 +230,7 @@ public:
                     for (termT& t : terms_misc) {
                         ImGui::SameLine();
                         ImGui::BeginGroup();
-                        imgui_str(t.title);
+                        imgui_Str(t.title);
                         check(t);
                         ImGui::EndGroup();
                     }
@@ -242,7 +242,7 @@ public:
             {
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                imgui_str("Native");
+                imgui_Str("Native");
 
                 ImGui::TableNextColumn();
                 checklist(terms_native, "Checklist##Native");
@@ -251,7 +251,7 @@ public:
             {
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                imgui_str("Totalistic");
+                imgui_Str("Totalistic");
 
                 ImGui::TableNextColumn();
                 checklist(terms_totalistic, "Checklist##Totalistic");
@@ -260,7 +260,7 @@ public:
             {
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                imgui_str("q w -    q w\n"
+                imgui_Str("q w -    q w\n"
                           "a s d ~ a s d\n"
                           "- x c    x c");
 
@@ -293,18 +293,18 @@ std::optional<legacy::moldT> static_constraints() {
         ImGui::InvisibleButton("Button", size);
         ImGui::PopID();
 
-        imgui_itemrectfilled(!enable ? IM_COL32(80, 80, 80, 255) : cols[state]);
-        imgui_itemrect(IM_COL32(200, 200, 200, 255));
+        imgui_ItemRectFilled(!enable ? IM_COL32(80, 80, 80, 255) : cols[state]);
+        imgui_ItemRect(IM_COL32(200, 200, 200, 255));
 
         if (enable && ImGui::IsItemHovered()) {
             // TODO: the ctrl is still awkward...
             if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
                 state = Any;
             } else {
-                if (imgui_scrollup()) {
+                if (imgui_MouseScrollingUp()) {
                     state = cond ? O_Cond : O;
                 }
-                if (imgui_scrolldown()) {
+                if (imgui_MouseScrollingDown()) {
                     state = cond ? I_Cond : I;
                 }
             }
@@ -403,10 +403,10 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
     {
         const auto mask_tooltip = [](const legacy::maskT& mask, const char* description) {
             static bool toggle = true;
-            if (auto tooltip = imgui_itemtooltip(toggle)) {
+            if (auto tooltip = imgui_ItemTooltip(toggle)) {
                 ImGui::PushTextWrapPos(280); // TODO: how to decide wrap pos properly?
-                imgui_str(description);
-                imgui_str(to_MAP_str(mask));
+                imgui_Str(description);
+                imgui_Str(to_MAP_str(mask));
                 ImGui::PopTextWrapPos();
             }
         };
@@ -431,7 +431,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         const legacy::maskT* mask_ptrs[]{&legacy::mask_zero, &mask_ids[id_tag], &subset.get_mask(), &mask_custom};
 
         ImGui::AlignTextToFramePadding();
-        imgui_str("Mask");
+        imgui_Str("Mask");
         for (int i = 0; i < 4; ++i) {
             ImGui::SameLine();
             // ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
@@ -447,10 +447,10 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                 }
                 // TODO: awkward; use popup window instead?
                 if (ImGui::IsItemHovered()) {
-                    if (imgui_scrollup()) {
+                    if (imgui_MouseScrollingUp()) {
                         id_tag = std::max(id_tag - 1, 0);
                     }
-                    if (imgui_scrolldown()) {
+                    if (imgui_MouseScrollingDown()) {
                         id_tag = std::min(id_tag + 1, 8);
                     }
                 }
@@ -510,7 +510,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             const int freec = legacy::count_free(par, mold.lock); // TODO: still wasteful...
 
             ImGui::SetNextItemWidth(item_width);
-            imgui_int_slider("##Quantity", &rcount, 0, par.k());
+            imgui_StepSliderInt("##Quantity", &rcount, 0, par.k());
             rcount = std::clamp(rcount, 0, freec);
             ImGui::SameLine(0, ImGui::GetStyle().ItemInnerSpacing.x);
             if (enter_button("Randomize")) {
@@ -534,7 +534,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             [&] { return_rule(legacy::act_int::prev(subset, mold)); },
             [&] { return_rule(legacy::act_int::next(subset, mold)); },
             [&] { return_rule(legacy::act_int::last(subset, mold)); }, true, enter_button);
-        ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
+        ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
 
         {
             if (!contained) {
@@ -547,7 +547,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                 [&] { return_rule(legacy::act_perm::next(subset, mold)); },
                 [&] { return_rule(legacy::act_perm::last(subset, mold)); }, true, enter_button);
             // TODO: (temp) shuffle is not more useful than randomize, but more convenient sometimes...
-            // ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
+            // ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
             // if (enter_button("Shuffle")) {
             //     return_rule(legacy::shuffle(subset, mold, global_mt19937()));
             // }
@@ -575,7 +575,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         if (ImGui::Button("Clear lock")) {
             return_lock({});
         }
-        ImGui::SameLine(), imgui_str("|"), ImGui::SameLine();
+        ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
         // TODO: move elsewhere
         if (ImGui::Button("Mir")) {
             return_mold(legacy::mirror(mold));
@@ -614,7 +614,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                         c_inconsistent);
         }
 
-        if (auto child = imgui_childwindow("Details")) {
+        if (auto child = imgui_ChildWindow("Details")) {
             const int zoom = 7;
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 4));
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
@@ -647,7 +647,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
 
                 ImGui::SameLine();
                 align_text(button_height);
-                imgui_str(labels[masked[head]]);
+                imgui_Str(labels[masked[head]]);
 
                 if (has_lock) {
                     // TODO: -> widget func... (addborder)
@@ -669,7 +669,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                 ImGui::SameLine();
                 ImGui::PushID(j);
                 align_text(button_height);
-                imgui_strdisabled("?");
+                imgui_StrDisabled("?");
                 if (ImGui::BeginPopupContextItem("Group", ImGuiPopupFlags_MouseButtonLeft)) {
                     ImGui::Text("Group size: %d", (int)group.size());
                     const int max_to_show = 128;
@@ -682,7 +682,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                         icons.image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
                         ImGui::SameLine();
                         align_text(ImGui::GetItemRectSize().y);
-                        imgui_str(labels[masked[code]]);
+                        imgui_Str(labels[masked[code]]);
                         if (mold.lock[code]) {
                             ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() - ImVec2(2, 2),
                                                                 ImGui::GetItemRectMax() + ImVec2(2, 2), IM_COL32_WHITE);
@@ -692,7 +692,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                         }
                     }
                     if (group.size() > max_to_show) {
-                        imgui_str("...");
+                        imgui_Str("...");
                     }
                     ImGui::EndPopup();
                 }

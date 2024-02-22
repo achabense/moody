@@ -4,57 +4,55 @@
 #include <string>
 
 #include "imgui.h"
-#include "imgui_internal.h" // TODO: record dependency...
-
-// Unlike ImGui::TextWrapped, doesn't take fmt str...
-// TODO: the name is awful...
-inline void imgui_str(std::string_view str) { //
-    ImGui::TextUnformatted(str.data(), str.data() + str.size());
-}
-
-inline void imgui_strwrapped(std::string_view str) {
-    ImGui::PushTextWrapPos(0.0f);
-    imgui_str(str);
-    ImGui::PopTextWrapPos();
-}
-
-inline void imgui_strcolored(const ImVec4& col, std::string_view str) {
-    ImGui::PushStyleColor(ImGuiCol_Text, col);
-    imgui_str(str);
-    ImGui::PopStyleColor();
-}
-
-inline void imgui_strdisabled(std::string_view str) {
-    imgui_strcolored(ImGui::GetStyle().Colors[ImGuiCol_TextDisabled], str);
-}
+#include "imgui_internal.h"
 
 // TODO: some items in `edit_rule` have offsets so not applicable...
-inline void imgui_itemrect(ImU32 col) {
+inline void imgui_ItemRect(ImU32 col) {
     const ImVec2 pos_min = ImGui::GetItemRectMin();
     const ImVec2 pos_max = ImGui::GetItemRectMax();
     ImGui::GetWindowDrawList()->AddRect(pos_min, pos_max, col);
 }
 
-inline void imgui_itemrectfilled(ImU32 col) {
+inline void imgui_ItemRectFilled(ImU32 col) {
     const ImVec2 pos_min = ImGui::GetItemRectMin();
     const ImVec2 pos_max = ImGui::GetItemRectMax();
     ImGui::GetWindowDrawList()->AddRectFilled(pos_min, pos_max, col);
 }
 
+// Unlike ImGui::Text(Wrapped/...), these functions take unformatted string as the argument.
+inline void imgui_Str(std::string_view str) { //
+    ImGui::TextUnformatted(str.data(), str.data() + str.size());
+}
+
+inline void imgui_StrWrapped(std::string_view str) {
+    ImGui::PushTextWrapPos(0.0f);
+    imgui_Str(str);
+    ImGui::PopTextWrapPos();
+}
+
+inline void imgui_StrColored(const ImVec4& col, std::string_view str) {
+    ImGui::PushStyleColor(ImGuiCol_Text, col);
+    imgui_Str(str);
+    ImGui::PopStyleColor();
+}
+
+inline void imgui_StrDisabled(std::string_view str) {
+    imgui_StrColored(ImGui::GetStyle().Colors[ImGuiCol_TextDisabled], str);
+}
+
 // Using std::string as `SetClipboardText` requires C-style string.
-inline void imgui_strcopyable(const std::string& str, void (*str_func)(std::string_view)) {
+inline void imgui_StrCopyable(const std::string& str, void (*str_func)(std::string_view)) {
     str_func(str);
     if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
         ImGui::SetClipboardText(str.c_str());
-        imgui_itemrect(IM_COL32_WHITE);
+        imgui_ItemRect(IM_COL32_WHITE);
     } else if (ImGui::IsItemHovered()) {
-        imgui_itemrect(IM_COL32(128, 128, 128, 255));
+        imgui_ItemRect(IM_COL32(128, 128, 128, 255));
     }
 }
 
-// ~ referring to ImGui::InputScalar; recheck...
-// TODO: better name; allow/disallow ++/-- by mouse scrolling?
-inline bool imgui_int_slider(const char* label, int* v, int v_min, int v_max) {
+// TODO: referring to ImGui::InputScalar; recheck...
+inline bool imgui_StepSliderInt(const char* label, int* v, int v_min, int v_max) {
     if (ImGui::GetCurrentWindow()->SkipItems) {
         return false;
     }
@@ -82,7 +80,7 @@ inline bool imgui_int_slider(const char* label, int* v, int v_min, int v_max) {
     const char* label_end = ImGui::FindRenderedTextEnd(label);
     if (label != label_end) {
         ImGui::SameLine(0, s);
-        imgui_str(std::string_view(label, label_end));
+        imgui_Str(std::string_view(label, label_end));
     }
     ImGui::PopID();
     ImGui::EndGroup();
@@ -93,56 +91,58 @@ inline bool imgui_int_slider(const char* label, int* v, int v_min, int v_max) {
     return changed;
 }
 
-inline bool imgui_keypressed(ImGuiKey key, bool repeat) {
+// TODO: recheck `bool IsKeyPressed(ImGuiKey, ImGuiID, ImGuiInputFlags)` in "imgui_internal.h"
+inline bool imgui_KeyPressed(ImGuiKey key, bool repeat) {
     return !ImGui::GetIO().WantCaptureKeyboard && ImGui::IsKeyPressed(key, repeat);
 };
 
-// TODO: other mouse functions...
-// TODO: rename to _mouse_XXX?
-inline bool imgui_scrolling() { return ImGui::GetIO().MouseWheel != 0; }
+// TODO: doesn't work if adding `!ImGui::GetIO().WantCaptureMouse`...
+inline bool imgui_MouseScrolling() { return ImGui::GetIO().MouseWheel != 0; }
 
-inline bool imgui_scrolldown() { return ImGui::GetIO().MouseWheel < 0; }
+inline bool imgui_MouseScrollingDown() { return ImGui::GetIO().MouseWheel < 0; }
 
-inline bool imgui_scrollup() { return ImGui::GetIO().MouseWheel > 0; }
+inline bool imgui_MouseScrollingUp() { return ImGui::GetIO().MouseWheel > 0; }
 
-struct [[nodiscard]] imgui_window {
-    imgui_window(const imgui_window&) = delete;
-    imgui_window& operator=(const imgui_window&) = delete;
+struct [[nodiscard]] imgui_Window {
+    imgui_Window(const imgui_Window&) = delete;
+    imgui_Window& operator=(const imgui_Window&) = delete;
 
     const bool visible;
     // TODO: refine interface and documentation
-    explicit imgui_window(const char* name, ImGuiWindowFlags flags = {})
+    explicit imgui_Window(const char* name, ImGuiWindowFlags flags = {})
         : visible(ImGui::Begin(name, nullptr, flags)) {}
-    explicit imgui_window(const char* name, bool* p_open, ImGuiWindowFlags flags = {})
+    explicit imgui_Window(const char* name, bool* p_open, ImGuiWindowFlags flags = {})
         : visible(ImGui::Begin(name, p_open, flags)) {}
-    ~imgui_window() {
+    ~imgui_Window() {
         ImGui::End(); // Unconditional.
     }
     explicit operator bool() const { return visible; }
 };
 
-struct [[nodiscard]] imgui_childwindow {
-    imgui_childwindow(const imgui_childwindow&) = delete;
-    imgui_childwindow& operator=(const imgui_childwindow&) = delete;
+struct [[nodiscard]] imgui_ChildWindow {
+    imgui_ChildWindow(const imgui_ChildWindow&) = delete;
+    imgui_ChildWindow& operator=(const imgui_ChildWindow&) = delete;
 
     const bool visible;
-    explicit imgui_childwindow(const char* name, const ImVec2& size = {}, ImGuiChildFlags child_flags = {},
+    explicit imgui_ChildWindow(const char* name, const ImVec2& size = {}, ImGuiChildFlags child_flags = {},
                                ImGuiWindowFlags window_flags = {})
         : visible(ImGui::BeginChild(name, size, child_flags, window_flags)) {}
-    ~imgui_childwindow() {
+    ~imgui_ChildWindow() {
         ImGui::EndChild(); // Unconditional.
     }
     explicit operator bool() const { return visible; }
 };
 
-class [[nodiscard]] imgui_itemtooltip {
+// TODO: this is not a general utility, the only place that really needs toggling may be
+// the space zooming window...
+class [[nodiscard]] imgui_ItemTooltip {
     bool begun = false;
 
 public:
-    imgui_itemtooltip(const imgui_itemtooltip&) = delete;
-    imgui_itemtooltip& operator=(const imgui_itemtooltip&) = delete;
+    imgui_ItemTooltip(const imgui_ItemTooltip&) = delete;
+    imgui_ItemTooltip& operator=(const imgui_ItemTooltip&) = delete;
 
-    explicit imgui_itemtooltip(bool& toggle) {
+    explicit imgui_ItemTooltip(bool& toggle) {
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
             // TODO: still have slight control conflicts...
             if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Right)) {
@@ -150,13 +150,13 @@ public:
             }
             if (toggle) {
                 // TODO: wrap according to actual tooltip contents...
-                // imgui_str("Double right click to turn on/off the tooltip");
+                // imgui_Str("Double right click to turn on/off the tooltip");
                 ImGui::BeginTooltip();
                 begun = true;
             }
         }
     }
-    ~imgui_itemtooltip() {
+    ~imgui_ItemTooltip() {
         if (begun) {
             ImGui::EndTooltip();
         }

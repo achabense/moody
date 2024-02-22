@@ -106,10 +106,10 @@ public:
         }
 
         if (m_valid) {
-            imgui_strcopyable(cpp17_u8string(m_current), imgui_str);
+            imgui_StrCopyable(cpp17_u8string(m_current), imgui_Str);
         } else {
             assert(m_dirs.empty() && m_files.empty());
-            imgui_strdisabled("(Invalid) " + cpp17_u8string(m_current));
+            imgui_StrDisabled("(Invalid) " + cpp17_u8string(m_current));
         }
 
         ImGui::Separator();
@@ -135,9 +135,9 @@ public:
                     set_current(m_current.parent_path());
                 }
                 ImGui::Separator();
-                if (auto child = imgui_childwindow("Folders")) {
+                if (auto child = imgui_ChildWindow("Folders")) {
                     if (m_dirs.empty()) {
-                        imgui_strdisabled("None");
+                        imgui_StrDisabled("None");
                     }
                     const entryT* sel = nullptr;
                     for (const entryT& entry : m_dirs) {
@@ -158,7 +158,7 @@ public:
             {
                 ImGui::InputText("Filter", buf_filter, std::size(buf_filter));
                 ImGui::Separator();
-                if (auto child = imgui_childwindow("Files")) {
+                if (auto child = imgui_ChildWindow("Files")) {
                     bool has = false;
                     for (const entryT& entry : m_files) {
                         const std::string str = cpp17_u8string(entry.path().filename());
@@ -170,7 +170,7 @@ public:
                         }
                     }
                     if (!has) {
-                        imgui_strdisabled("None");
+                        imgui_StrDisabled("None");
                     }
                 }
             }
@@ -294,24 +294,24 @@ public:
                 ret = true; // TODO: whether to set ret in this case?
             }
         }
-        if (auto child = imgui_childwindow("Child")) {
+        if (auto child = imgui_ChildWindow("Child")) {
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
             for (int l = 1; const auto& [text, id] : m_lines) {
                 ImGui::TextDisabled("%2d ", l++);
                 ImGui::SameLine();
-                imgui_strcopyable(text, imgui_strwrapped);
+                imgui_StrCopyable(text, imgui_StrWrapped);
 
                 if (id.has_value()) {
                     const bool is_mold = m_rules[*id].lock.has_value();
 
                     if (id == m_pos) {
-                        imgui_itemrectfilled(IM_COL32(is_mold ? 196 : 0, 255, 0, 60));
+                        imgui_ItemRectFilled(IM_COL32(is_mold ? 196 : 0, 255, 0, 60));
                         if (!ImGui::IsItemVisible() && focus) {
                             ImGui::SetScrollHereY();
                         }
                     }
                     if (ImGui::IsItemHovered()) {
-                        imgui_itemrectfilled(IM_COL32(is_mold ? 196 : 0, 255, 0, 30));
+                        imgui_ItemRectFilled(IM_COL32(is_mold ? 196 : 0, 255, 0, 30));
                         if (ImGui::IsItemClicked()) {
                             m_pos = *id;
                             ret = true;
@@ -349,7 +349,7 @@ std::optional<legacy::extrT::valT> load_rule() {
         if (ImGui::SmallButton("Reload")) {
             reload = true;
         }
-        imgui_strcopyable(cpp17_u8string(file->path()), imgui_str);
+        imgui_StrCopyable(cpp17_u8string(file->path()), imgui_Str);
 
         out = file->display();
     } else {
