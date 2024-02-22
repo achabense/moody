@@ -80,7 +80,7 @@
     <ClCompile Include="edit_rule.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="edit_tile.cpp">
+    <ClCompile Include="apply_rule.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="load_rule.cpp">

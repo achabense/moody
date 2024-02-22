@@ -166,7 +166,7 @@
     <ClInclude Include="rule.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="edit_tile.cpp" />
+    <ClCompile Include="apply_rule.cpp" />
     <ClCompile Include="imgui\imgui.cpp" />
     <ClCompile Include="imgui\imgui_demo.cpp" />
     <ClCompile Include="imgui\imgui_draw.cpp" />
