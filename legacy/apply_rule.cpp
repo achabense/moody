@@ -192,9 +192,9 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
     std::optional<legacy::moldT::lockT> out = std::nullopt;
 
     // TODO: the constraint is arbitrary; are there more sensible ways to decide size constraint?
-    // TODO: the min size should not be so restrictive (64, 64)...
+    // TODO: (temp) being related to min canvas size...
     const auto size_clamped = [](int width, int height) {
-        return legacy::tileT::sizeT{.width = std::clamp(width, 64, 1200), .height = std::clamp(height, 64, 1200)};
+        return legacy::tileT::sizeT{.width = std::clamp(width, 20, 1200), .height = std::clamp(height, 10, 1200)};
     };
 
     static torusT::initT init{.size{.width = 500, .height = 400}, .seed = 0, .density = 0.5};
@@ -390,213 +390,212 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
                 float(legacy::count(runner.tile())) / runner.tile().area());
     // TODO: canvas size, tile size, selected size, paste size...
 
-    const ImVec2 canvas_size = [] {
-        // Values of GetContentRegionAvail() can be negative...
-        ImVec2 size = ImGui::GetContentRegionAvail();
-        return ImVec2(std::max(size.x, 100.0f), std::max(size.y, 50.0f));
-    }();
-    const ImVec2 canvas_min = ImGui::GetCursorScreenPos();
-    const ImVec2 canvas_max = canvas_min + canvas_size;
-    last_known_canvas_size = canvas_size;
+    {
+        ImGui::InvisibleButton("Canvas", [] {
+            // Values of GetContentRegionAvail() can be negative...
+            ImVec2 size = ImGui::GetContentRegionAvail();
+            // TODO (temp) ~ min tile size * max zoom...
+            return ImVec2(std::max(size.x, 160.0f), std::max(size.y, 80.0f));
+        }());
+        const ImVec2 canvas_min = ImGui::GetItemRectMin();
+        const ImVec2 canvas_max = ImGui::GetItemRectMax();
+        const ImVec2 canvas_size = ImGui::GetItemRectSize();
+        last_known_canvas_size = canvas_size;
 
-    // Size is fixed now:
-    const legacy::tileT::sizeT tile_size = runner.tile().size(); // TODO: which (vs init.size) is better?
-    const ImVec2 img_size(tile_size.width * img_zoom, tile_size.height * img_zoom);
+        // Size is fixed now:
+        const legacy::tileT::sizeT tile_size = runner.tile().size(); // TODO: which (vs init.size) is better?
+        const ImVec2 img_size(tile_size.width * img_zoom, tile_size.height * img_zoom);
 
-    // Validity of paste is fixed now:
-    // This can happen when e.g. paste -> resize...
-    if (paste && (paste->width() > tile_size.width || paste->height() > tile_size.height)) {
-        paste.reset();
-    }
+        // Validity of paste is fixed now:
+        // This can happen when e.g. paste -> resize...
+        if (paste && (paste->width() > tile_size.width || paste->height() > tile_size.height)) {
+            paste.reset();
+        }
 
-    if (corner) {
-        img_off = {0, 0};
-    }
-    if (center) {
-        img_off = canvas_size / 2 - img_size / 2;
-        img_off.x = floor(img_off.x);
-        img_off.y = floor(img_off.y); // TODO: is flooring correct?
-    }
+        if (corner) {
+            img_off = {0, 0};
+        }
+        if (center) {
+            img_off = canvas_size / 2 - img_size / 2;
+            // TODO (temp) /img_zoom->floor->*img_zoom, so that img_off will be {0, 0} after fitting.
+            img_off.x = floor(img_off.x / img_zoom) * img_zoom;
+            img_off.y = floor(img_off.y / img_zoom) * img_zoom;
+        }
 
-    const ImVec2 img_min = canvas_min + img_off;
-    const ImVec2 img_max = img_min + img_size;
+        const ImVec2 img_min = canvas_min + img_off;
+        const ImVec2 img_max = img_min + img_size;
 
-    ImDrawList* const drawlist = ImGui::GetWindowDrawList();
-    drawlist->PushClipRect(canvas_min, canvas_max);
-    drawlist->AddRectFilled(canvas_min, canvas_max, IM_COL32(20, 20, 20, 255));
+        ImDrawList* const drawlist = ImGui::GetWindowDrawList();
+        drawlist->PushClipRect(canvas_min, canvas_max);
+        drawlist->AddRectFilled(canvas_min, canvas_max, IM_COL32(20, 20, 20, 255));
 
-    if (!paste) {
-        update(img, runner.tile());
+        if (!paste) {
+            update(img, runner.tile());
 
-        drawlist->AddImage(img.texture(), img_min, img_max);
-    } else {
-        // TODO: displays poorly with miniwindow...
+            drawlist->AddImage(img.texture(), img_min, img_max);
+        } else {
+            // TODO: displays poorly with miniwindow...
 
-        assert(paste->width() <= tile_size.width && paste->height() <= tile_size.height);
-        paste_beg.x = std::clamp(paste_beg.x, 0, tile_size.width - paste->width());
-        paste_beg.y = std::clamp(paste_beg.y, 0, tile_size.height - paste->height());
-        // TODO: rename...
-        const legacy::tileT::rangeT range = {paste_beg, paste_beg + paste->size()};
+            assert(paste->width() <= tile_size.width && paste->height() <= tile_size.height);
+            paste_beg.x = std::clamp(paste_beg.x, 0, tile_size.width - paste->width());
+            paste_beg.y = std::clamp(paste_beg.y, 0, tile_size.height - paste->height());
+            // TODO: rename...
+            const legacy::tileT::rangeT range = {paste_beg, paste_beg + paste->size()};
 
-        legacy::tileT temp(paste->size()); // TODO: wasteful...
-        legacy::copy(temp, {0, 0}, runner.tile(), range);
-        legacy::copy<legacy::copyE::Or>(runner.tile(), paste_beg, *paste);
-        update(img, runner.tile());
-        legacy::copy(runner.tile(), paste_beg, temp);
+            legacy::tileT temp(paste->size()); // TODO: wasteful...
+            legacy::copy(temp, {0, 0}, runner.tile(), range);
+            legacy::copy<legacy::copyE::Or>(runner.tile(), paste_beg, *paste);
+            update(img, runner.tile());
+            legacy::copy(runner.tile(), paste_beg, temp);
 
-        drawlist->AddImage(img.texture(), img_min, img_max);
-        const ImVec2 paste_min = img_min + ImVec2(range.begin.x, range.begin.y) * img_zoom;
-        const ImVec2 paste_max = img_min + ImVec2(range.end.x, range.end.y) * img_zoom;
-        drawlist->AddRectFilled(paste_min, paste_max, IM_COL32(255, 0, 0, 60));
-    }
+            drawlist->AddImage(img.texture(), img_min, img_max);
+            const ImVec2 paste_min = img_min + ImVec2(range.begin.x, range.begin.y) * img_zoom;
+            const ImVec2 paste_max = img_min + ImVec2(range.end.x, range.end.y) * img_zoom;
+            drawlist->AddRectFilled(paste_min, paste_max, IM_COL32(255, 0, 0, 60));
+        }
 
-    if (const auto range = sel.range(); range.width() > 1 || range.height() > 1) {
-        const ImVec2 sel_min = img_min + ImVec2(range.begin.x, range.begin.y) * img_zoom;
-        const ImVec2 sel_max = img_min + ImVec2(range.end.x, range.end.y) * img_zoom;
-        drawlist->AddRectFilled(sel_min, sel_max, IM_COL32(0, 255, 0, 40));
-        drawlist->AddRect(sel_min, sel_max, IM_COL32(0, 255, 0, 160));
-    }
-    drawlist->PopClipRect();
+        if (const auto range = sel.range(); range.width() > 1 || range.height() > 1) {
+            const ImVec2 sel_min = img_min + ImVec2(range.begin.x, range.begin.y) * img_zoom;
+            const ImVec2 sel_max = img_min + ImVec2(range.end.x, range.end.y) * img_zoom;
+            drawlist->AddRectFilled(sel_min, sel_max, IM_COL32(0, 255, 0, 40));
+            drawlist->AddRect(sel_min, sel_max, IM_COL32(0, 255, 0, 160));
+        }
+        drawlist->PopClipRect();
 
-    ImGui::InvisibleButton("Canvas", canvas_size);
-    assert(ImGui::GetItemRectMin() == canvas_min && ImGui::GetItemRectMax() == canvas_max);
+        const bool active = ImGui::IsItemActive();
+        ctrl.pause2 = paste || active; // TODO: won't work if |= active... should ctrl.run clear pause2?
+        if (ImGui::IsItemHovered()) {
+            // TODO: reorganize...
+            const ImGuiIO& io = ImGui::GetIO();
 
-    const bool active = ImGui::IsItemActive();
-    ctrl.pause2 = paste || active; // TODO: won't work if |= active... should ctrl.run clear pause2?
-    if (ImGui::IsItemHovered()) {
-        // TODO: reorganize...
-        const ImGuiIO& io = ImGui::GetIO();
+            assert(ImGui::IsMousePosValid());
+            // It turned out that, this will work well even if outside of the image...
+            const ImVec2 mouse_pos = io.MousePos;
+            const ImVec2 cell_pos_raw = (mouse_pos - img_min) / img_zoom;
+            const int celx = floor(cell_pos_raw.x);
+            const int cely = floor(cell_pos_raw.y);
 
-        assert(ImGui::IsMousePosValid());
-        // It turned out that, this will work well even if outside of the image...
-        const ImVec2 mouse_pos = io.MousePos;
-        const ImVec2 cell_pos_raw = (mouse_pos - img_min) / img_zoom;
-        const int celx = floor(cell_pos_raw.x);
-        const int cely = floor(cell_pos_raw.y);
+            if (active) {
+                if (!io.KeyCtrl) {
+                    img_off += io.MouseDelta;
+                } else if (img_zoom == 1) {
+                    runner.shift(io.MouseDelta.x, io.MouseDelta.y);
+                }
+            }
 
-        if (active) {
-            if (!io.KeyCtrl) {
-                img_off += io.MouseDelta;
-            } else if (img_zoom == 1) {
-                runner.shift(io.MouseDelta.x, io.MouseDelta.y);
+            // TODO: refine...
+            // TODO: zoom window temporarily conflicts with range selection... (both use Rclick)
+            if (!paste && img_zoom <= 2 && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                if (celx >= -10 && celx < tile_size.width + 10 && cely >= -10 && cely < tile_size.height + 10) {
+                    static bool toggle = true;
+                    if (auto tooltip = imgui_ItemTooltip(toggle)) {
+                        const int w = std::min(tile_size.width, 40);
+                        const int h = std::min(tile_size.height, 40);
+
+                        int minx = celx - w / 2, miny = cely - h / 2;
+                        int maxx = celx + (w - w / 2), maxy = cely + (h - h / 2);
+                        if (minx < 0) {
+                            minx = 0, maxx = w;
+                        }
+                        if (miny < 0) {
+                            miny = 0, maxy = h;
+                        }
+                        if (maxx > tile_size.width) {
+                            minx = tile_size.width - w, maxx = tile_size.width;
+                        }
+                        if (maxy > tile_size.height) {
+                            miny = tile_size.height - h, maxy = tile_size.height;
+                        }
+
+                        assert(w == maxx - minx && h == maxy - miny);
+                        ImGui::Image(img.texture(), ImVec2(w * 4, h * 4),
+                                     {(float)minx / tile_size.width, (float)miny / tile_size.height},
+                                     {(float)maxx / tile_size.width, (float)maxy / tile_size.height});
+                    }
+                }
+            }
+
+            // TODO: this shall belong to the runner.
+            // TODO: precedence against left-clicking?
+            if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+                // ctrl.pause = true;
+                sel.select_0.x = std::clamp(celx, 0, tile_size.width - 1);
+                sel.select_0.y = std::clamp(cely, 0, tile_size.height - 1);
+            }
+            if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+                sel.select_1.x = std::clamp(celx, 0, tile_size.width - 1);
+                sel.select_1.y = std::clamp(cely, 0, tile_size.height - 1);
+            }
+
+            // TODO: refactor away this block...
+            // TODO: the logic will be simplified if invisible button goes before the image...
+            if (paste) {
+                assert(paste->width() <= tile_size.width && paste->height() <= tile_size.height);
+                paste_beg.x = std::clamp(celx, 0, tile_size.width - paste->width());
+                paste_beg.y = std::clamp(cely, 0, tile_size.height - paste->height());
+
+                if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                    legacy::copy<legacy::copyE::Or>(runner.tile(), paste_beg, *paste);
+                    paste.reset();
+                }
+            }
+
+            if (imgui_MouseScrolling()) {
+                if (imgui_MouseScrollingDown() && img_zoom != 1) {
+                    img_zoom /= 2;
+                }
+                if (imgui_MouseScrollingUp() && img_zoom != 8) {
+                    img_zoom *= 2;
+                }
+                img_off = (mouse_pos - cell_pos_raw * img_zoom) - canvas_min;
+                img_off.x = round(img_off.x);
+                img_off.y = round(img_off.y); // TODO: is rounding correct?
             }
         }
 
-        // TODO: refine...
-        // TODO: zoom window temporarily conflicts with range selection... (both use Rclick)
-        if (!paste && img_zoom <= 2 && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-            if (celx >= -10 && celx < tile_size.width + 10 && cely >= -10 && cely < tile_size.height + 10) {
-                static bool toggle = true;
-                if (auto tooltip = imgui_ItemTooltip(toggle)) {
-                    // TODO: simplify...
-                    assert(tile_size.width >= 40);
-                    assert(tile_size.height >= 40);
-                    int minx = celx - 20, miny = cely - 20;
-                    int maxx = celx + 20, maxy = cely + 20;
-                    if (minx < 0) {
-                        minx = 0, maxx = 40;
-                    }
-                    if (miny < 0) {
-                        miny = 0, maxy = 40;
-                    }
-                    if (maxx > tile_size.width) {
-                        minx = tile_size.width - 40, maxx = tile_size.width;
-                    }
-                    if (maxy > tile_size.height) {
-                        miny = tile_size.height - 40, maxy = tile_size.height;
-                    }
-
-                    const int w = maxx - minx, h = maxy - miny;
-                    assert(w == 40 && h == 40);
-                    imgui_Str("Zoom:4"); // TODO: (temp)
-                    ImGui::Image(img.texture(), ImVec2(w * 4, h * 4),
-                                 {(float)minx / tile_size.width, (float)miny / tile_size.height},
-                                 {(float)maxx / tile_size.width, (float)maxy / tile_size.height});
+        if (imgui_KeyPressed(ImGuiKey_A, false)) {
+            sel.toggle_select_all(tile_size);
+        }
+        if (imgui_KeyPressed(ImGuiKey_V, false)) {
+            if (const char* text = ImGui::GetClipboardText()) {
+                try {
+                    // TODO: or ask whether to resize runner.tile?
+                    paste.emplace(legacy::from_RLE_str(text, tile_size));
+                } catch (const std::exception& err) {
+                    messenger::add_msg("{}", err.what());
                 }
             }
         }
-
-        // TODO: this shall belong to the runner.
-        // TODO: precedence against left-clicking?
-        if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-            // ctrl.pause = true;
-            sel.select_0.x = std::clamp(celx, 0, tile_size.width - 1);
-            sel.select_0.y = std::clamp(cely, 0, tile_size.height - 1);
-        }
-        if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-            sel.select_1.x = std::clamp(celx, 0, tile_size.width - 1);
-            sel.select_1.y = std::clamp(cely, 0, tile_size.height - 1);
-        }
-
-        // TODO: refactor away this block...
-        // TODO: the logic will be simplified if invisible button goes before the image...
-        if (paste) {
-            assert(paste->width() <= tile_size.width && paste->height() <= tile_size.height);
-            paste_beg.x = std::clamp(celx, 0, tile_size.width - paste->width());
-            paste_beg.y = std::clamp(cely, 0, tile_size.height - paste->height());
-
-            if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-                legacy::copy<legacy::copyE::Or>(runner.tile(), paste_beg, *paste);
-                paste.reset();
+        if (const auto range = sel.range(); range.height() > 1 || range.width() > 1) {
+            // TODO: what if the right mouse is still pressed?
+            if (imgui_KeyPressed(ImGuiKey_S, false)) {
+                const auto [begin, end] = legacy::bounding_box(runner.tile(), range);
+                if (begin != end) {
+                    sel.select_0 = begin;
+                    sel.select_1 = {.x = end.x - 1, .y = end.y - 1};
+                }
             }
-        }
-
-        if (imgui_MouseScrolling()) {
-            if (imgui_MouseScrollingDown() && img_zoom != 1) {
-                img_zoom /= 2;
+            if (imgui_KeyPressed(ImGuiKey_C, false) || imgui_KeyPressed(ImGuiKey_X, false)) {
+                ImGui::SetClipboardText(legacy::to_RLE_str(ctrl.rule, runner.tile(), range).c_str());
             }
-            if (imgui_MouseScrollingUp() && img_zoom != 8) {
-                img_zoom *= 2;
+            if (imgui_KeyPressed(ImGuiKey_Backspace, false) || imgui_KeyPressed(ImGuiKey_X, false)) {
+                legacy::clear_inside(runner.tile(), range);
             }
-            img_off = (mouse_pos - cell_pos_raw * img_zoom) - canvas_min;
-            img_off.x = round(img_off.x);
-            img_off.y = round(img_off.y); // TODO: is rounding correct?
-        }
-    }
-
-    if (imgui_KeyPressed(ImGuiKey_A, false)) {
-        sel.toggle_select_all(tile_size);
-    }
-    if (imgui_KeyPressed(ImGuiKey_V, false)) {
-        if (const char* text = ImGui::GetClipboardText()) {
-            try {
-                // TODO: or ask whether to resize runner.tile?
-                paste.emplace(legacy::from_RLE_str(text, tile_size));
-            } catch (const std::exception& err) {
-                messenger::add_msg("{}", err.what());
+            if (imgui_KeyPressed(ImGuiKey_Equal, false)) {
+                // TODO: specify density etc...
+                legacy::random_fill(runner.tile(), global_mt19937(), 0.5, range);
             }
-        }
-    }
-    if (const auto range = sel.range(); range.height() > 1 || range.width() > 1) {
-        // TODO: what if the right mouse is still pressed?
-        if (imgui_KeyPressed(ImGuiKey_S, false)) {
-            const auto [begin, end] = legacy::bounding_box(runner.tile(), range);
-            if (begin != end) {
-                sel.select_0 = begin;
-                sel.select_1 = {.x = end.x - 1, .y = end.y - 1};
+            // TODO: redesign keyboard ctrl...
+            if (imgui_KeyPressed(ImGuiKey_0, false)) {
+                legacy::clear_outside(runner.tile(), range);
             }
-        }
-        if (imgui_KeyPressed(ImGuiKey_C, false) || imgui_KeyPressed(ImGuiKey_X, false)) {
-            ImGui::SetClipboardText(legacy::to_RLE_str(ctrl.rule, runner.tile(), range).c_str());
-        }
-        if (imgui_KeyPressed(ImGuiKey_Backspace, false) || imgui_KeyPressed(ImGuiKey_X, false)) {
-            legacy::clear_inside(runner.tile(), range);
-        }
-        if (imgui_KeyPressed(ImGuiKey_Equal, false)) {
-            // TODO: specify density etc...
-            legacy::random_fill(runner.tile(), global_mt19937(), 0.5, range);
-        }
-        // TODO: redesign keyboard ctrl...
-        if (imgui_KeyPressed(ImGuiKey_0, false)) {
-            legacy::clear_outside(runner.tile(), range);
-        }
 
-        if (imgui_KeyPressed(ImGuiKey_P, false)) {
-            out = capture_closed(runner.tile(), range, ctrl.rule);
-        }
+            if (imgui_KeyPressed(ImGuiKey_P, false)) {
+                out = capture_closed(runner.tile(), range, ctrl.rule);
+            }
 
-        // TODO: support a menu somewhere...
-        // (context menu works poorly with rbutton selection...)
+            // TODO: support a menu somewhere...
+            // (context menu works poorly with rbutton selection...)
 #if 0
             if (ImGui::BeginPopupContextItem()) {
                 if (ImGui::MenuItem("Clear selected", "del")) { // 0/1
@@ -613,6 +612,7 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
                 ImGui::EndPopup();
             }
 #endif
+        }
     }
 
     ImGui::PopItemWidth();

@@ -202,13 +202,3 @@ public:
         show_help([desc] { imgui_Str(desc); }, sameline);
     }
 };
-
-// TODO: (temp) used to test gui changes...
-inline bool debug_switch() {
-    static bool s = false;
-    if (imgui_KeyPressed(ImGuiKey_T, false)) {
-        s = !s;
-    }
-
-    return s;
-}
