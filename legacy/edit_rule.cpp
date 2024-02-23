@@ -126,7 +126,7 @@ public:
         update_current();
     }
 
-    legacy::subsetT& select_subset(const legacy::moldT& mold) {
+    const legacy::subsetT& select_subset(const legacy::moldT& mold) {
         {
             // https://github.com/ocornut/imgui/issues/6902
             const float extra_w_sameline = ImGui::GetStyle().ItemSpacing.x * 2; // Two SameLine...
@@ -387,9 +387,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
 
     static subset_selector selector;
 
-    // TODO: non-const for set_mask. this is conceptually unsafe as it also allows assignments...
     // TODO: move mask selection logic into selector as well?
-    legacy::subsetT& subset = selector.select_subset(mold);
+    const legacy::subsetT& subset = selector.select_subset(mold);
     assert(!subset.empty());
     const legacy::partitionT& par = subset.get_par();
 
@@ -474,15 +473,15 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
     // still this is a horrible design; need redesign...
     const legacy::maskT& mask = *mask_ptr;
 
-    // TODO: make what to do obvious when !mask_avail etc...
-    const bool mask_avail = subset.set_mask(mask);
+    // TODO: make what to do obvious when !transform_avail etc...
+    const bool transform_avail = subset.contains(mask);
     const bool compatible = legacy::compatible(subset, mold);
     const bool contained = subset.contains(mold.rule);
     assert(!contained || compatible); // contained -> compatible
 
     // TODO: this is disabling all the operations, including mirror, clear-lock etc...
     // What can be allowed when the selected mask doesn't belong to the set?
-    if (!mask_avail) {
+    if (!transform_avail) {
         ImGui::BeginDisabled();
     }
 
@@ -510,7 +509,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             rcount = std::clamp(rcount, 0, freec);
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
             if (enter_button("Randomize")) {
-                return_rule(legacy::randomize(subset, mold, global_mt19937(), rcount));
+                return_rule(legacy::randomize(subset, mask, mold, global_mt19937(), rcount));
             }
         } else {
             ImGui::SetNextItemWidth(item_width);
@@ -519,17 +518,17 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                                ImGuiSliderFlags_NoInput);
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
             if (enter_button("Randomize")) {
-                return_rule(legacy::randomize_v2(subset, mold, global_mt19937(), density));
+                return_rule(legacy::randomize_v2(subset, mask, mold, global_mt19937(), density));
             }
         }
 
         // TODO: act_int::prev/next should use "contained" level instead...
         iter_group(
             "<00..", "dec", "inc", "11..>", //
-            [&] { return_rule(legacy::act_int::first(subset, mold)); },
-            [&] { return_rule(legacy::act_int::prev(subset, mold)); },
-            [&] { return_rule(legacy::act_int::next(subset, mold)); },
-            [&] { return_rule(legacy::act_int::last(subset, mold)); }, true, enter_button);
+            [&] { return_rule(legacy::act_int::first(subset, mask, mold)); },
+            [&] { return_rule(legacy::act_int::prev(subset, mask, mold)); },
+            [&] { return_rule(legacy::act_int::next(subset, mask, mold)); },
+            [&] { return_rule(legacy::act_int::last(subset, mask, mold)); }, true, enter_button);
         ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
 
         {
@@ -538,10 +537,10 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             }
             iter_group(
                 "<1.0.", "pprev", "pnext", "0.1.>", //
-                [&] { return_rule(legacy::act_perm::first(subset, mold)); },
-                [&] { return_rule(legacy::act_perm::prev(subset, mold)); },
-                [&] { return_rule(legacy::act_perm::next(subset, mold)); },
-                [&] { return_rule(legacy::act_perm::last(subset, mold)); }, true, enter_button);
+                [&] { return_rule(legacy::act_perm::first(subset, mask, mold)); },
+                [&] { return_rule(legacy::act_perm::prev(subset, mask, mold)); },
+                [&] { return_rule(legacy::act_perm::next(subset, mask, mold)); },
+                [&] { return_rule(legacy::act_perm::last(subset, mask, mold)); }, true, enter_button);
             // TODO: (temp) shuffle is not more useful than randomize, but more convenient sometimes...
             // ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
             // if (enter_button("Shuffle")) {
@@ -582,6 +581,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
     {
         const char labels[2][3]{{'-', chr_0, '\0'}, {'-', chr_1, '\0'}};
 
+        // TODO: which mask? `mask` or `subset.get_mask()`?
         // TODO: find a better name for `ruleT_masked` and the variables...
         const legacy::ruleT_masked masked = mask ^ mold.rule;
         const auto scanlist = legacy::scan(par, masked, mold.lock);
@@ -716,7 +716,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             ImGui::PopStyleVar(2);
         }
     }
-    if (!mask_avail) {
+    if (!transform_avail) {
         ImGui::EndDisabled();
     }
     return out;

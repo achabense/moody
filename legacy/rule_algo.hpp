@@ -216,16 +216,6 @@ namespace legacy {
             assert(!empty());
             return m_set->par;
         }
-        // TODO: whether to change the subset's mask directly? or just use the an independent mask
-        // under the control of the subset?
-        bool set_mask(const maskT& mask) {
-            assert(!empty());
-            if (!contains(mask)) {
-                return false;
-            }
-            m_set->mask = mask;
-            return true;
-        }
 
         // Look for a rule that both a and b contains.
         static std::optional<maskT> common_rule(const subsetT& a_, const subsetT& b_) {
@@ -450,14 +440,14 @@ namespace legacy {
         return mask ^ r;
     }
 
-    // TODO: better name...
     // Also, it might be helpful to support "in-lock" forging. For example, to dial to find potentially related
     // patterns...
     // Directly invert the locks, or add a flag in `forge`? (TODO: recheck `invert_lock`)
-    inline ruleT forge_rule(const subsetT& subset, const moldT& mold, std::invocable<bool*, bool*> auto fn) {
+    inline ruleT transform(const subsetT& subset, const maskT& mask, const moldT& mold,
+                           std::invocable<bool*, bool*> auto fn) {
+        assert(subset.contains(mask));
         assert(compatible(subset, mold));
 
-        const maskT& mask = subset.get_mask();
         const partitionT& par = subset.get_par();
 
         ruleT_masked r = mask ^ approximate(subset, mold);
@@ -490,10 +480,10 @@ namespace legacy {
 
     // TODO: `count` denotes free groups now; whether to switch to total groups (at least in the gui part)?
     // TODO: (temp) there was a plan to support count_min~count_max mode finally... dropped now.
-    inline ruleT randomize(const subsetT& subset, const moldT& mold, std::mt19937& rand, int count) {
+    inline ruleT randomize(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand, int count) {
         assert(compatible(subset, mold));
 
-        return forge_rule(subset, mold, [&rand, count](bool* begin, bool* end) {
+        return transform(subset, mask, mold, [&rand, count](bool* begin, bool* end) {
             int c = std::clamp(count, 0, int(end - begin));
             std::fill(begin, end, 0);
             std::fill_n(begin, c, 1);
@@ -501,41 +491,42 @@ namespace legacy {
         });
     }
 
-    inline ruleT randomize_v2(const subsetT& subset, const moldT& mold, std::mt19937& rand, double density) {
+    inline ruleT randomize_v2(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand,
+                              double density) {
         assert(compatible(subset, mold));
 
-        return forge_rule(subset, mold, [&rand, density](bool* begin, bool* end) {
+        return transform(subset, mask, mold, [&rand, density](bool* begin, bool* end) {
             std::bernoulli_distribution dist(std::clamp(density, 0.0, 1.0));
             std::generate(begin, end, [&] { return dist(rand); });
         });
     }
 
-    inline ruleT shuffle(const subsetT& subset, const moldT& mold, std::mt19937& rand) {
+    inline ruleT shuffle(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand) {
         assert(subset.contains(mold.rule));
 
-        return forge_rule(subset, mold, [&rand](bool* begin, bool* end) { std::shuffle(begin, end, rand); });
+        return transform(subset, mask, mold, [&rand](bool* begin, bool* end) { std::shuffle(begin, end, rand); });
     }
 
     // TODO: rename to [set_]first / ...
     struct act_int {
-        static ruleT first(const subsetT& subset, const moldT& mold) {
+        static ruleT first(const subsetT& subset, const maskT& mask, const moldT& mold) {
             assert(compatible(subset, mold));
 
-            return forge_rule(subset, mold, [](bool* begin, bool* end) { std::fill(begin, end, 0); });
+            return transform(subset, mask, mold, [](bool* begin, bool* end) { std::fill(begin, end, 0); });
         }
 
-        static ruleT last(const subsetT& subset, const moldT& mold) {
+        static ruleT last(const subsetT& subset, const maskT& mask, const moldT& mold) {
             assert(compatible(subset, mold));
 
-            return forge_rule(subset, mold, [](bool* begin, bool* end) { std::fill(begin, end, 1); });
+            return transform(subset, mask, mold, [](bool* begin, bool* end) { std::fill(begin, end, 1); });
         }
 
         // TODO: next/prev should require `contains`... using compatible to make the gui part work.
-        static ruleT next(const subsetT& subset, const moldT& mold) {
+        static ruleT next(const subsetT& subset, const maskT& mask, const moldT& mold) {
             // assert(subset.contains(mold.rule));
             assert(compatible(subset, mold));
 
-            return forge_rule(subset, mold, [](bool* begin, bool* end) {
+            return transform(subset, mask, mold, [](bool* begin, bool* end) {
                 // 11...0 -> 00...1; stop at 111...1 (last())
                 bool* first_0 = std::find(begin, end, 0);
                 if (first_0 != end) {
@@ -545,11 +536,11 @@ namespace legacy {
             });
         }
 
-        static ruleT prev(const subsetT& subset, const moldT& mold) {
+        static ruleT prev(const subsetT& subset, const maskT& mask, const moldT& mold) {
             // assert(subset.contains(mold.rule));
             assert(compatible(subset, mold));
 
-            return forge_rule(subset, mold, [](bool* begin, bool* end) {
+            return transform(subset, mask, mold, [](bool* begin, bool* end) {
                 // 00...1 -> 11...0; stop at 000...0 (first())
                 bool* first_1 = std::find(begin, end, 1);
                 if (first_1 != end) {
@@ -567,30 +558,30 @@ namespace legacy {
     struct act_perm {
         // TODO: should there be "set first c to be 1 and rest to be 0" util in the gui?
 
-        static ruleT first(const subsetT& subset, const moldT& mold) {
+        static ruleT first(const subsetT& subset, const maskT& mask, const moldT& mold) {
             assert(subset.contains(mold.rule));
 
-            return forge_rule(subset, mold, [](bool* begin, bool* end) {
+            return transform(subset, mask, mold, [](bool* begin, bool* end) {
                 int c = std::count(begin, end, 1);
                 std::fill(begin, end, 0);
                 std::fill_n(begin, c, 1);
             });
         }
 
-        static ruleT last(const subsetT& subset, const moldT& mold) {
+        static ruleT last(const subsetT& subset, const maskT& mask, const moldT& mold) {
             assert(subset.contains(mold.rule));
 
-            return forge_rule(subset, mold, [](bool* begin, bool* end) {
+            return transform(subset, mask, mold, [](bool* begin, bool* end) {
                 int c = std::count(begin, end, 1);
                 std::fill(begin, end, 0);
                 std::fill_n(end - c, c, 1);
             });
         }
 
-        static ruleT next(const subsetT& subset, const moldT& mold) {
+        static ruleT next(const subsetT& subset, const maskT& mask, const moldT& mold) {
             assert(subset.contains(mold.rule));
 
-            return forge_rule(subset, mold, [](bool* begin, bool* end) {
+            return transform(subset, mask, mold, [](bool* begin, bool* end) {
                 // Stop at 000...111 (last())
                 if (std::find(std::find(begin, end, 1), end, 0) == end) {
                     return;
@@ -600,10 +591,10 @@ namespace legacy {
             });
         }
 
-        static ruleT prev(const subsetT& subset, const moldT& mold) {
+        static ruleT prev(const subsetT& subset, const maskT& mask, const moldT& mold) {
             assert(subset.contains(mold.rule));
 
-            return forge_rule(subset, mold, [](bool* begin, bool* end) {
+            return transform(subset, mask, mold, [](bool* begin, bool* end) {
                 // Stop at 111...000 (first())
                 if (std::find(std::find(begin, end, 0), end, 1) == end) {
                     return;
