@@ -124,6 +124,13 @@ public:
     }
 };
 
+// TODO: rename...
+// TODO: Document that this is not the only situation that flicking effect can occur...
+static bool will_flick(const legacy::ruleT& rule) {
+    constexpr legacy::codeT all_0{0}, all_1{511};
+    return rule[all_0] == 1 && rule[all_1] == 0;
+}
+
 struct ctrlT {
     legacy::ruleT rule{};
 
@@ -132,7 +139,7 @@ struct ctrlT {
     int pace = 1;
     bool anti_flick = true; // TODO: add explanation
     int actual_pace() const {
-        if (anti_flick && legacy::will_flick(rule) && pace % 2) {
+        if (anti_flick && will_flick(rule) && pace % 2) {
             return pace + 1;
         }
         return pace;
@@ -508,6 +515,7 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
                         }
 
                         assert(w == maxx - minx && h == maxy - miny);
+                        // TODO: show some text...
                         ImGui::Image(img.texture(), ImVec2(w * 4, h * 4),
                                      {(float)minx / tile_size.width, (float)miny / tile_size.height},
                                      {(float)maxx / tile_size.width, (float)maxy / tile_size.height});

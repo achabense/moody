@@ -10,14 +10,9 @@
 #include <string>
 #include <vector>
 
-// TODO: refine tests...
 #ifndef NDEBUG
 #define ENABLE_TESTS
 #endif // !NDEBUG
-
-// TODO: recheck c-style casts...
-// TODO: recheck captures in the form of [&]...
-// TODO: tell apart precondition and impl assertion...
 
 static_assert(INT_MAX >= INT32_MAX);
 
@@ -64,7 +59,7 @@ namespace legacy {
             void fill(const T& val) { m_map.fill(val); }
             friend bool operator==(const map_to&, const map_to&) = default;
         };
-#
+
         enum bposE : int { bpos_q = 0, bpos_w, bpos_e, bpos_a, bpos_s, bpos_d, bpos_z, bpos_x, bpos_c };
 
         bool get(bposE bpos) const { return (val >> bpos) & 1; }
@@ -106,11 +101,12 @@ namespace legacy {
     namespace _tests {
         inline const testT test_codeT = [] { //
             for_each_code([](codeT code) { assert(encode(decode(code)) == code); });
+            assert(for_each_code_all_of([](codeT code) { return encode(decode(code)) == code; }));
         };
     }  // namespace _tests
 #endif // ENABLE_TESTS
 
-    // Map `codeT` to the value `s` become at next generation.
+    // Map `codeT` (essentially `situT`) to the value `s` become at next generation.
     class ruleT {
         codeT::map_to<bool> m_map{};
 
@@ -127,13 +123,6 @@ namespace legacy {
     concept rule_like = std::is_invocable_r_v<bool, T, codeT>;
 
     static_assert(rule_like<ruleT>);
-
-    // TODO: rename...
-    // TODO: Document that this is not the only situation that flicking effect can occur...
-    inline bool will_flick(const ruleT& rule) {
-        constexpr codeT all_0{0}, all_1{511};
-        return rule[all_0] == 1 && rule[all_1] == 0;
-    }
 
     inline ruleT make_rule(const rule_like auto& fn) {
         ruleT rule{};
@@ -197,14 +186,18 @@ namespace legacy {
             }
         }
 
-        // TODO: refine impl...
-        // TODO: explain the encoding scheme... (about `data`)
-        inline void append_base64(std::string& str, const auto& source /* ruleT or lockT */) {
-            bool data[512]{}; // Re-encoded as if bpos_q = 8, ... bpos_c = 0.
-            for_each_code([&](codeT code) {
-                const auto [q, w, e, a, s, d, z, x, c] = decode(code);
-                data[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1] = source[code];
-            });
+        // https://golly.sourceforge.io/Help/Algorithms/QuickLife.html
+        // "MAP string" is based on `q * 256 + w * 128 + ...` encoding scheme, which differs from `codeT`'s.
+        // TODO: better name...
+        inline int re_encode(const situT& situ) {
+            const auto [q, w, e, a, s, d, z, x, c] = situ;
+            return q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1;
+        }
+
+        inline void to_base64(std::string& str, const auto& source /* ruleT or lockT */) {
+            bool data[512]{}; // `situT` is encoded using `q * 256 + w * 128 + ... + c * 1`.
+            for_each_code([&](codeT code) { data[re_encode(decode(code))] = source[code]; });
+
             const auto get = [&data](int i) { return i < 512 ? data[i] : 0; };
             for (int i = 0; i < 512; i += 6) {
                 const uint8_t b6 = (get(i + 5) << 0) | (get(i + 4) << 1) | (get(i + 3) << 2) | (get(i + 2) << 3) |
@@ -213,8 +206,8 @@ namespace legacy {
             }
         }
 
-        inline void load_base64(std::string_view str, auto& dest /* ruleT or lockT */) {
-            bool data[512]{}; // Re-encoded as if bpos_q = 8, ... bpos_c = 0.
+        inline void from_base64(std::string_view str, auto& dest /* ruleT or lockT */) {
+            bool data[512]{}; // `situT` is encoded using `q * 256 + w * 128 + ... + c * 1`.
             auto put = [&data](int i, bool b) {
                 if (i < 512) {
                     data[i] = b;
@@ -232,25 +225,22 @@ namespace legacy {
                 put(i + 0, (b6 >> 5) & 1);
             }
 
-            for_each_code([&](codeT code) {
-                const auto [q, w, e, a, s, d, z, x, c] = decode(code);
-                dest[code] = data[q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1];
-            });
+            for_each_code([&](codeT code) { dest[code] = data[re_encode(decode(code))]; });
         }
     } // namespace _misc
 
-    // Convert ruleT to an "MAP rule" string.
+    // Convert ruleT to a "MAP rule" string.
     inline std::string to_MAP_str(const ruleT& rule) {
         std::string str = "MAP";
-        _misc::append_base64(str, rule);
+        _misc::to_base64(str, rule);
         return str;
     }
 
     inline std::string to_MAP_str(const moldT& mold) {
         std::string str = "MAP";
-        _misc::append_base64(str, mold.rule);
+        _misc::to_base64(str, mold.rule);
         str += " [";
-        _misc::append_base64(str, mold.lock);
+        _misc::to_base64(str, mold.lock);
         str += "]";
         return str;
     }
@@ -279,9 +269,9 @@ namespace legacy {
             extr.prefix = {match.prefix().first, match.prefix().second};
             extr.suffix = {match.suffix().first, match.suffix().second};
 
-            _misc::load_base64({match[1].first, match[1].second}, extr.val.emplace().rule);
+            _misc::from_base64({match[1].first, match[1].second}, extr.val.emplace().rule);
             if (match[3].matched) {
-                _misc::load_base64({match[3].first, match[3].second}, extr.val->lock.emplace());
+                _misc::from_base64({match[3].first, match[3].second}, extr.val->lock.emplace());
             }
         } else {
             extr.prefix = {begin, end};
