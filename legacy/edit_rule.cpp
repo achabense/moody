@@ -462,9 +462,12 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         }
 
         mask_ptr = mask_ptrs[mask_tag];
+
         // TODO: horrible...
-        if (mask_tag != 0) {
-            chr_0 = '.', chr_1 = '!';
+        switch (mask_tag) {
+            case 0: chr_0 = '0', chr_1 = '1'; break;
+            case 1: chr_0 = '.', chr_1 = '!'; break;
+            default: chr_0 = 'o', chr_1 = 'i'; break;
         }
     }
 
@@ -567,6 +570,10 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         }
 
         ImGui::SameLine();
+        if (ImGui::Button("Approximate")) {
+            return_rule(legacy::approximate(subset, mold));
+        }
+        ImGui::SameLine();
         if (ImGui::Button("Clear lock")) {
             return_lock({});
         }
@@ -581,7 +588,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
     {
         const char labels[2][3]{{'-', chr_0, '\0'}, {'-', chr_1, '\0'}};
 
-        // TODO: which mask? `mask` or `subset.get_mask()`?
+        // TODO: (!!!) which mask? `mask` or `subset.get_mask()`?
         // TODO: find a better name for `ruleT_masked` and the variables...
         const legacy::ruleT_masked masked = mask ^ mold.rule;
         const auto scanlist = legacy::scan(par, masked, mold.lock);
@@ -611,15 +618,21 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         }
 
         if (auto child = imgui_ChildWindow("Details")) {
+            // Precise vertical alignment:
+            // https://github.com/ocornut/imgui/issues/2064
+            const auto align_text = [](float height) {
+                const float off = std::max(0.0f, -1.0f + (height - ImGui::GetTextLineHeight()) / 2);
+                ImGui::SetCursorPosY(floor(ImGui::GetCursorPos().y + off));
+            };
+
             const int zoom = 7;
-            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 4));
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
             par.for_each_group([&](int j, const legacy::groupT& group) {
                 if (j % 8 != 0) {
-                    ImGui::SameLine();
+                    ImGui::SameLine(0, 12);
                 }
                 if (j != 0 && j % 64 == 0) {
-                    ImGui::Separator(); // TODO: refine...
+                    ImGui::Separator();
                 }
                 const bool inconsistent = scanlist[j].inconsistent();
                 const legacy::codeT head = group[0];
@@ -630,90 +643,69 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0, 0, 1));
                     ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.9f, 0, 0, 1));
                 }
-                const bool button_hit = icons.button(head, zoom);
-                const bool button_hover = ImGui::IsItemHovered();
-                const float button_height = ImGui::GetItemRectSize().y;
-
-                // Precise vertical alignment:
-                // https://github.com/ocornut/imgui/issues/2064
-                const auto align_text = [](float height) {
-                    const float off = std::max(0.0f, -1.0f + (height - ImGui::GetTextLineHeight()) / 2);
-                    ImGui::SetCursorPosY(floor(ImGui::GetCursorPos().y + off));
-                };
-
-                ImGui::SameLine();
-                align_text(button_height);
-                imgui_Str(labels[masked[head]]);
-
-                if (has_lock) {
-                    // TODO: better ways to show lock?
-                    const ImU32 col = scanlist[j].all_locked() ? IM_COL32_WHITE : IM_COL32(128, 128, 128, 255);
-                    ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() - ImVec2(2, 2),
-                                                        ImGui::GetItemRectMax() + ImVec2(2, 2), col);
+                if (icons.button(head, zoom)) {
+                    // TODO: (temp) redesigned; no "solve-conflicts" mode now
+                    // (which should be done by subset-approximation)...
+                    if (!ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+                        legacy::ruleT rule = mold.rule;
+                        for (legacy::codeT code : group) {
+                            rule[code] = !rule[code];
+                        }
+                        return_rule(rule);
+                    } else {
+                        legacy::moldT::lockT lock = mold.lock;
+                        for (legacy::codeT code : group) {
+                            lock[code] = !has_lock;
+                        }
+                        return_lock(lock);
+                    }
                 }
                 if (inconsistent) {
                     ImGui::PopStyleColor(3);
                 }
-
-                if (button_hover && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-                    legacy::moldT::lockT lock = mold.lock;
-                    for (auto code : group) {
-                        lock[code] = !has_lock; // TODO: not reversible; is this ok?
+                // TODO: currently disabled when !transform_avail (when the mask doesn't belong to the subset)...
+                if (transform_avail) {
+                    static bool toggle = true;
+                    if (auto tooltip = imgui_ItemTooltip(toggle)) {
+                        ImGui::Text("Group size: %d", (int)group.size());
+                        const int max_to_show = 64;
+                        for (int x = 0; auto code : group) {
+                            if (x++ % 8 != 0) {
+                                ImGui::SameLine();
+                            }
+                            // TODO: change color?
+                            // ImGui::GetStyle().Colors[ImGuiCol_Button]
+                            icons.image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
+                            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                            align_text(ImGui::GetItemRectSize().y);
+                            imgui_Str(labels[masked[code]]);
+                            if (mold.lock[code]) {
+                                ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() - ImVec2(2, 2),
+                                                                    ImGui::GetItemRectMax() + ImVec2(2, 2),
+                                                                    IM_COL32_WHITE);
+                            }
+                            if (x == max_to_show) {
+                                break;
+                            }
+                        }
+                        if (group.size() > max_to_show) {
+                            imgui_Str("...");
+                        }
                     }
-                    return_lock(lock);
                 }
-                ImGui::SameLine();
-                ImGui::PushID(j);
+
+                const float button_height = ImGui::GetItemRectSize().y;
+                ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                 align_text(button_height);
-                imgui_StrDisabled("?");
-                // TODO: still inconvenient...
-                // TODO: (regression) should be able to appear even if the `mask_avail` is false...
-                if (ImGui::BeginPopupContextItem("Group", ImGuiPopupFlags_MouseButtonLeft)) {
-                    ImGui::Text("Group size: %d", (int)group.size());
-                    const int max_to_show = 128;
-                    for (int x = 0; auto code : group) {
-                        if (x++ % 8 != 0) {
-                            ImGui::SameLine();
-                        }
-                        // TODO: change color?
-                        // ImGui::GetStyle().Colors[ImGuiCol_Button]
-                        icons.image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
-                        ImGui::SameLine();
-                        align_text(ImGui::GetItemRectSize().y);
-                        imgui_Str(labels[masked[code]]);
-                        if (mold.lock[code]) {
-                            ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() - ImVec2(2, 2),
-                                                                ImGui::GetItemRectMax() + ImVec2(2, 2), IM_COL32_WHITE);
-                        }
-                        if (x == max_to_show) {
-                            break;
-                        }
-                    }
-                    if (group.size() > max_to_show) {
-                        imgui_Str("...");
-                    }
-                    ImGui::EndPopup();
-                }
-                ImGui::PopID(); // Should do after the popup.
+                imgui_Str(labels[masked[head]]);
 
-                if (button_hit) {
-                    // TODO: reconsider whether manual approximation is needed...
-                    // TODO: document this behavior... (keyctrl->resolve conflicts)
-                    // TODO: reconsider how to deal with conflicts... (especially via masking rule...)
-                    legacy::ruleT r = mold.rule;
-                    if (ImGui::GetIO().KeyCtrl) {
-                        for (legacy::codeT c : group) {
-                            r[c] = mask[c];
-                        }
-                    } else {
-                        for (legacy::codeT c : group) {
-                            r[c] = !r[c];
-                        }
-                    }
-                    return_rule(r);
+                if (has_lock) {
+                    const ImU32 col = scanlist[j].all_locked() ? IM_COL32_WHITE : IM_COL32(128, 128, 128, 255);
+                    ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() - ImVec2(2, 2),
+                                                        ImGui::GetItemRectMax() + ImVec2(2, 2), col);
                 }
             });
-            ImGui::PopStyleVar(2);
+            ImGui::PopStyleVar(1);
         }
     }
     if (!transform_avail) {
