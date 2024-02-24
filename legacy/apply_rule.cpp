@@ -523,7 +523,7 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
                 }
             }
 
-            // TODO: this shall belong to the runner.
+            // TODO: what if clicked from outside into the canvas?
             // TODO: precedence against left-clicking?
             if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
                 // ctrl.pause = true;

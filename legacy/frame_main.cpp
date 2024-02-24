@@ -164,11 +164,13 @@ void frame_main(const code_image& icons, tile_image& img) {
         {
             const std::string rule_str = legacy::to_MAP_str(current.rule);
 
+            // TODO: add a shortcut for quick rule-saving...
+            // (As the rule may be gotten from enter-bound buttons)
             imgui_StrCopyable(rule_str, imgui_Str);
             helper::show_help("Current rule. You can right-click the text to copy to the clipboard.");
 
             // TODO: temp...
-            if (ImGui::Button("Copy&lock")) {
+            if (ImGui::Button("Copy rule+lock")) {
                 ImGui::SetClipboardText(legacy::to_MAP_str(current).c_str());
             }
             ImGui::SameLine();

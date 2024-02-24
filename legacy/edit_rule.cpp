@@ -130,12 +130,12 @@ public:
             const float extra_w = ImGui::CalcTextSize("ClearRecognize").x + extra_w_sameline + extra_w_padding;
             ImGui::SeparatorTextEx(0, "Select subsets", nullptr, extra_w);
             ImGui::SameLine();
-            if (ImGui::SmallButton("Clear")) {
+            if (ImGui::Button("Clear")) {
                 for_each_term([&](termT& t) { t.disabled = t.selected = false; });
                 update_current();
             }
             ImGui::SameLine();
-            if (ImGui::SmallButton("Recognize")) {
+            if (ImGui::Button("Recognize")) {
                 for_each_term([&](termT& t) {
                     t.disabled = false; // Will be updated by `update_current`.
                     t.selected = t.set.contains(mold.rule);
@@ -175,19 +175,17 @@ public:
             // TODO: find better color for "disabled"/incompatible etc... currently too ugly.
             const ImU32 cen_col = term.selected                ? ImGui::GetColorU32(ImGuiCol_ButtonHovered)
                                   : term.set.includes(current) ? ImGui::GetColorU32(ImGuiCol_FrameBg)
-                                  : term.disabled              ? IM_COL32(150, 45, 0, 255)
+                                  : term.disabled              ? IM_COL32(120, 30, 0, 255)
                                                                : IM_COL32_BLACK;
             const ImU32 ring_col = term.set.contains(mold.rule) ? IM_COL32(0, 255, 0, 255)
                                    : compatible(term.set, mold) ? IM_COL32(0, 100, 0, 255)
-                                                                : IM_COL32(255, 60, 0, 255);
+                                                                : IM_COL32(200, 45, 0, 255);
 
             imgui_ItemRectFilled(IM_COL32_BLACK);
-            imgui_ItemRectFilled(cen_col, ImVec2(4, 4));
+            imgui_ItemRectFilled(cen_col, term.disabled ? ImVec2(5, 5) : ImVec2(4, 4));
             imgui_ItemRect(ring_col);
             if (!term.disabled && ImGui::IsItemHovered()) {
                 imgui_ItemRectFilled(IM_COL32(255, 255, 255, 45));
-            } else if (term.disabled) {
-                imgui_ItemRectFilled(IM_COL32(0, 0, 0, 90));
             }
         };
 
@@ -403,60 +401,37 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
     const legacy::maskT* mask_ptr = nullptr;
     char chr_0 = '0', chr_1 = '1';
     {
-        const auto mask_tooltip = [](const legacy::maskT& mask, const char* description) {
-            static bool toggle = true;
-            if (auto tooltip = imgui_ItemTooltip(toggle)) {
-                ImGui::PushTextWrapPos(280); // TODO: how to decide wrap pos properly?
-                imgui_Str(description);
-                imgui_Str(to_MAP_str(mask));
-                ImGui::PopTextWrapPos();
-            }
-        };
-
-        using enum legacy::codeT::bposE;
-        static const legacy::maskT mask_ids[]{
-            legacy::make_mask(bpos_q), legacy::make_mask(bpos_w), legacy::make_mask(bpos_e),
-            legacy::make_mask(bpos_a), legacy::make_mask(bpos_s), legacy::make_mask(bpos_d),
-            legacy::make_mask(bpos_z), legacy::make_mask(bpos_x), legacy::make_mask(bpos_c)};
-        static int id_tag = 4; // s...
-
         static legacy::maskT mask_custom{{}};
 
         // TODO: better name...
-        static const char* const mask_labels[]{"Zero", "Identity", "????", "Custom"};
-        static const char* const mask_descriptions[]{"...", //
-                                                     "...", //
-                                                     "...", // TODO...
+        // TODO: add descriptions...
+        static const char* const mask_labels[]{"Zero", "Identity", "Native", "Custom"};
+        static const char* const mask_descriptions[]{"...",                //
+                                                     "...",                //
+                                                     "Guaranteed to work", //
                                                      "..."};
         static int mask_tag = 0;
 
-        const legacy::maskT* mask_ptrs[]{&legacy::mask_zero, &mask_ids[id_tag], &subset.get_mask(), &mask_custom};
+        // TODO: the support for other make_mask(bpos_*) was poorly designed and dropped.
+        // Redesign to add back these masks.
+        const legacy::maskT* mask_ptrs[]{&legacy::mask_zero, &legacy::mask_identity, &subset.get_mask(), &mask_custom};
 
         ImGui::AlignTextToFramePadding();
         imgui_Str("Mask");
         for (int i = 0; i < 4; ++i) {
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
 
-            if (i != 1) {
-                if (ImGui::RadioButton(mask_labels[i], mask_tag == i)) {
-                    mask_tag = i;
-                }
-            } else {
-                if (ImGui::RadioButton(std::format("Identity({})###Identity", "qweasdzxc"[id_tag]).c_str(),
-                                       mask_tag == i)) {
-                    mask_tag = i;
-                }
-                // TODO: awkward; use popup window instead?
-                if (ImGui::IsItemHovered()) {
-                    if (imgui_MouseScrollingUp()) {
-                        id_tag = std::max(id_tag - 1, 0);
-                    }
-                    if (imgui_MouseScrollingDown()) {
-                        id_tag = std::min(id_tag + 1, 8);
-                    }
-                }
+            if (ImGui::RadioButton(mask_labels[i], mask_tag == i)) {
+                mask_tag = i;
             }
-            mask_tooltip(*mask_ptrs[i], mask_descriptions[i]);
+
+            static bool toggle = true;
+            if (auto tooltip = imgui_ItemTooltip(toggle)) {
+                ImGui::PushTextWrapPos(280); // TODO: how to decide wrap pos properly?
+                imgui_Str(mask_descriptions[i]);
+                imgui_Str(legacy::to_MAP_str(*mask_ptrs[i]));
+                ImGui::PopTextWrapPos();
+            }
         }
 
         ImGui::SameLine();
