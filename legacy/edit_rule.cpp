@@ -122,6 +122,7 @@ public:
         update_current();
     }
 
+    // TODO: `mold` is the analysis target, rename and explain.
     const legacy::subsetT& select_subset(const legacy::moldT& mold) {
         {
             // https://github.com/ocornut/imgui/issues/6902
@@ -402,34 +403,50 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
     auto return_lock = [&out, &mold](const legacy::moldT::lockT& lock) { out.emplace(mold.rule, lock); };
     auto return_mold = [&out](const legacy::moldT& mold) { out.emplace(mold); };
 
-    static subset_selector selector;
+    static std::optional<legacy::moldT> temp_analysis_target = std::nullopt;
 
-    // TODO: move mask selection logic into selector as well?
-    const legacy::subsetT& subset = selector.select_subset(mold);
+    static subset_selector selector;
+    const legacy::subsetT& subset = selector.select_subset(temp_analysis_target.value_or(mold));
     assert(!subset.empty());
     const legacy::partitionT& par = subset.get_par();
+    if (temp_analysis_target) {
+        temp_analysis_target.reset();
+    }
 
     ImGui::Separator();
 
-    // TODO: this part is fairly poorly designed and implemented... redesign...
-    // TODO: enable testing masking rule instead of target rule when hovered...
-    const legacy::maskT* mask_ptr = nullptr;
+    // Select mask.
     char chr_0 = '0', chr_1 = '1';
-    {
+    const legacy::maskT& mask = [&] {
+        // TODO: finish...
+        const char* const about_mask = "About mask:\n"
+                                       "A mask is an arbitrary rule used to do XOR masking for other rules...\n"
+                                       "When the rule doesn't actually belong to the selected subsets ...";
+
         static legacy::maskT mask_custom{{}};
 
-        // TODO: better name...
-        // TODO: add descriptions...
+        // TODO: finish descriptions (use cases etc)
         static const char* const mask_labels[]{"Zero", "Identity", "Native", "Custom"};
-        static const char* const mask_descriptions[]{"...",                //
-                                                     "...",                //
-                                                     "Guaranteed to work", //
-                                                     "..."};
+        static const char* const mask_descriptions[]{
+            "The all-zero rule.\n"
+            "Masked by this you see the actual values, and ...",
+
+            "The rule that maps each situation to the center cell itself, so any pattern will keep unchanged under "
+            "this rule. (Click \"<00..\" button to set to it for test.)\n"
+            "As the masking rule it shows how \"volatile\" a rule is ...", // TODO: "<00.." is not a good label...
+
+            "A specific rule known to belong to the selected subsets, so that it is guaranteed to be able to support "
+            "editions...", // (may or may not be the all-zero rule/identity rule depending on the subsets you have
+                           // selected...)
+
+            "Custom rule; you can click \"Take current rule\" button to set this to the current rule.\n"
+            "Important tip: ..."};
         static int mask_tag = 0;
 
-        // TODO: the support for other make_mask(bpos_*) was poorly designed and dropped.
+        // TODO: the support for other make_mask(bpos_* (other than bpos_s)) was poorly designed and dropped.
         // Redesign to add back these masks.
-        const legacy::maskT* mask_ptrs[]{&legacy::mask_zero, &legacy::mask_identity, &subset.get_mask(), &mask_custom};
+        const legacy::maskT* const mask_ptrs[]{&legacy::mask_zero, &legacy::mask_identity, &subset.get_mask(),
+                                               &mask_custom};
 
         ImGui::AlignTextToFramePadding();
         imgui_Str("Mask");
@@ -440,22 +457,24 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                 mask_tag = i;
             }
 
-            static bool toggle = true;
-            if (auto tooltip = imgui_ItemTooltip(toggle)) {
-                ImGui::PushTextWrapPos(280); // TODO: how to decide wrap pos properly?
+            helper::show_help([&] {
+                // TODO: will unpaired push like this cause leakage? (is the style-stack regularly cleared, or will
+                // this accumulate?)
+                // ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 1.0);
                 imgui_Str(mask_descriptions[i]);
                 imgui_Str(legacy::to_MAP_str(*mask_ptrs[i]));
-                ImGui::PopTextWrapPos();
-            }
+                ImGui::Separator();
+                imgui_Str(about_mask);
+
+                temp_analysis_target.emplace(*mask_ptrs[i]);
+            });
         }
 
         ImGui::SameLine();
-        if (ImGui::Button("Current rule")) {
+        if (ImGui::SmallButton("Take current rule")) {
             mask_tag = 3;
             mask_custom = {mold.rule};
         }
-
-        mask_ptr = mask_ptrs[mask_tag];
 
         // TODO: horrible...
         switch (mask_tag) {
@@ -463,12 +482,9 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             case 1: chr_0 = '.', chr_1 = '!'; break;
             default: chr_0 = 'o', chr_1 = 'i'; break;
         }
-    }
 
-    // TODO: (temp) about the lifetime of mask:
-    // mask points at either static objects or par.mask, so this should be safe here...
-    // still this is a horrible design; need redesign...
-    const legacy::maskT& mask = *mask_ptr;
+        return *mask_ptrs[mask_tag];
+    }();
 
     // TODO: make what to do obvious when !transform_avail etc...
     const bool transform_avail = subset.contains(mask);

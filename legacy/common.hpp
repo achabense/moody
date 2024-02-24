@@ -194,7 +194,7 @@ public:
     static void show_help(const std::invocable<> auto& desc, bool sameline = true) {
         if (enable_help) {
             if (sameline) {
-                ImGui::SameLine();
+                ImGui::SameLine(0, 0); // TODO: reconsider spacing when help mode is mostly finished...
             }
             // Modified from `HelpMarker` in "imgui_demo.cpp".
             ImGui::TextDisabled("(?)");

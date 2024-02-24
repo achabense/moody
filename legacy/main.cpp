@@ -11,6 +11,8 @@
 
 #include "common.hpp"
 
+// #define DISABLE_FRAMETATE_CAPPING
+
 [[noreturn]] static void resource_failure() {
     printf("Error: %s", SDL_GetError());
     exit(EXIT_FAILURE);
@@ -112,7 +114,12 @@ int main(int, char**) {
         resource_failure();
     }
 
+#ifndef DISABLE_FRAMETATE_CAPPING
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
+#else
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+#endif // !DISABLE_FRAMETATE_CAPPING
+
     if (!renderer) {
         resource_failure();
     }
@@ -207,6 +214,7 @@ int main(int, char**) {
             frame_main(icons, img);
             end_frame();
 
+#ifndef DISABLE_FRAMETATE_CAPPING
             // Added as an extra assurance for the framerate.
             // (Normally `SDL_RENDERER_PRESENTVSYNC` should be enough to guarantee a moderate framerate.)
             static Uint64 next = 0;
@@ -215,6 +223,7 @@ int main(int, char**) {
                 SDL_Delay(next - now);
             }
             next = SDL_GetTicks64() + 10;
+#endif // !DISABLE_FRAMETATE_CAPPING
         }
     }
 
