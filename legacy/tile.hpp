@@ -299,12 +299,12 @@ namespace legacy {
         });
     }
 
-    inline void clear_inside(tileT& tile, const tileT::rangeT& range /* Required */, bool v = 0) {
+    inline void clear_inside(tileT& tile, const tileT::rangeT& range /* Required */, const bool v = 0) {
         tile.for_each_line(range, [v](std::span<bool> line) { std::ranges::fill(line, v); });
     }
 
     // TODO: mixture of tile.range() and range arg looks confusing... rename.
-    inline void clear_outside(tileT& tile, const tileT::rangeT& range /* Required */, bool v = 0) {
+    inline void clear_outside(tileT& tile, const tileT::rangeT& range /* Required */, const bool v = 0) {
         assert(tile.has_range(range));
         tile.for_each_line(tile.range(), [&](int y, std::span<bool> line) {
             if (y < range.begin.y || y >= range.end.y) {
@@ -316,7 +316,7 @@ namespace legacy {
         });
     }
 
-    inline tileT::rangeT bounding_box(const tileT& tile, const tileT::rangeT& range /* Required */, bool v = 0) {
+    inline tileT::rangeT bounding_box(const tileT& tile, const tileT::rangeT& range /* Required */, const bool v = 0) {
         // About the usage of std::string:
         // 1. I hate std::vector<bool>.
         // 2. There is no std::find_last in C++20. (https://en.cppreference.com/w/cpp/algorithm/ranges/find_last)

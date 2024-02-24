@@ -228,6 +228,7 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
     if (ctrl.rule != rule) {
         ctrl.rule = rule;
         should_restart = true;
+        ctrl.anti_flick = true;
         ctrl.pause = false;
     }
 
@@ -308,46 +309,48 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
             should_restart = true;
         }
 
-        static char input_width[20]{}, input_height[20]{};
-        const auto filter = [](ImGuiInputTextCallbackData* data) -> int {
-            return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
-        };
-        const float s = imgui_ItemInnerSpacingX();
-        const float w = (ImGui::CalcItemWidth() - s) / 2; // TODO: is floor/ceil needed?
-        ImGui::SetNextItemWidth(w);
-        ImGui::InputTextWithHint("##Width", "width", input_width, std::size(input_width),
-                                 ImGuiInputTextFlags_CallbackCharFilter, filter);
-        ImGui::SameLine(0, s);
-        ImGui::SetNextItemWidth(w);
-        ImGui::InputTextWithHint("##Height", "height", input_height, std::size(input_height),
-                                 ImGuiInputTextFlags_CallbackCharFilter, filter);
-        ImGui::SameLine(0, s);
-        // TODO: to avoid spanning:
-        // ImGui::Selectable(title.c_str(), false, 0, ImGui::CalcTextSize(title.c_str(), title.c_str() +
-        // title.size(), false)
-        // But `Selectable` does `CalcTextSize` in itself. Are there native ways to do without re-calculation?
-        const std::string title = std::format("Size ({}, {})", runner.tile().width(), runner.tile().height());
-        if (ImGui::Selectable(title.c_str())) {
-            // TODO: support using current screen/tilesize/zoom?
-            int w = 0, h = 0;
-            if (std::from_chars(input_width, std::end(input_width), w).ec == std::errc{} &&
-                std::from_chars(input_height, std::end(input_height), h).ec == std::errc{}) {
-                img_off = {0, 0};
-                img_zoom = 1;
-                const legacy::tileT::sizeT size = size_clamped(w, h);
-                if (init.size != size) {
-                    init.size = size;
-                    runner.restart(init); // TODO: about vs setting should_restart...
+        {
+            static char input_width[20]{}, input_height[20]{};
+            const auto filter = [](ImGuiInputTextCallbackData* data) -> int {
+                return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
+            };
+            const float s = imgui_ItemInnerSpacingX();
+            const float w = (ImGui::CalcItemWidth() - s * 2 - ImGui::CalcTextSize("Resize").x -
+                             ImGui::GetStyle().FramePadding.x * 2) /
+                            2; // TODO: is floor/ceil needed?
+            ImGui::SetNextItemWidth(w);
+            ImGui::InputTextWithHint("##Width", "width", input_width, std::size(input_width),
+                                     ImGuiInputTextFlags_CallbackCharFilter, filter);
+            ImGui::SameLine(0, s);
+            ImGui::SetNextItemWidth(w);
+            ImGui::InputTextWithHint("##Height", "height", input_height, std::size(input_height),
+                                     ImGuiInputTextFlags_CallbackCharFilter, filter);
+            ImGui::SameLine(0, s);
+            if (ImGui::Button("Resize")) {
+                int width = init.size.width, height = init.size.height;
+                const bool has_w = std::from_chars(input_width, std::end(input_width), width).ec == std::errc{};
+                const bool has_h = std::from_chars(input_height, std::end(input_height), height).ec == std::errc{};
+                // ~ the value is unmodified if `from_chars` fails.
+                if (has_w || has_h) {
+                    img_off = {0, 0};
+                    img_zoom = 1;
+                    const legacy::tileT::sizeT size = size_clamped(width, height);
+                    if (init.size != size) {
+                        init.size = size;
+                        runner.restart(init); // TODO: about vs setting should_restart...
+                    }
                 }
+                input_width[0] = '\0';
+                input_height[0] = '\0';
             }
-            // TODO: what to do else?
-            input_width[0] = '\0';
-            input_height[0] = '\0';
+
+            ImGui::SameLine(0, s);
+            ImGui::Text("Width:%d, Height:%d", runner.tile().width(), runner.tile().height());
         }
 
         ImGui::AlignTextToFramePadding();
-        imgui_Str("Fit with zoom");
-        ImGui::SameLine(), imgui_Str("="), ImGui::SameLine(); // TODO: About sameline() and ' '...
+        imgui_Str("Fit with zoom =");
+        ImGui::SameLine();
         for (const ImVec2 size = square_size(); int z : {1, 2, 4, 8}) {
             if (z != 1) {
                 ImGui::SameLine(0, imgui_ItemInnerSpacingX());
@@ -393,8 +396,7 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
     }
 
     // TODO: move elsewhere in the gui?
-    ImGui::Text("Width:%d,Height:%d,Gen:%d,Density:%.4f", runner.tile().width(), runner.tile().height(), runner.gen(),
-                float(legacy::count(runner.tile())) / runner.tile().area());
+    ImGui::Text("Gen:%d, Density:%.4f", runner.gen(), float(legacy::count(runner.tile())) / runner.tile().area());
     // TODO: canvas size, tile size, selected size, paste size...
 
     {
@@ -581,6 +583,8 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
                 if (begin != end) {
                     sel.select_0 = begin;
                     sel.select_1 = {.x = end.x - 1, .y = end.y - 1};
+                } else {
+                    sel.clear();
                 }
             }
             if (imgui_KeyPressed(ImGuiKey_C, false) || imgui_KeyPressed(ImGuiKey_X, false)) {
