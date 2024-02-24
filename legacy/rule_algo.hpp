@@ -495,10 +495,8 @@ namespace legacy {
             return transform(subset, mask, mold, [](bool* begin, bool* end) { std::fill(begin, end, 1); });
         }
 
-        // TODO: next/prev should require `contains`... using compatible to make the gui part work.
         static ruleT next(const subsetT& subset, const maskT& mask, const moldT& mold) {
-            // assert(subset.contains(mold.rule));
-            assert(compatible(subset, mold));
+            assert(subset.contains(mold.rule));
 
             return transform(subset, mask, mold, [](bool* begin, bool* end) {
                 // 11...0 -> 00...1; stop at 111...1 (last())
@@ -511,8 +509,7 @@ namespace legacy {
         }
 
         static ruleT prev(const subsetT& subset, const maskT& mask, const moldT& mold) {
-            // assert(subset.contains(mold.rule));
-            assert(compatible(subset, mold));
+            assert(subset.contains(mold.rule));
 
             return transform(subset, mask, mold, [](bool* begin, bool* end) {
                 // 00...1 -> 11...0; stop at 000...0 (first())

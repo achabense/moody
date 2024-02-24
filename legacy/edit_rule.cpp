@@ -5,7 +5,7 @@
 // TODO: support rollbacking diff rules?
 
 // TODO: support navigation among enter-buttons?
-inline bool enter_button(const char* label) {
+static bool enter_button(const char* label) {
     static ImGuiID bind_id = 0;
     bool ret = ImGui::Button(label);
     const ImGuiID button_id = ImGui::GetItemID();
@@ -504,13 +504,13 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             }
         }
 
-        // TODO: act_int::prev/next should use "contained" level instead...
+        // TODO: it looks strange when only middle part is disabled...
         iter_group(
             "<00..", "dec", "inc", "11..>", //
             [&] { return_rule(legacy::act_int::first(subset, mask, mold)); },
             [&] { return_rule(legacy::act_int::prev(subset, mask, mold)); },
             [&] { return_rule(legacy::act_int::next(subset, mask, mold)); },
-            [&] { return_rule(legacy::act_int::last(subset, mask, mold)); }, true, enter_button);
+            [&] { return_rule(legacy::act_int::last(subset, mask, mold)); }, contained ? enter_button : nullptr);
         ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
 
         {
@@ -522,7 +522,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                 [&] { return_rule(legacy::act_perm::first(subset, mask, mold)); },
                 [&] { return_rule(legacy::act_perm::prev(subset, mask, mold)); },
                 [&] { return_rule(legacy::act_perm::next(subset, mask, mold)); },
-                [&] { return_rule(legacy::act_perm::last(subset, mask, mold)); }, true, enter_button);
+                [&] { return_rule(legacy::act_perm::last(subset, mask, mold)); }, enter_button);
             // TODO: (temp) shuffle is not more useful than randomize, but more convenient sometimes...
             // ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
             // if (enter_button("Shuffle")) {

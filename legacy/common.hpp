@@ -106,25 +106,35 @@ inline ImVec2 square_size() {
 inline bool default_button(const char* label) { return ImGui::Button(label); }
 
 inline void iter_group(const char* tag_first, const char* tag_prev, const char* tag_next, const char* tag_last,
-                       auto act_first, auto act_prev, auto act_next, auto act_last, bool allow_scrolling = true,
-                       bool (*middle_button)(const char*) = default_button) {
+                       const auto& act_first, const auto& act_prev, const auto& act_next, const auto& act_last,
+                       bool (*const middle_button)(const char*) = default_button) {
     if (ImGui::Button(tag_first)) {
         act_first();
     }
 
+    // TODO: (temp) using middle_button=nullptr to mean "middle part uses default_button but is disabled"...
+    // This is only for a widget in edit_rule.cpp, and the appearance looks strange. Still needs redesign.
     ImGui::SameLine();
+    bool enable_scrolling = true;
+    if (!middle_button) {
+        enable_scrolling = false;
+        ImGui::BeginDisabled();
+    }
     ImGui::BeginGroup();
-    if (middle_button(tag_prev)) {
-        allow_scrolling = false;
+    if ((middle_button ? middle_button : default_button)(tag_prev)) {
+        enable_scrolling = false;
         act_prev();
     }
     ImGui::SameLine(0, 0), imgui_Str("/"), ImGui::SameLine(0, 0);
-    if (middle_button(tag_next)) {
-        allow_scrolling = false;
+    if ((middle_button ? middle_button : default_button)(tag_next)) {
+        enable_scrolling = false;
         act_next();
     }
     ImGui::EndGroup();
-    if (allow_scrolling && ImGui::IsItemHovered()) {
+    if (!middle_button) {
+        ImGui::EndDisabled();
+    }
+    if (enable_scrolling && ImGui::IsItemHovered()) {
         if (imgui_MouseScrollingUp()) {
             act_prev();
         } else if (imgui_MouseScrollingDown()) {
