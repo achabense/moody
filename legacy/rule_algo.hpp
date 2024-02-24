@@ -122,7 +122,7 @@ namespace legacy {
         }
 
     public:
-        // "User-declared" to avoid implicit moving (to avoid `m_data` being emptied):
+        // ~ "user-declared" to avoid implicit moving (to avoid `m_data` being emptied):
         partitionT(const partitionT&) = default;
         partitionT& operator=(const partitionT&) = default;
 
@@ -180,9 +180,11 @@ namespace legacy {
         }
     };
 
-    // A subsetT defines a subset of all possible ruleT.
-    // TODO: lockT is currently not a part of subsetT (but do take part in generation)
-    // Extension is possible - let subsetT be ...(TODO, detailed explanation)
+    // TODO ...
+    // A subsetT (s = {} or (m, p)) defines a subset of all possible ruleT, where:
+    // ...
+    // (As a result, any rule in the subset can be used as the mask without ...)
+    // About interaction with `moldT`...
     class subsetT {
         struct nonemptyT {
             maskT mask;
@@ -290,48 +292,11 @@ namespace legacy {
         return subsetT{};
     }
 
-#if 0
-    // TODO: apply scanlist-based strategy?
-    class scanT {
-        struct counterT {
-            // 0/1 means masked value.
-            int free_0 = 0, free_1 = 0;
-            int lock_0 = 0, lock_1 = 0;
-
-            bool any_locked() const { return lock_0 || lock_1; }
-            bool all_locked() const { return !free_0 && !free_1; }
-            bool none_locked() const { return !any_locked(); }
-        };
-
-        std::vector<counterT> vec;
-
-    public:
-        scanT(const subsetT& subset, const moldT& mold) {
-            const maskT& mask = subset.get_mask();
-            const partitionT& par = subset.get_par();
-            const ruleT_masked r = mask ^ mold.rule;
-
-            vec.resize(par.k());
-            par.for_each_group([&](int j, const groupT& group) {
-                for (codeT code : group) {
-                    if (mold.lock[code]) {
-                        r[code] ? ++vec[j].lock_1 : ++vec[j].lock_0;
-                    } else {
-                        r[code] ? ++vec[j].free_1 : ++vec[j].free_0;
-                    }
-                }
-            });
-        }
-
-        int count_free() const { return std::ranges::count_if(vec, &counterT::none_locked); }
-    };
-#endif
-
-    // TODO: redesign param...
+    // TODO: enhance...
     inline auto scan(const partitionT& par, const ruleT_masked& rule, const moldT::lockT& lock) {
         struct counterT {
             int free_0 = 0, free_1 = 0;
-            int locked_0 = 0, locked_1 = 0;
+            int locked_0 = 0, locked_1 = 0; // 0/1 means masked value.
 
             bool any_locked() const { return locked_0 || locked_1; }
             bool none_locked() const { return !any_locked(); }
@@ -378,9 +343,7 @@ namespace legacy {
         return free;
     }
 
-    // TODO: too strict?
-    // TODO: add nodiscard? the function name looks like in-place modification...
-    // or redesign params...
+    // TODO: explain why requiring subset.contains(mold.rule).
     inline moldT::lockT enhance_lock(const subsetT& subset, const moldT& mold) {
         assert(subset.contains(mold.rule));
 
@@ -411,6 +374,8 @@ namespace legacy {
         return lock;
     }
 
+    // Does there exist any rule that belongs to both `subset` and `mold`?
+    // TODO: about moldT::compatible...
     inline bool compatible(const subsetT& subset, const moldT& mold) {
         if (subset.empty()) {
             return false;
@@ -420,32 +385,39 @@ namespace legacy {
         return subset.get_par().test(r, mold.lock);
     }
 
+    // Return a rule that belongs to `subset` and `mold` and is closest to `mold.rule`.
+    // (If `mold.rule` already belongs to `subset`, the result should be exactly `mold.rule`.)
     inline ruleT approximate(const subsetT& subset, const moldT& mold) {
         assert(compatible(subset, mold));
 
         const maskT& mask = subset.get_mask();
         const partitionT& par = subset.get_par();
+        const auto scanlist = scan(par, mask ^ mold.rule, mold.lock);
 
-        ruleT_masked r = mask ^ mold.rule;
-        par.for_each_group([&](const groupT& group) {
-            const auto fnd = std::ranges::find_if(group, [&](codeT code) { return mold.lock[code]; });
-            const bool b = fnd != group.end() ? r[*fnd] : r[group[0]];
+        ruleT_masked r{};
+        par.for_each_group([&](int j, const groupT& group) {
+            const auto& scan = scanlist[j];
+            // TODO: explain; recheck...
+            const bool v = scan.locked_0 ? 0 : scan.locked_1 ? 1 : scan.free_0 > scan.free_1 ? 0 : 1;
             for (codeT code : group) {
-                r[code] = b;
+                r[code] = v;
             }
         });
 
-        // TODO: explain...
-        assert(!subset.contains(mold.rule) || (mold.rule == (mask ^ r)));
-        return mask ^ r;
+        const ruleT res = mask ^ r;
+        assert(subset.contains(res) && mold.compatible(res));
+        // subset.contains(mold.rule) -> mold.rule == res:
+        assert(!subset.contains(mold.rule) || (mold.rule == res));
+        return res;
     }
 
-    // Also, it might be helpful to support "in-lock" forging. For example, to dial to find potentially related
-    // patterns...
-    // Directly invert the locks, or add a flag in `forge`? (TODO: recheck `invert_lock`)
+    // TODO: explain...
+    // X Also, it might be helpful to support "in-lock" forging. For example, to dial to find potentially related
+    // X patterns...
+    // X Directly invert the locks, or add a flag in `forge`? (TODO: recheck `invert_lock`)
     inline ruleT transform(const subsetT& subset, const maskT& mask, const moldT& mold,
                            std::invocable<bool*, bool*> auto fn) {
-        assert(subset.contains(mask));
+        assert(subset.contains(mask)); // TODO ... about why not using subset.get_mask()...
         assert(compatible(subset, mold));
 
         const partitionT& par = subset.get_par();
@@ -475,7 +447,9 @@ namespace legacy {
             }
         });
 
-        return mask ^ r;
+        const ruleT res = mask ^ r;
+        assert(subset.contains(res) && mold.compatible(res));
+        return res;
     }
 
     // TODO: `count` denotes free groups now; whether to switch to total groups (at least in the gui part)?
@@ -605,18 +579,37 @@ namespace legacy {
         }
     };
 
-    // TODO: support other transformations (lr/ud etc)?
+    // TODO: these transforms can take advantage of _make_subset utilities. (but may not at cost of less clarity)
     // TODO: proper name...
-    inline moldT mirror(const moldT& mold) {
+    inline moldT trans_mirror(const moldT& mold) {
         moldT mir{};
         for_each_code([&](codeT code) {
-            constexpr codeT::bposE S = codeT::bpos_s;
-            const codeT codex = codeT(~code & 511);
-            const bool flip = codex.get(S) != mold.rule[codex];
-            mir.rule[code] = flip ? !code.get(S) : code.get(S);
-            mir.lock[code] = mold.lock[codex];
+            const auto [q, w, e, a, s, d, z, x, c] = decode(code);
+            const codeT code_mir = encode({!q, !w, !e, //
+                                           !a, !s, !d, //
+                                           !z, !x, !c});
+            mir.lock[code_mir] = mold.lock[code];
+            mir.rule[code_mir] = (mold.rule[code] == s) ? !s : !(!s); // So that ->
+            assert((mir.rule[code_mir] == !s) == (mold.rule[code] == s));
         });
         return mir;
+    }
+
+    // TODO: add test that mirror->mirror->original...
+
+    // TODO: this is correct, but will open door to unsupported subsets
+    // (For example, rules in `hex` space will be mapped to `hex2` space, so all the symmetry checks are lost)
+    inline moldT trans_left_right(const moldT& mold) {
+        moldT lr{};
+        for_each_code([&](codeT code) {
+            const auto [q, w, e, a, s, d, z, x, c] = decode(code);
+            const codeT code_lr = encode({e, w, q, //
+                                          d, s, a, //
+                                          c, x, z});
+            lr.lock[code_lr] = mold.lock[code];
+            lr.rule[code_lr] = mold.rule[code];
+        });
+        return lr;
     }
 
     inline namespace _make_subset {

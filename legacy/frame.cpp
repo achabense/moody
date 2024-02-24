@@ -96,9 +96,7 @@ static void assign_val(legacy::moldT& mold, legacy::extrT::valT& val) {
         mold.lock = *val.lock;
         mold.rule = val.rule;
     } else {
-        // Clear the lock if val.rule doesn't fit well.
-        if (!legacy::for_each_code_all_of(
-                [&](legacy::codeT code) { return !mold.lock[code] || mold.rule[code] == val.rule[code]; })) {
+        if (!mold.compatible(val.rule)) {
             mold.lock = {};
         }
         mold.rule = val.rule;

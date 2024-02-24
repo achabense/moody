@@ -6,17 +6,18 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 
-// TODO: some items in `edit_rule` have offsets so not applicable...
-inline void imgui_ItemRect(ImU32 col) {
+inline void imgui_ItemRect(ImU32 col, ImVec2 off_min = {0, 0}) {
     const ImVec2 pos_min = ImGui::GetItemRectMin();
     const ImVec2 pos_max = ImGui::GetItemRectMax();
-    ImGui::GetWindowDrawList()->AddRect(pos_min, pos_max, col);
+    ImGui::GetWindowDrawList()->AddRect(ImVec2(pos_min.x + off_min.x, pos_min.y + off_min.y),
+                                        ImVec2(pos_max.x - off_min.x, pos_max.y - off_min.y), col);
 }
 
-inline void imgui_ItemRectFilled(ImU32 col) {
+inline void imgui_ItemRectFilled(ImU32 col, ImVec2 off_min = {0, 0}) {
     const ImVec2 pos_min = ImGui::GetItemRectMin();
     const ImVec2 pos_max = ImGui::GetItemRectMax();
-    ImGui::GetWindowDrawList()->AddRectFilled(pos_min, pos_max, col);
+    ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(pos_min.x + off_min.x, pos_min.y + off_min.y),
+                                              ImVec2(pos_max.x - off_min.x, pos_max.y - off_min.y), col);
 }
 
 // Unlike ImGui::Text(Wrapped/...), these functions take unformatted string as the argument.

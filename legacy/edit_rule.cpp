@@ -1,7 +1,3 @@
-#ifndef IMGUI_DEFINE_MATH_OPERATORS
-#define IMGUI_DEFINE_MATH_OPERATORS
-#endif
-
 #include "rule_algo.hpp"
 
 #include "common.hpp"
@@ -157,34 +153,42 @@ public:
                 term.selected = !term.selected;
                 update_current();
             }
+#if 0 // Convenient but not necessary...
+            else if (ImGui::IsItemHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Right) && term.selected) {
+                assert(!term.disabled);
+                term.selected = false;
+                update_current();
+            }
+#endif
             ImGui::PopID();
 
-            if (term.description) {
+            {
                 static bool toggle = true;
                 if (auto tooltip = imgui_ItemTooltip(toggle)) {
-                    imgui_Str(term.description);
+                    imgui_Str(term.description ? term.description : "TODO");
                 }
             }
 
-            // TODO: change color when hovered?
-            // const bool hovered = ImGui::IsItemHovered();
+            // TODO: refine...
 
             // TODO: explain coloring scheme; redesign if necessary (especially ring col)
             // TODO: find better color for "disabled"/incompatible etc... currently too ugly.
             const ImU32 cen_col = term.selected                ? ImGui::GetColorU32(ImGuiCol_ButtonHovered)
                                   : term.set.includes(current) ? ImGui::GetColorU32(ImGuiCol_FrameBg)
-                                  : term.disabled              ? IM_COL32(150, 0, 0, 255)
+                                  : term.disabled              ? IM_COL32(150, 45, 0, 255)
                                                                : IM_COL32_BLACK;
             const ImU32 ring_col = term.set.contains(mold.rule) ? IM_COL32(0, 255, 0, 255)
                                    : compatible(term.set, mold) ? IM_COL32(0, 100, 0, 255)
-                                                                : IM_COL32(255, 0, 0, 255);
+                                                                : IM_COL32(255, 60, 0, 255);
 
-            const ImVec2 pos_min = ImGui::GetItemRectMin();
-            const ImVec2 pos_max = ImGui::GetItemRectMax();
-            assert(pos_min + size == pos_max);
-            assert(size.x > 8 && size.y > 8);
-            ImGui::GetWindowDrawList()->AddRectFilled(pos_min + ImVec2(4, 4), pos_max - ImVec2(4, 4), cen_col);
-            ImGui::GetWindowDrawList()->AddRect(pos_min, pos_max, ring_col);
+            imgui_ItemRectFilled(IM_COL32_BLACK);
+            imgui_ItemRectFilled(cen_col, ImVec2(4, 4));
+            imgui_ItemRect(ring_col);
+            if (!term.disabled && ImGui::IsItemHovered()) {
+                imgui_ItemRectFilled(IM_COL32(255, 255, 255, 45));
+            } else if (term.disabled) {
+                imgui_ItemRectFilled(IM_COL32(0, 0, 0, 90));
+            }
         };
 
         // TODO: the layout is still horrible...
@@ -565,14 +569,14 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             }
         }
 
-        if (!compatible) {
-            ImGui::EndDisabled();
-        }
-
         ImGui::SameLine();
         if (ImGui::Button("Approximate")) {
             return_rule(legacy::approximate(subset, mold));
         }
+        if (!compatible) {
+            ImGui::EndDisabled();
+        }
+
         ImGui::SameLine();
         if (ImGui::Button("Clear lock")) {
             return_lock({});
@@ -580,7 +584,12 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
         // TODO: move elsewhere
         if (ImGui::Button("Mir")) {
-            return_mold(legacy::mirror(mold));
+            return_mold(legacy::trans_mirror(mold));
+        }
+        ImGui::SameLine();
+        // TODO: temp, experimental; not too useful for now...
+        if (ImGui::Button("LR")) {
+            return_mold(legacy::trans_left_right(mold));
         }
     }
 
@@ -594,6 +603,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         const auto scanlist = legacy::scan(par, masked, mold.lock);
         {
             // TODO: add more statistics... e.g. full vs partial lock...
+            // TODO: refactor...
             const int c_group = par.k();
             int c_locked = 0;
             int c_0 = 0, c_1 = 0;
@@ -680,9 +690,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                             align_text(ImGui::GetItemRectSize().y);
                             imgui_Str(labels[masked[code]]);
                             if (mold.lock[code]) {
-                                ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() - ImVec2(2, 2),
-                                                                    ImGui::GetItemRectMax() + ImVec2(2, 2),
-                                                                    IM_COL32_WHITE);
+                                imgui_ItemRect(IM_COL32_WHITE, ImVec2(-2, -2));
                             }
                             if (x == max_to_show) {
                                 break;
@@ -701,8 +709,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
 
                 if (has_lock) {
                     const ImU32 col = scanlist[j].all_locked() ? IM_COL32_WHITE : IM_COL32(128, 128, 128, 255);
-                    ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin() - ImVec2(2, 2),
-                                                        ImGui::GetItemRectMax() + ImVec2(2, 2), col);
+                    imgui_ItemRect(col, ImVec2(-2, -2));
                 }
             });
             ImGui::PopStyleVar(1);

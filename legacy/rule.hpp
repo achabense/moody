@@ -152,6 +152,13 @@ namespace legacy {
         ruleT rule{};
         lockT lock{};
 
+        // Does `r` have the same values for all locked codes?
+        bool compatible(const ruleT& r) const {
+            return for_each_code_all_of([&](codeT code) { //
+                return !lock[code] || rule[code] == r[code];
+            });
+        }
+
         friend bool operator==(const moldT&, const moldT&) = default;
     };
 
