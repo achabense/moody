@@ -49,7 +49,7 @@ public:
 
     ~tile_image();
     // TODO: explain
-    void update(int w, int h, std::function<const bool*(int)> getline);
+    void refresh(int w, int h, std::function<const bool*(int)> getline);
 
     ImTextureID texture() const { return m_texture; }
 };
@@ -92,8 +92,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
 
 std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_image& img);
 
-// TODO: eh... I find it really hard to find a sensible name for this...
-void frame(const code_image& icons, tile_image& img);
+void frame_main(const code_image& icons, tile_image& img);
 
 inline const int item_width = 220;
 
@@ -178,7 +177,7 @@ public:
 
 // TODO: better name... app_helper? (is this program an "app"?)
 class helper {
-    friend void frame(const code_image&, tile_image&);
+    friend void frame_main(const code_image&, tile_image&);
     static inline bool enable_help = false;
 
 public:

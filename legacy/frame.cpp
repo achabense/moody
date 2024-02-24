@@ -103,7 +103,7 @@ static void assign_val(legacy::moldT& mold, legacy::extrT::valT& val) {
     }
 }
 
-void frame(const code_image& icons, tile_image& img) {
+void frame_main(const code_image& icons, tile_image& img) {
     static recorderT recorder;
 
 #ifndef NDEBUG

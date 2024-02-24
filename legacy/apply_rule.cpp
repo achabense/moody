@@ -6,8 +6,8 @@
 
 #include "common.hpp"
 
-static void update(tile_image& img, const legacy::tileT& tile) {
-    img.update(tile.width(), tile.height(), [&tile](int y) { return tile.line(y); });
+static void refresh(tile_image& img, const legacy::tileT& tile) {
+    img.refresh(tile.width(), tile.height(), [&tile](int y) { return tile.line(y); });
 }
 
 static void run_torus(legacy::tileT& tile, legacy::tileT& temp, const legacy::rule_like auto& rule) {
@@ -437,7 +437,7 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
         drawlist->AddRectFilled(canvas_min, canvas_max, IM_COL32(20, 20, 20, 255));
 
         if (!paste) {
-            update(img, runner.tile());
+            refresh(img, runner.tile());
 
             drawlist->AddImage(img.texture(), img_min, img_max);
         } else {
@@ -452,7 +452,7 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
             legacy::tileT temp(paste->size()); // TODO: wasteful...
             legacy::copy(temp, {0, 0}, runner.tile(), range);
             legacy::copy<legacy::copyE::Or>(runner.tile(), paste_beg, *paste);
-            update(img, runner.tile());
+            refresh(img, runner.tile());
             legacy::copy(runner.tile(), paste_beg, temp);
 
             drawlist->AddImage(img.texture(), img_min, img_max);

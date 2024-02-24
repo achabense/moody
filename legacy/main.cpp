@@ -35,7 +35,7 @@ static Uint32 color_for(bool b) {
     return b ? -1 /* White */ : 0 /* Black*/;
 }
 
-void tile_image::update(const int w, const int h, std::function<const bool*(int)> getline) {
+void tile_image::refresh(const int w, const int h, std::function<const bool*(int)> getline) {
     if (!m_texture || m_w != w || m_h != h) {
         if (m_texture) {
             SDL_DestroyTexture(static_cast<SDL_Texture*>(m_texture));
@@ -204,7 +204,7 @@ int main(int, char**) {
         tile_image img;
 
         while (begin_frame()) {
-            frame(icons, img);
+            frame_main(icons, img);
             end_frame();
 
             // Added as an extra assurance for the framerate.
