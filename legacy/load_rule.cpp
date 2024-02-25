@@ -279,6 +279,15 @@ public:
                 [&] { ret = true, m_pos = total - 1; });
             ImGui::SameLine();
             ImGui::Text("Total:%d At:%d", total, m_pos + 1);
+
+            // TODO: (temp) added back as this is very convenient; whether to require the window to be focused?
+            if (!ret) {
+                if (imgui_KeyPressed(ImGuiKey_UpArrow, true)) {
+                    ret = true, m_pos = std::max(0, m_pos - 1);
+                } else if (imgui_KeyPressed(ImGuiKey_DownArrow, true)) {
+                    ret = true, m_pos = std::min(total - 1, m_pos + 1);
+                }
+            }
         } else {
             ImGui::Text("No rules");
         }

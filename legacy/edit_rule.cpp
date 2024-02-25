@@ -244,122 +244,6 @@ public:
     }
 };
 
-// TODO: move elsewhere?
-std::optional<legacy::moldT> static_constraints() {
-    enum stateE { Any_background, O, I, O_background, I_background };
-    const int r = 9;
-    static stateE board[r][r]{/*Any_background...*/};
-    static stateE state_lbutton = I;
-    const stateE state_rbutton = Any_background;
-    static const ImU32 cols[5]{IM_COL32(100, 100, 100, 255), //
-                               IM_COL32(0, 0, 0, 255),       //
-                               IM_COL32(255, 255, 255, 255), //
-                               IM_COL32(80, 0, 80, 255),     //
-                               IM_COL32(200, 0, 200, 255)};
-
-    const bool ret = ImGui::Button("Done");
-    ImGui::SameLine();
-    if (ImGui::Button("Clear")) {
-        for (auto& l : board) {
-            for (auto& s : l) {
-                s = Any_background;
-            }
-        }
-    }
-
-    // Display-only; the value of `state_lbutton` is controlled by mouse-scrolling.
-    ImGui::BeginDisabled();
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {2, 2});
-    for (const stateE s : {O, I, O_background, I_background}) {
-        if (s != O) {
-            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-        }
-        // No need for unique ID here (as the return value is not used).
-        ImGui::RadioButton("##Radio", s == state_lbutton);
-        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-        ImGui::Dummy(square_size());
-        imgui_ItemRectFilled(cols[s]);
-        imgui_ItemRect(IM_COL32(200, 200, 200, 255));
-    }
-    ImGui::PopStyleVar();
-    ImGui::EndDisabled();
-
-    ImGui::BeginGroup();
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {0, 0});
-    for (int y = 0; y < r; ++y) {
-        for (int x = 0; x < r; ++x) {
-            if (x != 0) {
-                ImGui::SameLine();
-            }
-
-            // No need for unique ID here (as IsItemHovered + IsMouseDown doesn't reply on ID).
-            ImGui::InvisibleButton("##Invisible", square_size());
-
-            const bool editable = y >= 1 && y < r - 1 && x >= 1 && x < r - 1;
-            stateE& state = board[y][x];
-            imgui_ItemRectFilled(!editable ? IM_COL32(80, 80, 80, 255) : cols[state]);
-            imgui_ItemRect(IM_COL32(200, 200, 200, 255));
-
-            if (editable && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)) {
-                if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-                    state = state_rbutton;
-                } else if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-                    state = state_lbutton;
-                }
-            }
-        }
-    }
-    ImGui::PopStyleVar();
-    ImGui::EndGroup();
-    if (ImGui::IsItemHovered()) {
-        if (imgui_MouseScrollingDown()) {
-            state_lbutton = (stateE)std::min((int)I_background, state_lbutton + 1);
-        } else if (imgui_MouseScrollingUp()) {
-            state_lbutton = (stateE)std::max((int)O, state_lbutton - 1);
-        }
-    }
-
-    if (ret) {
-        legacy::moldT mold{};
-        for (int y = 1; y < r - 1; ++y) {
-            for (int x = 1; x < r - 1; ++x) {
-                if (board[y][x] == O || board[y][x] == I) {
-                    // For example:
-                    //  O   O_b  I                  001       001
-                    // [Any] O   O  will result in [0]00 and [1]00 being set.
-                    //  I_b  I  I_b                 111       111
-                    legacy::for_each_code([&](legacy::codeT code) {
-                        auto imbue = [](bool& b, stateE state) {
-                            if (state == O || state == O_background) {
-                                b = 0;
-                            } else if (state == I || state == I_background) {
-                                b = 1;
-                            }
-                        };
-
-                        legacy::situT situ = legacy::decode(code);
-
-                        imbue(situ.q, board[y - 1][x - 1]);
-                        imbue(situ.w, board[y - 1][x]);
-                        imbue(situ.e, board[y - 1][x + 1]);
-                        imbue(situ.a, board[y][x - 1]);
-                        imbue(situ.s, board[y][x]);
-                        imbue(situ.d, board[y][x + 1]);
-                        imbue(situ.z, board[y + 1][x - 1]);
-                        imbue(situ.x, board[y + 1][x]);
-                        imbue(situ.c, board[y + 1][x + 1]);
-
-                        mold.rule[legacy::encode(situ)] = board[y][x] == O ? 0 : 1;
-                        mold.lock[legacy::encode(situ)] = true;
-                    });
-                }
-            }
-        }
-        return mold;
-    }
-    return std::nullopt;
-}
-
 // TODO: there must be an [obvious] way to support "dial" mode.
 std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_image& icons) {
     std::optional<legacy::moldT> out;
@@ -489,6 +373,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                 ++c_inconsistent;
             }
         }
+        // TODO: redesign what to show based on compatible/contained/...
         ImGui::Text("Groups:%d [Locked:%d(0:%d,1:%d)] [%c:%d] [%c:%d] [x:%d]", c_group, c_locked_0 + c_locked_1,
                     c_locked_0, c_locked_1, chr_0, c_0, chr_1, c_1, c_inconsistent);
         return std::array{c_group - c_locked_0 - c_locked_1, c_locked_0, c_locked_1};
@@ -521,6 +406,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                 return_rule(legacy::randomize(subset, mask, mold, global_mt19937(), rcount - c_locked_1));
             }
         } else {
+            // TODO: redesign...
             ImGui::SetNextItemWidth(item_width);
             static float density = 0.5;
             ImGui::SliderFloat("##Density", &density, 0, 1, std::format("Around {}", round(density * par.k())).c_str(),
@@ -615,6 +501,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             if (j != 0 && j % 64 == 0) {
                 ImGui::Separator();
             }
+            // TODO: if the mask doesn't belong to the subset the coloring scheme doe not make sense here...
             const bool inconsistent = scanlist[j].inconsistent();
             const legacy::codeT head = group[0];
             const bool has_lock = scanlist[j].any_locked();
@@ -696,4 +583,119 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         ImGui::EndDisabled();
     }
     return out;
+}
+
+std::optional<legacy::moldT> static_constraints() {
+    enum stateE { Any_background, O, I, O_background, I_background };
+    const int r = 9;
+    static stateE board[r][r]{/*Any_background...*/};
+    static stateE state_lbutton = I;
+    const stateE state_rbutton = Any_background;
+    static const ImU32 cols[5]{IM_COL32(100, 100, 100, 255), //
+                               IM_COL32(0, 0, 0, 255),       //
+                               IM_COL32(255, 255, 255, 255), //
+                               IM_COL32(80, 0, 80, 255),     //
+                               IM_COL32(200, 0, 200, 255)};
+
+    const bool ret = ImGui::Button("Done");
+    ImGui::SameLine();
+    if (ImGui::Button("Clear")) {
+        for (auto& l : board) {
+            for (auto& s : l) {
+                s = Any_background;
+            }
+        }
+    }
+
+    // Display-only; the value of `state_lbutton` is controlled by mouse-scrolling.
+    ImGui::BeginDisabled();
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {2, 2});
+    for (const stateE s : {O, I, O_background, I_background}) {
+        if (s != O) {
+            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+        }
+        // No need for unique ID here (as the return value is not used).
+        ImGui::RadioButton("##Radio", s == state_lbutton);
+        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+        ImGui::Dummy(square_size());
+        imgui_ItemRectFilled(cols[s]);
+        imgui_ItemRect(IM_COL32(200, 200, 200, 255));
+    }
+    ImGui::PopStyleVar();
+    ImGui::EndDisabled();
+
+    ImGui::BeginGroup();
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {0, 0});
+    for (int y = 0; y < r; ++y) {
+        for (int x = 0; x < r; ++x) {
+            if (x != 0) {
+                ImGui::SameLine();
+            }
+
+            // No need for unique ID here (as IsItemHovered + IsMouseDown doesn't reply on ID).
+            ImGui::InvisibleButton("##Invisible", square_size());
+
+            const bool editable = y >= 1 && y < r - 1 && x >= 1 && x < r - 1;
+            stateE& state = board[y][x];
+            imgui_ItemRectFilled(!editable ? IM_COL32(80, 80, 80, 255) : cols[state]);
+            imgui_ItemRect(IM_COL32(200, 200, 200, 255));
+
+            if (editable && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)) {
+                if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+                    state = state_rbutton;
+                } else if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                    state = state_lbutton;
+                }
+            }
+        }
+    }
+    ImGui::PopStyleVar();
+    ImGui::EndGroup();
+    if (ImGui::IsItemHovered()) {
+        if (imgui_MouseScrollingDown()) {
+            state_lbutton = (stateE)std::min((int)I_background, state_lbutton + 1);
+        } else if (imgui_MouseScrollingUp()) {
+            state_lbutton = (stateE)std::max((int)O, state_lbutton - 1);
+        }
+    }
+
+    if (ret) {
+        legacy::moldT mold{};
+        for (int y = 1; y < r - 1; ++y) {
+            for (int x = 1; x < r - 1; ++x) {
+                if (board[y][x] == O || board[y][x] == I) {
+                    // For example:
+                    //  O   O_b  I                  001       001
+                    // [Any] O   O  will result in [0]00 and [1]00 being set.
+                    //  I_b  I  I_b                 111       111
+                    legacy::for_each_code([&](legacy::codeT code) {
+                        auto imbue = [](bool& b, stateE state) {
+                            if (state == O || state == O_background) {
+                                b = 0;
+                            } else if (state == I || state == I_background) {
+                                b = 1;
+                            }
+                        };
+
+                        legacy::situT situ = legacy::decode(code);
+
+                        imbue(situ.q, board[y - 1][x - 1]);
+                        imbue(situ.w, board[y - 1][x]);
+                        imbue(situ.e, board[y - 1][x + 1]);
+                        imbue(situ.a, board[y][x - 1]);
+                        imbue(situ.s, board[y][x]);
+                        imbue(situ.d, board[y][x + 1]);
+                        imbue(situ.z, board[y + 1][x - 1]);
+                        imbue(situ.x, board[y + 1][x]);
+                        imbue(situ.c, board[y + 1][x + 1]);
+
+                        mold.rule[legacy::encode(situ)] = board[y][x] == O ? 0 : 1;
+                        mold.lock[legacy::encode(situ)] = true;
+                    });
+                }
+            }
+        }
+        return mold;
+    }
+    return std::nullopt;
 }

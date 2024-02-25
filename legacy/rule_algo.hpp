@@ -363,6 +363,15 @@ namespace legacy {
         return lock;
     }
 
+    // TODO: (temp) the affect is the same as the old version.
+    inline moldT::lockT invert_lock_v2(const subsetT& subset, const moldT& mold) {
+        assert(subset.contains(mold.rule));
+        moldT::lockT lock = enhance_lock(subset, mold);
+        for_each_code([&](codeT code) { lock[code] = !lock[code]; });
+
+        return lock;
+    }
+
     // Does there exist any rule that belongs to both `subset` and `mold`?
     // TODO: about moldT::compatible...
     inline bool compatible(const subsetT& subset, const moldT& mold) {
@@ -401,9 +410,7 @@ namespace legacy {
     }
 
     // TODO: explain...
-    // X Also, it might be helpful to support "in-lock" forging. For example, to dial to find potentially related
-    // X patterns...
-    // X Directly invert the locks, or add a flag in `forge`? (TODO: recheck `invert_lock`)
+    // TODO: as to in-lock transformation, whether to use invert-lock approach, or to add an extra tag for `transform`?
     inline ruleT transform(const subsetT& subset, const maskT& mask, const moldT& mold,
                            std::invocable<bool*, bool*> auto fn) {
         assert(subset.contains(mask)); // TODO ... about why not using subset.get_mask()...
@@ -441,8 +448,7 @@ namespace legacy {
         return res;
     }
 
-    // TODO: `count` denotes free groups now; whether to switch to total groups (at least in the gui part)?
-    // TODO: (temp) there was a plan to support count_min~count_max mode finally... dropped now.
+    // TODO: explain...
     inline ruleT randomize(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand, int count) {
         assert(compatible(subset, mold));
 
@@ -454,6 +460,7 @@ namespace legacy {
         });
     }
 
+    // TODO: rename...
     inline ruleT randomize_v2(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand,
                               double density) {
         assert(compatible(subset, mold));
@@ -464,11 +471,13 @@ namespace legacy {
         });
     }
 
+#if 0
     inline ruleT shuffle(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand) {
         assert(subset.contains(mold.rule));
 
         return transform(subset, mask, mold, [&rand](bool* begin, bool* end) { std::shuffle(begin, end, rand); });
     }
+#endif
 
     // TODO: rename to [set_]first / ...
     struct act_int {

@@ -87,8 +87,8 @@ public:
 bool file_nav_add_special_path(const char* u8path, const char* title);
 std::optional<legacy::extrT::valT> load_rule();
 
-std::optional<legacy::moldT> static_constraints();
 std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_image& icons);
+std::optional<legacy::moldT> static_constraints();
 
 std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_image& img);
 
