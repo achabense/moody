@@ -1,6 +1,7 @@
 #include "common.hpp"
 
 // TODO: (temp) moved from rule.hpp, this appears not a too-general functionality.
+// TODO: move out of namespace legacy?
 namespace legacy {
     // TODO: rename...
     struct compressT {
@@ -16,7 +17,7 @@ namespace legacy {
         };
     };
 
-    inline compressT compress(const moldT& mold) {
+    static compressT compress(const moldT& mold) {
         compressT cmpr{};
         for_each_code([&](codeT code) {
             cmpr.bits_rule[code / 8] |= mold.rule[code] << (code % 8);
@@ -25,7 +26,7 @@ namespace legacy {
         return cmpr;
     }
 
-    inline moldT decompress(const compressT& cmpr) {
+    static moldT decompress(const compressT& cmpr) {
         moldT mold{};
         for_each_code([&](codeT code) {
             mold.rule[code] = (cmpr.bits_rule[code / 8] >> (code % 8)) & 1;
@@ -36,7 +37,7 @@ namespace legacy {
 
 #ifdef ENABLE_TESTS
     namespace _tests {
-        inline const testT test_compressT = [] {
+        static const testT test_compressT = [] {
             moldT mold{};
             for_each_code([&](codeT code) {
                 mold.rule[code] = testT::rand() & 1;

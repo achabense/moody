@@ -189,6 +189,7 @@ public:
 class helper {
     friend void frame_main(const code_image&, tile_image&);
     static inline bool enable_help = false;
+    // static inline bool toggle = true; // TODO: add a toggle?
 
 public:
     static void show_help(const std::invocable<> auto& desc, bool sameline = true) {

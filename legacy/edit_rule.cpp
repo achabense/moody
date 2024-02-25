@@ -163,6 +163,7 @@ public:
 #endif
             ImGui::PopID();
 
+            // TODO: if using helper::show_help, the helpmark will take up too much space here...
             {
                 static bool toggle = true;
                 if (auto tooltip = imgui_ItemTooltip(toggle)) {
@@ -190,87 +191,53 @@ public:
             }
         };
 
-        // TODO: the layout is still horrible...
-        const ImGuiTableFlags flags_outer = ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit;
-        const ImGuiTableFlags flags_inner =
-            ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoHostExtendX;
+        if (ImGui::BeginTable("Checklists", 2, ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit)) {
+            auto put_row = [](const char* l_str, const auto& r_logic) {
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                imgui_Str(l_str);
 
-        if (ImGui::BeginTable("Checklists", 2, flags_outer)) {
-            auto checklist = [&](termT_vec& terms, const char* label) {
-                if (ImGui::BeginTable(label, terms.size(), flags_inner)) {
-                    ImGui::TableNextRow();
-                    for (termT& t : terms) {
-                        ImGui::TableNextColumn();
-                        imgui_Str(t.title);
-                        check(t);
+                ImGui::TableNextColumn();
+                r_logic();
+            };
+
+            auto checklist = [&](termT_vec& terms) {
+                for (bool first = true; termT & t : terms) {
+                    if (!std::exchange(first, false)) {
+                        ImGui::SameLine();
                     }
-                    ImGui::EndTable();
+                    ImGui::BeginGroup();
+                    imgui_Str(t.title);
+                    check(t);
+                    ImGui::EndGroup();
                 }
             };
 
-            {
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                imgui_Str("Ignore & Misc");
-
-                ImGui::TableNextColumn();
-                if (ImGui::BeginTable("Checklist##Ignore&Misc", 1, flags_inner)) {
-                    ImGui::TableNextRow();
-                    // TODO: slightly confusing; light color should represent "take-into-account" instead of
-                    // "ignore" Is this solvable by applying specific coloring scheme?
-                    ImGui::TableNextColumn();
-                    ImGui::BeginGroup();
-                    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 2));
-                    for (int l = 0; l < 3; ++l) {
-                        check(terms_ignore[l * 3 + 0]);
-                        ImGui::SameLine();
-                        check(terms_ignore[l * 3 + 1]);
-                        ImGui::SameLine();
-                        check(terms_ignore[l * 3 + 2]);
-                    }
-                    ImGui::PopStyleVar();
-                    ImGui::EndGroup();
-
-                    for (termT& t : terms_misc) {
-                        ImGui::SameLine();
-                        ImGui::BeginGroup();
-                        imgui_Str(t.title);
-                        check(t);
-                        ImGui::EndGroup();
-                    }
-
-                    ImGui::EndTable();
+            put_row("Ignore & Misc", [&] {
+                // TODO: slightly confusing; light color should represent "take-into-account" instead of
+                // "ignore" Is this solvable by applying specific coloring scheme?
+                ImGui::BeginGroup();
+                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 2));
+                for (int l = 0; l < 3; ++l) {
+                    check(terms_ignore[l * 3 + 0]);
+                    ImGui::SameLine();
+                    check(terms_ignore[l * 3 + 1]);
+                    ImGui::SameLine();
+                    check(terms_ignore[l * 3 + 2]);
                 }
-            }
+                ImGui::PopStyleVar();
+                ImGui::EndGroup();
 
-            {
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                imgui_Str("Native");
+                ImGui::SameLine();
+                checklist(terms_misc);
+            });
 
-                ImGui::TableNextColumn();
-                checklist(terms_native, "Checklist##Native");
-            }
-
-            {
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                imgui_Str("Totalistic");
-
-                ImGui::TableNextColumn();
-                checklist(terms_totalistic, "Checklist##Totalistic");
-            }
-
-            {
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                imgui_Str("q w -    q w\n"
-                          "a s d ~ a s d\n"
-                          "- x c    x c");
-
-                ImGui::TableNextColumn();
-                checklist(terms_hex, "Checklist##Hex");
-            }
+            put_row("Native", [&] { checklist(terms_native); });
+            put_row("Totalistic", [&] { checklist(terms_totalistic); });
+            put_row("q w -    q w\n"
+                    "a s d ~ a s d\n"
+                    "- x c    x c",
+                    [&] { checklist(terms_hex); });
 
             ImGui::EndTable();
         }
@@ -601,8 +568,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
 
     // TODO: support filtering?
     {
-        const char labels[2][3]{{'-', chr_0, '\0'}, {'-', chr_1, '\0'}};
-
         // TODO: (!!!) which mask? `mask` or `subset.get_mask()`?
         // TODO: find a better name for `ruleT_masked` and the variables...
         const legacy::ruleT_masked masked = mask ^ mold.rule;
@@ -634,6 +599,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         }
 
         if (auto child = imgui_ChildWindow("Details")) {
+            const char labels[2][3]{{'-', chr_0, '\0'}, {'-', chr_1, '\0'}};
+
             // Precise vertical alignment:
             // https://github.com/ocornut/imgui/issues/2064
             const auto align_text = [](float height) {
