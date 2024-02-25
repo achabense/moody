@@ -332,17 +332,6 @@ namespace legacy {
         return std::ranges::none_of(group, [&lock](codeT code) { return lock[code]; });
     }
 
-    // TODO: used in `edit_rule`; avoidable if scan early...
-    inline int count_free(const partitionT& par, const moldT::lockT& lock) {
-        int free = 0;
-        par.for_each_group([&](const groupT& group) {
-            if (none_locked(lock, group)) {
-                ++free;
-            }
-        });
-        return free;
-    }
-
     // TODO: explain why requiring subset.contains(mold.rule).
     inline moldT::lockT enhance_lock(const subsetT& subset, const moldT& mold) {
         assert(subset.contains(mold.rule));

@@ -496,8 +496,7 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
             // TODO: zoom window temporarily conflicts with range selection... (both use Rclick)
             if (!paste && img_zoom <= 2 && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
                 if (celx >= -10 && celx < tile_size.width + 10 && cely >= -10 && cely < tile_size.height + 10) {
-                    static bool toggle = true;
-                    if (auto tooltip = imgui_ItemTooltip(toggle)) {
+                    if (static bool toggle = true; auto tooltip = imgui_ItemTooltip(toggle)) {
                         const int w = std::min(tile_size.width, 40);
                         const int h = std::min(tile_size.height, 40);
 

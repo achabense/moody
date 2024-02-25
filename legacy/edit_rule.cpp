@@ -164,11 +164,8 @@ public:
             ImGui::PopID();
 
             // TODO: if using helper::show_help, the helpmark will take up too much space here...
-            {
-                static bool toggle = true;
-                if (auto tooltip = imgui_ItemTooltip(toggle)) {
-                    imgui_Str(term.description ? term.description : "TODO");
-                }
+            if (static bool toggle = true; auto tooltip = imgui_ItemTooltip(toggle)) {
+                imgui_Str(term.description ? term.description : "TODO");
             }
 
             // TODO: refine...
@@ -453,25 +450,57 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         return *mask_ptrs[mask_tag];
     }();
 
-    // TODO: make what to do obvious when !transform_avail etc...
-    const bool transform_avail = subset.contains(mask);
+    const bool mask_avail = subset.contains(mask);
     const bool compatible = legacy::compatible(subset, mold);
     const bool contained = subset.contains(mold.rule);
     assert(!contained || compatible); // contained -> compatible
 
-    // TODO: this is disabling all the operations, including mirror, clear-lock etc...
-    // What can be allowed when the selected mask doesn't belong to the set?
-    if (!transform_avail) {
+    // Disable all edit operations if !mask_avail, including those that do not really need
+    // the mask to be valid (or even do not depend on subset utils).
+    // (These operations include: ... TODO: list all)
+    // This makes sense as:
+    // 1. Such operations are not many, and they are typically used in combination with those that
+    // do need correct masks.
+    // 2. The program already provides a way to get always-usable mask (the "native" mode).
+    if (!mask_avail) {
+        ImGui::BeginDisabled();
+    }
+
+    // TODO: !!! explain && redesign this part... not always meaningful...
+    // TODO: about mask vs subset.get_mask()...
+    const legacy::ruleT_masked masked = mask ^ mold.rule;
+    const auto scanlist = legacy::scan(par, masked, mold.lock);
+    const auto [c_free, c_locked_0, c_locked_1] = [&] {
+        const int c_group = par.k();
+        int c_locked_0 = 0, c_locked_1 = 0;
+        int c_0 = 0, c_1 = 0;
+        int c_inconsistent = 0;
+        for (const auto& scan : scanlist) {
+            if (scan.locked_0) {
+                ++c_locked_0;
+            } else if (scan.locked_1) {
+                ++c_locked_1;
+            }
+            if (scan.all_0()) {
+                ++c_0;
+            } else if (scan.all_1()) {
+                ++c_1;
+            } else if (scan.inconsistent()) {
+                ++c_inconsistent;
+            }
+        }
+        ImGui::Text("Groups:%d [Locked:%d(0:%d,1:%d)] [%c:%d] [%c:%d] [x:%d]", c_group, c_locked_0 + c_locked_1,
+                    c_locked_0, c_locked_1, chr_0, c_0, chr_1, c_1, c_inconsistent);
+        return std::array{c_group - c_locked_0 - c_locked_1, c_locked_0, c_locked_1};
+    }();
+
+    if (!compatible) {
         ImGui::BeginDisabled();
     }
 
     {
-        if (!compatible) {
-            ImGui::BeginDisabled();
-        }
-
         // TODO: refine (better names etc)...
-        static bool exact_mode = false;
+        static bool exact_mode = true;
 
         if (ImGui::Button(std::format("Mode = {}###Mode", exact_mode ? "Exact" : "Dens ").c_str())) {
             exact_mode = !exact_mode;
@@ -480,16 +509,16 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
         if (exact_mode) {
             // TODO: still unstable between partition switches...
-            // TODO: the range should be scoped by locks... so, what should rcount be?
-            static int rcount = 0.5 * par.k();
-            const int freec = legacy::count_free(par, mold.lock); // TODO: still wasteful...
+            // TODO: not meaningful when !compatible.
+            static int rcount = 0.5 * par.k(); // Distance to the mask.
 
+            // TODO: refine sliding effect...
             ImGui::SetNextItemWidth(item_width);
             imgui_StepSliderInt("##Quantity", &rcount, 0, par.k());
-            rcount = std::clamp(rcount, 0, freec);
+            rcount = std::clamp(rcount, c_locked_1, c_locked_1 + c_free);
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
             if (enter_button("Randomize")) {
-                return_rule(legacy::randomize(subset, mask, mold, global_mt19937(), rcount));
+                return_rule(legacy::randomize(subset, mask, mold, global_mt19937(), rcount - c_locked_1));
             }
         } else {
             ImGui::SetNextItemWidth(item_width);
@@ -501,194 +530,169 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                 return_rule(legacy::randomize_v2(subset, mask, mold, global_mt19937(), density));
             }
         }
+    }
 
-        // TODO: it looks strange when only middle part is disabled...
+    // TODO: it looks strange when only middle part is disabled...
+    iter_group(
+        "<00..", "dec", "inc", "11..>", //
+        [&] { return_rule(legacy::act_int::first(subset, mask, mold)); },
+        [&] { return_rule(legacy::act_int::prev(subset, mask, mold)); },
+        [&] { return_rule(legacy::act_int::next(subset, mask, mold)); },
+        [&] { return_rule(legacy::act_int::last(subset, mask, mold)); }, contained ? enter_button : nullptr);
+    ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
+
+    {
+        if (!contained) {
+            ImGui::BeginDisabled();
+        }
         iter_group(
-            "<00..", "dec", "inc", "11..>", //
-            [&] { return_rule(legacy::act_int::first(subset, mask, mold)); },
-            [&] { return_rule(legacy::act_int::prev(subset, mask, mold)); },
-            [&] { return_rule(legacy::act_int::next(subset, mask, mold)); },
-            [&] { return_rule(legacy::act_int::last(subset, mask, mold)); }, contained ? enter_button : nullptr);
-        ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
+            "<1.0.", "pprev", "pnext", "0.1.>", //
+            [&] { return_rule(legacy::act_perm::first(subset, mask, mold)); },
+            [&] { return_rule(legacy::act_perm::prev(subset, mask, mold)); },
+            [&] { return_rule(legacy::act_perm::next(subset, mask, mold)); },
+            [&] { return_rule(legacy::act_perm::last(subset, mask, mold)); }, enter_button);
+        // TODO: (temp) shuffle is not more useful than randomize, but more convenient sometimes...
+        // ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
+        // if (enter_button("Shuffle")) {
+        //     return_rule(legacy::shuffle(subset, mold, global_mt19937()));
+        // }
 
-        {
-            if (!contained) {
-                ImGui::BeginDisabled();
-            }
-            iter_group(
-                "<1.0.", "pprev", "pnext", "0.1.>", //
-                [&] { return_rule(legacy::act_perm::first(subset, mask, mold)); },
-                [&] { return_rule(legacy::act_perm::prev(subset, mask, mold)); },
-                [&] { return_rule(legacy::act_perm::next(subset, mask, mold)); },
-                [&] { return_rule(legacy::act_perm::last(subset, mask, mold)); }, enter_button);
-            // TODO: (temp) shuffle is not more useful than randomize, but more convenient sometimes...
-            // ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
-            // if (enter_button("Shuffle")) {
-            //     return_rule(legacy::shuffle(subset, mold, global_mt19937()));
-            // }
-
-            // TODO: (temp) new line begins here...
-            // TODO: enhance might be stricter than necessary...
-            if (ImGui::Button("Enhance lock")) {
-                return_lock(legacy::enhance_lock(subset, mold));
-            }
-            ImGui::SameLine();
-            // TODO: (temp) experimental... may consider the "forging mode" approach finally.
-            if (ImGui::Button("Invert lock")) {
-                return_lock(legacy::invert_lock(subset, mold));
-            }
-            if (!contained) {
-                ImGui::EndDisabled();
-            }
+        // TODO: (temp) new line begins here...
+        // TODO: enhance might be stricter than necessary...
+        if (ImGui::Button("Enhance lock")) {
+            return_lock(legacy::enhance_lock(subset, mold));
         }
-
         ImGui::SameLine();
-        if (ImGui::Button("Approximate")) {
-            return_rule(legacy::approximate(subset, mold));
+        // TODO: (temp) experimental... may consider the "forging mode" approach finally.
+        if (ImGui::Button("Invert lock")) {
+            return_lock(legacy::invert_lock(subset, mold));
         }
-        if (!compatible) {
+        if (!contained) {
             ImGui::EndDisabled();
         }
+    }
 
-        ImGui::SameLine();
-        if (ImGui::Button("Clear lock")) {
-            return_lock({});
-        }
-        ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
-        // TODO: move elsewhere
-        if (ImGui::Button("Mir")) {
-            return_mold(legacy::trans_mirror(mold));
-        }
-        ImGui::SameLine();
-        // TODO: temp, experimental; not too useful for now...
-        if (ImGui::Button("LR")) {
-            return_mold(legacy::trans_left_right(mold));
-        }
+    ImGui::SameLine();
+    if (ImGui::Button("Approximate")) {
+        return_rule(legacy::approximate(subset, mold));
+    }
+    if (!compatible) {
+        ImGui::EndDisabled();
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("Clear lock")) {
+        return_lock({});
+    }
+    ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
+    // TODO: move elsewhere
+    if (ImGui::Button("Mir")) {
+        return_mold(legacy::trans_mirror(mold));
+    }
+    ImGui::SameLine();
+    // TODO: temp, experimental; not too useful for now...
+    if (ImGui::Button("LR")) {
+        return_mold(legacy::trans_left_right(mold));
     }
 
     // TODO: support filtering?
-    {
-        // TODO: (!!!) which mask? `mask` or `subset.get_mask()`?
-        // TODO: find a better name for `ruleT_masked` and the variables...
-        const legacy::ruleT_masked masked = mask ^ mold.rule;
-        const auto scanlist = legacy::scan(par, masked, mold.lock);
-        {
-            // TODO: add more statistics... e.g. full vs partial lock...
-            // TODO: refactor...
-            const int c_group = par.k();
-            int c_locked = 0;
-            int c_0 = 0, c_1 = 0;
-            int c_inconsistent = 0;
-            for (const auto& scan : scanlist) {
-                if (scan.any_locked()) {
-                    ++c_locked;
-                }
-                if (scan.all_0()) {
-                    ++c_0;
-                }
-                if (scan.all_1()) {
-                    ++c_1;
-                }
-                if (scan.inconsistent()) {
-                    ++c_inconsistent;
+    if (auto child = imgui_ChildWindow("Details")) {
+        const char labels[2][3]{{'-', chr_0, '\0'}, {'-', chr_1, '\0'}};
+
+        // Precise vertical alignment:
+        // https://github.com/ocornut/imgui/issues/2064
+        const auto align_text = [](float height) {
+            const float off = std::max(0.0f, -1.0f + (height - ImGui::GetTextLineHeight()) / 2);
+            ImGui::SetCursorPosY(floor(ImGui::GetCursorPos().y + off));
+        };
+
+        const int zoom = 7;
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
+        par.for_each_group([&](int j, const legacy::groupT& group) {
+            if (j % 8 != 0) {
+                ImGui::SameLine(0, 12);
+            }
+            if (j != 0 && j % 64 == 0) {
+                ImGui::Separator();
+            }
+            const bool inconsistent = scanlist[j].inconsistent();
+            const legacy::codeT head = group[0];
+            const bool has_lock = scanlist[j].any_locked();
+
+            if (inconsistent) {
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0, 0, 1));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0, 0, 1));
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.9f, 0, 0, 1));
+            }
+            if (icons.button(head, zoom)) {
+                // TODO: (temp) redesigned; no "solve-conflicts" mode now
+                // (which should be done by subset-approximation)...
+                if (!ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+                    legacy::ruleT rule = mold.rule;
+                    for (legacy::codeT code : group) {
+                        rule[code] = !rule[code];
+                    }
+                    return_rule(rule);
+                } else {
+                    legacy::moldT::lockT lock = mold.lock;
+                    for (legacy::codeT code : group) {
+                        lock[code] = !has_lock;
+                    }
+                    return_lock(lock);
                 }
             }
-            // TODO: locked{all-0,all-1,inc}, unlocked{all-0,all-1...} etc...
-            ImGui::Text("Groups:%d (Locked:%d) [%c:%d] [%c:%d] [%c:%d]", c_group, c_locked, chr_0, c_0, chr_1, c_1, 'x',
-                        c_inconsistent);
-        }
+            if (inconsistent) {
+                ImGui::PopStyleColor(3);
+            }
 
-        if (auto child = imgui_ChildWindow("Details")) {
-            const char labels[2][3]{{'-', chr_0, '\0'}, {'-', chr_1, '\0'}};
-
-            // Precise vertical alignment:
-            // https://github.com/ocornut/imgui/issues/2064
-            const auto align_text = [](float height) {
-                const float off = std::max(0.0f, -1.0f + (height - ImGui::GetTextLineHeight()) / 2);
-                ImGui::SetCursorPosY(floor(ImGui::GetCursorPos().y + off));
-            };
-
-            const int zoom = 7;
-            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
-            par.for_each_group([&](int j, const legacy::groupT& group) {
-                if (j % 8 != 0) {
-                    ImGui::SameLine(0, 12);
-                }
-                if (j != 0 && j % 64 == 0) {
-                    ImGui::Separator();
-                }
-                const bool inconsistent = scanlist[j].inconsistent();
-                const legacy::codeT head = group[0];
-                const bool has_lock = scanlist[j].any_locked();
-
-                if (inconsistent) {
-                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0, 0, 1));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0, 0, 1));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.9f, 0, 0, 1));
-                }
-                if (icons.button(head, zoom)) {
-                    // TODO: (temp) redesigned; no "solve-conflicts" mode now
-                    // (which should be done by subset-approximation)...
-                    if (!ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-                        legacy::ruleT rule = mold.rule;
-                        for (legacy::codeT code : group) {
-                            rule[code] = !rule[code];
-                        }
-                        return_rule(rule);
-                    } else {
-                        legacy::moldT::lockT lock = mold.lock;
-                        for (legacy::codeT code : group) {
-                            lock[code] = !has_lock;
-                        }
-                        return_lock(lock);
+            // TODO: explain why caring about this - why not just hide the tooltip when disabled.
+            // TODO: are there better ways to present with normal alpha if in disabled block, than temporarily
+            // end-disabled?
+            if (!mask_avail) {
+                ImGui::EndDisabled();
+            }
+            if (static bool toggle = true; auto tooltip = imgui_ItemTooltip(toggle)) {
+                ImGui::Text("Group size: %d", (int)group.size());
+                const int max_to_show = 64;
+                for (int x = 0; auto code : group) {
+                    if (x++ % 8 != 0) {
+                        ImGui::SameLine();
+                    }
+                    // TODO: change color?
+                    // ImGui::GetStyle().Colors[ImGuiCol_Button]
+                    icons.image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
+                    ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                    align_text(ImGui::GetItemRectSize().y);
+                    imgui_Str(labels[masked[code]]);
+                    if (mold.lock[code]) {
+                        imgui_ItemRect(IM_COL32_WHITE, ImVec2(-2, -2));
+                    }
+                    if (x == max_to_show) {
+                        break;
                     }
                 }
-                if (inconsistent) {
-                    ImGui::PopStyleColor(3);
+                if (group.size() > max_to_show) {
+                    imgui_Str("...");
                 }
-                // TODO: currently disabled when !transform_avail (when the mask doesn't belong to the subset)...
-                if (transform_avail) {
-                    static bool toggle = true;
-                    if (auto tooltip = imgui_ItemTooltip(toggle)) {
-                        ImGui::Text("Group size: %d", (int)group.size());
-                        const int max_to_show = 64;
-                        for (int x = 0; auto code : group) {
-                            if (x++ % 8 != 0) {
-                                ImGui::SameLine();
-                            }
-                            // TODO: change color?
-                            // ImGui::GetStyle().Colors[ImGuiCol_Button]
-                            icons.image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
-                            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                            align_text(ImGui::GetItemRectSize().y);
-                            imgui_Str(labels[masked[code]]);
-                            if (mold.lock[code]) {
-                                imgui_ItemRect(IM_COL32_WHITE, ImVec2(-2, -2));
-                            }
-                            if (x == max_to_show) {
-                                break;
-                            }
-                        }
-                        if (group.size() > max_to_show) {
-                            imgui_Str("...");
-                        }
-                    }
-                }
+            }
+            if (!mask_avail) {
+                ImGui::BeginDisabled();
+            }
 
-                const float button_height = ImGui::GetItemRectSize().y;
-                ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                align_text(button_height);
-                imgui_Str(labels[masked[head]]);
+            const float button_height = ImGui::GetItemRectSize().y;
+            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+            align_text(button_height);
+            imgui_Str(labels[masked[head]]);
 
-                if (has_lock) {
-                    const ImU32 col = scanlist[j].all_locked() ? IM_COL32_WHITE : IM_COL32(128, 128, 128, 255);
-                    imgui_ItemRect(col, ImVec2(-2, -2));
-                }
-            });
-            ImGui::PopStyleVar(1);
-        }
+            if (has_lock) {
+                const ImU32 col = scanlist[j].all_locked() ? IM_COL32_WHITE : IM_COL32(128, 128, 128, 255);
+                imgui_ItemRect(col, ImVec2(-2, -2));
+            }
+        });
+        ImGui::PopStyleVar(1);
     }
-    if (!transform_avail) {
+
+    if (!mask_avail) {
         ImGui::EndDisabled();
     }
     return out;
