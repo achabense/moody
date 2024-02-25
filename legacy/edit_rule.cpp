@@ -2,8 +2,6 @@
 
 #include "common.hpp"
 
-// TODO: support rollbacking diff rules?
-
 // TODO: support navigation among enter-buttons?
 static bool enter_button(const char* label) {
     static ImGuiID bind_id = 0;
@@ -271,6 +269,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                                        "A mask is an arbitrary rule used to do XOR masking for other rules...\n"
                                        "When the rule doesn't actually belong to the selected subsets ...";
 
+        // TODO: support rollbacking custom masks?
         static legacy::maskT mask_custom{{}};
 
         // TODO: finish descriptions (use cases etc)
@@ -305,6 +304,10 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                 mask_tag = i;
             }
 
+            if (ImGui::IsItemHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+                temp_analysis_target.emplace(*mask_ptrs[i]);
+            }
+
             helper::show_help([&] {
                 // TODO: will unpaired push like this cause leakage? (is the style-stack regularly cleared, or will
                 // this accumulate?)
@@ -313,8 +316,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                 imgui_Str(legacy::to_MAP_str(*mask_ptrs[i]));
                 ImGui::Separator();
                 imgui_Str(about_mask);
-
-                temp_analysis_target.emplace(*mask_ptrs[i]);
             });
         }
 
@@ -334,24 +335,27 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         return *mask_ptrs[mask_tag];
     }();
 
-    const bool mask_avail = subset.contains(mask);
-    const bool compatible = legacy::compatible(subset, mold);
-    const bool contained = subset.contains(mold.rule);
-    assert(!contained || compatible); // contained -> compatible
-
-    // Disable all edit operations if !mask_avail, including those that do not really need
-    // the mask to be valid (or even do not depend on subset utils).
+    // Disable all edit operations if !subset.contains(mask), including those that do not really need
+    // the mask to be valid (or even do not depend on subsetT).
     // (These operations include: ... TODO: list all)
     // This makes sense as:
     // 1. Such operations are not many, and they are typically used in combination with those that
     // do need correct masks.
     // 2. The program already provides a way to get always-usable mask (the "native" mode).
-    if (!mask_avail) {
-        ImGui::BeginDisabled();
+    if (!subset.contains(mask)) {
+        ImGui::Separator();
+        // TODO: complete message. other suggestions.
+        imgui_StrWrapped(
+            "This mask (?rule?) doesn't belong to the selected subsets. Try other masks ... the \"Native\" mask will "
+            "always work... Right-click the masks to see what subsets they apply to.");
+        // TODO: the native and custom mode has mutable mask, will the temp-analysis be misleading for them?
+        return std::nullopt;
     }
 
-    // TODO: !!! explain && redesign this part... not always meaningful...
-    // TODO: about mask vs subset.get_mask()...
+    const bool compatible = legacy::compatible(subset, mold);
+    const bool contained = subset.contains(mold.rule);
+    assert(!contained || compatible); // contained -> compatible
+
     const legacy::ruleT_masked masked = mask ^ mold.rule;
     const auto scanlist = legacy::scan(par, masked, mold.lock);
     const auto [c_free, c_locked_0, c_locked_1] = [&] {
@@ -501,7 +505,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             if (j != 0 && j % 64 == 0) {
                 ImGui::Separator();
             }
-            // TODO: if the mask doesn't belong to the subset the coloring scheme doe not make sense here...
             const bool inconsistent = scanlist[j].inconsistent();
             const legacy::codeT head = group[0];
             const bool has_lock = scanlist[j].any_locked();
@@ -532,12 +535,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                 ImGui::PopStyleColor(3);
             }
 
-            // TODO: explain why caring about this - why not just hide the tooltip when disabled.
-            // TODO: are there better ways to present with normal alpha if in disabled block, than temporarily
-            // end-disabled?
-            if (!mask_avail) {
-                ImGui::EndDisabled();
-            }
             if (static bool toggle = true; auto tooltip = imgui_ItemTooltip(toggle)) {
                 ImGui::Text("Group size: %d", (int)group.size());
                 const int max_to_show = 64;
@@ -562,9 +559,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                     imgui_Str("...");
                 }
             }
-            if (!mask_avail) {
-                ImGui::BeginDisabled();
-            }
 
             const float button_height = ImGui::GetItemRectSize().y;
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
@@ -579,9 +573,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         ImGui::PopStyleVar(1);
     }
 
-    if (!mask_avail) {
-        ImGui::EndDisabled();
-    }
     return out;
 }
 
