@@ -68,8 +68,19 @@ public:
     void update(const legacy::moldT& mold) {
         const legacy::compressT cmpr = legacy::compress(mold);
         if (cmpr != m_record[m_pos]) {
-            m_record.push_back(cmpr);
-            set_last();
+            const int last = size() - 1;
+            if (m_pos == last && last != 0 && cmpr == m_record[last - 1]) {
+                m_pos = last - 1;
+            } else if (m_pos == last - 1 && cmpr == m_record[last]) {
+                m_pos = last;
+            } else {
+                // TODO: or reverse([m_pos]...[last])? or do nothing?
+                if (m_pos != last) {
+                    std::swap(m_record[m_pos], m_record[last]);
+                }
+                m_record.push_back(cmpr);
+                set_last();
+            }
         }
     }
 

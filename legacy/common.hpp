@@ -37,6 +37,7 @@ inline std::mt19937& global_mt19937() {
 }
 
 // TODO: look for better names for tile_image and code_image.
+// TODO: screen_image?
 class tile_image {
     int m_w, m_h;
     ImTextureID m_texture;
@@ -54,6 +55,7 @@ public:
     ImTextureID texture() const { return m_texture; }
 };
 
+// TODO: code_icons?
 class code_image {
     ImTextureID m_texture;
 

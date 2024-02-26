@@ -3,6 +3,7 @@
 #include "rule.hpp"
 
 namespace legacy {
+    // TODO: use ruleT directly?
     // A maskT is a ruleT used to do XOR mask for other rules.
     // The result reflects how the rule is different from the masking rule.
     struct maskT : public ruleT {};
@@ -448,10 +449,10 @@ namespace legacy {
         return res;
     }
 
+    // TODO: better name...
     // TODO: explain...
-    inline ruleT randomize(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand, int count) {
-        assert(compatible(subset, mold));
-
+    inline ruleT randomize_c(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand,
+                             int count) {
         return transform(subset, mask, mold, [&rand, count](bool* begin, bool* end) {
             int c = std::clamp(count, 0, int(end - begin));
             std::fill(begin, end, 0);
@@ -460,11 +461,8 @@ namespace legacy {
         });
     }
 
-    // TODO: rename...
-    inline ruleT randomize_v2(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand,
-                              double density) {
-        assert(compatible(subset, mold));
-
+    inline ruleT randomize_d(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand,
+                             double density) {
         return transform(subset, mask, mold, [&rand, density](bool* begin, bool* end) {
             std::bernoulli_distribution dist(std::clamp(density, 0.0, 1.0));
             std::generate(begin, end, [&] { return dist(rand); });
@@ -479,17 +477,14 @@ namespace legacy {
     }
 #endif
 
+    // TODO: better name: seq_integral / seq_perm
     // TODO: rename to [set_]first / ...
     struct act_int {
         static ruleT first(const subsetT& subset, const maskT& mask, const moldT& mold) {
-            assert(compatible(subset, mold));
-
             return transform(subset, mask, mold, [](bool* begin, bool* end) { std::fill(begin, end, 0); });
         }
 
         static ruleT last(const subsetT& subset, const maskT& mask, const moldT& mold) {
-            assert(compatible(subset, mold));
-
             return transform(subset, mask, mold, [](bool* begin, bool* end) { std::fill(begin, end, 1); });
         }
 

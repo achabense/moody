@@ -107,6 +107,7 @@ int main(int, char**) {
     SDL_SetHint(SDL_HINT_IME_SHOW_UI, "1");
 #endif
 
+    // TODO: "MAP explorer"?
     // Create window with SDL_Renderer graphics context
     const SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     window = SDL_CreateWindow("Rule editor", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);

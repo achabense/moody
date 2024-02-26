@@ -297,6 +297,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
 
         ImGui::AlignTextToFramePadding();
         imgui_Str("Mask");
+        helper::show_help(about_mask);
+
         for (int i = 0; i < 4; ++i) {
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
 
@@ -314,8 +316,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                 // ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 1.0);
                 imgui_Str(mask_descriptions[i]);
                 imgui_Str(legacy::to_MAP_str(*mask_ptrs[i]));
-                ImGui::Separator();
-                imgui_Str(about_mask);
             });
         }
 
@@ -388,36 +388,29 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
     }
 
     {
-        // TODO: refine (better names etc)...
         static bool exact_mode = true;
-
-        if (ImGui::Button(std::format("Mode = {}###Mode", exact_mode ? "Exact" : "Dens ").c_str())) {
+        if (ImGui::Button(std::format("{}###Mode", exact_mode ? "Exactly" : "Around ").c_str())) {
             exact_mode = !exact_mode;
         }
 
         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-        if (exact_mode) {
-            // TODO: still unstable between partition switches...
-            // TODO: not meaningful when !compatible.
-            static int rcount = 0.5 * par.k(); // Distance to the mask.
 
-            // TODO: refine sliding effect...
-            ImGui::SetNextItemWidth(item_width);
-            imgui_StepSliderInt("##Quantity", &rcount, 0, par.k());
-            rcount = std::clamp(rcount, c_locked_1, c_locked_1 + c_free);
-            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-            if (enter_button("Randomize")) {
-                return_rule(legacy::randomize(subset, mask, mold, global_mt19937(), rcount - c_locked_1));
-            }
-        } else {
-            // TODO: redesign...
-            ImGui::SetNextItemWidth(item_width);
-            static float density = 0.5;
-            ImGui::SliderFloat("##Density", &density, 0, 1, std::format("Around {}", round(density * par.k())).c_str(),
-                               ImGuiSliderFlags_NoInput);
-            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-            if (enter_button("Randomize")) {
-                return_rule(legacy::randomize_v2(subset, mask, mold, global_mt19937(), density));
+        // TODO (temp) finally this is stable...
+        // TODO: explain; better name...
+        static double density = 0.5;
+        int rcount = c_locked_1 + round(density * c_free);
+
+        ImGui::SetNextItemWidth(item_width);
+        if (imgui_StepSliderInt("##Quantity", &rcount, c_locked_1, c_locked_1 + c_free) && c_free != 0) {
+            density = double(rcount - c_locked_1) / c_free;
+            assert(c_locked_1 + round(density * c_free) == rcount);
+        }
+        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+        if (enter_button("Randomize")) {
+            if (exact_mode) {
+                return_rule(legacy::randomize_c(subset, mask, mold, global_mt19937(), rcount - c_locked_1));
+            } else {
+                return_rule(legacy::randomize_d(subset, mask, mold, global_mt19937(), density));
             }
         }
     }
