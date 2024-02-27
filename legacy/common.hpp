@@ -31,8 +31,9 @@ inline void assert_utf8_encoding() {
 using std::chrono_literals::operator""ms;
 using clockT = std::chrono::steady_clock;
 
+// TODO: switch to mt19937_64?
 inline std::mt19937& global_mt19937() {
-    static std::mt19937 rand(time(0));
+    static std::mt19937 rand{(uint32_t)time(0)};
     return rand;
 }
 
@@ -187,6 +188,7 @@ public:
     }
 };
 
+// TODO: override the transparency? (so will be normally displayed even in disabled block...)
 // TODO: better name... app_helper? (is this program an "app"?)
 class helper {
     friend void frame_main(const code_image&, tile_image&);
@@ -194,6 +196,7 @@ class helper {
     // static inline bool toggle = true; // TODO: add a toggle?
 
 public:
+    // TODO: return enable_help? specify helpmark?
     static void show_help(const std::invocable<> auto& desc, bool sameline = true) {
         if (enable_help) {
             if (sameline) {

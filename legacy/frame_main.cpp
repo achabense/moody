@@ -116,14 +116,13 @@ static void assign_val(legacy::moldT& mold, legacy::extrT::valT& val) {
 }
 
 void frame_main(const code_image& icons, tile_image& img) {
-    static recorderT recorder;
+    messenger::display();
 
 #ifndef NDEBUG
     ImGui::ShowDemoWindow();
 #endif
 
-    messenger::display();
-
+    static recorderT recorder;
     legacy::moldT current = recorder.current();
     bool update = false;
 
@@ -162,49 +161,57 @@ void frame_main(const code_image& icons, tile_image& img) {
             helper::enable_help = !helper::enable_help;
         }
 
-        ImGui::Checkbox("\"help\"", &helper::enable_help);
+        ImGui::Checkbox("\"Help\"", &helper::enable_help);
         helper::show_help("Or press 'H' to toggle this mode.");
         ImGui::SameLine();
         ImGui::Checkbox("\"Load\"", &show_load);
         ImGui::SameLine();
         ImGui::Checkbox("\"Static\"", &show_static);
+        // TODO: not very useful... show time-since-startup instead?
+        // ImGui::SameLine();
+        // ImGui::Text("    (%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
+        // TODO: (temp) added back; remove when pasting is supported by load_rule...
         ImGui::SameLine();
-        ImGui::Text("    (%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
+        if (ImGui::Button("Paste")) {
+            if (const char* str = ImGui::GetClipboardText()) {
+                if (auto out = legacy::extract_MAP_str(std::string_view(str)).val) {
+                    assign_val(current, *out);
+                    update = true;
+                } else {
+                    messenger::add_msg("No rule");
+                }
+            }
+        }
+        ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
+        // TODO: simplify? unlike the one in fileT::display, this is mainly for undo/redo...
+        iter_group(
+            "<|", "prev", "next", "|>", //
+            [&] { recorder.set_first(); }, [&] { recorder.set_prev(); }, [&] { recorder.set_next(); },
+            [&] { recorder.set_last(); });
+        ImGui::SameLine();
+        ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1); // TODO: +1 is clumsy
+        ImGui::SameLine();
+        if (ImGui::Button("Clear")) {
+            recorder.clear();
+        }
 
         // TODO: as `current` may have been changed by static_constraints, `current` may have been out-of-sync with
         // recorder at this frame... Does this matter?
         {
-            const std::string rule_str = legacy::to_MAP_str(current.rule);
-
             // TODO: add a shortcut for quick rule-saving...
             // (As the rule may be gotten from enter-bound buttons)
-            imgui_StrCopyable(rule_str, imgui_Str);
-            helper::show_help("Current rule. You can right-click the text to copy to the clipboard.");
-
-            // TODO: temp...
-            if (ImGui::Button("Copy rule+lock")) {
-                ImGui::SetClipboardText(legacy::to_MAP_str(current).c_str());
-            }
-            ImGui::SameLine();
-            // TODO: (temp) added back; remove when pasting is supported by load_rule...
-            if (ImGui::Button("Paste")) {
-                if (const char* str = ImGui::GetClipboardText()) {
-                    if (auto out = legacy::extract_MAP_str(std::string_view(str)).val) {
-                        assign_val(current, *out);
-                        update = true;
-                    }
-                }
-            }
-            ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
-            ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1); // TODO: +1 is clumsy
-            ImGui::SameLine();
-            iter_group(
-                "<|", "prev", "next", "|>", //
-                [&] { recorder.set_first(); }, [&] { recorder.set_prev(); }, [&] { recorder.set_next(); },
-                [&] { recorder.set_last(); });
-            ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
-            if (ImGui::Button("Clear")) {
-                recorder.clear();
+            static bool with_lock = false;
+            if (with_lock) {
+                imgui_StrCopyable(legacy::to_MAP_str(current), imgui_Str);
+                with_lock = ImGui::IsItemHovered();
+            } else {
+                // TODO: relying on "[lock]" not to be hidden...
+                imgui_StrCopyable(legacy::to_MAP_str(current.rule), imgui_Str);
+                // TODO: about lock...
+                helper::show_help("Current rule. You can hover on the text and right-click to copy to the clipboard.");
+                ImGui::SameLine();
+                imgui_StrDisabled("[lock]");
+                with_lock = ImGui::IsItemHovered();
             }
         }
 

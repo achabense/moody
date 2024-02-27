@@ -271,15 +271,15 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
         ImGui::EndDisabled();
         ImGui::SameLine();
         ImGui::PushButtonRepeat(true);
-        // TODO: visual feedback...
         if (ImGui::Button("+1")) {
             extra = 1;
         }
-        ImGui::SameLine();
-        // TODO: +p is not quite useful if not paused...
-        // TODO: The usage of format looks wasteful...
-        if (ImGui::Button(std::format("+p({})###+p", ctrl.actual_pace()).c_str())) {
-            extra = ctrl.actual_pace();
+        if (ctrl.pause) {
+            ImGui::SameLine();
+            // TODO: The usage of format looks wasteful...
+            if (ImGui::Button(std::format("+p({})###+p", ctrl.actual_pace()).c_str())) {
+                extra = ctrl.actual_pace();
+            }
         }
         ImGui::PopButtonRepeat();
         ImGui::SameLine();
