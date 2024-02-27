@@ -1,62 +1,13 @@
 #include "common.hpp"
 
-// TODO: (temp) moved from rule.hpp, this appears not a too-general functionality.
-// TODO: move out of namespace legacy?
-namespace legacy {
-    // TODO: rename...
-    struct compressT {
-        std::array<uint8_t, 64> bits_rule{}, bits_lock{}; // as bitset.
-
-        friend bool operator==(const compressT&, const compressT&) = default;
-        struct hashT {
-            size_t operator()(const compressT& cmpr) const {
-                // ~ not UB.
-                return std::hash<std::string_view>{}(
-                    std::string_view(reinterpret_cast<const char*>(&cmpr), sizeof(cmpr)));
-            }
-        };
-    };
-
-    static compressT compress(const moldT& mold) {
-        compressT cmpr{};
-        for_each_code([&](codeT code) {
-            cmpr.bits_rule[code / 8] |= mold.rule[code] << (code % 8);
-            cmpr.bits_lock[code / 8] |= mold.lock[code] << (code % 8);
-        });
-        return cmpr;
-    }
-
-    static moldT decompress(const compressT& cmpr) {
-        moldT mold{};
-        for_each_code([&](codeT code) {
-            mold.rule[code] = (cmpr.bits_rule[code / 8] >> (code % 8)) & 1;
-            mold.lock[code] = (cmpr.bits_lock[code / 8] >> (code % 8)) & 1;
-        });
-        return mold;
-    }
-
-#ifdef ENABLE_TESTS
-    namespace _tests {
-        static const testT test_compressT = [] {
-            moldT mold{};
-            for_each_code([&](codeT code) {
-                mold.rule[code] = testT::rand() & 1;
-                mold.lock[code] = testT::rand() & 1;
-            });
-            assert(decompress(compress(mold)) == mold);
-        };
-    }  // namespace _tests
-#endif // ENABLE_TESTS
-} // namespace legacy
-
 // Never empty.
 class recorderT {
-    std::vector<legacy::compressT> m_record;
+    std::vector<legacy::moldT> m_record;
     int m_pos;
 
 public:
     recorderT() {
-        m_record.push_back(legacy::compress({legacy::game_of_life()}));
+        m_record.push_back({.rule = legacy::game_of_life(), .lock{}});
         m_pos = 0;
     }
 
@@ -66,19 +17,18 @@ public:
     int pos() const { return m_pos; }
 
     void update(const legacy::moldT& mold) {
-        const legacy::compressT cmpr = legacy::compress(mold);
-        if (cmpr != m_record[m_pos]) {
+        if (mold != m_record[m_pos]) {
             const int last = size() - 1;
-            if (m_pos == last && last != 0 && cmpr == m_record[last - 1]) {
+            if (m_pos == last && last != 0 && mold == m_record[last - 1]) {
                 m_pos = last - 1;
-            } else if (m_pos == last - 1 && cmpr == m_record[last]) {
+            } else if (m_pos == last - 1 && mold == m_record[last]) {
                 m_pos = last;
             } else {
                 // TODO: or reverse([m_pos]...[last])? or do nothing?
                 if (m_pos != last) {
                     std::swap(m_record[m_pos], m_record[last]);
                 }
-                m_record.push_back(cmpr);
+                m_record.push_back(mold);
                 set_last();
             }
         }
@@ -86,7 +36,7 @@ public:
 
     legacy::moldT current() const {
         assert(m_pos >= 0 && m_pos < size());
-        return legacy::decompress(m_record[m_pos]);
+        return m_record[m_pos];
     }
 
     void set_next() { set_pos(m_pos + 1); }
