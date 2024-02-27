@@ -10,6 +10,10 @@
 #include <string>
 #include <vector>
 
+// Must: Must be done before initial release.
+// TODO: (Must) better name for namespace `legacy`.
+// TODO: (Must) remove outdated TODOs.
+
 #ifndef NDEBUG
 #define ENABLE_TESTS
 #endif // !NDEBUG
@@ -27,11 +31,12 @@ namespace legacy {
     }  // namespace _tests
 #endif // ENABLE_TESTS
 
-    // TODO: make the state of the cell strongly-typed (and maybe not use bool as underlying type)?
-    // (This will entails a lot of casts but will make the concepts clearer)
-    // enum class cellT : bool {};
+    // TODO: make cell-state strongly-typed?
+    // (This will entail a lot of casts, but if applied successfully will make logics clearer, and the underlying
+    // type can be different from `bool`.)
+    // enum class cellT : uint8_t {};
 
-    // The state of `s` and its neighbors.
+    // The state of cell `s` and its neighbors.
     // (The variables are named after the keys in the qwerty keyboard.)
     struct situT {
         bool q, w, e;
@@ -39,7 +44,6 @@ namespace legacy {
         bool z, x, c;
     };
 
-    // TODO: remove remaining direct use of "512"...
     // `situT` encoded as an integer.
     struct codeT {
         int val;
@@ -106,7 +110,7 @@ namespace legacy {
     }  // namespace _tests
 #endif // ENABLE_TESTS
 
-    // Map `codeT` (essentially `situT`) to the value `s` become at next generation.
+    // Map `situT` (represented by `codeT`) to the value `s` become at next generation.
     class ruleT {
         codeT::map_to<bool> m_map{};
 
@@ -195,17 +199,16 @@ namespace legacy {
 
         // https://golly.sourceforge.io/Help/Algorithms/QuickLife.html
         // "MAP string" is based on `q * 256 + w * 128 + ...` encoding scheme, which differs from `codeT`'s.
-        // TODO: better name...
-        inline int re_encode(const situT& situ) {
+        inline int encode_MAP(const situT& situ) {
             const auto [q, w, e, a, s, d, z, x, c] = situ;
             return q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1;
         }
 
-        inline void to_base64(std::string& str, const auto& source /* ruleT or lockT */) {
-            bool data[512]{}; // `situT` is encoded using `q * 256 + w * 128 + ... + c * 1`.
-            for_each_code([&](codeT code) { data[re_encode(decode(code))] = source[code]; });
+        inline void to_MAP(std::string& str, const auto& source /* ruleT or lockT */) {
+            bool MAP_data[512]{};
+            for_each_code([&](codeT code) { MAP_data[encode_MAP(decode(code))] = source[code]; });
 
-            const auto get = [&data](int i) { return i < 512 ? data[i] : 0; };
+            const auto get = [&MAP_data](int i) { return i < 512 ? MAP_data[i] : 0; };
             for (int i = 0; i < 512; i += 6) {
                 const uint8_t b6 = (get(i + 5) << 0) | (get(i + 4) << 1) | (get(i + 3) << 2) | (get(i + 2) << 3) |
                                    (get(i + 1) << 4) | (get(i + 0) << 5);
@@ -213,17 +216,17 @@ namespace legacy {
             }
         }
 
-        inline void from_base64(std::string_view str, auto& dest /* ruleT or lockT */) {
-            bool data[512]{}; // `situT` is encoded using `q * 256 + w * 128 + ... + c * 1`.
-            auto put = [&data](int i, bool b) {
+        inline void from_MAP(std::string_view str, auto& dest /* ruleT or lockT */) {
+            bool MAP_data[512]{};
+            auto put = [&MAP_data](int i, bool b) {
                 if (i < 512) {
-                    data[i] = b;
+                    MAP_data[i] = b;
                 }
             };
 
-            int chp = 0;
+            int pos = 0;
             for (int i = 0; i < 512; i += 6) {
-                const uint8_t b6 = from_base64(str[chp++]);
+                const uint8_t b6 = from_base64(str[pos++]);
                 put(i + 5, (b6 >> 0) & 1);
                 put(i + 4, (b6 >> 1) & 1);
                 put(i + 3, (b6 >> 2) & 1);
@@ -232,22 +235,22 @@ namespace legacy {
                 put(i + 0, (b6 >> 5) & 1);
             }
 
-            for_each_code([&](codeT code) { dest[code] = data[re_encode(decode(code))]; });
+            for_each_code([&](codeT code) { dest[code] = MAP_data[encode_MAP(decode(code))]; });
         }
     } // namespace _misc
 
     // Convert ruleT to a "MAP rule" string.
     inline std::string to_MAP_str(const ruleT& rule) {
         std::string str = "MAP";
-        _misc::to_base64(str, rule);
+        _misc::to_MAP(str, rule);
         return str;
     }
 
     inline std::string to_MAP_str(const moldT& mold) {
         std::string str = "MAP";
-        _misc::to_base64(str, mold.rule);
+        _misc::to_MAP(str, mold.rule);
         str += " [";
-        _misc::to_base64(str, mold.lock);
+        _misc::to_MAP(str, mold.lock);
         str += "]";
         return str;
     }
@@ -276,9 +279,9 @@ namespace legacy {
             extr.prefix = {match.prefix().first, match.prefix().second};
             extr.suffix = {match.suffix().first, match.suffix().second};
 
-            _misc::from_base64({match[1].first, match[1].second}, extr.val.emplace().rule);
+            _misc::from_MAP({match[1].first, match[1].second}, extr.val.emplace().rule);
             if (match[3].matched) {
-                _misc::from_base64({match[3].first, match[3].second}, extr.val->lock.emplace());
+                _misc::from_MAP({match[3].first, match[3].second}, extr.val->lock.emplace());
             }
         } else {
             extr.prefix = {begin, end};

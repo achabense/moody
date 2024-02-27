@@ -93,6 +93,5 @@
   <ItemGroup>
     <None Include=".clang-format" />
     <None Include="README.md" />
-    <None Include="TODOS.md" />
   </ItemGroup>
 </Project>

@@ -126,7 +126,7 @@ int main(int, char**) {
     }
 
     // Setup Dear ImGui context
-    IMGUI_CHECKVERSION();
+    IMGUI_CHECKVERSION(); // TODO: where is this needed? should every source-file add this check?
     ImGui::CreateContext();
 
     // TODO: Currently the controls of the program are poorly designed, and are especially not taking

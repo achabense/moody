@@ -92,7 +92,7 @@ namespace legacy {
         int height() const { return m_size.height; }
         int area() const { return m_size.width * m_size.height; }
 
-        rangeT range() const { return {{0, 0}, {.x = m_size.width, .y = m_size.height}}; }
+        rangeT entire_range() const { return {{0, 0}, {.x = m_size.width, .y = m_size.height}}; }
         bool has_range(const rangeT& range) const {
             const auto& [begin, end] = range;
             return 0 <= begin.x && begin.x <= end.x && end.x <= m_size.width && //
@@ -258,7 +258,7 @@ namespace legacy {
 
     inline int count(const tileT& tile, const rangeT_opt& range = {}) {
         int c = 0;
-        tile.for_each_line(range.value_or(tile.range()), [&c](std::span<const bool> line) {
+        tile.for_each_line(range.value_or(tile.entire_range()), [&c](std::span<const bool> line) {
             for (bool v : line) {
                 c += v;
             }
@@ -272,7 +272,7 @@ namespace legacy {
     inline void copy(tileT& dest, tileT::posT d_begin, const tileT& source, const rangeT_opt& s_range_ = {}) {
         assert(&source != &dest);
 
-        const tileT::rangeT s_range = s_range_.value_or(source.range());
+        const tileT::rangeT s_range = s_range_.value_or(source.entire_range());
         assert(dest.has_range({d_begin, d_begin + s_range.size()}));
 
         source.for_each_line(s_range, [&dest, &d_begin](int y, std::span<const bool> line) {
@@ -294,7 +294,7 @@ namespace legacy {
     // Is this worthwhile? Fall back to bernoulli_distribution instead?
     inline void random_fill(tileT& tile, std::mt19937& rand, double density, const rangeT_opt& range = {}) {
         const uint32_t c = std::mt19937::max() * std::clamp(density, 0.0, 1.0);
-        tile.for_each_line(range.value_or(tile.range()), [&](std::span<bool> line) { //
+        tile.for_each_line(range.value_or(tile.entire_range()), [&](std::span<bool> line) { //
             std::ranges::generate(line, [&] { return rand() < c; });
         });
     }
@@ -303,10 +303,9 @@ namespace legacy {
         tile.for_each_line(range, [v](std::span<bool> line) { std::ranges::fill(line, v); });
     }
 
-    // TODO: mixture of tile.range() and range arg looks confusing... rename.
     inline void clear_outside(tileT& tile, const tileT::rangeT& range /* Required */, const bool v = 0) {
         assert(tile.has_range(range));
-        tile.for_each_line(tile.range(), [&](int y, std::span<bool> line) {
+        tile.for_each_line(tile.entire_range(), [&](int y, std::span<bool> line) {
             if (y < range.begin.y || y >= range.end.y) {
                 std::ranges::fill(line, v);
             } else {
@@ -352,7 +351,7 @@ namespace legacy {
         // (wontfix) consecutive '$'s are not combined.
         std::string str;
         size_t last_nl = 0;
-        tile.for_each_line(range.value_or(tile.range()), [&str, &last_nl](int y, std::span<const bool> line) {
+        tile.for_each_line(range.value_or(tile.entire_range()), [&str, &last_nl](int y, std::span<const bool> line) {
             if (y != 0) {
                 str += '$';
             }
@@ -386,7 +385,7 @@ namespace legacy {
     }
 
     inline std::string to_RLE_str(const ruleT& rule, const tileT& tile, const rangeT_opt& range_ = {}) {
-        const tileT::rangeT range = range_.value_or(tile.range());
+        const tileT::rangeT range = range_.value_or(tile.entire_range());
         return std::format("x = {}, y = {}, rule = {}\n{}!", range.width(), range.height(), to_MAP_str(rule),
                            to_RLE_str(tile, range));
     }

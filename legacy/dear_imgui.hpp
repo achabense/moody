@@ -113,10 +113,7 @@ struct [[nodiscard]] imgui_Window {
     imgui_Window& operator=(const imgui_Window&) = delete;
 
     const bool visible;
-    // TODO: refine interface and documentation
-    explicit imgui_Window(const char* name, ImGuiWindowFlags flags = {})
-        : visible(ImGui::Begin(name, nullptr, flags)) {}
-    explicit imgui_Window(const char* name, bool* p_open, ImGuiWindowFlags flags = {})
+    explicit imgui_Window(const char* name, bool* p_open = nullptr, ImGuiWindowFlags flags = {})
         : visible(ImGui::Begin(name, p_open, flags)) {}
     ~imgui_Window() {
         ImGui::End(); // Unconditional.
@@ -138,8 +135,7 @@ struct [[nodiscard]] imgui_ChildWindow {
     explicit operator bool() const { return visible; }
 };
 
-// TODO: this is not a general utility, the only place that really needs toggling may be
-// the space zooming window...
+// TODO: Move to common.h as this is not "general" enough...
 class [[nodiscard]] imgui_ItemTooltip {
     bool begun = false;
 
@@ -169,3 +165,19 @@ public:
 
     explicit operator bool() const { return begun; }
 };
+
+#if 0
+// TODO: or this?
+inline bool imgui_BeginItemTooltip(bool& toggle) {
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
+        // TODO: still have slight control conflicts...
+        if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Right)) {
+            toggle = !toggle;
+        }
+
+        return toggle && ImGui::BeginTooltip();
+    }
+
+    return false;
+}
+#endif

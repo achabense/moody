@@ -1,5 +1,9 @@
 #include "common.hpp"
 
+// TODO: (Must) add "About" window.
+// TODO: (Must) add help-mode coverage.
+
+// TODO: improve recorder logic (especially `update`...)
 // Never empty.
 class recorderT {
     std::vector<legacy::moldT> m_record;
@@ -80,7 +84,7 @@ void frame_main(const code_image& icons, tile_image& img) {
     static bool show_static = false;
 
     if (show_load) {
-        // TODO: this should be controlled by load_rule ...
+        // TODO: which is responsible for setting Size(Constraints)? frame_main or load_rule?
         ImGui::SetNextWindowSize({600, 400}, ImGuiCond_FirstUseEver);
         ImGui::SetNextWindowSizeConstraints(ImVec2(400, 200), ImVec2(FLT_MAX, FLT_MAX));
         if (auto window = imgui_Window("Load rule", &show_load, ImGuiWindowFlags_NoCollapse)) {
@@ -106,7 +110,7 @@ void frame_main(const code_image& icons, tile_image& img) {
 
     ImGui::SetNextWindowPos(viewport->WorkPos);
     ImGui::SetNextWindowSize(viewport->WorkSize);
-    if (auto window = imgui_Window("Main", flags)) {
+    if (auto window = imgui_Window("Main", nullptr, flags)) {
         if (imgui_KeyPressed(ImGuiKey_H, false)) {
             helper::enable_help = !helper::enable_help;
         }
@@ -117,10 +121,9 @@ void frame_main(const code_image& icons, tile_image& img) {
         ImGui::Checkbox("\"Load\"", &show_load);
         ImGui::SameLine();
         ImGui::Checkbox("\"Static\"", &show_static);
-        // TODO: not very useful... show time-since-startup instead?
-        // ImGui::SameLine();
+        // TODO: whether to show FPS/Framecount? whether to show time-since-startup?
         // ImGui::Text("    (%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
-        // TODO: (temp) added back; remove when pasting is supported by load_rule...
+        // TODO: (Must) remove paste button; formally support pasting in load_rule part.
         ImGui::SameLine();
         if (ImGui::Button("Paste")) {
             if (const char* str = ImGui::GetClipboardText()) {
@@ -145,8 +148,8 @@ void frame_main(const code_image& icons, tile_image& img) {
             recorder.clear();
         }
 
-        // TODO: as `current` may have been changed by static_constraints, `current` may have been out-of-sync with
-        // recorder at this frame... Does this matter?
+        // TODO: whether to do set_*(next etc) / update current eagerly during the frame?
+        // (whether to postpone after gui logics?)
         {
             // TODO: reconsider how to show help for the rule string...
             // TODO: about lock...
@@ -164,7 +167,7 @@ void frame_main(const code_image& icons, tile_image& img) {
                 imgui_StrCopyable(legacy::to_MAP_str(current.rule), imgui_Str);
                 ImGui::SameLine(0, ImGui::CalcTextSize(" ").x - 1); // TODO: about -1...
                 std::string lock_str = "[";
-                legacy::_misc::to_base64(lock_str, current.lock); // TODO: avoid raw calls like this...
+                legacy::_misc::to_MAP(lock_str, current.lock); // TODO: avoid raw calls like this...
                 lock_str += "]";
                 imgui_StrDisabled(lock_str);
                 with_lock = ImGui::IsItemHovered();
@@ -182,7 +185,8 @@ void frame_main(const code_image& icons, tile_image& img) {
                     update = true;
                 }
 
-                // TODO: This is used to pair with enter key and is somewhat broken...
+                // TODO: (Must) every key-control must be documented in the help mode...
+                // TODO: better control...
                 if (imgui_KeyPressed(ImGuiKey_Semicolon, true)) {
                     recorder.set_prev();
                 }
