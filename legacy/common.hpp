@@ -196,8 +196,10 @@ class helper {
     // static inline bool toggle = true; // TODO: add a toggle?
 
 public:
-    // TODO: return enable_help? specify helpmark?
-    static void show_help(const std::invocable<> auto& desc, bool sameline = true) {
+    // TODO: (temp) returning `enable_help` as an awkward workaround to detect whether the helpmark is shown (to decide
+    // whether to call sameline when the helpmark is shown before the widget...)... redesign if possible...
+    // TODO: specify helpmark?
+    static bool show_help(const std::invocable<> auto& desc, bool sameline = true) {
         if (enable_help) {
             if (sameline) {
                 ImGui::SameLine(0, 0); // TODO: reconsider spacing when help mode is mostly finished...
@@ -211,9 +213,10 @@ public:
                 ImGui::EndTooltip();
             }
         }
+        return enable_help;
     }
 
-    static void show_help(const char* desc, bool sameline = true) { //
-        show_help([desc] { imgui_Str(desc); }, sameline);
+    static bool show_help(const char* desc, bool sameline = true) { //
+        return show_help([desc] { imgui_Str(desc); }, sameline);
     }
 };

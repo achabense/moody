@@ -527,11 +527,11 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
             // TODO: what if clicked from outside into the canvas?
             // TODO: precedence against left-clicking?
             if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-                // ctrl.pause = true;
                 sel.select_0.x = std::clamp(celx, 0, tile_size.width - 1);
                 sel.select_0.y = std::clamp(cely, 0, tile_size.height - 1);
             }
             if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+                ctrl.pause2 = true; // TODO: works poorly with double-rclick toggling...
                 sel.select_1.x = std::clamp(celx, 0, tile_size.width - 1);
                 sel.select_1.y = std::clamp(cely, 0, tile_size.height - 1);
             }

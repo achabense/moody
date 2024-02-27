@@ -148,6 +148,12 @@ void frame_main(const code_image& icons, tile_image& img) {
         // TODO: as `current` may have been changed by static_constraints, `current` may have been out-of-sync with
         // recorder at this frame... Does this matter?
         {
+            // TODO: reconsider how to show help for the rule string...
+            // TODO: about lock...
+            if (helper::show_help("Current rule. You can hover on the text and right-click to copy to the clipboard.",
+                                  false)) {
+                ImGui::SameLine(0, 0);
+            }
             // TODO: add a shortcut for quick rule-saving...
             // (As the rule may be gotten from enter-bound buttons)
             static bool with_lock = false;
@@ -155,12 +161,12 @@ void frame_main(const code_image& icons, tile_image& img) {
                 imgui_StrCopyable(legacy::to_MAP_str(current), imgui_Str);
                 with_lock = ImGui::IsItemHovered();
             } else {
-                // TODO: relying on "[lock]" not to be hidden...
                 imgui_StrCopyable(legacy::to_MAP_str(current.rule), imgui_Str);
-                // TODO: about lock...
-                helper::show_help("Current rule. You can hover on the text and right-click to copy to the clipboard.");
-                ImGui::SameLine();
-                imgui_StrDisabled("[lock]");
+                ImGui::SameLine(0, ImGui::CalcTextSize(" ").x - 1); // TODO: about -1...
+                std::string lock_str = "[";
+                legacy::_misc::to_base64(lock_str, current.lock); // TODO: avoid raw calls like this...
+                lock_str += "]";
+                imgui_StrDisabled(lock_str);
                 with_lock = ImGui::IsItemHovered();
             }
         }
