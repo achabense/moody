@@ -276,7 +276,6 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
         if (ImGui::Button("Restart") || imgui_KeyPressed(ImGuiKey_R, false)) {
             should_restart = true;
         }
-        // TODO: canvas size, selected size, paste size...
     }
 
     ImGui::BeginGroup();
@@ -400,6 +399,8 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
     }
     ImGui::EndGroup();
 
+    ImGui::Separator();
+
     // TODO: set pattern as init state? what if size is already changed?
     // TODO: specify mouse-dragging behavior (especially, no-op must be an option)
     // TODO: range-selected randomization don't need fixed seed. However, there should be a way to specify density.
@@ -423,8 +424,6 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
             paste.reset();
         }
     }
-
-    ImGui::Separator();
 
     {
         ImGui::InvisibleButton("Canvas", [] {
@@ -513,10 +512,10 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
             }
 
             // TODO: refine...
-            // TODO: zoom window temporarily conflicts with range selection... (both use Rclick)
-            if (!paste && img_zoom <= 2 && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+            if (img_zoom <= 2 && !paste && !ImGui::IsMouseDown(ImGuiMouseButton_Left) &&
+                !ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
                 if (celx >= -10 && celx < tile_size.width + 10 && cely >= -10 && cely < tile_size.height + 10) {
-                    if (static bool toggle = true; auto tooltip = imgui_ItemTooltip(toggle)) {
+                    if (ImGui::BeginItemTooltip()) {
                         const int w = std::min(tile_size.width, 40);
                         const int h = std::min(tile_size.height, 40);
 
@@ -540,6 +539,7 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
                         ImGui::Image(img.texture(), ImVec2(w * 4, h * 4),
                                      {(float)minx / tile_size.width, (float)miny / tile_size.height},
                                      {(float)maxx / tile_size.width, (float)maxy / tile_size.height});
+                        ImGui::EndTooltip();
                     }
                 }
             }
@@ -551,7 +551,7 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
                 sel.select_0.y = std::clamp(cely, 0, tile_size.height - 1);
             }
             if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-                ctrl.pause2 = true; // TODO: works poorly with double-rclick toggling...
+                ctrl.pause2 = true;
                 sel.select_1.x = std::clamp(celx, 0, tile_size.width - 1);
                 sel.select_1.y = std::clamp(cely, 0, tile_size.height - 1);
             }

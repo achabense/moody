@@ -161,13 +161,13 @@ public:
 #endif
             ImGui::PopID();
 
-            // TODO: if using helper::show_help, the helpmark will take up too much space here...
-            if (static bool toggle = true; auto tooltip = imgui_ItemTooltip(toggle)) {
+            // TODO: use helper::show_help instead.
+            if (ImGui::BeginItemTooltip()) {
                 imgui_Str(term.description ? term.description : "TODO");
+                ImGui::EndTooltip();
             }
 
             // TODO: refine...
-
             // TODO: explain coloring scheme; redesign if necessary (especially ring col)
             // TODO: find better color for "disabled"/incompatible etc... currently too ugly.
             const ImU32 cen_col = term.selected                ? ImGui::GetColorU32(ImGuiCol_ButtonHovered)
@@ -286,7 +286,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             "editions...", // (may or may not be the all-zero rule/identity rule depending on the subsets you have
                            // selected...)
 
-            "Custom rule; you can click \"Take current rule\" button to set this to the current rule.\n"
+            "Custom rule; you can click \"Take current\" button to set this to the current rule.\n"
             "Important tip: ..."};
         static int mask_tag = 0;
 
@@ -320,7 +320,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         }
 
         ImGui::SameLine();
-        if (ImGui::SmallButton("Take current rule")) {
+        if (ImGui::Button("Take current")) {
             mask_tag = 3;
             mask_custom = {mold.rule};
         }
@@ -430,7 +430,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             ImGui::BeginDisabled();
         }
         iter_group(
-            "<1.0.", "pprev", "pnext", "0.1.>", //
+            "<1.0.", "p_prev", "p_next", "0.1.>", //
             [&] { return_rule(legacy::act_perm::first(subset, mask, mold)); },
             [&] { return_rule(legacy::act_perm::prev(subset, mask, mold)); },
             [&] { return_rule(legacy::act_perm::next(subset, mask, mold)); },
@@ -529,9 +529,9 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                 ImGui::PopStyleColor(3);
             }
 
-            if (static bool toggle = true; auto tooltip = imgui_ItemTooltip(toggle)) {
+            if (ImGui::BeginItemTooltip()) {
                 ImGui::Text("Group size: %d", (int)group.size());
-                const int max_to_show = 64;
+                const int max_to_show = 48;
                 for (int x = 0; auto code : group) {
                     if (x++ % 8 != 0) {
                         ImGui::SameLine();
@@ -552,6 +552,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                 if (group.size() > max_to_show) {
                     imgui_Str("...");
                 }
+                ImGui::EndTooltip();
             }
 
             const float button_height = ImGui::GetItemRectSize().y;
