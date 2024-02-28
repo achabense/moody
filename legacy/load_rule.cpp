@@ -29,7 +29,7 @@ class file_nav {
     using entryT = std::filesystem::directory_entry;
 
     char buf_path[200]{};
-    char buf_filter[20]{".txt"};
+    char buf_filter[20]{};
 
     // TODO: is canonical path necessary?
     bool m_valid = false; // The last call to `collect(current, ...)` is successful.
@@ -228,7 +228,7 @@ class textT {
     std::vector<legacy::extrT::valT> m_rules{};
     int m_pos = 0; // Current pos (m_rules[m_pos]), valid if !m_rules.empty().
 
-    bool restart = true;
+    bool should_rewind = true;
 
 public:
     textT() {}
@@ -240,7 +240,7 @@ public:
         m_lines.clear();
         m_rules.clear();
         m_pos = 0;
-        restart = true;
+        should_rewind = true;
     }
 
     // `str` is assumed to be utf8-encoded.
@@ -291,11 +291,11 @@ public:
             ImGui::Text("No rules");
         }
 
-        const bool focus = ret;
-
         ImGui::Separator();
 
-        if (std::exchange(restart, false)) {
+        const bool locate = ret;
+
+        if (std::exchange(should_rewind, false)) {
             ImGui::SetNextWindowScroll({0, 0});
             assert(m_pos == 0);
             if (total != 0) {
@@ -317,7 +317,7 @@ public:
 
                     if (id == m_pos) {
                         imgui_ItemRectFilled(IM_COL32(is_mold ? 196 : 0, 255, 0, 60));
-                        if (!ImGui::IsItemVisible() && focus) {
+                        if (!ImGui::IsItemVisible() && locate) {
                             ImGui::SetScrollHereY();
                         }
                     }
@@ -342,66 +342,45 @@ public:
     }
 };
 
-// TODO: temp...
-class fileT {
-    textT m_text;
-    pathT m_path;
-
-public:
-    fileT(pathT path) : m_path(std::move(path)) { reload(); }
-
-    const pathT& path() const { return m_path; }
-    bool has_rule() const { return m_text.has_rule(); }
-
-    void reload() {
-        m_text.clear();
-        if (auto data = load_binary(m_path, 100'000)) {
-            m_text.append(std::move(*data));
-        }
-    }
-
-    std::optional<legacy::extrT::valT> display() { return m_text.display(); }
-};
-
 // TODO: show the last opened file in file-nav?
 // TODO: whether to support opening multiple files?
 std::optional<legacy::extrT::valT> load_rule() {
     static file_nav nav;
+
+    struct fileT {
+        pathT path;
+        textT text;
+    };
     static std::optional<fileT> file;
 
     std::optional<legacy::extrT::valT> out;
 
-    bool close = false;
-    bool reload = false;
-    if (file) {
-        if (ImGui::SmallButton("Close")) {
-            close = true;
-        }
-        ImGui::SameLine();
-        if (ImGui::SmallButton("Reload")) {
-            reload = true;
-        }
-        imgui_StrCopyable(cpp17_u8string(file->path()), imgui_Str);
-
-        out = file->display();
-    } else {
+    bool close = false, load = false;
+    if (!file) {
         if (auto sel = nav.display()) {
             file.emplace(*sel);
-            if (!file->has_rule()) {
-                file.reset();
-                messenger::add_msg("Found no rules");
-            }
+            load = true;
         }
+    } else {
+        close = ImGui::SmallButton("Close");
+        ImGui::SameLine();
+        load = ImGui::SmallButton("Reload");
+        // TODO: unlike the one in file_nav.display, this can be StrWrapped...
+        imgui_StrCopyable(cpp17_u8string(file->path), imgui_Str);
+
+        out = file->text.display();
     }
 
     if (close) {
-        file.reset();
-    }
-    // TODO: awkward... refactor...
-    if (reload) {
         assert(file);
-        file->reload();
-        if (!file->has_rule()) {
+        file.reset();
+    } else if (load) {
+        assert(file);
+        file->text.clear();
+        if (auto data = load_binary(file->path, 100'000)) {
+            file->text.append(*data);
+        }
+        if (!file->text.has_rule()) {
             file.reset();
             messenger::add_msg("Found no rules");
         }
