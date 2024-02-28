@@ -211,54 +211,52 @@ static std::optional<std::string> load_binary(const pathT& path, int max_size) {
 // TODO: support saving into file? (without relying on the clipboard)
 // TODO: support in-memory loadings. (e.g. tutorial about typical ways to find interesting rules)
 
-class fileT {
+// TODO: better name? docT?
+
+// It is easy to locate all rules in the text via `extract_MAP_str`.
+// However there are no easy ways to locate or highlight (only) the rule across the lines.
+// See: https://github.com/ocornut/imgui/issues/2313
+// So, currently `textT` is line-based, and only recognizes the first rule for each line, and will
+// highlight the whole line if the line contains a rule.
+class textT {
     struct lineT {
         std::string text;
         std::optional<int> id = std::nullopt;
     };
 
-    pathT m_path;
-    std::vector<lineT> m_lines;
-    std::vector<legacy::extrT::valT> m_rules;
+    std::vector<lineT> m_lines{};
+    std::vector<legacy::extrT::valT> m_rules{};
     int m_pos = 0; // Current pos (m_rules[m_pos]), valid if !m_rules.empty().
 
     bool restart = true;
 
-    // TODO: It is easy to locate all rules in a text span via `extract_MAP_str`.
-    // However there are no easy ways to locate or highlight (only) the rule across the lines in the gui.
-    // See: https://github.com/ocornut/imgui/issues/2313
-    // So, currently the program only recognizes the first rule for each line, and highlights the whole line if
-    // the line contains a rule.
-
-    // The content of the stream is assumed to be utf8-encoded.
-    // (If not, the rules are still likely extractable.)
-    static void append(std::vector<lineT>& lines, std::vector<legacy::extrT::valT>& rules, std::istream& is) {
-        std::string text;
-        while (std::getline(is, text)) {
-            const auto val = legacy::extract_MAP_str(text).val;
-            lineT& line = lines.emplace_back(std::move(text));
-            if (val.has_value()) {
-                rules.push_back(*val);
-                line.id = rules.size() - 1;
-            }
-        }
-    }
-
 public:
-    fileT(pathT path) : m_path(std::move(path)) { reload(); }
+    textT() {}
+    textT(std::string_view str) { append(str); }
 
-    const pathT& path() const { return m_path; }
     bool has_rule() const { return !m_rules.empty(); }
 
-    void reload() {
+    void clear() {
         m_lines.clear();
         m_rules.clear();
         m_pos = 0;
         restart = true;
+    }
 
-        if (auto data = load_binary(m_path, 100'000)) {
-            std::istringstream ss(std::move(*data));
-            append(m_lines, m_rules, ss);
+    // `str` is assumed to be utf8-encoded.
+    // (If not, the rules are still likely extractable.)
+    void append(std::string_view str) {
+        // (wontfix) It's not worthwhile to bother removing this copy.
+        std::istringstream is{std::string(str)};
+
+        std::string text;
+        while (std::getline(is, text)) {
+            const auto val = legacy::extract_MAP_str(text).val;
+            lineT& line = m_lines.emplace_back(std::move(text));
+            if (val.has_value()) {
+                m_rules.push_back(*val);
+                line.id = m_rules.size() - 1;
+            }
         }
     }
 
@@ -281,6 +279,7 @@ public:
             ImGui::Text("Total:%d At:%d", total, m_pos + 1);
 
             // TODO: (temp) added back as this is very convenient; whether to require the window to be focused?
+            // (required if there are going to be multiple opened files in the gui)...
             if (!ret) {
                 if (imgui_KeyPressed(ImGuiKey_UpArrow, true)) {
                     ret = true, m_pos = std::max(0, m_pos - 1);
@@ -308,7 +307,10 @@ public:
             for (int l = 1; const auto& [text, id] : m_lines) {
                 ImGui::TextDisabled("%2d ", l++);
                 ImGui::SameLine();
-                imgui_StrCopyable(text, imgui_StrWrapped);
+                // TODO: (temp) changed back to non-copyable mode; it's possible to support multi-line copying
+                // (which is useful for extracting RLE patterns)
+                imgui_StrWrapped(text);
+                // imgui_StrCopyable(text, imgui_StrWrapped);
 
                 if (id.has_value()) {
                     const bool is_mold = m_rules[*id].lock.has_value();
@@ -338,6 +340,27 @@ public:
             return std::nullopt;
         }
     }
+};
+
+// TODO: temp...
+class fileT {
+    textT m_text;
+    pathT m_path;
+
+public:
+    fileT(pathT path) : m_path(std::move(path)) { reload(); }
+
+    const pathT& path() const { return m_path; }
+    bool has_rule() const { return m_text.has_rule(); }
+
+    void reload() {
+        m_text.clear();
+        if (auto data = load_binary(m_path, 100'000)) {
+            m_text.append(std::move(*data));
+        }
+    }
+
+    std::optional<legacy::extrT::valT> display() { return m_text.display(); }
 };
 
 // TODO: show the last opened file in file-nav?
