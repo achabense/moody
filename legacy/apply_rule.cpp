@@ -162,13 +162,15 @@ struct ctrlT {
     }
 };
 
-// TODO: support 1*1 selection?
+// TODO (temp) Surprisingly nasty to deal with...
 // TODO: explain...
 struct selectT {
+    bool active = true;
     // []
     legacy::tileT::posT select_0{0, 0}, select_1{0, 0};
 
     void clear() { select_0 = select_1 = {0, 0}; }
+#if 0
     void toggle_select_all(legacy::tileT::sizeT size) {
         // all-selected ? clear : select-all
         const auto [begin, end] = range();
@@ -179,11 +181,7 @@ struct selectT {
             select_1 = {.x = size.width - 1, .y = size.height - 1};
         }
     }
-
-    bool empty() const {
-        const auto r = range();
-        return r.width() <= 1 && r.height() <= 1;
-    }
+#endif
 
     legacy::tileT::rangeT range() const {
         int x0 = select_0.x, x1 = select_1.x;
@@ -218,10 +216,10 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
     static int img_zoom = 1;
     assert(img_off.x == int(img_off.x) && img_off.y == int(img_off.y));
 
-    static std::optional<legacy::tileT> paste;
+    static std::optional<legacy::tileT> paste = std::nullopt;
     static legacy::tileT::posT paste_beg{0, 0}; // dbegin for copy... (TODO: this is confusing...)
 
-    static selectT sel{};
+    static std::optional<selectT> sel = std::nullopt;
 
     // TODO: not robust
     // ~ runner.restart(...) shall not happen before rendering.
@@ -366,7 +364,7 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
                     const legacy::tileT::sizeT size = size_clamped(width, height);
                     if (init.size != size) {
                         init.size = size;
-                        sel.clear();
+                        sel.reset();
                         paste.reset();        // TODO: whether to show some message for these invalidation?
                         runner.restart(init); // TODO: about vs setting should_restart...
                     }
@@ -395,7 +393,7 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
                     size_clamped((int)last_known_canvas_size.x / img_zoom, (int)last_known_canvas_size.y / img_zoom);
                 if (init.size != size) {
                     init.size = size;
-                    sel.clear();
+                    sel.reset();
                     paste.reset(); // TODO: whether to show some message for these invalidation?
                     runner.restart(init);
                 }
@@ -423,9 +421,21 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
     if (ImGui::Button("...")) {
         ImGui::OpenPopup("Tile_Menu"); // TODO: temp; when should the menu appear?
     }
+    // TODO: whether to allow sel and paste to co-exist?
+    // TODO: whether to allow 1*1 selection?
+    // TODO: provide an easy way to clear selection...
+    if (sel) {
+        ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
+        const auto range = sel->range();
+        if (ImGui::Button(
+                std::format("Drop selection (w:{} h:{})###drop_sel", range.width(), range.height()).c_str())) {
+            sel.reset();
+        }
+    }
     if (paste) {
         ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
-        if (ImGui::Button("Drop paste")) {
+        if (ImGui::Button(
+                std::format("Drop paste (w:{} h:{})###drop_paste", paste->width(), paste->height()).c_str())) {
             paste.reset();
         }
     }
@@ -487,8 +497,8 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
             drawlist->AddRectFilled(paste_min, paste_max, IM_COL32(255, 0, 0, 60));
         }
 
-        if (!sel.empty()) {
-            const auto range = sel.range();
+        if (sel) {
+            const auto range = sel->range();
             const ImVec2 sel_min = img_min + ImVec2(range.begin.x, range.begin.y) * img_zoom;
             const ImVec2 sel_max = img_min + ImVec2(range.end.x, range.end.y) * img_zoom;
             drawlist->AddRectFilled(sel_min, sel_max, IM_COL32(0, 255, 0, 40));
@@ -498,7 +508,16 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
 
         const bool active = ImGui::IsItemActive();
         ctrl.pause2 = paste || active; // TODO: won't work if |= active... should ctrl.run clear pause2?
-        if (ImGui::IsItemHovered(/* ImGuiHoveredFlags_AllowWhenBlockedByPopup */)) {
+
+        if (sel && sel->active) {
+            if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+                ctrl.pause2 = true;
+            } else {
+                sel->active = false;
+            }
+        }
+
+        if (ImGui::IsItemHovered()) {
             // TODO: reorganize...
             const ImGuiIO& io = ImGui::GetIO();
 
@@ -550,16 +569,16 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
                 }
             }
 
-            // TODO: what if clicked from outside into the canvas?
             // TODO: precedence against left-clicking?
             if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-                sel.select_0.x = std::clamp(celx, 0, tile_size.width - 1);
-                sel.select_0.y = std::clamp(cely, 0, tile_size.height - 1);
+                const legacy::tileT::posT pos{.x = std::clamp(celx, 0, tile_size.width - 1),
+                                              .y = std::clamp(cely, 0, tile_size.height - 1)};
+                sel = {.active = true, .select_0 = pos, .select_1 = pos};
             }
-            if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+            if (sel && sel->active && ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
                 ctrl.pause2 = true;
-                sel.select_1.x = std::clamp(celx, 0, tile_size.width - 1);
-                sel.select_1.y = std::clamp(cely, 0, tile_size.height - 1);
+                sel->select_1.x = std::clamp(celx, 0, tile_size.width - 1);
+                sel->select_1.y = std::clamp(cely, 0, tile_size.height - 1);
             }
             // if (ImGui::IsMouseReleased(ImGuiMouseButton_Right) && !sel.empty()) {
             //     ImGui::OpenPopup("Tile_Menu");
@@ -591,9 +610,10 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
             }
         }
 
-        if (imgui_KeyPressed(ImGuiKey_A, false)) {
-            sel.toggle_select_all(tile_size);
-        }
+        // TODO: re-impl selection toggling...
+        // if (imgui_KeyPressed(ImGuiKey_A, false)) {
+        //     sel.toggle_select_all(tile_size);
+        // }
         if (imgui_KeyPressed(ImGuiKey_V, false)) {
             if (const char* text = ImGui::GetClipboardText()) {
                 try {
@@ -634,18 +654,18 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
             // TODO: document other keyboard-only operations...
             ImGui::EndPopup();
         }
-        if (!sel.empty()) {
-            const auto range = sel.range();
+        if (sel) {
+            const auto range = sel->range();
 
-            // TODO: what if the right mouse is still pressed?
-            // TODO: wontfix? 1*1 area will be considered empty.
+            // TODO: what if these keys are pressed together?
             if (imgui_KeyPressed(ImGuiKey_S, false) || op == Shrink) {
                 const auto [begin, end] = legacy::bounding_box(runner.tile(), range);
                 if (begin != end) {
-                    sel.select_0 = begin;
-                    sel.select_1 = {.x = end.x - 1, .y = end.y - 1};
+                    sel->select_0 = begin;
+                    sel->select_1 = {.x = end.x - 1, .y = end.y - 1};
+                    sel->active = false;
                 } else {
-                    sel.clear();
+                    sel.reset();
                 }
             }
             if (imgui_KeyPressed(ImGuiKey_C, false) || imgui_KeyPressed(ImGuiKey_X, false) || op == Copy || op == Cut) {
