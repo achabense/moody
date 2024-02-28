@@ -180,6 +180,11 @@ struct selectT {
         }
     }
 
+    bool empty() const {
+        const auto r = range();
+        return r.width() <= 1 && r.height() <= 1;
+    }
+
     legacy::tileT::rangeT range() const {
         int x0 = select_0.x, x1 = select_1.x;
         int y0 = select_0.y, y1 = select_1.y;
@@ -482,7 +487,8 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
             drawlist->AddRectFilled(paste_min, paste_max, IM_COL32(255, 0, 0, 60));
         }
 
-        if (const auto range = sel.range(); range.width() > 1 || range.height() > 1) {
+        if (!sel.empty()) {
+            const auto range = sel.range();
             const ImVec2 sel_min = img_min + ImVec2(range.begin.x, range.begin.y) * img_zoom;
             const ImVec2 sel_max = img_min + ImVec2(range.end.x, range.end.y) * img_zoom;
             drawlist->AddRectFilled(sel_min, sel_max, IM_COL32(0, 255, 0, 40));
@@ -492,7 +498,7 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
 
         const bool active = ImGui::IsItemActive();
         ctrl.pause2 = paste || active; // TODO: won't work if |= active... should ctrl.run clear pause2?
-        if (ImGui::IsItemHovered()) {
+        if (ImGui::IsItemHovered(/* ImGuiHoveredFlags_AllowWhenBlockedByPopup */)) {
             // TODO: reorganize...
             const ImGuiIO& io = ImGui::GetIO();
 
@@ -555,6 +561,9 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
                 sel.select_1.x = std::clamp(celx, 0, tile_size.width - 1);
                 sel.select_1.y = std::clamp(cely, 0, tile_size.height - 1);
             }
+            // if (ImGui::IsMouseReleased(ImGuiMouseButton_Right) && !sel.empty()) {
+            //     ImGui::OpenPopup("Tile_Menu");
+            // }
 
             // TODO: refactor away this block...
             // TODO: the logic will be simplified if invisible button goes before the image...
@@ -596,31 +605,41 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
             }
         }
 
+        // TODO: redesign keyboard ctrl...
         // TODO: (Must) finish...
         static float fill_den = 0.5;
-        enum opE { None, Capture };
+        enum opE { None, Random_fill, Clear_inside, Clear_outside, Shrink, Copy, Cut, Capture };
         opE op = None;
         // TODO: make this actually work...
         if (ImGui::BeginPopup("Tile_Menu")) {
             ctrl.pause2 = true;
             ImGui::SliderFloat("Fill density", &fill_den, 0.0f, 1.0f, "%.2f", ImGuiSliderFlags_NoInput);
             ImGui::Separator();
-            if (ImGui::MenuItem("Random fill", "+")) {
-            }
-            if (ImGui::MenuItem("Clear selected", "backspace")) { // 0/1
-            }
-            if (ImGui::MenuItem("Clear outside", "0")) { // 0/1
-            }
-            if (ImGui::MenuItem("Copy", "c")) {
-            }
-            if (ImGui::MenuItem("Capture", "p")) {
+            // These can be chained by `else if` without visual effect, as the popup will disappear after clicking.
+            if (ImGui::MenuItem("Random fill", "=")) {
+                op = Random_fill;
+            } else if (ImGui::MenuItem("Clear", "backspace")) { // TODO: 0/1
+                op = Clear_inside;
+            } else if (ImGui::MenuItem("Clear outside", "0")) { // TODO: 0/1
+                op = Clear_outside;
+            } else if (ImGui::MenuItem("Shrink", "s")) { // TODO: 0/1
+                op = Shrink;
+            } else if (ImGui::MenuItem("Copy", "c")) {
+                op = Copy;
+            } else if (ImGui::MenuItem("Cut", "x")) {
+                op = Cut;
+            } else if (ImGui::MenuItem("Capture", "p")) {
                 op = Capture;
             }
+            // TODO: document other keyboard-only operations...
             ImGui::EndPopup();
         }
-        if (const auto range = sel.range(); range.height() > 1 || range.width() > 1) {
+        if (!sel.empty()) {
+            const auto range = sel.range();
+
             // TODO: what if the right mouse is still pressed?
-            if (imgui_KeyPressed(ImGuiKey_S, false)) {
+            // TODO: wontfix? 1*1 area will be considered empty.
+            if (imgui_KeyPressed(ImGuiKey_S, false) || op == Shrink) {
                 const auto [begin, end] = legacy::bounding_box(runner.tile(), range);
                 if (begin != end) {
                     sel.select_0 = begin;
@@ -629,21 +648,19 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
                     sel.clear();
                 }
             }
-            if (imgui_KeyPressed(ImGuiKey_C, false) || imgui_KeyPressed(ImGuiKey_X, false)) {
+            if (imgui_KeyPressed(ImGuiKey_C, false) || imgui_KeyPressed(ImGuiKey_X, false) || op == Copy || op == Cut) {
                 ImGui::SetClipboardText(legacy::to_RLE_str(ctrl.rule, runner.tile(), range).c_str());
             }
-            if (imgui_KeyPressed(ImGuiKey_Backspace, false) || imgui_KeyPressed(ImGuiKey_X, false)) {
+            if (imgui_KeyPressed(ImGuiKey_Backspace, false) || imgui_KeyPressed(ImGuiKey_X, false) ||
+                op == Clear_inside || op == Cut) {
                 legacy::clear_inside(runner.tile(), range);
             }
-            if (imgui_KeyPressed(ImGuiKey_Equal, false)) {
-                // TODO: specify density etc...
+            if (imgui_KeyPressed(ImGuiKey_Equal, false) || op == Random_fill) {
                 legacy::random_fill(runner.tile(), global_mt19937(), fill_den, range);
             }
-            // TODO: redesign keyboard ctrl...
-            if (imgui_KeyPressed(ImGuiKey_0, false)) {
+            if (imgui_KeyPressed(ImGuiKey_0, false) || op == Clear_outside) {
                 legacy::clear_outside(runner.tile(), range);
             }
-
             if (imgui_KeyPressed(ImGuiKey_P, false) || op == Capture) {
                 out = capture_closed(runner.tile(), range, ctrl.rule);
             }

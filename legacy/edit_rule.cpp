@@ -509,21 +509,17 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
                 ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.9f, 0, 0, 1));
             }
             if (icons.button(head, zoom)) {
-                // TODO: (temp) redesigned; no "solve-conflicts" mode now
-                // (which should be done by subset-approximation)...
-                if (!ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-                    legacy::ruleT rule = mold.rule;
-                    for (legacy::codeT code : group) {
-                        rule[code] = !rule[code];
-                    }
-                    return_rule(rule);
-                } else {
-                    legacy::moldT::lockT lock = mold.lock;
-                    for (legacy::codeT code : group) {
-                        lock[code] = !has_lock;
-                    }
-                    return_lock(lock);
+                legacy::ruleT rule = mold.rule;
+                for (legacy::codeT code : group) {
+                    rule[code] = !rule[code];
                 }
+                return_rule(rule);
+            } else if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+                legacy::moldT::lockT lock = mold.lock;
+                for (legacy::codeT code : group) {
+                    lock[code] = !has_lock;
+                }
+                return_lock(lock);
             }
             if (inconsistent) {
                 ImGui::PopStyleColor(3);
