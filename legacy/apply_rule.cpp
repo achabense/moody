@@ -124,22 +124,20 @@ public:
     }
 };
 
-// TODO: rename...
-// TODO: Document that this is not the only situation that flicking effect can occur...
-static bool will_flick(const legacy::ruleT& rule) {
+static bool strobing(const legacy::ruleT& rule) {
     constexpr legacy::codeT all_0{0}, all_1{511};
     return rule[all_0] == 1 && rule[all_1] == 0;
 }
 
+// TODO: reduce to local lambdas...
 struct ctrlT {
     legacy::ruleT rule{};
 
-    // TODO: better name?
     static constexpr int pace_min = 1, pace_max = 20;
     int pace = 1;
-    bool anti_flick = true; // TODO: add explanation
+    bool anti_strobing = true;
     int actual_pace() const {
-        if (anti_flick && will_flick(rule) && pace % 2) {
+        if (anti_strobing && strobing(rule) && pace % 2) {
             return pace + 1;
         }
         return pace;
@@ -152,7 +150,7 @@ struct ctrlT {
     bool pause = false;
     bool pause2 = false; // TODO: explain...
 
-    void run(torusT& runner, int extra = 0) const {
+    void run(torusT& runner, int extra) const {
         if (extra != 0) {
             runner.run(rule, extra);
         }
@@ -168,7 +166,7 @@ struct ctrlT {
 // TODO: explain...
 struct selectT {
     // []
-    legacy::tileT::posT select_0{0, 0}, select_1{0, 0}; // cell index, not pixel.
+    legacy::tileT::posT select_0{0, 0}, select_1{0, 0};
 
     void clear() { select_0 = select_1 = {0, 0}; }
     void toggle_select_all(legacy::tileT::sizeT size) {
@@ -209,7 +207,7 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
     assert(init.size == runner.tile().size());
     assert(init.size == size_clamped(init.size.width, init.size.height));
 
-    static ctrlT ctrl{.rule = rule, .pace = 1, .anti_flick = true, .gap_frame = 0, .pause = false};
+    static ctrlT ctrl{.rule = rule, .pace = 1, .anti_strobing = true, .gap_frame = 0, .pause = false};
 
     static ImVec2 img_off = {0, 0};
     static int img_zoom = 1;
@@ -228,11 +226,11 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
     if (ctrl.rule != rule) {
         ctrl.rule = rule;
         should_restart = true;
-        ctrl.anti_flick = true;
+        ctrl.anti_strobing = true;
         ctrl.pause = false;
     }
 
-    static ImVec2 last_known_canvas_size{100, 100}; // TODO: make std::optional?
+    static ImVec2 last_known_canvas_size{160, 80}; // TODO: make std::optional?
 
     // TODO: better be controlled by frame()?
     ImGui::PushItemWidth(item_width);
@@ -267,8 +265,12 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
         const float extra_w_sameline = ImGui::GetStyle().ItemSpacing.x * 1; // One SameLine...
         const float extra_w_padding = ImGui::GetStyle().FramePadding.x * 2; // One Button * two sides...
         const float extra_w = ImGui::CalcTextSize("Restart").x + extra_w_sameline + extra_w_padding;
-        const std::string str = std::format("Generation:{:2}, density:{:.4f}", runner.gen(),
-                                            float(legacy::count(runner.tile())) / runner.tile().area());
+        const std::string str = std::format("Generation:{}, density:{:.4f}{}", runner.gen(),
+                                            float(legacy::count(runner.tile())) / runner.tile().area(),
+                                            runner.gen() < 10     ? "   "
+                                            : runner.gen() < 100  ? "  "
+                                            : runner.gen() < 1000 ? " "
+                                                                  : "");
         ImGui::SeparatorTextEx(0, str.c_str(), nullptr, extra_w);
         ImGui::SameLine();
         if (ImGui::Button("Restart") || imgui_KeyPressed(ImGuiKey_R, false)) {
@@ -289,6 +291,8 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
         if (ImGui::Button("+1")) {
             extra = 1;
         }
+        // TODO: finish.
+        helper::show_help("Advance generation by 1 (instead of pace). This is useful for ...");
         if (ctrl.pause) {
             ImGui::SameLine();
             // TODO: The usage of format looks wasteful...
@@ -302,10 +306,20 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
         imgui_StepSliderInt("Gap Frame (0~20)", &ctrl.gap_frame, ctrl.gap_min, ctrl.gap_max);
 
         imgui_StepSliderInt("Pace (1~20)", &ctrl.pace, ctrl.pace_min, ctrl.pace_max);
-        ImGui::AlignTextToFramePadding();
-        ImGui::Text("(Actual pace: %d)", ctrl.actual_pace());
-        ImGui::SameLine();
-        ImGui::Checkbox("anti-flick", &ctrl.anti_flick);
+
+        // TODO: should be interactive.
+        // the rule has only all_0 and all_1 NOT flipped, and has interesting effect in extremely low/high densities.
+        // (e.g. 0.01, 0.99)
+        ImGui::Checkbox("Anti-strobing", &ctrl.anti_strobing);
+        helper::show_help(
+            "Actually this is not enough to guarantee smooth visual effect. For example, the following "
+            "\"non-strobing\" rule has really terrible visual effect:\n\n"
+            "MAPf/8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAQ\n\n"
+            "In cases like this, it generally helps to set the pace to 2*n manually to remove bad visual effects.");
+        if (ctrl.anti_strobing) {
+            ImGui::SameLine();
+            ImGui::Text(" (Actual pace: %d)", ctrl.actual_pace());
+        }
     }
     ImGui::EndGroup();
     ImGui::SameLine();
@@ -589,7 +603,7 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
         // TODO: make this actually work...
         if (ImGui::BeginPopup("Tile_Menu")) {
             ctrl.pause2 = true;
-            ImGui::SliderFloat("Fill density", &fill_den, 0.0f, 1.0f);
+            ImGui::SliderFloat("Fill density", &fill_den, 0.0f, 1.0f, "%.2f", ImGuiSliderFlags_NoInput);
             ImGui::Separator();
             if (ImGui::MenuItem("Random fill", "+")) {
             }
