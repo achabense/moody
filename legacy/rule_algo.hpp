@@ -140,11 +140,11 @@ namespace legacy {
             }
         }
 
-        /*implicit*/ partitionT(const equivT& u) : m_eq(u) {
+        /*implicit*/ partitionT(const equivT& eq) : m_eq(eq) {
             m_k = 0;
             m_map.fill(-1);
             for_each_code([&](codeT code) {
-                const codeT head = u.headof(code);
+                const codeT head = eq.headof(code);
                 if (m_map[head] == -1) {
                     m_map[head] = m_k++;
                 }
@@ -237,19 +237,23 @@ namespace legacy {
             maskT common{};
             codeT::map_to<bool> assigned{};
 
-            // TODO: this is really slow in debug mode... the complexity seems 512^2 in worst case.
-            // TODO: explain try-assign will result a correct rule iff a & b != {}.
+            // Assign values according to equivalence relations, without checking for consistency
+            // in the groups.
+            codeT::map_to<bool> a_checked{}, b_checked{}; // To reduce time-complexity.
             auto try_assign = [&](const codeT code, const bool v, auto& self) -> void {
-                if (!assigned[code]) {
-                    assigned[code] = true;
+                if (!std::exchange(assigned[code], true)) {
                     common[code] = v;
-                    const bool masked_by_a = a.mask[code] ^ v;
-                    const bool masked_by_b = b.mask[code] ^ v;
-                    for (const codeT c : a.par.group_for(code)) {
-                        self(c, a.mask[c] ^ masked_by_a, self);
+                    if (!std::exchange(a_checked[a.par.group_for(code)[0]], true)) {
+                        const bool masked_by_a = a.mask[code] ^ v;
+                        for (const codeT c : a.par.group_for(code)) {
+                            self(c, a.mask[c] ^ masked_by_a, self);
+                        }
                     }
-                    for (const codeT c : b.par.group_for(code)) {
-                        self(c, b.mask[c] ^ masked_by_b, self);
+                    if (!std::exchange(b_checked[b.par.group_for(code)[0]], true)) {
+                        const bool masked_by_b = b.mask[code] ^ v;
+                        for (const codeT c : b.par.group_for(code)) {
+                            self(c, b.mask[c] ^ masked_by_b, self);
+                        }
                     }
                 }
             };
@@ -265,6 +269,7 @@ namespace legacy {
                 }
             });
 
+            assert(for_each_code_all_of([&](codeT code) { return assigned[code]; }));
             if (!a.contains(common) || !b.contains(common)) {
                 return std::nullopt;
             }
