@@ -262,6 +262,21 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
         ctrl.pause = true;
     }
 
+    {
+        // TODO: (temp) keeping in-line with edit-rule's
+        const float extra_w_sameline = ImGui::GetStyle().ItemSpacing.x * 1; // One SameLine...
+        const float extra_w_padding = ImGui::GetStyle().FramePadding.x * 2; // One Button * two sides...
+        const float extra_w = ImGui::CalcTextSize("Restart").x + extra_w_sameline + extra_w_padding;
+        const std::string str = std::format("Generation:{:2}, density:{:.4f}", runner.gen(),
+                                            float(legacy::count(runner.tile())) / runner.tile().area());
+        ImGui::SeparatorTextEx(0, str.c_str(), nullptr, extra_w);
+        ImGui::SameLine();
+        if (ImGui::Button("Restart") || imgui_KeyPressed(ImGuiKey_R, false)) {
+            should_restart = true;
+        }
+        // TODO: canvas size, selected size, paste size...
+    }
+
     ImGui::BeginGroup();
     {
         ImGui::Checkbox("Pause", &ctrl.pause);
@@ -282,10 +297,6 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
             }
         }
         ImGui::PopButtonRepeat();
-        ImGui::SameLine();
-        if (ImGui::Button("Restart") || imgui_KeyPressed(ImGuiKey_R, false)) {
-            should_restart = true;
-        }
 
         // TODO: Gap-frame shall be really timer-based...
         imgui_StepSliderInt("Gap Frame (0~20)", &ctrl.gap_frame, ctrl.gap_min, ctrl.gap_max);
@@ -337,6 +348,8 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
                     const legacy::tileT::sizeT size = size_clamped(width, height);
                     if (init.size != size) {
                         init.size = size;
+                        sel.clear();
+                        paste.reset();        // TODO: whether to show some message for these invalidation?
                         runner.restart(init); // TODO: about vs setting should_restart...
                     }
                 }
@@ -364,14 +377,14 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
                     size_clamped((int)last_known_canvas_size.x / img_zoom, (int)last_known_canvas_size.y / img_zoom);
                 if (init.size != size) {
                     init.size = size;
+                    sel.clear();
+                    paste.reset(); // TODO: whether to show some message for these invalidation?
                     runner.restart(init);
                 }
             }
         }
     }
     ImGui::EndGroup();
-
-    // TODO: let right+ctrl move selected area?
 
     // TODO: set pattern as init state? what if size is already changed?
     // TODO: specify mouse-dragging behavior (especially, no-op must be an option)
@@ -380,14 +393,16 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
     // TODO: copy vs copy to clipboard; paste vs paste from clipboard? (don't want to pollute clipboard with small
     // rle strings...
     // TODO: should be able to recognize "rule = " part in the rle string.
+    // TODO: about the plan for boundless space and space period...
 
-    // TODO: "periodical tile" feature is generally not too useful without boundless space, and torus is
-    // enough for visual feedback.
     const bool corner = ImGui::Button("Corner"); // TODO: move elsewhere...
     ImGui::SameLine();
     const bool center = ImGui::Button("Center");
     // TODO: select all, unselect button...
-
+    ImGui::SameLine();
+    if (ImGui::Button("...")) {
+        ImGui::OpenPopup("Tile_Menu"); // TODO: temp; when should the menu appear?
+    }
     if (paste) {
         ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
         if (ImGui::Button("Drop paste")) {
@@ -395,9 +410,7 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
         }
     }
 
-    // TODO: move elsewhere in the gui?
-    ImGui::Text("Gen:%d, Density:%.4f", runner.gen(), float(legacy::count(runner.tile())) / runner.tile().area());
-    // TODO: canvas size, tile size, selected size, paste size...
+    ImGui::Separator();
 
     {
         ImGui::InvisibleButton("Canvas", [] {
@@ -411,15 +424,8 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
         const ImVec2 canvas_size = ImGui::GetItemRectSize();
         last_known_canvas_size = canvas_size;
 
-        // Size is fixed now:
         const legacy::tileT::sizeT tile_size = runner.tile().size(); // TODO: which (vs init.size) is better?
         const ImVec2 img_size(tile_size.width * img_zoom, tile_size.height * img_zoom);
-
-        // Validity of paste is fixed now:
-        // This can happen when e.g. paste -> resize...
-        if (paste && (paste->width() > tile_size.width || paste->height() > tile_size.height)) {
-            paste.reset();
-        }
 
         if (corner) {
             img_off = {0, 0};
@@ -575,6 +581,29 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
                 }
             }
         }
+
+        // TODO: (Must) finish...
+        static float fill_den = 0.5;
+        enum opE { None, Capture };
+        opE op = None;
+        // TODO: make this actually work...
+        if (ImGui::BeginPopup("Tile_Menu")) {
+            ctrl.pause2 = true;
+            ImGui::SliderFloat("Fill density", &fill_den, 0.0f, 1.0f);
+            ImGui::Separator();
+            if (ImGui::MenuItem("Random fill", "+")) {
+            }
+            if (ImGui::MenuItem("Clear selected", "backspace")) { // 0/1
+            }
+            if (ImGui::MenuItem("Clear outside", "0")) { // 0/1
+            }
+            if (ImGui::MenuItem("Copy", "c")) {
+            }
+            if (ImGui::MenuItem("Capture", "p")) {
+                op = Capture;
+            }
+            ImGui::EndPopup();
+        }
         if (const auto range = sel.range(); range.height() > 1 || range.width() > 1) {
             // TODO: what if the right mouse is still pressed?
             if (imgui_KeyPressed(ImGuiKey_S, false)) {
@@ -594,35 +623,16 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
             }
             if (imgui_KeyPressed(ImGuiKey_Equal, false)) {
                 // TODO: specify density etc...
-                legacy::random_fill(runner.tile(), global_mt19937(), 0.5, range);
+                legacy::random_fill(runner.tile(), global_mt19937(), fill_den, range);
             }
             // TODO: redesign keyboard ctrl...
             if (imgui_KeyPressed(ImGuiKey_0, false)) {
                 legacy::clear_outside(runner.tile(), range);
             }
 
-            if (imgui_KeyPressed(ImGuiKey_P, false)) {
+            if (imgui_KeyPressed(ImGuiKey_P, false) || op == Capture) {
                 out = capture_closed(runner.tile(), range, ctrl.rule);
             }
-
-            // TODO: support a menu somewhere...
-            // (context menu works poorly with rbutton selection...)
-#if 0
-            if (ImGui::BeginPopupContextItem()) {
-                if (ImGui::MenuItem("Clear selected", "del")) { // 0/1
-                }
-                if (ImGui::MenuItem("Clear outside", "0")) { // 0/1
-                }
-                // randomize-density...
-                if (ImGui::MenuItem("Randomize", "+")) {
-                }
-                if (ImGui::MenuItem("Copy", "c")) {
-                }
-                if (ImGui::MenuItem("Capture", "p")) {
-                }
-                ImGui::EndPopup();
-            }
-#endif
         }
     }
 

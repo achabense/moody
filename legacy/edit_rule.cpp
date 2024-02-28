@@ -125,7 +125,7 @@ public:
         {
             // https://github.com/ocornut/imgui/issues/6902
             const float extra_w_sameline = ImGui::GetStyle().ItemSpacing.x * 2; // Two SameLine...
-            const float extra_w_padding = ImGui::GetStyle().FramePadding.x * 4; // Two SmallButton * two sides...
+            const float extra_w_padding = ImGui::GetStyle().FramePadding.x * 4; // Two Button * two sides...
             const float extra_w = ImGui::CalcTextSize("ClearRecognize").x + extra_w_sameline + extra_w_padding;
             ImGui::SeparatorTextEx(0, "Select subsets", nullptr, extra_w);
             ImGui::SameLine();
@@ -335,6 +335,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         return *mask_ptrs[mask_tag];
     }();
 
+    ImGui::Separator();
+
     // Disable all edit operations if !subset.contains(mask), including those that do not really need
     // the mask to be valid (or even do not depend on subsetT).
     // (These operations include: ... TODO: list all)
@@ -343,7 +345,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
     // do need correct masks.
     // 2. The program already provides a way to get always-usable mask (the "native" mode).
     if (!subset.contains(mask)) {
-        ImGui::Separator();
         // TODO: complete message. other suggestions.
         imgui_StrWrapped(
             "This mask (?rule?) doesn't belong to the selected subsets. Try other masks ... the \"Native\" mask will "
