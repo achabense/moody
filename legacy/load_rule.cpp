@@ -4,6 +4,8 @@
 
 #include "common.hpp"
 
+#define ENABLE_MULTILINE_COPYING
+
 using pathT = std::filesystem::path;
 
 // (wontfix) After wasting so much time, I'd rather afford the extra copy than bothering with "more efficient"
@@ -230,6 +232,21 @@ class textT {
 
     bool should_rewind = true;
 
+#ifdef ENABLE_MULTILINE_COPYING
+    struct selT {
+        int beg = 0, end = 0;
+        bool contains(int l) const {
+            if (beg < end) {
+                return beg <= l && l <= end;
+            } else {
+                return end <= l && l <= beg;
+            }
+        }
+        std::pair<int, int> minmax() const { return std::minmax(beg, end); }
+    };
+    std::optional<selT> m_sel = std::nullopt;
+#endif // ENABLE_MULTILINE_COPYING
+
 public:
     textT() {}
     textT(std::string_view str) { append(str); }
@@ -241,6 +258,10 @@ public:
         m_rules.clear();
         m_pos = 0;
         should_rewind = true;
+
+#ifdef ENABLE_MULTILINE_COPYING
+        m_sel.reset();
+#endif
     }
 
     // `str` is assumed to be utf8-encoded.
@@ -302,15 +323,43 @@ public:
                 ret = true; // TODO: whether to set ret in this case?
             }
         }
+
+#ifdef ENABLE_MULTILINE_COPYING
+        if (ImGui::IsMouseReleased(ImGuiMouseButton_Right) && m_sel) {
+            std::string str;
+            const auto [min, max] = m_sel->minmax();
+            for (int i = min; i <= max; ++i) {
+                if (i != min) {
+                    str += '\n';
+                }
+                str += m_lines[i].text;
+            }
+            messenger::add_msg("{}", str);
+            m_sel.reset();
+        }
+#endif // ENABLE_MULTILINE_COPYING
+
         if (auto child = imgui_ChildWindow("Child")) {
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
             for (int l = 1; const auto& [text, id] : m_lines) {
                 ImGui::TextDisabled("%2d ", l++);
                 ImGui::SameLine();
-                // TODO: (temp) changed back to non-copyable mode; it's possible to support multi-line copying
-                // (which is useful for extracting RLE patterns)
                 imgui_StrWrapped(text);
-                // imgui_StrCopyable(text, imgui_StrWrapped);
+
+#ifdef ENABLE_MULTILINE_COPYING
+                const int this_l = l - 2;
+                if (ImGui::IsItemHovered()) {
+                    if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+                        m_sel = {this_l, this_l};
+                    } else if (m_sel && ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+                        m_sel->end = this_l;
+                    }
+                }
+                if (m_sel && m_sel->contains(this_l)) {
+                    imgui_ItemRectFilled(IM_COL32(255, 255, 255, 90));
+                    continue; // TODO: (temp) using `continue` to make the logics easier to scope.
+                }
+#endif // ENABLE_MULTILINE_COPYING
 
                 if (id.has_value()) {
                     const bool is_mold = m_rules[*id].lock.has_value();

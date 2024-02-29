@@ -360,7 +360,9 @@ namespace legacy {
             bool v = 0;
             auto flush = [&] {
                 if (c != 0) {
-                    if (str.size() > last_nl + 60) {
+                    // TODO: (temp) changed to 58 as 60 may not always fit into a single line under `wrap_len`
+                    // line wrappinng... this is not a necessary change but also does no harm.
+                    if (str.size() > last_nl + 58) {
                         str += '\n';
                         last_nl = str.size();
                     }

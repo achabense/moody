@@ -104,6 +104,11 @@ inline ImVec2 square_size() {
     return ImVec2(r, r);
 }
 
+inline float wrap_len() {
+    // The same as the one in `HelpMarker` in "imgui_demo.cpp".
+    return ImGui::GetFontSize() * 35.0f;
+}
+
 // TODO: (temp) exposing `middle_button` for enter-binding in `edit_rule`
 // TODO (temp) this was defined as a lambda; workaround for a parsing error in clang...
 inline bool default_button(const char* label) { return ImGui::Button(label); }
@@ -154,36 +159,36 @@ inline void iter_group(const char* tag_first, const char* tag_prev, const char* 
 // TODO: better name...
 class messenger {
     inline static std::vector<std::string> m_strs{};
+    inline static bool openable = true;
 
 public:
     messenger() = delete;
 
     template <class... U>
     static void add_msg(std::format_string<const U&...> fmt, const U&... args) noexcept {
-        m_strs.emplace_back(std::format(fmt, args...));
+        m_strs.push_back(std::format(fmt, args...));
     }
 
     static void display() {
-        static bool opened = false;
-
-        if (!opened && !m_strs.empty()) {
+        if (openable && !m_strs.empty()) {
             ImGui::OpenPopup("Message");
-            opened = true;
+            openable = false;
         }
 
-        if (opened) {
-            if (ImGui::BeginPopup("Message")) {
-                for (bool first = true; const std::string& str : m_strs) {
-                    if (!std::exchange(first, false)) {
-                        ImGui::Separator();
-                    }
-                    imgui_Str(str);
+        if (ImGui::BeginPopup("Message")) {
+            assert(!openable && !m_strs.empty());
+            ImGui::PushTextWrapPos(wrap_len());
+            for (bool first = true; const std::string& str : m_strs) {
+                if (!std::exchange(first, false)) {
+                    ImGui::Separator();
                 }
-                ImGui::EndPopup();
-            } else {
-                m_strs.clear();
-                opened = false;
+                imgui_StrCopyable(str, imgui_Str);
             }
+            ImGui::PopTextWrapPos();
+            ImGui::EndPopup();
+        } else {
+            m_strs.clear();
+            openable = true;
         }
     }
 };
@@ -204,10 +209,9 @@ public:
             if (sameline) {
                 ImGui::SameLine(0, 0); // TODO: reconsider spacing when help mode is mostly finished...
             }
-            // Modified from `HelpMarker` in "imgui_demo.cpp".
-            ImGui::TextDisabled("(?)");
+            imgui_Str("(?)");
             if (ImGui::BeginItemTooltip()) {
-                ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+                ImGui::PushTextWrapPos(wrap_len());
                 desc();
                 ImGui::PopTextWrapPos();
                 ImGui::EndTooltip();

@@ -670,6 +670,7 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
             }
             if (imgui_KeyPressed(ImGuiKey_C, false) || imgui_KeyPressed(ImGuiKey_X, false) || op == Copy || op == Cut) {
                 ImGui::SetClipboardText(legacy::to_RLE_str(ctrl.rule, runner.tile(), range).c_str());
+                // messenger::add_msg("{}", legacy::to_RLE_str(ctrl.rule, runner.tile(), range));
             }
             if (imgui_KeyPressed(ImGuiKey_Backspace, false) || imgui_KeyPressed(ImGuiKey_X, false) ||
                 op == Clear_inside || op == Cut) {
