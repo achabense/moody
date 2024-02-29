@@ -474,26 +474,26 @@ namespace legacy {
         });
     }
 
-#if 0
-    inline ruleT shuffle(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand) {
-        assert(subset.contains(mold.rule));
-
-        return transform(subset, mask, mold, [&rand](bool* begin, bool* end) { std::shuffle(begin, end, rand); });
-    }
-#endif
-
-    // TODO: better name: seq_integral / seq_perm
-    // TODO: rename to [set_]first / ...
-    struct act_int {
-        static ruleT first(const subsetT& subset, const maskT& mask, const moldT& mold) {
+    // Integral.
+    struct seq_int {
+        static ruleT min(const subsetT& subset, const maskT& mask, const moldT& mold) {
             return transform(subset, mask, mold, [](bool* begin, bool* end) { std::fill(begin, end, 0); });
         }
 
-        static ruleT last(const subsetT& subset, const maskT& mask, const moldT& mold) {
+        static ruleT one(const subsetT& subset, const maskT& mask, const moldT& mold) {
+            return transform(subset, mask, mold, [](bool* begin, bool* end) {
+                if (begin != end) {
+                    *begin = 1;
+                    std::fill(begin + 1, end, 0);
+                }
+            });
+        }
+
+        static ruleT max(const subsetT& subset, const maskT& mask, const moldT& mold) {
             return transform(subset, mask, mold, [](bool* begin, bool* end) { std::fill(begin, end, 1); });
         }
 
-        static ruleT next(const subsetT& subset, const maskT& mask, const moldT& mold) {
+        static ruleT inc(const subsetT& subset, const maskT& mask, const moldT& mold) {
             assert(subset.contains(mold.rule));
 
             return transform(subset, mask, mold, [](bool* begin, bool* end) {
@@ -506,7 +506,7 @@ namespace legacy {
             });
         }
 
-        static ruleT prev(const subsetT& subset, const maskT& mask, const moldT& mold) {
+        static ruleT dec(const subsetT& subset, const maskT& mask, const moldT& mold) {
             assert(subset.contains(mold.rule));
 
             return transform(subset, mask, mold, [](bool* begin, bool* end) {
@@ -520,13 +520,8 @@ namespace legacy {
         }
     };
 
-    // TODO: ++/--count when reaching end?
-    // Intentionally using reverse_iterator... TODO: explain why...
-    // (TODO: rephrase) As to CTAD vs make_XXX..., here is pitfall for using std::reverse_iterator directly.
-    // https://quuxplusone.github.io/blog/2022/08/02/reverse-iterator-ctad/
-    struct act_perm {
-        // TODO: should there be "set first c to be 1 and rest to be 0" util in the gui?
-
+    // Permutative.
+    struct seq_perm {
         static ruleT first(const subsetT& subset, const maskT& mask, const moldT& mold) {
             assert(subset.contains(mold.rule));
 
@@ -536,6 +531,14 @@ namespace legacy {
                 std::fill_n(begin, c, 1);
             });
         }
+
+#if 0
+        static ruleT shuffle(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand) {
+            assert(subset.contains(mold.rule));
+
+            return transform(subset, mask, mold, [&rand](bool* begin, bool* end) { std::shuffle(begin, end, rand); });
+        }
+#endif
 
         static ruleT last(const subsetT& subset, const maskT& mask, const moldT& mold) {
             assert(subset.contains(mold.rule));
@@ -556,7 +559,7 @@ namespace legacy {
                     return;
                 }
 
-                std::next_permutation(std::make_reverse_iterator(end), std::make_reverse_iterator(begin));
+                std::next_permutation(std::reverse_iterator(end), std::reverse_iterator(begin));
             });
         }
 
@@ -569,7 +572,7 @@ namespace legacy {
                     return;
                 }
 
-                std::prev_permutation(std::make_reverse_iterator(end), std::make_reverse_iterator(begin));
+                std::prev_permutation(std::reverse_iterator(end), std::reverse_iterator(begin));
             });
         }
     };

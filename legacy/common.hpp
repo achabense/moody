@@ -122,7 +122,7 @@ inline void iter_group(const char* tag_first, const char* tag_prev, const char* 
 
     // TODO: (temp) using middle_button=nullptr to mean "middle part uses default_button but is disabled"...
     // This is only for a widget in edit_rule.cpp, and the appearance looks strange. Still needs redesign.
-    ImGui::SameLine();
+    ImGui::SameLine(0, imgui_ItemInnerSpacingX());
     bool enable_scrolling = true;
     if (!middle_button) {
         enable_scrolling = false;
@@ -150,7 +150,7 @@ inline void iter_group(const char* tag_first, const char* tag_prev, const char* 
         }
     }
 
-    ImGui::SameLine();
+    ImGui::SameLine(0, imgui_ItemInnerSpacingX());
     if (ImGui::Button(tag_last)) {
         act_last();
     }
@@ -209,7 +209,7 @@ public:
             if (sameline) {
                 ImGui::SameLine(0, 0); // TODO: reconsider spacing when help mode is mostly finished...
             }
-            imgui_Str("(?)");
+            imgui_StrDisabled("(?)");
             if (ImGui::BeginItemTooltip()) {
                 ImGui::PushTextWrapPos(wrap_len());
                 desc();

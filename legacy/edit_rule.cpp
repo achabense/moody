@@ -242,7 +242,6 @@ public:
     }
 };
 
-// TODO: there must be an [obvious] way to support "dial" mode.
 std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_image& icons) {
     std::optional<legacy::moldT> out;
     auto return_rule = [&out, &mold](const legacy::ruleT& rule) { out.emplace(rule, mold.lock); };
@@ -250,7 +249,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
     auto return_mold = [&out](const legacy::moldT& mold) { out.emplace(mold); };
 
     static std::optional<legacy::moldT> temp_analysis_target = std::nullopt;
-
     static subset_selector selector;
     const legacy::subsetT& subset = selector.select_subset(temp_analysis_target.value_or(mold));
     assert(!subset.empty());
@@ -262,6 +260,9 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
     ImGui::Separator();
 
     // Select mask.
+    // TODO: (temp) temp_analysis_target and temp_dial_target are horrible things...
+    // TODO: better name for "dial"?
+    static std::optional<legacy::moldT> temp_dial_target = std::nullopt;
     char chr_0 = '0', chr_1 = '1';
     const legacy::maskT& mask = [&] {
         // TODO: finish...
@@ -323,6 +324,12 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         if (ImGui::Button("Take current")) {
             mask_tag = 3;
             mask_custom = {mold.rule};
+        }
+        if (temp_dial_target) {
+            mask_tag = 3;
+            mask_custom = {temp_dial_target->rule};
+            return_rule(legacy::seq_int::one(subset, mask_custom, *temp_dial_target));
+            temp_dial_target.reset();
         }
 
         // TODO: horrible...
@@ -419,41 +426,40 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
     // TODO: it looks strange when only middle part is disabled...
     iter_group(
         "<00..", "dec", "inc", "11..>", //
-        [&] { return_rule(legacy::act_int::first(subset, mask, mold)); },
-        [&] { return_rule(legacy::act_int::prev(subset, mask, mold)); },
-        [&] { return_rule(legacy::act_int::next(subset, mask, mold)); },
-        [&] { return_rule(legacy::act_int::last(subset, mask, mold)); }, contained ? enter_button : nullptr);
+        [&] { return_rule(legacy::seq_int::min(subset, mask, mold)); },
+        [&] { return_rule(legacy::seq_int::dec(subset, mask, mold)); },
+        [&] { return_rule(legacy::seq_int::inc(subset, mask, mold)); },
+        [&] { return_rule(legacy::seq_int::max(subset, mask, mold)); }, contained ? enter_button : nullptr);
     ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
 
-    {
-        if (!contained) {
-            ImGui::BeginDisabled();
-        }
-        iter_group(
-            "<1.0.", "p_prev", "p_next", "0.1.>", //
-            [&] { return_rule(legacy::act_perm::first(subset, mask, mold)); },
-            [&] { return_rule(legacy::act_perm::prev(subset, mask, mold)); },
-            [&] { return_rule(legacy::act_perm::next(subset, mask, mold)); },
-            [&] { return_rule(legacy::act_perm::last(subset, mask, mold)); }, enter_button);
-        // TODO: (temp) shuffle is not more useful than randomize, but more convenient sometimes...
-        // ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
-        // if (enter_button("Shuffle")) {
-        //     return_rule(legacy::shuffle(subset, mold, global_mt19937()));
-        // }
+    if (!contained) {
+        ImGui::BeginDisabled();
+    }
+    iter_group(
+        "<1.0.", "prev", "next", "0.1.>", //
+        [&] { return_rule(legacy::seq_perm::first(subset, mask, mold)); },
+        [&] { return_rule(legacy::seq_perm::prev(subset, mask, mold)); },
+        [&] { return_rule(legacy::seq_perm::next(subset, mask, mold)); },
+        [&] { return_rule(legacy::seq_perm::last(subset, mask, mold)); }, enter_button);
 
-        // TODO: (temp) new line begins here...
-        // TODO: enhance might be stricter than necessary...
-        if (ImGui::Button("Enhance lock")) {
-            return_lock(legacy::enhance_lock(subset, mold));
-        }
-        ImGui::SameLine();
-        // TODO: (temp) experimental... may consider the "forging mode" approach finally.
-        if (ImGui::Button("Invert lock")) {
-            return_lock(legacy::invert_lock(subset, mold));
-        }
-        if (!contained) {
-            ImGui::EndDisabled();
-        }
+    ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
+    // TODO: when to use Abc vs abc?
+    if (ImGui::Button("dial")) {
+        temp_dial_target.emplace(mold);
+    }
+    helper::show_help("Equivalent to..."); // TODO...
+
+    // TODO: enhance might be stricter than necessary...
+    if (ImGui::Button("Enhance lock")) {
+        return_lock(legacy::enhance_lock(subset, mold));
+    }
+    ImGui::SameLine();
+    // TODO: (temp) experimental... may consider the "forging mode" approach finally.
+    if (ImGui::Button("Invert lock")) {
+        return_lock(legacy::invert_lock(subset, mold));
+    }
+    if (!contained) {
+        ImGui::EndDisabled();
     }
 
     ImGui::SameLine();
