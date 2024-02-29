@@ -281,7 +281,7 @@ public:
         }
     }
 
-    std::optional<legacy::extrT::valT> display() {
+    void display(std::optional<legacy::extrT::valT>& out) {
         bool ret = false;
         const int total = m_rules.size();
 
@@ -384,16 +384,14 @@ public:
 
         if (ret) {
             assert(m_pos >= 0 && m_pos < total);
-            return m_rules[m_pos];
-        } else {
-            return std::nullopt;
+            out = m_rules[m_pos];
         }
     }
 };
 
 // TODO: show the last opened file in file-nav?
 // TODO: whether to support opening multiple files?
-std::optional<legacy::extrT::valT> load_rule() {
+static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
     static file_nav nav;
 
     struct fileT {
@@ -401,8 +399,6 @@ std::optional<legacy::extrT::valT> load_rule() {
         textT text;
     };
     static std::optional<fileT> file;
-
-    std::optional<legacy::extrT::valT> out;
 
     bool close = false, load = false;
     if (!file) {
@@ -417,7 +413,7 @@ std::optional<legacy::extrT::valT> load_rule() {
         // TODO: unlike the one in file_nav.display, this can be StrWrapped...
         imgui_StrCopyable(cpp17_u8string(file->path), imgui_Str);
 
-        out = file->text.display();
+        file->text.display(out);
     }
 
     if (close) {
@@ -433,6 +429,61 @@ std::optional<legacy::extrT::valT> load_rule() {
             file.reset();
             messenger::add_msg("Found no rules");
         }
+    }
+}
+
+// TODO: awkward...
+static void load_rule_from_clipboard(std::optional<legacy::extrT::valT>& out) {
+    static textT text(".........");
+
+    if (ImGui::SmallButton("Paste")) {
+        if (const char* str = ImGui::GetClipboardText()) {
+            std::string_view str_view(str);
+            // TODO: share with load binary...
+            if (100'000 > str_view.length()) {
+                // TODO: or create and swap?
+                if (legacy::extract_MAP_str(str_view).val) {
+                    text.clear();
+                    text.append(str);
+                } else {
+                    messenger::add_msg("Found no rules");
+                }
+            } else {
+                messenger::add_msg("Text too long: {} > {} (bytes)", 100'000, str_view.size());
+            }
+        }
+    }
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Clear")) {
+        text.clear();
+    }
+
+    text.display(out);
+}
+
+static void load_rule_from_memory(std::optional<legacy::extrT::valT>& out) {
+    static textT text("TODO");
+
+    text.display(out);
+}
+
+std::optional<legacy::extrT::valT> load_rule() {
+    std::optional<legacy::extrT::valT> out = std::nullopt;
+
+    if (ImGui::BeginTabBar("Tabs")) {
+        if (ImGui::BeginTabItem("Open file")) {
+            load_rule_from_file(out);
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Paste")) {
+            load_rule_from_clipboard(out);
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Documents")) {
+            load_rule_from_memory(out);
+            ImGui::EndTabItem();
+        }
+        ImGui::EndTabBar();
     }
 
     return out;

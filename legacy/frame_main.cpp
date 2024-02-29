@@ -1,7 +1,9 @@
 #include "common.hpp"
 
-// TODO: (Must) add "About" window.
 // TODO: (Must) add help-mode coverage.
+
+// TODO: (Must) finish... should not be too ugly...
+static void about_this_program() { imgui_StrCopyable("TODO...", imgui_StrWrapped); }
 
 // TODO: improve recorder logic (especially `update`...)
 // Never empty.
@@ -82,11 +84,12 @@ void frame_main(const code_image& icons, tile_image& img) {
 
     static bool show_load = true;
     static bool show_static = false;
+    static bool show_about = false;
 
     if (show_load) {
         // TODO: which is responsible for setting Size(Constraints)? frame_main or load_rule?
         ImGui::SetNextWindowSize({600, 400}, ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSizeConstraints(ImVec2(400, 200), ImVec2(FLT_MAX, FLT_MAX));
+        ImGui::SetNextWindowSizeConstraints(ImVec2(400, 300), ImVec2(FLT_MAX, FLT_MAX));
         if (auto window = imgui_Window("Load rule", &show_load, ImGuiWindowFlags_NoCollapse)) {
             if (auto out = load_rule()) {
                 assign_val(current, *out);
@@ -121,20 +124,21 @@ void frame_main(const code_image& icons, tile_image& img) {
         ImGui::Checkbox("\"Load\"", &show_load);
         ImGui::SameLine();
         ImGui::Checkbox("\"Static\"", &show_static);
+        ImGui::SameLine();
+        if (ImGui::Checkbox("\"About\"", &show_about) && show_about) {
+            ImGui::OpenPopup("About this program");
+        }
+        // TODO: refine...
+        if (show_about) {
+            ImGui::SetNextWindowSize({500, 300}, ImGuiCond_Always);
+        }
+        if (ImGui::BeginPopupModal("About this program", &show_about, ImGuiWindowFlags_NoResize)) {
+            about_this_program();
+            ImGui::EndPopup();
+        }
+
         // TODO: whether to show FPS/Framecount? whether to show time-since-startup?
         // ImGui::Text("    (%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
-        // TODO: (Must) remove paste button; formally support pasting in load_rule part.
-        ImGui::SameLine();
-        if (ImGui::Button("Paste")) {
-            if (const char* str = ImGui::GetClipboardText()) {
-                if (auto out = legacy::extract_MAP_str(std::string_view(str)).val) {
-                    assign_val(current, *out);
-                    update = true;
-                } else {
-                    messenger::add_msg("No rule");
-                }
-            }
-        }
         ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
         // TODO: simplify? unlike the one in fileT::display, this is mainly for undo/redo...
         iter_group(
