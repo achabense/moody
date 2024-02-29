@@ -396,9 +396,19 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
     // TODO: should be able to recognize "rule = " part in the rle string.
     // TODO: about the plan for boundless space and space period...
 
-    const bool corner = ImGui::Button("Corner"); // TODO: move elsewhere...
+    const legacy::tileT::sizeT tile_size = runner.tile().size(); // TODO: which (vs init.size) is better?
+    const ImVec2 img_size(tile_size.width * img_zoom, tile_size.height * img_zoom);
+
+    if (ImGui::Button("Corner")) {
+        img_off = {0, 0};
+    }
     ImGui::SameLine();
-    const bool center = ImGui::Button("Center");
+    if (ImGui::Button("Center")) {
+        img_off = last_known_canvas_size / 2 - img_size / 2;
+        // TODO (temp) /img_zoom->floor->*img_zoom, so that img_off will be {0, 0} after fitting.
+        img_off.x = floor(img_off.x / img_zoom) * img_zoom;
+        img_off.y = floor(img_off.y / img_zoom) * img_zoom;
+    }
     // TODO: select all, unselect button...
     ImGui::SameLine();
     if (ImGui::Button("...")) {
@@ -421,6 +431,8 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
         }
     }
 
+    ctrl.pause2 = false; // TODO: recheck when to set pause2...
+
     {
         ImGui::InvisibleButton("Canvas", [] {
             // Values of GetContentRegionAvail() can be negative...
@@ -433,17 +445,17 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
         const ImVec2 canvas_size = ImGui::GetItemRectSize();
         last_known_canvas_size = canvas_size;
 
-        const legacy::tileT::sizeT tile_size = runner.tile().size(); // TODO: which (vs init.size) is better?
-        const ImVec2 img_size(tile_size.width * img_zoom, tile_size.height * img_zoom);
-
-        if (corner) {
-            img_off = {0, 0};
+        if (ImGui::IsItemActive()) {
+            ctrl.pause2 = true;
         }
-        if (center) {
-            img_off = canvas_size / 2 - img_size / 2;
-            // TODO (temp) /img_zoom->floor->*img_zoom, so that img_off will be {0, 0} after fitting.
-            img_off.x = floor(img_off.x / img_zoom) * img_zoom;
-            img_off.y = floor(img_off.y / img_zoom) * img_zoom;
+        if (ImGui::IsItemHovered() && ImGui::IsItemActive()) {
+            // Some logics rely on this to be done before rendering to work well.
+            const ImGuiIO& io = ImGui::GetIO();
+            if (io.KeyCtrl && img_zoom == 1) {
+                runner.shift(io.MouseDelta.x, io.MouseDelta.y);
+            } else {
+                img_off += io.MouseDelta;
+            }
         }
 
         const ImVec2 img_min = canvas_min + img_off;
@@ -487,45 +499,29 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
         }
         drawlist->PopClipRect();
 
-        const bool active = ImGui::IsItemActive();
-        ctrl.pause2 = paste || active; // TODO: won't work if |= active... should ctrl.run clear pause2?
-
-        if (sel && sel->active) {
-            if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-                ctrl.pause2 = true;
-            } else {
-                sel->active = false;
-                // TODO: shrinking (bounding_box) has no size check like this. This is intentional.
-                // (to allow a single r-click to unselect the area.)
-                if (sel->width() <= 1 && sel->height() <= 1) {
-                    sel.reset();
-                }
+        if (sel && sel->active && !ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+            sel->active = false;
+            // TODO: shrinking (bounding_box) has no size check like this. This is intentional.
+            // (to allow a single r-click to unselect the area.)
+            if (sel->width() <= 1 && sel->height() <= 1) {
+                sel.reset();
             }
+            // if (sel && ImGui::IsMouseReleased(ImGuiMouseButton_Right)) {
+            //     ImGui::OpenPopup("Tile_Menu");
+            // }
         }
 
         if (ImGui::IsItemHovered()) {
-            // TODO: reorganize...
-            const ImGuiIO& io = ImGui::GetIO();
-
             assert(ImGui::IsMousePosValid());
-            // It turned out that, this will work well even if outside of the image...
-            const ImVec2 mouse_pos = io.MousePos;
+            // This will work well even if outside of the image.
+            const ImVec2 mouse_pos = ImGui::GetIO().MousePos;
             const ImVec2 cell_pos_raw = (mouse_pos - img_min) / img_zoom;
             const int celx = floor(cell_pos_raw.x);
             const int cely = floor(cell_pos_raw.y);
 
-            if (active) {
-                if (!io.KeyCtrl) {
-                    img_off += io.MouseDelta;
-                } else if (img_zoom == 1) {
-                    runner.shift(io.MouseDelta.x, io.MouseDelta.y);
-                }
-            }
-
-            // TODO: refine...
-            if (img_zoom <= 2 && !paste && !ImGui::IsMouseDown(ImGuiMouseButton_Left) &&
-                !ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+            if (img_zoom == 1 && !paste && !ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
                 if (celx >= -10 && celx < tile_size.width + 10 && cely >= -10 && cely < tile_size.height + 10) {
+                    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
                     if (ImGui::BeginItemTooltip()) {
                         const int w = std::min(tile_size.width, 40);
                         const int h = std::min(tile_size.height, 40);
@@ -546,29 +542,23 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
                         }
 
                         assert(w == maxx - minx && h == maxy - miny);
-                        // TODO: show some text...
                         ImGui::Image(img.texture(), ImVec2(w * 4, h * 4),
                                      {(float)minx / tile_size.width, (float)miny / tile_size.height},
                                      {(float)maxx / tile_size.width, (float)maxy / tile_size.height});
                         ImGui::EndTooltip();
                     }
+                    ImGui::PopStyleVar();
                 }
             }
 
-            // TODO: precedence against left-clicking?
             if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
                 const legacy::tileT::posT pos{.x = std::clamp(celx, 0, tile_size.width - 1),
                                               .y = std::clamp(cely, 0, tile_size.height - 1)};
                 sel = {.active = true, .beg = pos, .end = pos};
-            }
-            if (sel && sel->active && ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-                ctrl.pause2 = true;
+            } else if (sel && sel->active && ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
                 sel->end.x = std::clamp(celx, 0, tile_size.width - 1);
                 sel->end.y = std::clamp(cely, 0, tile_size.height - 1);
             }
-            // if (ImGui::IsMouseReleased(ImGuiMouseButton_Right) && !sel.empty()) {
-            //     ImGui::OpenPopup("Tile_Menu");
-            // }
 
             // TODO: refactor away this block...
             // TODO: the logic will be simplified if invisible button goes before the image...
@@ -673,6 +663,10 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
                 out = capture_closed(runner.tile(), range, ctrl.rule);
             }
         }
+    }
+
+    if (paste || (sel && sel->active)) {
+        ctrl.pause2 = true;
     }
 
     ImGui::PopItemWidth();
