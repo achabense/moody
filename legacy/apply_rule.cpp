@@ -166,34 +166,17 @@ struct ctrlT {
 // TODO: explain...
 struct selectT {
     bool active = true;
-    // []
-    legacy::tileT::posT select_0{0, 0}, select_1{0, 0};
+    legacy::tileT::posT beg{0, 0}, end{0, 0}; // [] instead of [).
 
-    void clear() { select_0 = select_1 = {0, 0}; }
-#if 0
-    void toggle_select_all(legacy::tileT::sizeT size) {
-        // all-selected ? clear : select-all
-        const auto [begin, end] = range();
-        if (begin.x == 0 && begin.y == 0 && end.x == size.width && end.y == size.height) {
-            clear();
-        } else {
-            select_0 = {0, 0};
-            select_1 = {.x = size.width - 1, .y = size.height - 1};
-        }
-    }
-#endif
+    legacy::tileT::rangeT to_range() const {
+        const auto [xmin, xmax] = std::minmax(beg.x, end.x);
+        const auto [ymin, ymax] = std::minmax(beg.y, end.y);
 
-    legacy::tileT::rangeT range() const {
-        int x0 = select_0.x, x1 = select_1.x;
-        int y0 = select_0.y, y1 = select_1.y;
-        if (x0 > x1) {
-            std::swap(x0, x1);
-        }
-        if (y0 > y1) {
-            std::swap(y0, y1);
-        }
-        return {.begin{x0, y0}, .end{x1 + 1, y1 + 1}};
+        return {.begin{xmin, ymin}, .end{xmax + 1, ymax + 1}};
     }
+
+    int width() const { return std::abs(beg.x - end.x) + 1; }
+    int height() const { return std::abs(beg.y - end.y) + 1; }
 };
 
 std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_image& img) {
@@ -426,9 +409,7 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
     // TODO: provide an easy way to clear selection...
     if (sel) {
         ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
-        const auto range = sel->range();
-        if (ImGui::Button(
-                std::format("Drop selection (w:{} h:{})###drop_sel", range.width(), range.height()).c_str())) {
+        if (ImGui::Button(std::format("Drop selection (w:{} h:{})###drop_sel", sel->width(), sel->height()).c_str())) {
             sel.reset();
         }
     }
@@ -498,7 +479,7 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
         }
 
         if (sel) {
-            const auto range = sel->range();
+            const auto range = sel->to_range();
             const ImVec2 sel_min = img_min + ImVec2(range.begin.x, range.begin.y) * img_zoom;
             const ImVec2 sel_max = img_min + ImVec2(range.end.x, range.end.y) * img_zoom;
             drawlist->AddRectFilled(sel_min, sel_max, IM_COL32(0, 255, 0, 40));
@@ -514,6 +495,11 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
                 ctrl.pause2 = true;
             } else {
                 sel->active = false;
+                // TODO: shrinking (bounding_box) has no size check like this. This is intentional.
+                // (to allow a single r-click to unselect the area.)
+                if (sel->width() <= 1 && sel->height() <= 1) {
+                    sel.reset();
+                }
             }
         }
 
@@ -573,12 +559,12 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
             if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
                 const legacy::tileT::posT pos{.x = std::clamp(celx, 0, tile_size.width - 1),
                                               .y = std::clamp(cely, 0, tile_size.height - 1)};
-                sel = {.active = true, .select_0 = pos, .select_1 = pos};
+                sel = {.active = true, .beg = pos, .end = pos};
             }
             if (sel && sel->active && ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
                 ctrl.pause2 = true;
-                sel->select_1.x = std::clamp(celx, 0, tile_size.width - 1);
-                sel->select_1.y = std::clamp(cely, 0, tile_size.height - 1);
+                sel->end.x = std::clamp(celx, 0, tile_size.width - 1);
+                sel->end.y = std::clamp(cely, 0, tile_size.height - 1);
             }
             // if (ImGui::IsMouseReleased(ImGuiMouseButton_Right) && !sel.empty()) {
             //     ImGui::OpenPopup("Tile_Menu");
@@ -610,10 +596,13 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
             }
         }
 
-        // TODO: re-impl selection toggling...
-        // if (imgui_KeyPressed(ImGuiKey_A, false)) {
-        //     sel.toggle_select_all(tile_size);
-        // }
+        if (imgui_KeyPressed(ImGuiKey_A, false)) {
+            if (!sel || sel->width() != tile_size.width || sel->height() != tile_size.height) {
+                sel = {.active = false, .beg = {0, 0}, .end = {.x = tile_size.width - 1, .y = tile_size.height - 1}};
+            } else {
+                sel.reset();
+            }
+        }
         if (imgui_KeyPressed(ImGuiKey_V, false)) {
             if (const char* text = ImGui::GetClipboardText()) {
                 try {
@@ -655,15 +644,13 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
             ImGui::EndPopup();
         }
         if (sel) {
-            const auto range = sel->range();
+            const auto range = sel->to_range();
 
             // TODO: what if these keys are pressed together?
             if (imgui_KeyPressed(ImGuiKey_S, false) || op == Shrink) {
                 const auto [begin, end] = legacy::bounding_box(runner.tile(), range);
                 if (begin != end) {
-                    sel->select_0 = begin;
-                    sel->select_1 = {.x = end.x - 1, .y = end.y - 1};
-                    sel->active = false;
+                    sel = {.active = false, .beg = begin, .end = {.x = end.x - 1, .y = end.y - 1}};
                 } else {
                     sel.reset();
                 }
