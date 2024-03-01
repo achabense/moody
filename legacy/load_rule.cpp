@@ -424,10 +424,13 @@ static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
         file->text.clear();
         if (auto data = load_binary(file->path, 100'000)) {
             file->text.append(*data);
-        }
-        if (!file->text.has_rule()) {
+            if (!file->text.has_rule()) {
+                file.reset();
+                messenger::add_msg("Found no rules");
+            }
+        } else {
             file.reset();
-            messenger::add_msg("Found no rules");
+            // load_binary has done messenger::add_msg.
         }
     }
 }

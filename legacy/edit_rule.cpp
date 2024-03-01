@@ -366,57 +366,74 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
 
     const legacy::ruleT_masked masked = mask ^ mold.rule;
     const auto scanlist = legacy::scan(par, masked, mold.lock);
-    const auto [c_free, c_locked_0, c_locked_1] = [&] {
-        const int c_group = par.k();
-        int c_locked_0 = 0, c_locked_1 = 0;
-        int c_0 = 0, c_1 = 0;
-        int c_inconsistent = 0;
-        for (const auto& scan : scanlist) {
-            if (scan.locked_0) {
-                ++c_locked_0;
-            } else if (scan.locked_1) {
-                ++c_locked_1;
-            }
-            if (scan.all_0()) {
-                ++c_0;
-            } else if (scan.all_1()) {
-                ++c_1;
-            } else if (scan.inconsistent()) {
-                ++c_inconsistent;
-            }
-        }
-        // TODO: redesign what to show based on compatible/contained/...
-        ImGui::Text("Groups:%d [Locked:%d(0:%d,1:%d)] [%c:%d] [%c:%d] [x:%d]", c_group, c_locked_0 + c_locked_1,
-                    c_locked_0, c_locked_1, chr_0, c_0, chr_1, c_1, c_inconsistent);
-        return std::array{c_group - c_locked_0 - c_locked_1, c_locked_0, c_locked_1};
-    }();
-
-    if (!compatible) {
-        ImGui::BeginDisabled();
-    }
 
     {
+        const auto [c_free, c_locked_0, c_locked_1] = [&] {
+            const int c_group = par.k();
+            int c_0 = 0, c_1 = 0, c_x = 0;
+            int c_free = 0;
+            int c_locked_0 = 0, c_locked_1 = 0, c_locked_x = 0;
+            for (const auto& scan : scanlist) {
+                if (scan.all_0()) {
+                    ++c_0;
+                } else if (scan.all_1()) {
+                    ++c_1;
+                } else {
+                    // c_x: number of groups that make `mold.rule` uncontained.
+                    ++c_x;
+                }
+
+                if (!scan.locked_0 && !scan.locked_1) {
+                    ++c_free;
+                } else if (!scan.locked_0 && scan.locked_1) {
+                    ++c_locked_1;
+                } else if (scan.locked_0 && !scan.locked_1) {
+                    ++c_locked_0;
+                } else {
+                    // c_locked_x: number of groups that make `mold` incompatible.
+                    ++c_locked_x;
+                }
+            }
+
+            assert(contained == !c_x);
+            assert(compatible == !c_locked_x);
+
+            // TODO: refine...
+            std::string summary = std::format("Groups:{} ({}:{} {}:{} x:{})", c_group, chr_0, c_0, chr_1, c_1, c_x);
+            if (c_free != c_group) {
+                summary += std::format(" [Locked:{} ({}:{} {}:{} x:{})]", c_group - c_free, chr_0, c_locked_0, chr_1,
+                                       c_locked_1, c_locked_x);
+            }
+            imgui_Str(summary);
+
+            assert(c_free + c_locked_0 + c_locked_1 + c_locked_x == c_group);
+            return std::array{c_free, c_locked_0, c_locked_1};
+        }();
+
+        if (!compatible) {
+            ImGui::BeginDisabled();
+        }
+
+        // dist: The "distance" to the masking rule the randomization want to achieve.
+        // (which does not make sense when !compatible)
+        static double density = 0.5;
+        int dist = c_locked_1 + round(density * c_free);
+
         static bool exact_mode = true;
-        if (ImGui::Button(std::format("{}###Mode", exact_mode ? "Exactly" : "Around ").c_str())) {
+        if (ImGui::Button(exact_mode ? "Exactly###Mode" : "Around ###Mode")) {
             exact_mode = !exact_mode;
         }
 
         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-
-        // TODO (temp) finally this is stable...
-        // TODO: explain; better name...
-        static double density = 0.5;
-        int rcount = c_locked_1 + round(density * c_free);
-
         ImGui::SetNextItemWidth(item_width);
-        if (imgui_StepSliderInt("##Quantity", &rcount, c_locked_1, c_locked_1 + c_free) && c_free != 0) {
-            density = double(rcount - c_locked_1) / c_free;
-            assert(c_locked_1 + round(density * c_free) == rcount);
+        if (imgui_StepSliderInt("##Quantity", &dist, c_locked_1, c_locked_1 + c_free) && c_free != 0) {
+            density = double(dist - c_locked_1) / c_free;
+            assert(c_locked_1 + round(density * c_free) == dist);
         }
         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
         if (enter_button("Randomize")) {
             if (exact_mode) {
-                return_rule(legacy::randomize_c(subset, mask, mold, global_mt19937(), rcount - c_locked_1));
+                return_rule(legacy::randomize_c(subset, mask, mold, global_mt19937(), dist - c_locked_1));
             } else {
                 return_rule(legacy::randomize_d(subset, mask, mold, global_mt19937(), density));
             }
@@ -454,7 +471,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         return_lock(legacy::enhance_lock(subset, mold));
     }
     ImGui::SameLine();
-    // TODO: (temp) experimental... may consider the "forging mode" approach finally.
     if (ImGui::Button("Invert lock")) {
         return_lock(legacy::invert_lock(subset, mold));
     }
