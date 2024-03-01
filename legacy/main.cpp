@@ -71,7 +71,7 @@ screenT::~screenT() {
     }
 }
 
-code_image::code_image() {
+code_icons::code_icons() {
     const int width = 3, height = 3 * 512;
     m_texture = create_texture(SDL_TEXTUREACCESS_STATIC, width, height);
     // Using heap allocation to avoid "Function uses XXX bytes of stack" warning.
@@ -89,7 +89,7 @@ code_image::code_image() {
     SDL_UpdateTexture(static_cast<SDL_Texture*>(m_texture), nullptr, pixels.get(), width * sizeof(Uint32));
 }
 
-code_image::~code_image() { SDL_DestroyTexture(static_cast<SDL_Texture*>(m_texture)); }
+code_icons::~code_icons() { SDL_DestroyTexture(static_cast<SDL_Texture*>(m_texture)); }
 
 // The encoding of `argv` cannot be relied upon, see:
 // https://stackoverflow.com/questions/5408730/what-is-the-encoding-of-argv
@@ -208,7 +208,7 @@ int main(int, char**) {
     };
 
     {
-        code_image icons;
+        code_icons icons;
         screenT screen;
 
         while (begin_frame()) {

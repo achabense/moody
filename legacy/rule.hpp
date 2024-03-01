@@ -12,7 +12,6 @@
 
 // Must: Must be done before initial release.
 // TODO: (Must) better name for namespace `legacy`.
-// TODO: (Must) remove outdated TODOs.
 
 #ifndef NDEBUG
 #define ENABLE_TESTS
@@ -110,7 +109,7 @@ namespace legacy {
     }  // namespace _tests
 #endif // ENABLE_TESTS
 
-    // Map `situT` (represented by `codeT`) to the value `s` become at next generation.
+    // Map `situT` (encoded as `codeT`) to the value `s` become at next generation.
     class ruleT {
         codeT::map_to<bool> m_map{};
 
@@ -122,6 +121,10 @@ namespace legacy {
 
         friend bool operator==(const ruleT&, const ruleT&) = default;
     };
+
+    // The program uses normal "MAP strings" to store the rules (so the output can be accepted by other
+    // programs like Golly), which is based on `q*256+w*128+...` encoding scheme.
+    // See `to_MAP` and `from_MAP` below for details.
 
     template <class T>
     concept rule_like = std::is_invocable_r_v<bool, T, codeT>;
@@ -156,7 +159,7 @@ namespace legacy {
         ruleT rule{};
         lockT lock{};
 
-        // Does `r` have the same values for all locked codes?
+        // Test whether `r` has the same values for all locked codes.
         bool compatible(const ruleT& r) const {
             return for_each_code_all_of([&](codeT code) { //
                 return !lock[code] || rule[code] == r[code];
@@ -239,7 +242,7 @@ namespace legacy {
         }
     } // namespace _misc
 
-    // Convert ruleT to a "MAP rule" string.
+    // Convert ruleT to a "MAP string".
     inline std::string to_MAP_str(const ruleT& rule) {
         std::string str = "MAP";
         _misc::to_MAP(str, rule);
@@ -296,9 +299,6 @@ namespace legacy {
 
 #ifdef ENABLE_TESTS
     namespace _tests {
-        // https://golly.sourceforge.io/Help/Algorithms/QuickLife.html
-        // > So, Conway's Life (B3/S23) encoded as a MAP rule is:
-        // > rule = MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA
         inline const testT test_MAP_str = [] {
             {
                 const std::string_view str = "...";
@@ -309,6 +309,9 @@ namespace legacy {
             }
 
             {
+                // https://golly.sourceforge.io/Help/Algorithms/QuickLife.html
+                // > So, Conway's Life (B3/S23) encoded as a MAP rule is:
+                // > rule = MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA
                 const std::string_view gol_str =
                     "MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA";
                 const ruleT gol = game_of_life();

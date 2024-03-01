@@ -53,7 +53,6 @@ inline void imgui_StrCopyable(const std::string& str, void (*str_func)(std::stri
     }
 }
 
-// TODO: still clunky...
 inline float imgui_ItemInnerSpacingX() { return ImGui::GetStyle().ItemInnerSpacing.x; }
 
 // TODO: referring to ImGui::InputScalar; recheck...

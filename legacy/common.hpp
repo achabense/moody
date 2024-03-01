@@ -46,18 +46,18 @@ public:
 };
 
 // Provide texture for codes.
-class code_image {
+class code_icons {
     ImTextureID m_texture;
 
 public:
-    code_image(const code_image&) = delete;
-    code_image& operator=(const code_image&) = delete;
+    code_icons(const code_icons&) = delete;
+    code_icons& operator=(const code_icons&) = delete;
 
-    code_image();
-    ~code_image();
+    code_icons();
+    ~code_icons();
 
     void image(legacy::codeT code, int zoom, const ImVec4& tint_col = ImVec4(1, 1, 1, 1),
-               const ImVec4 border_col = ImVec4(0, 0, 0, 0)) const {
+               const ImVec4& border_col = ImVec4(0, 0, 0, 0)) const {
         const ImVec2 size(3 * zoom, 3 * zoom);
         const ImVec2 uv0(0, code * (1.0f / 512));
         const ImVec2 uv1(1, (code + 1) * (1.0f / 512));
@@ -78,11 +78,11 @@ public:
 
 // Managed by `main`.
 bool file_nav_add_special_path(const char* u8path, const char* title);
-void frame_main(const code_image& icons, screenT& screen);
+void frame_main(const code_icons& icons, screenT& screen);
 
 // Managed by `frame_main`.
 std::optional<legacy::extrT::valT> load_rule();
-std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_image& icons);
+std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_icons& icons);
 std::optional<legacy::moldT> static_constraints();
 std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, screenT& screen);
 
@@ -103,8 +103,8 @@ inline float wrap_len() {
     return ImGui::GetFontSize() * 35.0f;
 }
 
-// TODO: (temp) exposing `middle_button` for enter-binding in `edit_rule`
-// TODO (temp) this was defined as a lambda; workaround for a parsing error in clang...
+// (Workaround; exposing `middle_button` for enter-binding in `edit_rule`)
+// (This was defined as a lambda; workaround for a parsing error in clang...)
 inline bool default_button(const char* label) { return ImGui::Button(label); }
 
 inline void iter_group(const char* label_first, const char* label_prev, const char* label_next, const char* label_last,
@@ -114,8 +114,8 @@ inline void iter_group(const char* label_first, const char* label_prev, const ch
         act_first();
     }
 
-    // TODO: (temp) using middle_button=nullptr to mean "middle part uses default_button but is disabled"...
-    // This is only for a widget in edit_rule.cpp, and the appearance looks strange. Still needs redesign.
+    // (Workaround; using middle_button = nullptr to mean "middle part uses default_button and is disabled")
+    // (This is only for a widget in edit_rule.cpp, and the appearance looks strange. Still needs redesign.)
     ImGui::SameLine(0, imgui_ItemInnerSpacingX());
     bool enable_scrolling = true;
     if (!middle_button) {
@@ -163,6 +163,7 @@ public:
         m_strs.push_back(std::format(fmt, args...));
     }
 
+    // Managed by `frame_main`.
     static void display() {
         if (openable && !m_strs.empty()) {
             ImGui::OpenPopup("Message");
@@ -190,9 +191,8 @@ public:
 // TODO: override the transparency? (so will be normally displayed even in disabled block...)
 // TODO: better name... app_helper? (is this program an "app"?)
 class helper {
-    friend void frame_main(const code_image&, screenT&);
+    friend void frame_main(const code_icons&, screenT&);
     static inline bool enable_help = false;
-    // static inline bool toggle = true; // TODO: add a toggle?
 
 public:
     // TODO: (temp) returning `enable_help` as an awkward workaround to detect whether the helpmark is shown (to decide

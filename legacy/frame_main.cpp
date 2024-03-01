@@ -71,7 +71,7 @@ static void assign_val(legacy::moldT& mold, legacy::extrT::valT& val) {
     }
 }
 
-void frame_main(const code_image& icons, screenT& screen) {
+void frame_main(const code_icons& icons, screenT& screen) {
     messenger::display();
 
 #ifndef NDEBUG

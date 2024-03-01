@@ -242,7 +242,7 @@ public:
     }
 };
 
-std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_image& icons) {
+std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_icons& icons) {
     std::optional<legacy::moldT> out = std::nullopt;
     auto return_rule = [&out, &mold](const legacy::ruleT& rule) { out.emplace(rule, mold.lock); };
     auto return_lock = [&out, &mold](const legacy::moldT::lockT& lock) { out.emplace(mold.rule, lock); };

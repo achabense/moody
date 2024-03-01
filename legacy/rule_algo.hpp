@@ -55,14 +55,14 @@ namespace legacy {
             for_each_code([&](codeT code) { parof[code] = code; });
         }
 
-        // Does `r` have the same value in each group?
+        // Test whether `r` has the same value in each group?
         bool test(const ruleT_masked& r) const {
             return for_each_code_all_of([&](codeT code) { //
                 return r[code] == r[parof[code]];
             });
         }
 
-        // Does `r` have the same value for locked codes in each group?
+        // Test whether `r` has the same value for locked codes in each group?
         bool test(const ruleT_masked& r, const moldT::lockT& lock) const {
             codeT::map_to<int> record;
             record.fill(-1);
@@ -378,7 +378,7 @@ namespace legacy {
         return lock;
     }
 
-    // Does there exist any rule that belongs to both `subset` and `mold`?
+    // Test whether there exists any rule that belongs to both `subset` and `mold`?
     // TODO: about moldT::compatible...
     inline bool compatible(const subsetT& subset, const moldT& mold) {
         if (subset.empty()) {
