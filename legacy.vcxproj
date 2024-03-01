@@ -72,19 +72,19 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>F:\lib\SDL2-devel-2.28.4-VC\SDL2-2.28.4\include;C:\*redacted*\source\repos\legacy\legacy\imgui;$(IncludePath)</IncludePath>
+    <IncludePath>F:\lib\SDL2-devel-2.28.4-VC\SDL2-2.28.4\include;C:\*redacted*\source\repos\legacy\imgui;C:\*redacted*\source\repos\legacy\imgui_sdl2</IncludePath>
     <LibraryPath>F:\lib\SDL2-devel-2.28.4-VC\SDL2-2.28.4\lib\x64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IncludePath>F:\lib\SDL2-devel-2.28.4-VC\SDL2-2.28.4\include;C:\*redacted*\source\repos\legacy\legacy\imgui;$(IncludePath)</IncludePath>
+    <IncludePath>F:\lib\SDL2-devel-2.28.4-VC\SDL2-2.28.4\include;C:\*redacted*\source\repos\legacy\imgui;C:\*redacted*\source\repos\legacy\imgui_sdl2</IncludePath>
     <LibraryPath>F:\lib\SDL2-devel-2.28.4-VC\SDL2-2.28.4\lib\x64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>F:\lib\SDL2-devel-2.28.4-VC\SDL2-2.28.4\include;C:\*redacted*\source\repos\legacy\legacy\imgui;C:\*redacted*\source\repos\legacy\legacy\imgui_sdl2;$(IncludePath)</IncludePath>
+    <IncludePath>F:\lib\SDL2-devel-2.28.4-VC\SDL2-2.28.4\include;C:\*redacted*\source\repos\legacy\imgui;C:\*redacted*\source\repos\legacy\imgui_sdl2</IncludePath>
     <LibraryPath>F:\lib\SDL2-devel-2.28.4-VC\SDL2-2.28.4\lib\x64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>F:\lib\SDL2-devel-2.28.4-VC\SDL2-2.28.4\include;C:\*redacted*\source\repos\legacy\legacy\imgui;C:\*redacted*\source\repos\legacy\legacy\imgui_sdl2;$(IncludePath)</IncludePath>
+    <IncludePath>F:\lib\SDL2-devel-2.28.4-VC\SDL2-2.28.4\include;C:\*redacted*\source\repos\legacy\imgui;C:\*redacted*\source\repos\legacy\imgui_sdl2</IncludePath>
     <LibraryPath>F:\lib\SDL2-devel-2.28.4-VC\SDL2-2.28.4\lib\x64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -154,33 +154,33 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="common.hpp" />
-    <ClInclude Include="dear_imgui.hpp" />
+    <ClInclude Include="src\common.hpp" />
+    <ClInclude Include="src\dear_imgui.hpp" />
     <ClInclude Include="imgui\imconfig.h" />
     <ClInclude Include="imgui\imgui.h" />
     <ClInclude Include="imgui\imgui_internal.h" />
     <ClInclude Include="imgui_sdl2\imgui_impl_sdl2.h" />
     <ClInclude Include="imgui_sdl2\imgui_impl_sdlrenderer2.h" />
-    <ClInclude Include="rule_algo.hpp" />
-    <ClInclude Include="tile.hpp" />
-    <ClInclude Include="rule.hpp" />
+    <ClInclude Include="src\rule_algo.hpp" />
+    <ClInclude Include="src\tile.hpp" />
+    <ClInclude Include="src\rule.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="apply_rule.cpp" />
+    <ClCompile Include="src\apply_rule.cpp" />
     <ClCompile Include="imgui\imgui.cpp" />
     <ClCompile Include="imgui\imgui_demo.cpp" />
     <ClCompile Include="imgui\imgui_draw.cpp" />
     <ClCompile Include="imgui\imgui_tables.cpp" />
     <ClCompile Include="imgui\imgui_widgets.cpp" />
-    <ClCompile Include="load_rule.cpp" />
-    <ClCompile Include="main.cpp" />
+    <ClCompile Include="src\load_rule.cpp" />
+    <ClCompile Include="src\main.cpp" />
     <ClCompile Include="imgui_sdl2\imgui_impl_sdl2.cpp" />
     <ClCompile Include="imgui_sdl2\imgui_impl_sdlrenderer2.cpp" />
-    <ClCompile Include="edit_rule.cpp" />
-    <ClCompile Include="frame_main.cpp" />
+    <ClCompile Include="src\edit_rule.cpp" />
+    <ClCompile Include="src\frame_main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include=".clang-format" />
+    <None Include="src\.clang-format" />
     <None Include="README.md" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

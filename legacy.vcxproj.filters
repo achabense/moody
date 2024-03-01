@@ -21,10 +21,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="rule.hpp">
+    <ClInclude Include="src\rule.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="tile.hpp">
+    <ClInclude Include="src\tile.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="imgui_sdl2\imgui_impl_sdl2.h">
@@ -42,18 +42,18 @@
     <ClInclude Include="imgui\imconfig.h">
       <Filter>imgui</Filter>
     </ClInclude>
-    <ClInclude Include="rule_algo.hpp">
+    <ClInclude Include="src\rule_algo.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="dear_imgui.hpp">
+    <ClInclude Include="src\dear_imgui.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="common.hpp">
+    <ClInclude Include="src\common.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
+    <ClCompile Include="src\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="imgui_sdl2\imgui_impl_sdl2.cpp">
@@ -77,21 +77,21 @@
     <ClCompile Include="imgui\imgui_widgets.cpp">
       <Filter>imgui</Filter>
     </ClCompile>
-    <ClCompile Include="edit_rule.cpp">
+    <ClCompile Include="src\edit_rule.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="apply_rule.cpp">
+    <ClCompile Include="src\apply_rule.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="load_rule.cpp">
+    <ClCompile Include="src\load_rule.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="frame_main.cpp">
+    <ClCompile Include="src\frame_main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include=".clang-format" />
+    <None Include="src\.clang-format" />
     <None Include="README.md" />
   </ItemGroup>
 </Project>
