@@ -102,25 +102,28 @@ public:
         }
     }
 
-    // TODO: recheck logic...
-    void shift(int dx, int dy) {
+    // (0, 0) is mapped to (wrap(dx), wrap(dy)).
+    void rotate(int dx, int dy) {
         const int width = m_tile.width(), height = m_tile.height();
 
         const auto wrap = [](int v, int r) { return ((v % r) + r) % r; };
-        dx = wrap(-dx, width);
-        dy = wrap(-dy, height);
+        dx = wrap(dx, width);
+        dy = wrap(dy, height);
+        assert(dx >= 0 && dx < width && dy >= 0 && dy < height);
         if (dx == 0 && dy == 0) {
             return;
         }
 
+        [[maybe_unused]] const bool test = m_tile.line(0)[0];
         m_temp.resize(m_tile.size());
         for (int y = 0; y < height; ++y) {
-            const bool* source = m_tile.line((y + dy) % height);
-            bool* dest = m_temp.line(y);
-            std::copy_n(source, width, dest);
-            std::rotate(dest, dest + dx, dest + width);
+            const bool* source = m_tile.line(y);
+            bool* dest = m_temp.line((y + dy) % height);
+            std::copy_n(source, width - dx, dest + dx);
+            std::copy_n(source + width - dx, dx, dest);
         }
         m_tile.swap(m_temp);
+        assert(test == m_tile.line(dy)[dx]);
     }
 };
 
@@ -450,7 +453,7 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
             // Some logics rely on this to be done before rendering to work well.
             const ImGuiIO& io = ImGui::GetIO();
             if (io.KeyCtrl && img_zoom == 1) {
-                runner.shift(io.MouseDelta.x, io.MouseDelta.y);
+                runner.rotate(io.MouseDelta.x, io.MouseDelta.y);
             } else {
                 img_off += io.MouseDelta;
             }
