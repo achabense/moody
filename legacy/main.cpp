@@ -107,10 +107,10 @@ int main(int, char**) {
     SDL_SetHint(SDL_HINT_IME_SHOW_UI, "1");
 #endif
 
-    // TODO: "MAP explorer"?
     // Create window with SDL_Renderer graphics context
     const SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-    window = SDL_CreateWindow("Rule editor", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
+    window =
+        SDL_CreateWindow("MAP-rule explorer", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
     if (!window) {
         resource_failure();
     }
@@ -120,17 +120,14 @@ int main(int, char**) {
 #else
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 #endif // !DISABLE_FRAMETATE_CAPPING
-
     if (!renderer) {
         resource_failure();
     }
 
     // Setup Dear ImGui context
-    IMGUI_CHECKVERSION(); // TODO: where is this needed? should every source-file add this check?
     ImGui::CreateContext();
 
-    // TODO: Currently the controls of the program are poorly designed, and are especially not taking
-    // navigation mode into consideration...
+    // Currently the controls of the program work poorly with navigation mode.
     assert(!(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_NavEnableKeyboard));
     assert(!(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_NavEnableGamepad));
 
@@ -141,7 +138,7 @@ int main(int, char**) {
     ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
     ImGui_ImplSDLRenderer2_Init(renderer);
 
-    // TODO: works but blurry, and how to apply in project?
+    // Test-only.
     // ImGui::GetIO().Fonts->AddFontFromFileTTF(R"(C:\Windows\Fonts\Deng.ttf)", 13, nullptr,
     //                                          ImGui::GetIO().Fonts->GetGlyphRangesChineseFull());
 
@@ -152,7 +149,7 @@ int main(int, char**) {
         }
 
         file_nav_add_special_path(base_path, "Exe path");
-        // TODO: remove when finished...
+        // TODO: (Must) remove when finished...
         file_nav_add_special_path(R"(C:\*redacted*\Desktop\rulelists_new)", "Temp");
 
         const std::string path = base_path;
@@ -165,8 +162,7 @@ int main(int, char**) {
         };
 
         // Freeze the absolute path of "imgui.ini" and "imgui_log.txt".
-        // (wontfix) These memory leaks are intentional, as in this case I don't want to care about
-        // when to delete them...
+        // (wontfix) These memory leaks are intentional, as it's hard to decide when to delete them...
         assert(path.ends_with('\\') || path.ends_with('/'));
         ImGui::GetIO().IniFilename = strdup(path + "imgui.ini");
         ImGui::GetIO().LogFilename = strdup(path + "imgui_log.txt");
@@ -179,14 +175,13 @@ int main(int, char**) {
             if (event.type == SDL_QUIT) {
                 return false;
             }
-            // TODO: this appears not needed:
-            if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE &&
-                event.window.windowID == SDL_GetWindowID(window)) {
-                return false;
-            }
+            // This appears not needed.
+            // if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE &&
+            //     event.window.windowID == SDL_GetWindowID(window)) {
+            //     return false;
+            // }
         }
 
-        // Start the Dear ImGui frame
         ImGui_ImplSDLRenderer2_NewFrame();
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();

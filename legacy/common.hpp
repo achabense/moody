@@ -7,6 +7,8 @@
 #include "dear_imgui.hpp"
 #include "rule.hpp"
 
+/* Not inline */ static const bool check_version = IMGUI_CHECKVERSION();
+
 #if 0
 // Enforce that ordinary string literals are encoded with utf-8.
 // This requires certain compiler flags to be set (e.g. `/utf-8` in MSVC).
