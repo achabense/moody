@@ -4,6 +4,9 @@
 
 #include "common.hpp"
 
+// TODO: whether to consider write access (file-editing etc)?
+// TODO: support saving into file? (without relying on the clipboard)
+
 #define ENABLE_MULTILINE_COPYING
 
 using pathT = std::filesystem::path;
@@ -25,15 +28,23 @@ static pathT cpp17_u8path(const std::string_view path) { //
     return pathT(std::u8string(path.begin(), path.end()));
 }
 
-// TODO: recheck...
-// TODO: able to create/append/open file?
+static std::vector<std::pair<pathT, std::string>> special_paths;
+bool file_nav_add_special_path(const char* u8path, const char* title) {
+    std::error_code ec{};
+    pathT p = std::filesystem::canonical(cpp17_u8path(u8path), ec);
+    if (!ec) {
+        special_paths.emplace_back(std::move(p), title);
+        return true;
+    }
+    return false;
+}
+
 class file_nav {
     using entryT = std::filesystem::directory_entry;
 
     char buf_path[200]{};
     char buf_filter[20]{};
 
-    // TODO: is canonical path necessary?
     bool m_valid = false; // The last call to `collect(current, ...)` is successful.
     pathT m_current;      // Canonical path.
     std::vector<entryT> m_dirs, m_files;
@@ -88,18 +99,6 @@ public:
         set_current(path);
     }
 
-    // TODO: refine...
-    inline static std::vector<std::pair<pathT, std::string>> additionals;
-    static bool add_special_path(const char* u8path, const char* title) {
-        std::error_code ec{};
-        pathT p = std::filesystem::canonical(cpp17_u8path(u8path), ec);
-        if (!ec) {
-            additionals.emplace_back(std::move(p), title);
-            return true;
-        }
-        return false;
-    }
-
     [[nodiscard]] std::optional<pathT> display() {
         std::optional<pathT> target = std::nullopt;
 
@@ -124,7 +123,7 @@ public:
                     set_current(m_current / cpp17_u8path(buf_path));
                     buf_path[0] = '\0';
                 }
-                for (const auto& [path, title] : additionals) {
+                for (const auto& [path, title] : special_paths) {
                     if (ImGui::MenuItem(title.c_str())) {
                         set_current(path);
                     }
@@ -146,8 +145,6 @@ public:
                         }
                     }
                     if (sel) {
-                        // TODO: does directory_entry.path always return absolute path?
-                        assert(sel->path().is_absolute());
                         set_current(sel->path());
                     }
                 }
@@ -179,10 +176,6 @@ public:
     }
 };
 
-bool file_nav_add_special_path(const char* u8path, const char* title) {
-    return file_nav::add_special_path(u8path, title);
-}
-
 static std::optional<std::string> load_binary(const pathT& path, int max_size) {
     std::error_code ec{};
     const auto size = std::filesystem::file_size(path, ec);
@@ -204,10 +197,6 @@ static std::optional<std::string> load_binary(const pathT& path, int max_size) {
     }
     return {};
 }
-
-// TODO: support saving into file? (without relying on the clipboard)
-
-// TODO: better name? docT?
 
 // It is easy to locate all rules in the text via `extract_MAP_str`.
 // However there are no easy ways to locate or highlight (only) the rule across the lines.
@@ -351,7 +340,7 @@ public:
                 }
                 if (m_sel && m_sel->contains(this_l)) {
                     imgui_ItemRectFilled(IM_COL32(255, 255, 255, 90));
-                    continue; // TODO: (temp) using `continue` to make the logics easier to scope.
+                    continue;
                 }
 #endif // ENABLE_MULTILINE_COPYING
 
@@ -384,7 +373,7 @@ public:
 };
 
 // TODO: show the last opened file in file-nav?
-// TODO: whether to support opening multiple files?
+// TODO: support opening multiple files?
 static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
     static file_nav nav;
 
@@ -408,7 +397,6 @@ static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
         close = ImGui::SmallButton("Close");
         ImGui::SameLine();
         load = ImGui::SmallButton("Reload");
-        // TODO: unlike the one in file_nav.display, this can be StrWrapped...
         imgui_StrCopyable(cpp17_u8string(file->path), imgui_Str);
 
         file->text.display(out);
