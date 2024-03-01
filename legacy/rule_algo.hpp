@@ -55,14 +55,14 @@ namespace legacy {
             for_each_code([&](codeT code) { parof[code] = code; });
         }
 
-        // Test whether `r` has the same value in each group?
+        // Test whether `r` has the same value in each group.
         bool test(const ruleT_masked& r) const {
             return for_each_code_all_of([&](codeT code) { //
                 return r[code] == r[parof[code]];
             });
         }
 
-        // Test whether `r` has the same value for locked codes in each group?
+        // Test whether `r` has the same value for locked codes in each group.
         bool test(const ruleT_masked& r, const moldT::lockT& lock) const {
             codeT::map_to<int> record;
             record.fill(-1);
@@ -181,11 +181,10 @@ namespace legacy {
         }
     };
 
-    // TODO ...
-    // A subsetT (s = {} or (m, p)) defines a subset of all possible ruleT, where:
-    // ...
-    // (As a result, any rule in the subset can be used as the mask without ...)
-    // About interaction with `moldT`...
+    // A `subsetT` (s = {} or (m, p)) defines a subset of all MAP rules, where:
+    // A rule (r) belongs to a non-empty subset iff (m ^ r) has the same value for each group in (p).
+    // (As a result, any rule in the subset can equally serve as the mask. There is no difference which rule is used.)
+    // It can be proven that the intersection of `subsetT` is also `subsetT` (see below).
     class subsetT {
         struct nonemptyT {
             maskT mask;
@@ -299,7 +298,7 @@ namespace legacy {
     }
 
     // TODO: enhance...
-    inline auto scan(const partitionT& par, const ruleT_masked& rule, const moldT::lockT& lock) {
+    inline auto scan(const partitionT& par, const maskT& mask, const moldT& mold) {
         struct counterT {
             int free_0 = 0, free_1 = 0;
             int locked_0 = 0, locked_1 = 0; // 0/1 means masked value.
@@ -313,13 +312,14 @@ namespace legacy {
             bool inconsistent() const { return !all_0() && !all_1(); }
         };
 
+        const ruleT_masked r = mask ^ mold.rule;
         std::vector<counterT> vec(par.k());
         par.for_each_group([&](int j, const groupT& group) {
             for (codeT code : group) {
-                if (lock[code]) {
-                    rule[code] ? ++vec[j].locked_1 : ++vec[j].locked_0;
+                if (mold.lock[code]) {
+                    r[code] ? ++vec[j].locked_1 : ++vec[j].locked_0;
                 } else {
-                    rule[code] ? ++vec[j].free_1 : ++vec[j].free_0;
+                    r[code] ? ++vec[j].free_1 : ++vec[j].free_0;
                 }
             }
         });
@@ -378,7 +378,7 @@ namespace legacy {
         return lock;
     }
 
-    // Test whether there exists any rule that belongs to both `subset` and `mold`?
+    // Test whether there exists any rule that belongs to both `subset` and `mold`.
     // TODO: about moldT::compatible...
     inline bool compatible(const subsetT& subset, const moldT& mold) {
         if (subset.empty()) {
@@ -396,11 +396,12 @@ namespace legacy {
 
         const maskT& mask = subset.get_mask();
         const partitionT& par = subset.get_par();
-        const auto scanlist = scan(par, mask ^ mold.rule, mold.lock);
+        const auto scanlist = scan(par, mask, mold);
 
         ruleT_masked r{};
         par.for_each_group([&](int j, const groupT& group) {
             const auto& scan = scanlist[j];
+            assert(!(scan.locked_0 && scan.locked_1));
             // TODO: explain; recheck...
             const bool v = scan.locked_0 ? 0 : scan.locked_1 ? 1 : scan.free_0 > scan.free_1 ? 0 : 1;
             for (codeT code : group) {

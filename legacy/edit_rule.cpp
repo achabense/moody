@@ -364,8 +364,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
     const bool contained = subset.contains(mold.rule);
     assert(!contained || compatible); // contained -> compatible
 
-    const legacy::ruleT_masked masked = mask ^ mold.rule;
-    const auto scanlist = legacy::scan(par, masked, mold.lock);
+    const auto scanlist = legacy::scan(par, mask, mold);
 
     {
         const auto [c_free, c_locked_0, c_locked_1] = [&] {
@@ -506,6 +505,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
     // TODO: support filtering?
     if (auto child = imgui_ChildWindow("Details")) {
         const char labels[2][3]{{'-', chr_0, '\0'}, {'-', chr_1, '\0'}};
+        const legacy::ruleT_masked masked = mask ^ mold.rule;
 
         // Precise vertical alignment:
         // https://github.com/ocornut/imgui/issues/2064

@@ -7,7 +7,6 @@
 
 namespace legacy {
     // TODO: explain layout.
-    // TODO: add assertions about emptiness...
     class tileT {
     public:
         struct posT {
@@ -24,7 +23,6 @@ namespace legacy {
             return {.x = pos.x + size.width, .y = pos.y + size.height};
         }
 
-        // TODO: whether to consider ranges like {[0,0],[0,100]} to be valid empty range?
         struct rangeT {
             posT begin, end; // [)
             int width() const {
@@ -101,11 +99,11 @@ namespace legacy {
 
     private:
         bool* _line(int _y) {
-            assert(_y >= 0 && _y < m_size.height + 2);
+            assert(m_data && _y >= 0 && _y < m_size.height + 2);
             return m_data + _y * (m_size.width + 2);
         }
         const bool* _line(int _y) const {
-            assert(_y >= 0 && _y < m_size.height + 2);
+            assert(m_data && _y >= 0 && _y < m_size.height + 2);
             return m_data + _y * (m_size.width + 2);
         }
 
