@@ -69,6 +69,7 @@ class file_nav {
         }
     }
 
+public:
     void refresh_if_valid() {
         if (m_valid) {
             try {
@@ -82,7 +83,6 @@ class file_nav {
         }
     }
 
-public:
     file_nav(const pathT& path = std::filesystem::current_path()) {
         m_valid = false;
         set_current(path);
@@ -90,7 +90,7 @@ public:
 
     // TODO: refine...
     inline static std::vector<std::pair<pathT, std::string>> additionals;
-    static bool add_special_path(const char* u8path, const char* title) { //
+    static bool add_special_path(const char* u8path, const char* title) {
         std::error_code ec{};
         pathT p = std::filesystem::canonical(cpp17_u8path(u8path), ec);
         if (!ec) {
@@ -102,10 +102,6 @@ public:
 
     [[nodiscard]] std::optional<pathT> display() {
         std::optional<pathT> target = std::nullopt;
-
-        if (ImGui::SmallButton("Refresh")) {
-            refresh_if_valid();
-        }
 
         if (m_valid) {
             imgui_StrCopyable(cpp17_u8string(m_current), imgui_Str);
@@ -209,9 +205,7 @@ static std::optional<std::string> load_binary(const pathT& path, int max_size) {
     return {};
 }
 
-// TODO: should support clipboard paste in similar ways...
 // TODO: support saving into file? (without relying on the clipboard)
-// TODO: support in-memory loadings. (e.g. tutorial about typical ways to find interesting rules)
 
 // TODO: better name? docT?
 
@@ -402,6 +396,10 @@ static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
 
     bool close = false, load = false;
     if (!file) {
+        if (ImGui::SmallButton("Refresh")) {
+            nav.refresh_if_valid();
+        }
+
         if (auto sel = nav.display()) {
             file.emplace(*sel);
             load = true;
@@ -435,35 +433,6 @@ static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
     }
 }
 
-// TODO: awkward...
-static void load_rule_from_clipboard(std::optional<legacy::extrT::valT>& out) {
-    static textT text(".........");
-
-    if (ImGui::SmallButton("Paste")) {
-        if (const char* str = ImGui::GetClipboardText()) {
-            std::string_view str_view(str);
-            // TODO: share with load binary...
-            if (100'000 > str_view.length()) {
-                // TODO: or create and swap?
-                if (legacy::extract_MAP_str(str_view).val) {
-                    text.clear();
-                    text.append(str);
-                } else {
-                    messenger::add_msg("Found no rules");
-                }
-            } else {
-                messenger::add_msg("Text too long: {} > {} (bytes)", 100'000, str_view.size());
-            }
-        }
-    }
-    ImGui::SameLine();
-    if (ImGui::SmallButton("Clear")) {
-        text.clear();
-    }
-
-    text.display(out);
-}
-
 static void load_rule_from_memory(std::optional<legacy::extrT::valT>& out) {
     static textT text("TODO");
 
@@ -476,10 +445,6 @@ std::optional<legacy::extrT::valT> load_rule() {
     if (ImGui::BeginTabBar("Tabs")) {
         if (ImGui::BeginTabItem("Open file")) {
             load_rule_from_file(out);
-            ImGui::EndTabItem();
-        }
-        if (ImGui::BeginTabItem("Paste")) {
-            load_rule_from_clipboard(out);
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("Documents")) {

@@ -136,6 +136,18 @@ void frame_main(const code_image& icons, tile_image& img) {
             about_this_program();
             ImGui::EndPopup();
         }
+        // TODO: (temp) added back... a decent pasting util is really hard to design...
+        ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
+        if (ImGui::Button("Paste")) {
+            if (const char* str = ImGui::GetClipboardText()) {
+                if (auto out = legacy::extract_MAP_str(std::string_view(str)).val) {
+                    assign_val(current, *out);
+                    update = true;
+                } else {
+                    messenger::add_msg("Found no rules");
+                }
+            }
+        }
 
         // TODO: whether to show FPS/Framecount? whether to show time-since-startup?
         // ImGui::Text("    (%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());

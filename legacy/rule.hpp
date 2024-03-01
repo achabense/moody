@@ -103,7 +103,7 @@ namespace legacy {
 
 #ifdef ENABLE_TESTS
     namespace _tests {
-        inline const testT test_codeT = [] { //
+        inline const testT test_codeT = [] {
             for_each_code([](codeT code) { assert(encode(decode(code)) == code); });
             assert(for_each_code_all_of([](codeT code) { return encode(decode(code)) == code; }));
         };
@@ -267,7 +267,10 @@ namespace legacy {
     };
 
     // Extract ruleT or moldT from text.
-    inline extrT extract_MAP_str(const char* begin, const char* end) {
+    inline extrT extract_MAP_str(std::span<const char> data) {
+        const char* begin = data.data();
+        const char* end = data.data() + data.size();
+
         extrT extr{};
 
         static_assert((512 + 5) / 6 == 86);
@@ -289,10 +292,6 @@ namespace legacy {
         }
 
         return extr;
-    }
-
-    inline extrT extract_MAP_str(std::span<const char> data) {
-        return extract_MAP_str(data.data(), data.data() + data.size());
     }
 
 #ifdef ENABLE_TESTS
