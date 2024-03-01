@@ -179,6 +179,7 @@ struct selectT {
     int height() const { return std::abs(beg.y - end.y) + 1; }
 };
 
+// TODO: the canvas part is horribly written, needs heavy refactorings in the future...
 std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_image& img) {
     std::optional<legacy::moldT::lockT> out = std::nullopt;
 
@@ -280,7 +281,6 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
         helper::show_help("Advance generation by 1 (instead of pace). This is useful for ...");
         if (ctrl.pause) {
             ImGui::SameLine();
-            // TODO: The usage of format looks wasteful...
             if (ImGui::Button(std::format("+p({})###+p", ctrl.actual_pace()).c_str())) {
                 extra = ctrl.actual_pace();
             }
@@ -415,8 +415,6 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
         ImGui::OpenPopup("Tile_Menu"); // TODO: temp; when should the menu appear?
     }
     // TODO: whether to allow sel and paste to co-exist?
-    // TODO: whether to allow 1*1 selection?
-    // TODO: provide an easy way to clear selection...
     if (sel) {
         ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
         if (ImGui::Button(std::format("Drop selection (w:{} h:{})###drop_sel", sel->width(), sel->height()).c_str())) {
@@ -498,6 +496,18 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
             drawlist->AddRect(sel_min, sel_max, IM_COL32(0, 255, 0, 160));
         }
         drawlist->PopClipRect();
+
+        // TODO: temporarily put here...
+        if (imgui_KeyPressed(ImGuiKey_V, false)) {
+            if (const char* text = ImGui::GetClipboardText()) {
+                try {
+                    // TODO: or ask whether to resize runner.tile?
+                    paste.emplace(legacy::from_RLE_str(text, tile_size));
+                } catch (const std::exception& err) {
+                    messenger::add_msg("{}", err.what());
+                }
+            }
+        }
 
         if (sel && sel->active && !ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
             sel->active = false;
@@ -582,7 +592,7 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
                 }
                 img_off = (mouse_pos - cell_pos_raw * img_zoom) - canvas_min;
                 img_off.x = round(img_off.x);
-                img_off.y = round(img_off.y); // TODO: is rounding correct?
+                img_off.y = round(img_off.y);
             }
         }
 
@@ -591,16 +601,6 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
                 sel = {.active = false, .beg = {0, 0}, .end = {.x = tile_size.width - 1, .y = tile_size.height - 1}};
             } else {
                 sel.reset();
-            }
-        }
-        if (imgui_KeyPressed(ImGuiKey_V, false)) {
-            if (const char* text = ImGui::GetClipboardText()) {
-                try {
-                    // TODO: or ask whether to resize runner.tile?
-                    paste.emplace(legacy::from_RLE_str(text, tile_size));
-                } catch (const std::exception& err) {
-                    messenger::add_msg("{}", err.what());
-                }
             }
         }
 

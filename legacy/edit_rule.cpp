@@ -243,26 +243,26 @@ public:
 };
 
 std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_image& icons) {
-    std::optional<legacy::moldT> out;
+    std::optional<legacy::moldT> out = std::nullopt;
     auto return_rule = [&out, &mold](const legacy::ruleT& rule) { out.emplace(rule, mold.lock); };
     auto return_lock = [&out, &mold](const legacy::moldT::lockT& lock) { out.emplace(mold.rule, lock); };
     auto return_mold = [&out](const legacy::moldT& mold) { out.emplace(mold); };
 
-    static std::optional<legacy::moldT> temp_analysis_target = std::nullopt;
+    // pass_* are data passed from the previous frame.
+    static std::optional<legacy::moldT> pass_analysis_target = std::nullopt;
     static subset_selector selector;
-    const legacy::subsetT& subset = selector.select_subset(temp_analysis_target.value_or(mold));
+    const legacy::subsetT& subset = selector.select_subset(pass_analysis_target.value_or(mold));
     assert(!subset.empty());
     const legacy::partitionT& par = subset.get_par();
-    if (temp_analysis_target) {
-        temp_analysis_target.reset();
+
+    if (pass_analysis_target) {
+        pass_analysis_target.reset();
     }
 
     ImGui::Separator();
 
     // Select mask.
-    // TODO: (temp) temp_analysis_target and temp_dial_target are horrible things...
-    // TODO: better name for "dial"?
-    static std::optional<legacy::moldT> temp_dial_target = std::nullopt;
+    static std::optional<legacy::ruleT> pass_custom_mask = std::nullopt;
     char chr_0 = '0', chr_1 = '1';
     const legacy::maskT& mask = [&] {
         // TODO: finish...
@@ -291,6 +291,12 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             "Important tip: ..."};
         static int mask_tag = 0;
 
+        if (pass_custom_mask) {
+            mask_tag = 3;
+            mask_custom = {*pass_custom_mask};
+            pass_custom_mask.reset();
+        }
+
         // TODO: the support for other make_mask(bpos_* (other than bpos_s)) was poorly designed and dropped.
         // Redesign to add back these masks.
         const legacy::maskT* const mask_ptrs[]{&legacy::mask_zero, &legacy::mask_identity, &subset.get_mask(),
@@ -308,7 +314,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
             }
 
             if (ImGui::IsItemHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-                temp_analysis_target.emplace(*mask_ptrs[i]);
+                pass_analysis_target.emplace(*mask_ptrs[i]);
             }
 
             helper::show_help([&] {
@@ -324,12 +330,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         if (ImGui::Button("Take current")) {
             mask_tag = 3;
             mask_custom = {mold.rule};
-        }
-        if (temp_dial_target) {
-            mask_tag = 3;
-            mask_custom = {temp_dial_target->rule};
-            return_rule(legacy::seq_int::one(subset, mask_custom, *temp_dial_target));
-            temp_dial_target.reset();
         }
 
         // TODO: horrible...
@@ -460,9 +460,11 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ima
         [&] { return_rule(legacy::seq_perm::last(subset, mask, mold)); }, enter_button);
 
     ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
+    // TODO: better name for "dial"?
     // TODO: when to use Abc vs abc?
     if (ImGui::Button("dial")) {
-        temp_dial_target.emplace(mold);
+        pass_custom_mask.emplace(mold.rule);
+        return_rule(legacy::seq_int::one(subset, {mold.rule}, mold));
     }
     helper::show_help("Equivalent to..."); // TODO...
 
