@@ -37,7 +37,7 @@ static Uint32 color_for(bool b) {
     return b ? -1 /* White */ : 0 /* Black*/;
 }
 
-void tile_image::refresh(const int w, const int h, std::function<const bool*(int)> getline) {
+void screenT::refresh(const int w, const int h, std::function<const bool*(int)> getline) {
     if (!m_texture || m_w != w || m_h != h) {
         if (m_texture) {
             SDL_DestroyTexture(static_cast<SDL_Texture*>(m_texture));
@@ -65,7 +65,7 @@ void tile_image::refresh(const int w, const int h, std::function<const bool*(int
     SDL_UnlockTexture(static_cast<SDL_Texture*>(m_texture));
 }
 
-tile_image::~tile_image() {
+screenT::~screenT() {
     if (m_texture) {
         SDL_DestroyTexture(static_cast<SDL_Texture*>(m_texture));
     }
@@ -209,10 +209,10 @@ int main(int, char**) {
 
     {
         code_image icons;
-        tile_image img;
+        screenT screen;
 
         while (begin_frame()) {
-            frame_main(icons, img);
+            frame_main(icons, screen);
             end_frame();
 
 #ifndef DISABLE_FRAMETATE_CAPPING

@@ -28,35 +28,24 @@ inline void assert_utf8_encoding() {
 // To make things easy the program does not try to deal with these strings.
 #endif
 
-using std::chrono_literals::operator""ms;
-using clockT = std::chrono::steady_clock;
-
-// TODO: switch to mt19937_64?
-inline std::mt19937& global_mt19937() {
-    static std::mt19937 rand{(uint32_t)time(0)};
-    return rand;
-}
-
-// TODO: look for better names for tile_image and code_image.
-// TODO: screen_image?
-class tile_image {
+// Provide texture for cells.
+class screenT {
     int m_w, m_h;
     ImTextureID m_texture;
 
 public:
-    tile_image(const tile_image&) = delete;
-    tile_image& operator=(const tile_image&) = delete;
+    screenT(const screenT&) = delete;
+    screenT& operator=(const screenT&) = delete;
 
-    tile_image() : m_w{}, m_h{}, m_texture{nullptr} {}
+    screenT() : m_w{}, m_h{}, m_texture{nullptr} {}
 
-    ~tile_image();
-    // TODO: explain
+    ~screenT();
     void refresh(int w, int h, std::function<const bool*(int)> getline);
 
     ImTextureID texture() const { return m_texture; }
 };
 
-// TODO: code_icons?
+// Provide texture for codes.
 class code_image {
     ImTextureID m_texture;
 
@@ -87,15 +76,20 @@ public:
     }
 };
 
+// Managed by `main`.
 bool file_nav_add_special_path(const char* u8path, const char* title);
-std::optional<legacy::extrT::valT> load_rule();
+void frame_main(const code_image& icons, screenT& screen);
 
+// Managed by `frame_main`.
+std::optional<legacy::extrT::valT> load_rule();
 std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_image& icons);
 std::optional<legacy::moldT> static_constraints();
+std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, screenT& screen);
 
-std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_image& img);
-
-void frame_main(const code_image& icons, tile_image& img);
+inline std::mt19937& global_mt19937() {
+    static std::mt19937 rand{(uint32_t)time(0)};
+    return rand;
+}
 
 inline const int item_width = 220;
 
@@ -113,10 +107,10 @@ inline float wrap_len() {
 // TODO (temp) this was defined as a lambda; workaround for a parsing error in clang...
 inline bool default_button(const char* label) { return ImGui::Button(label); }
 
-inline void iter_group(const char* tag_first, const char* tag_prev, const char* tag_next, const char* tag_last,
+inline void iter_group(const char* label_first, const char* label_prev, const char* label_next, const char* label_last,
                        const auto& act_first, const auto& act_prev, const auto& act_next, const auto& act_last,
                        bool (*const middle_button)(const char*) = default_button) {
-    if (ImGui::Button(tag_first)) {
+    if (ImGui::Button(label_first)) {
         act_first();
     }
 
@@ -129,12 +123,12 @@ inline void iter_group(const char* tag_first, const char* tag_prev, const char* 
         ImGui::BeginDisabled();
     }
     ImGui::BeginGroup();
-    if ((middle_button ? middle_button : default_button)(tag_prev)) {
+    if ((middle_button ? middle_button : default_button)(label_prev)) {
         enable_scrolling = false;
         act_prev();
     }
     ImGui::SameLine(0, 0), imgui_Str("/"), ImGui::SameLine(0, 0);
-    if ((middle_button ? middle_button : default_button)(tag_next)) {
+    if ((middle_button ? middle_button : default_button)(label_next)) {
         enable_scrolling = false;
         act_next();
     }
@@ -151,7 +145,7 @@ inline void iter_group(const char* tag_first, const char* tag_prev, const char* 
     }
 
     ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-    if (ImGui::Button(tag_last)) {
+    if (ImGui::Button(label_last)) {
         act_last();
     }
 };
@@ -196,7 +190,7 @@ public:
 // TODO: override the transparency? (so will be normally displayed even in disabled block...)
 // TODO: better name... app_helper? (is this program an "app"?)
 class helper {
-    friend void frame_main(const code_image&, tile_image&);
+    friend void frame_main(const code_image&, screenT&);
     static inline bool enable_help = false;
     // static inline bool toggle = true; // TODO: add a toggle?
 

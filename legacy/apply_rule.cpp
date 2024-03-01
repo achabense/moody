@@ -6,8 +6,8 @@
 
 #include "common.hpp"
 
-static void refresh(tile_image& img, const legacy::tileT& tile) {
-    img.refresh(tile.width(), tile.height(), [&tile](int y) { return tile.line(y); });
+static void refresh(screenT& screen, const legacy::tileT& tile) {
+    screen.refresh(tile.width(), tile.height(), [&tile](int y) { return tile.line(y); });
 }
 
 static void run_torus(legacy::tileT& tile, legacy::tileT& temp, const legacy::rule_like auto& rule) {
@@ -183,7 +183,7 @@ struct selectT {
 };
 
 // TODO: the canvas part is horribly written, needs heavy refactorings in the future...
-std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_image& img) {
+std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, screenT& screen) {
     std::optional<legacy::moldT::lockT> out = std::nullopt;
 
     // TODO: the constraint is arbitrary; are there more sensible ways to decide size constraint?
@@ -199,9 +199,9 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
 
     static ctrlT ctrl{.rule = rule, .pace = 1, .anti_strobing = true, .gap_frame = 0, .pause = false};
 
-    static ImVec2 img_off = {0, 0};
-    static int img_zoom = 1;
-    assert(img_off.x == int(img_off.x) && img_off.y == int(img_off.y));
+    static ImVec2 screen_off = {0, 0};
+    static int screen_zoom = 1;
+    assert(screen_off.x == int(screen_off.x) && screen_off.y == int(screen_off.y));
 
     static std::optional<legacy::tileT> paste = std::nullopt;
     static legacy::tileT::posT paste_beg{0, 0}; // dbegin for copy... (TODO: this is confusing...)
@@ -345,8 +345,8 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
                 const bool has_h = std::from_chars(input_height, std::end(input_height), height).ec == std::errc{};
                 // ~ the value is unmodified if `from_chars` fails.
                 if (has_w || has_h) {
-                    img_off = {0, 0};
-                    img_zoom = 1;
+                    screen_off = {0, 0};
+                    screen_zoom = 1;
                     const legacy::tileT::sizeT size = size_clamped(width, height);
                     if (init.size != size) {
                         init.size = size;
@@ -371,12 +371,12 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
                 ImGui::SameLine(0, imgui_ItemInnerSpacingX());
             }
             if (ImGui::Button(std::to_string(z).c_str(), size)) {
-                img_zoom = z;
-                img_off = {0, 0};
+                screen_zoom = z;
+                screen_off = {0, 0};
 
                 // TODO: explain that `last_known_canvas_size` works well...
-                const legacy::tileT::sizeT size =
-                    size_clamped((int)last_known_canvas_size.x / img_zoom, (int)last_known_canvas_size.y / img_zoom);
+                const legacy::tileT::sizeT size = size_clamped((int)last_known_canvas_size.x / screen_zoom,
+                                                               (int)last_known_canvas_size.y / screen_zoom);
                 if (init.size != size) {
                     init.size = size;
                     sel.reset();
@@ -400,17 +400,17 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
     // TODO: about the plan for boundless space and space period...
 
     const legacy::tileT::sizeT tile_size = runner.tile().size(); // TODO: which (vs init.size) is better?
-    const ImVec2 img_size(tile_size.width * img_zoom, tile_size.height * img_zoom);
+    const ImVec2 screen_size(tile_size.width * screen_zoom, tile_size.height * screen_zoom);
 
     if (ImGui::Button("Corner")) {
-        img_off = {0, 0};
+        screen_off = {0, 0};
     }
     ImGui::SameLine();
     if (ImGui::Button("Center")) {
-        img_off = last_known_canvas_size / 2 - img_size / 2;
-        // TODO (temp) /img_zoom->floor->*img_zoom, so that img_off will be {0, 0} after fitting.
-        img_off.x = floor(img_off.x / img_zoom) * img_zoom;
-        img_off.y = floor(img_off.y / img_zoom) * img_zoom;
+        screen_off = last_known_canvas_size / 2 - screen_size / 2;
+        // TODO (temp) /screen_zoom->floor->*screen_zoom, so that screen_off will be {0, 0} after fitting.
+        screen_off.x = floor(screen_off.x / screen_zoom) * screen_zoom;
+        screen_off.y = floor(screen_off.y / screen_zoom) * screen_zoom;
     }
     // TODO: select all, unselect button...
     ImGui::SameLine();
@@ -452,24 +452,24 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
         if (ImGui::IsItemHovered() && ImGui::IsItemActive()) {
             // Some logics rely on this to be done before rendering to work well.
             const ImGuiIO& io = ImGui::GetIO();
-            if (io.KeyCtrl && img_zoom == 1) {
+            if (io.KeyCtrl && screen_zoom == 1) {
                 runner.rotate(io.MouseDelta.x, io.MouseDelta.y);
             } else {
-                img_off += io.MouseDelta;
+                screen_off += io.MouseDelta;
             }
         }
 
-        const ImVec2 img_min = canvas_min + img_off;
-        const ImVec2 img_max = img_min + img_size;
+        const ImVec2 screen_min = canvas_min + screen_off;
+        const ImVec2 screen_max = screen_min + screen_size;
 
         ImDrawList* const drawlist = ImGui::GetWindowDrawList();
         drawlist->PushClipRect(canvas_min, canvas_max);
         drawlist->AddRectFilled(canvas_min, canvas_max, IM_COL32(20, 20, 20, 255));
 
         if (!paste) {
-            refresh(img, runner.tile());
+            refresh(screen, runner.tile());
 
-            drawlist->AddImage(img.texture(), img_min, img_max);
+            drawlist->AddImage(screen.texture(), screen_min, screen_max);
         } else {
             // TODO: displays poorly with miniwindow...
 
@@ -482,19 +482,19 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
             legacy::tileT temp(paste->size()); // TODO: wasteful...
             legacy::copy(temp, {0, 0}, runner.tile(), range);
             legacy::copy<legacy::copyE::Or>(runner.tile(), paste_beg, *paste);
-            refresh(img, runner.tile());
+            refresh(screen, runner.tile());
             legacy::copy(runner.tile(), paste_beg, temp);
 
-            drawlist->AddImage(img.texture(), img_min, img_max);
-            const ImVec2 paste_min = img_min + ImVec2(range.begin.x, range.begin.y) * img_zoom;
-            const ImVec2 paste_max = img_min + ImVec2(range.end.x, range.end.y) * img_zoom;
+            drawlist->AddImage(screen.texture(), screen_min, screen_max);
+            const ImVec2 paste_min = screen_min + ImVec2(range.begin.x, range.begin.y) * screen_zoom;
+            const ImVec2 paste_max = screen_min + ImVec2(range.end.x, range.end.y) * screen_zoom;
             drawlist->AddRectFilled(paste_min, paste_max, IM_COL32(255, 0, 0, 60));
         }
 
         if (sel) {
             const auto range = sel->to_range();
-            const ImVec2 sel_min = img_min + ImVec2(range.begin.x, range.begin.y) * img_zoom;
-            const ImVec2 sel_max = img_min + ImVec2(range.end.x, range.end.y) * img_zoom;
+            const ImVec2 sel_min = screen_min + ImVec2(range.begin.x, range.begin.y) * screen_zoom;
+            const ImVec2 sel_max = screen_min + ImVec2(range.end.x, range.end.y) * screen_zoom;
             drawlist->AddRectFilled(sel_min, sel_max, IM_COL32(0, 255, 0, 40));
             drawlist->AddRect(sel_min, sel_max, IM_COL32(0, 255, 0, 160));
         }
@@ -528,11 +528,11 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
             assert(ImGui::IsMousePosValid());
             // This will work well even if outside of the image.
             const ImVec2 mouse_pos = ImGui::GetIO().MousePos;
-            const ImVec2 cell_pos_raw = (mouse_pos - img_min) / img_zoom;
+            const ImVec2 cell_pos_raw = (mouse_pos - screen_min) / screen_zoom;
             const int celx = floor(cell_pos_raw.x);
             const int cely = floor(cell_pos_raw.y);
 
-            if (img_zoom == 1 && !paste && !ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+            if (screen_zoom == 1 && !paste && !ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
                 if (celx >= -10 && celx < tile_size.width + 10 && cely >= -10 && cely < tile_size.height + 10) {
                     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
                     if (ImGui::BeginItemTooltip()) {
@@ -555,7 +555,7 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
                         }
 
                         assert(w == maxx - minx && h == maxy - miny);
-                        ImGui::Image(img.texture(), ImVec2(w * 4, h * 4),
+                        ImGui::Image(screen.texture(), ImVec2(w * 4, h * 4),
                                      {(float)minx / tile_size.width, (float)miny / tile_size.height},
                                      {(float)maxx / tile_size.width, (float)maxy / tile_size.height});
                         ImGui::EndTooltip();
@@ -587,15 +587,15 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, tile_i
             }
 
             if (imgui_MouseScrolling()) {
-                if (imgui_MouseScrollingDown() && img_zoom != 1) {
-                    img_zoom /= 2;
+                if (imgui_MouseScrollingDown() && screen_zoom != 1) {
+                    screen_zoom /= 2;
                 }
-                if (imgui_MouseScrollingUp() && img_zoom != 8) {
-                    img_zoom *= 2;
+                if (imgui_MouseScrollingUp() && screen_zoom != 8) {
+                    screen_zoom *= 2;
                 }
-                img_off = (mouse_pos - cell_pos_raw * img_zoom) - canvas_min;
-                img_off.x = round(img_off.x);
-                img_off.y = round(img_off.y);
+                screen_off = (mouse_pos - cell_pos_raw * screen_zoom) - canvas_min;
+                screen_off.x = round(screen_off.x);
+                screen_off.y = round(screen_off.y);
             }
         }
 

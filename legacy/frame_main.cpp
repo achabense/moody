@@ -71,7 +71,7 @@ static void assign_val(legacy::moldT& mold, legacy::extrT::valT& val) {
     }
 }
 
-void frame_main(const code_image& icons, tile_image& img) {
+void frame_main(const code_image& icons, screenT& screen) {
     messenger::display();
 
 #ifndef NDEBUG
@@ -212,7 +212,7 @@ void frame_main(const code_image& icons, tile_image& img) {
             }
             ImGui::TableNextColumn();
             if (auto child = imgui_ChildWindow("Til", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
-                if (auto out = apply_rule(current.rule, img)) {
+                if (auto out = apply_rule(current.rule, screen)) {
                     current.lock = *out;
                     update = true;
                 }
