@@ -471,10 +471,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
     if (ImGui::Button("Enhance lock")) {
         return_lock(legacy::enhance_lock(subset, mold));
     }
-    ImGui::SameLine();
-    if (ImGui::Button("Invert lock")) {
-        return_lock(legacy::invert_lock(subset, mold));
-    }
     if (!contained) {
         ImGui::EndDisabled();
     }

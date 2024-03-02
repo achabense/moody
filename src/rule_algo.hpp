@@ -353,8 +353,10 @@ namespace legacy {
         return lock;
     }
 
-    // TODO: (temp) experimental... may consider the "forging mode" approach finally.
-    // Notice this is different from flipping the values of each lock[code].
+    // TODO: it's helpful to support in-lock transformations; however, simply inverting the lock like
+    // this does not work well in some situations. Especially, there may need to be a mode that modifies
+    // both locked and free groups.
+#if 0
     inline moldT::lockT invert_lock(const subsetT& subset, const moldT& mold) {
         assert(subset.contains(mold.rule));
 
@@ -369,7 +371,7 @@ namespace legacy {
         return lock;
     }
 
-    // TODO: (temp) the affect is the same as the old version.
+    // Equivalent to:
     inline moldT::lockT invert_lock_v2(const subsetT& subset, const moldT& mold) {
         assert(subset.contains(mold.rule));
         moldT::lockT lock = enhance_lock(subset, mold);
@@ -377,9 +379,10 @@ namespace legacy {
 
         return lock;
     }
+#endif
 
     // Test whether there exists any rule that belongs to both `subset` and `mold`.
-    // TODO: about moldT::compatible...
+    // (subset.contains(rule) && mold.compatible(rule))
     inline bool compatible(const subsetT& subset, const moldT& mold) {
         if (subset.empty()) {
             return false;
@@ -390,7 +393,7 @@ namespace legacy {
     }
 
     // Return a rule that belongs to `subset` and `mold` and is closest to `mold.rule`.
-    // (If `mold.rule` already belongs to `subset`, the result should be exactly `mold.rule`.)
+    // (If `mold.rule` already belongs to `subset`, the result will be exactly `mold.rule`.)
     inline ruleT approximate(const subsetT& subset, const moldT& mold) {
         assert(compatible(subset, mold));
 
@@ -401,8 +404,10 @@ namespace legacy {
         ruleT_masked r{};
         par.for_each_group([&](int j, const groupT& group) {
             const auto& scan = scanlist[j];
+            // If there are locks, `v` must be the locked value to guarantee `mold.compatible`.
+            // Otherwise, if v = 0 the "distance" will be free_1; if v = 1 the "distance" will be free_0.
+            // So for example, if free_0 = 9, free_1 = 3, then v should be 0 to make "distance" = free_1 = 3.
             assert(!(scan.locked_0 && scan.locked_1));
-            // TODO: explain; recheck...
             const bool v = scan.locked_0 ? 0 : scan.locked_1 ? 1 : scan.free_0 > scan.free_1 ? 0 : 1;
             for (codeT code : group) {
                 r[code] = v;
@@ -416,11 +421,13 @@ namespace legacy {
         return res;
     }
 
-    // TODO: explain...
-    // TODO: as to in-lock transformation, whether to use invert-lock approach, or to add an extra tag for `transform`?
+#if 1
+    // Firstly get rule = approximate(subset, mold), then transform the rule to another one:
+    // 1. The locked groups are not affected.
+    // 2. The free groups are listed as a sequence of values (relative to `mask`), and re-assigned by `fn`.
     inline ruleT transform(const subsetT& subset, const maskT& mask, const moldT& mold,
                            std::invocable<bool*, bool*> auto fn) {
-        assert(subset.contains(mask)); // TODO ... about why not using subset.get_mask()...
+        assert(subset.contains(mask));
         assert(compatible(subset, mold));
 
         const partitionT& par = subset.get_par();
@@ -454,6 +461,58 @@ namespace legacy {
         assert(subset.contains(res) && mold.compatible(res));
         return res;
     }
+#else
+    // It's possible to support in-lock transformation without touching the locks like this:
+    // (However, this partially defeats the purpose of "lock" so is harder to control...)
+    inline ruleT transform_v2(const subsetT& subset, const maskT& mask, const moldT& mold,
+                              const std::invocable<bool*, bool*> auto& fn_free,
+                              const std::invocable<bool*, bool*> auto& fn_locked) {
+        assert(subset.contains(mask));
+        assert(compatible(subset, mold));
+
+        const partitionT& par = subset.get_par();
+
+        ruleT_masked r = mask ^ approximate(subset, mold);
+
+        assert(par.k() <= 512);
+        std::array<bool, 512> seq_free{}, seq_locked{};
+        int z_free = 0, z_locked = 0;
+        par.for_each_group([&](const groupT& group) {
+            if (none_locked(mold.lock, group)) {
+                seq_free[z_free++] = r[group[0]];
+            } else {
+                seq_locked[z_locked++] = r[group[0]];
+            }
+        });
+
+        fn_free(seq_free.data(), seq_free.data() + z_free);
+        fn_locked(seq_locked.data(), seq_locked.data() + z_locked);
+
+        z_free = 0, z_locked = 0;
+        par.for_each_group([&](const groupT& group) {
+            bool v = 0;
+            if (none_locked(mold.lock, group)) {
+                v = seq_free[z_free++];
+            } else {
+                v = seq_locked[z_locked++];
+            }
+            for (codeT code : group) {
+                r[code] = v;
+            }
+        });
+
+        const ruleT res = mask ^ r;
+        assert(subset.contains(res));
+        return res;
+    }
+
+    inline ruleT transform(const subsetT& subset, const maskT& mask, const moldT& mold,
+                           const std::invocable<bool*, bool*> auto& fn_free) {
+        const ruleT res = transform_v2(subset, mask, mold, fn_free, [](bool*, bool*) {});
+        assert(mold.compatible(res));
+        return res;
+    }
+#endif
 
     // TODO: better name...
     // TODO: explain...
