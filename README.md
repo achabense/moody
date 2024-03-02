@@ -1,51 +1,43 @@
-(Mess)
-The program (later called editor) is intended to be used ?v assistance ?prep a (arbitrary) text editor.
-
-Grouping: If a rule is ?? it satisfies the concept behind the partition...
-Predefined groups:
-Native ...
-Hex...
-...
-
-About state symmetry(?)
-
-Lock: Together with the ??? rule, a lock is a representation of what can happen / has happened ...
-
-Evolvement capture:
-It ... leave enough space for the ...
-(TODO: Detect invalid capture...)
-Still-life constraints: ...
-
-(TODO: program-specific data (lock-?partition...))
-
 #### About this program
-* This program enables easy ways to recognize and operate on ... which are representable with ??? (need explanation)
+The program provides many tools to explore subsets of 2-state anisotropic rules in range-1 Moore neighborhood (also known as MAP rules).
+(Link...)
+
+In this program, it's easy to:
+- Test what subsets a MAP rule belongs to.
+- Generate rules in the specified subsets. (Explain...)
+- Look through all the rules in a subset.
+- Look through all the rules that are ...
+- The above things, with the extra constraints that some ...
+- Look through all MAP-encoded rules in a file.
+- ... and so on.
+
+The supported subsets are many, including:
+- Totalistic rules (with or without the center cell)
+- Isotropic non-totalistic rules.
+- Self-complementary rules.
+- Rules in hexagonal neighborhood.
+- ... (Full list, with link)
+
+And you can combine these subsets freely to explore intersections of these subsets.
 
 #### What can be saved & how to save
-* Rules can be loaded and exported via MAP format strings. The program is unable to recognize rules in other formats. To compensate for this ...
-* Click "Copy" to save to the clipboard. (Where to store the string is up to the users.)
-* The program is able to load multiple rules from files or the clipboard. Click "Paste" to load from the clipboard. There are no specific requirements for the file format - the program just treats ??? as byte streams and extracts every sequences recognizable as MAP strings.
-* Paths of the files can be provided as ???, or the program is able to select the paths via a ???
+- The program uses normal MAP-strings (TODO...) to store rules. This means you can try these rules in other programs like Golly.
+- It's easy to copy the rule to the clipboard: right-click the text and it's there.
+- For now the program cannot ..., which means you'd have to use this program with a text-editor.
+- The program is able to load all MAP rules from a file (on a per-line basis) (Explain...) There are no specific requirements for the file format...
 
-#### Use cases
-~ Randomization
-(mask: zero vs identity)
+#### Concepts
+(masks, locks etc...)
 
-~ Iterating through all rules under von Neumann neighborhood
-... (add spatial symmetry) ...(mis-combination (that makes into a whole group))
-
-~ Dialing through Game of Life rules in the iso subset...
-(show some of the interesting rules)
-(randomization based on custom mask(==gol))
-
-~ Capture the glider
-(show the glider-only rule)
-(wrong way of capturing (e.g. for oscillators, bounding-box is not enough))
+#### Typical use cases
+(Should be supported interactively by the program)
+(Should begin with the gol rule)
+(As to capture, the glider-only rule is the best beginning example)
+(Should document how to capture, especially bounding-box is not large enough)
 
 #### Dependency
-* ImGui
-* SDL2
+* ImGui (which is carried by this project) (Link)
+* SDL2 (Link)
 * C++20
-
-#### License
-...
+* VS project (will consider cmake build in the future)
+* ...
