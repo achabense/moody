@@ -1,3 +1,5 @@
+#include <deque>
+
 #include "rule_algo.hpp"
 
 #include "common.hpp"
@@ -33,19 +35,21 @@ class subset_selector {
         bool selected = false;
         // bool includes_cur = false; // TODO: whether to cache this?
         bool disabled = false; // current & set -> empty.
+
+        bool includes(const termT& other) const { return set.includes(other.set); }
     };
 
-    using termT_vec = std::vector<termT>;
+    using termT_list = std::deque<termT>;
 
-    termT_vec terms_ignore; // TODO: rename...
-    termT_vec terms_misc;
-    termT_vec terms_native;
-    termT_vec terms_totalistic;
-    termT_vec terms_hex;
+    termT_list terms_ignore; // TODO: rename...
+    termT_list terms_misc;
+    termT_list terms_native;
+    termT_list terms_totalistic;
+    termT_list terms_hex;
     // TODO: about the plan to support user-defined subsets...
 
     void for_each_term(const auto& fn) {
-        for (termT_vec* terms : {&terms_ignore, &terms_misc, &terms_native, &terms_totalistic, &terms_hex}) {
+        for (termT_list* terms : {&terms_ignore, &terms_misc, &terms_native, &terms_totalistic, &terms_hex}) {
             for (termT& t : *terms) {
                 fn(t);
             }
@@ -72,52 +76,78 @@ class subset_selector {
 public:
     subset_selector() : current(legacy::subsetT::universal()) {
         using namespace legacy::_make_subset;
-        // TODO: add some tests after the construction...
         // TODO: add descriptions...
 
-        terms_ignore.emplace_back("q", make_subset({mp_ignore_q}));
+        const termT& ignore_q = terms_ignore.emplace_back("q", make_subset({mp_ignore_q}));
         terms_ignore.emplace_back("w", make_subset({mp_ignore_w}));
-        terms_ignore.emplace_back("e", make_subset({mp_ignore_e}));
+        const termT& ignore_e = terms_ignore.emplace_back("e", make_subset({mp_ignore_e}));
         terms_ignore.emplace_back("a", make_subset({mp_ignore_a}));
         terms_ignore.emplace_back("s", make_subset({mp_ignore_s}, mask_zero),
                                   "0->1, 1->1 or 0->0, 1->0"); // TODO: whether to put in terms_ignore?
         terms_ignore.emplace_back("d", make_subset({mp_ignore_d}));
-        terms_ignore.emplace_back("z", make_subset({mp_ignore_z}));
+        const termT& ignore_z = terms_ignore.emplace_back("z", make_subset({mp_ignore_z}));
         terms_ignore.emplace_back("x", make_subset({mp_ignore_x}));
-        terms_ignore.emplace_back("c", make_subset({mp_ignore_c}));
+        const termT& ignore_c = terms_ignore.emplace_back("c", make_subset({mp_ignore_c}));
 
         terms_misc.emplace_back("S(f)", make_subset({mp_ignore_s}, mask_identity), "0->0, 1->1 or 0->1, 1->0");
-        terms_misc.emplace_back("Hex", make_subset({mp_hex_ignore}));
-        // TODO: or define mp_von_ignore?
-        terms_misc.emplace_back("Von", make_subset({mp_ignore_q, mp_ignore_e, mp_ignore_z, mp_ignore_c}));
+        const termT& ignore_hex = terms_misc.emplace_back("Hex", make_subset({mp_hex_ignore}));
+        const termT& ignore_von = terms_misc.emplace_back("Von", make_subset({mp_von_ignore}));
         terms_misc.emplace_back("Dual", make_subset({mp_dual}, mask_identity)); // Self-complementary
         // terms_misc.emplace_back("'C8'", make_subset({mp_C8}));
 
-        terms_native.emplace_back("All", make_subset({mp_refl_wsx, mp_refl_qsc}));
+        const termT& native_isotropic = terms_native.emplace_back("All", make_subset({mp_refl_wsx, mp_refl_qsc}));
         terms_native.emplace_back("|", make_subset({mp_refl_wsx}));
         terms_native.emplace_back("-", make_subset({mp_refl_asd}));
         terms_native.emplace_back("\\", make_subset({mp_refl_qsc}));
         terms_native.emplace_back("/", make_subset({mp_refl_esz}));
-        terms_native.emplace_back("C2", make_subset({mp_C2}));
-        terms_native.emplace_back("C4", make_subset({mp_C4}));
+        const termT& native_C2 = terms_native.emplace_back("C2", make_subset({mp_C2}));
+        const termT& native_C4 = terms_native.emplace_back("C4", make_subset({mp_C4}));
 
-        terms_totalistic.emplace_back("Tot", make_subset({mp_C8, mp_tot_exc_s}));
-        terms_totalistic.emplace_back("Tot(+s)", make_subset({mp_C8, mp_tot_inc_s}));
-        terms_totalistic.emplace_back("Hex_Tot", make_subset({mp_hex_C6, mp_hex_tot_exc_s}));
-        terms_totalistic.emplace_back("Hex_Tot(+s)", make_subset({mp_hex_C6, mp_hex_tot_inc_s}));
+        const termT& native_tot_exc_s = terms_totalistic.emplace_back("Tot", make_subset({mp_C8, mp_tot_exc_s}));
+        const termT& native_tot_inc_s = terms_totalistic.emplace_back("Tot(+s)", make_subset({mp_C8, mp_tot_inc_s}));
+        const termT& hex_tot_exc_s =
+            terms_totalistic.emplace_back("Hex_Tot", make_subset({mp_hex_C6, mp_hex_tot_exc_s}));
+        const termT& hex_tot_inc_s =
+            terms_totalistic.emplace_back("Hex_Tot(+s)", make_subset({mp_hex_C6, mp_hex_tot_inc_s}));
 
-        terms_hex.emplace_back("All", make_subset({mp_hex_refl_asd, mp_hex_refl_aq}));
+        const termT& hex_isotropic = terms_hex.emplace_back("All", make_subset({mp_hex_refl_asd, mp_hex_refl_aq}));
         terms_hex.emplace_back("a-d", make_subset({mp_hex_refl_asd}));
         terms_hex.emplace_back("q-c", make_subset({mp_hex_refl_qsc}));
         terms_hex.emplace_back("w-x", make_subset({mp_hex_refl_wsx}));
         terms_hex.emplace_back("a|q", make_subset({mp_hex_refl_aq}));
         terms_hex.emplace_back("q|w", make_subset({mp_hex_refl_qw}));
         terms_hex.emplace_back("w|d", make_subset({mp_hex_refl_wd}));
-        terms_hex.emplace_back("C2", make_subset({mp_hex_C2}));
-        terms_hex.emplace_back("C3", make_subset({mp_hex_C3}));
-        terms_hex.emplace_back("C6", make_subset({mp_hex_C6}));
+        const termT& hex_C2 = terms_hex.emplace_back("C2", make_subset({mp_hex_C2}));
+        const termT& hex_C3 = terms_hex.emplace_back("C3", make_subset({mp_hex_C3}));
+        const termT& hex_C6 = terms_hex.emplace_back("C6", make_subset({mp_hex_C6}));
 
         update_current();
+
+        // [[maybe_unused]] will make lines too long...
+        (void)ignore_q, (void)ignore_e, (void)ignore_z, (void)ignore_c;
+        (void)ignore_hex, (void)ignore_von;
+        (void)native_isotropic, (void)native_C2, (void)native_C4;
+        (void)native_tot_exc_s, (void)native_tot_inc_s, (void)hex_tot_exc_s, (void)hex_tot_inc_s;
+        (void)hex_isotropic, (void)hex_C2, (void)hex_C3, (void)hex_C6;
+
+        assert(ignore_e.includes(ignore_hex));
+        assert(ignore_z.includes(ignore_hex));
+        assert(ignore_q.includes(ignore_von));
+        assert(ignore_e.includes(ignore_von));
+        assert(ignore_z.includes(ignore_von));
+        assert(ignore_c.includes(ignore_von));
+
+        assert(native_C2.set.includes(native_C4.set));
+        assert(std::ranges::all_of(terms_native, [&](const termT& t) { return t.includes(native_isotropic); }));
+        assert(native_isotropic.includes(native_tot_exc_s));
+        assert(native_tot_exc_s.includes(native_tot_inc_s));
+
+        assert(std::ranges::all_of(terms_hex, [&](const termT& t) { return ignore_hex.includes(t); }));
+        assert(hex_C2.includes(hex_C6));
+        assert(hex_C3.includes(hex_C6));
+        assert(std::ranges::all_of(terms_hex, [&](const termT& t) { return t.includes(hex_isotropic); }));
+        assert(hex_isotropic.includes(hex_tot_exc_s));
+        assert(hex_tot_exc_s.includes(hex_tot_inc_s));
     }
 
     // TODO: `mold` is the analysis target, rename and explain.
@@ -196,7 +226,7 @@ public:
                 r_logic();
             };
 
-            auto checklist = [&](termT_vec& terms) {
+            auto checklist = [&](termT_list& terms) {
                 for (bool first = true; termT & t : terms) {
                     if (!std::exchange(first, false)) {
                         ImGui::SameLine();

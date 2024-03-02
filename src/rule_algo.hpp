@@ -729,7 +729,6 @@ namespace legacy {
         // The following mappers are defined relative to mp_identity.
         // That is, the effects actually means the effects of mapperT_pair{mp_identity, mp_*}.
 
-        // TODO: add descriptions...
         // TODO: about ignore_s and maskT...
         inline constexpr mapperT mp_ignore_q("0weasdzxc");
         inline constexpr mapperT mp_ignore_w("q0easdzxc");
@@ -761,15 +760,13 @@ namespace legacy {
         inline constexpr mapperT mp_C4("zaq"
                                        "xsw"
                                        "cde"); // 90 (clockwise)
-        // 90 has the same effects as 270... TODO: recheck...
 
-        // TODO: explain; actually irrelevant of symmetry...
-        // 1. I misunderstood "rotate" symmetry. "ro45" is never about symmetry (I've no idea what it is)
-        // 2. As seemingly-senseless partition like ro45 can make non-trivial patterns, should support after all...
-        // TODO: explain C8 (not related to static symmetry, but covers C4 and works with tot_xxc_s)
+        // Native totalistic.
+        // The `C8` mapper came from misconception of rotational symmetry (not more special than common C4 rules),
+        // but is useful to help define totalistic rules.
         inline constexpr mapperT mp_C8("aqw"
                                        "zse"
-                                       "xcd");
+                                       "xcd"); // "45" (clockwise)
         inline constexpr mapperT mp_tot_exc_s("wqe"
                                               "asd"
                                               "zxc"); // swap(q,w); *C8 -> totalistic, excluding s
@@ -782,8 +779,11 @@ namespace legacy {
                                          "!a!s!d"
                                          "!z!x!c");
 
-        // Hexagonal emulation and emulated symmetry.
+        inline constexpr mapperT mp_von_ignore("0w0"
+                                               "asd"
+                                               "0x0"); // ignore_(q,e,z,c)
 
+        // Hexagonal emulation and emulated symmetry.
         // q w -     q w
         // a s d -> a s d
         // - x c     x c
@@ -821,6 +821,7 @@ namespace legacy {
                                            "xsw"
                                            "0cd"); // 60 (clockwise)
 
+        // Hexagonal totalistic.
         inline constexpr mapperT mp_hex_tot_exc_s("wq0"
                                                   "asd"
                                                   "0xc"); // swap(q,w); *C6 -> totalistic, excluding s
@@ -860,7 +861,7 @@ namespace legacy {
                 for (const mapperT* m : {&mp_refl_asd, &mp_refl_wsx, &mp_refl_qsc, &mp_refl_esz, &mp_C2}) {
                     assert((*m)((*m)(code)) == code);
                 }
-                assert(mp_C4(mp_C4(mp_C4(mp_C4(code)))) == code);
+                assert(mp_C4(mp_C4(code)) == mp_C2(code));
 
                 assert(mp_dual(mp_dual(code)) == code);
 
