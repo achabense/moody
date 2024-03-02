@@ -3,8 +3,10 @@
 #include "rule.hpp"
 
 namespace legacy {
-    // TODO: use ruleT directly?
-    // A maskT is a ruleT used to do XOR mask for other rules.
+    // TODO: defining `maskT` to emphasis which rule serves as the mask; it might be more
+    // convenient to use `ruleT` directly.
+
+    // A maskT is an arbitrary ruleT selected to do XOR mask for other rules.
     // The result reflects how the rule is different from the masking rule.
     struct maskT : public ruleT {};
     using ruleT_masked = codeT::map_to<bool>;
@@ -203,6 +205,7 @@ namespace legacy {
         explicit subsetT(const maskT& mask, const partitionT& par) { m_set.emplace(mask, par); }
 
         explicit subsetT() : m_set{std::nullopt} {}
+        // The whole MAP set:
         static subsetT universal() { return subsetT{maskT{}, equivT{}}; }
 
         bool empty() const { return !m_set.has_value(); }
@@ -514,8 +517,6 @@ namespace legacy {
     }
 #endif
 
-    // TODO: better name...
-    // TODO: explain...
     inline ruleT randomize_c(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand,
                              int count) {
         return transform(subset, mask, mold, [&rand, count](bool* begin, bool* end) {
@@ -526,10 +527,10 @@ namespace legacy {
         });
     }
 
-    inline ruleT randomize_d(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand,
-                             double density) {
-        return transform(subset, mask, mold, [&rand, density](bool* begin, bool* end) {
-            std::bernoulli_distribution dist(std::clamp(density, 0.0, 1.0));
+    inline ruleT randomize_p(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand,
+                             double p) {
+        return transform(subset, mask, mold, [&rand, p](bool* begin, bool* end) {
+            std::bernoulli_distribution dist(std::clamp(p, 0.0, 1.0));
             std::generate(begin, end, [&] { return dist(rand); });
         });
     }
@@ -637,39 +638,6 @@ namespace legacy {
         }
     };
 
-    // TODO: these transforms can take advantage of _make_subset utilities. (but may not at cost of less clarity)
-    // TODO: proper name...
-    inline moldT trans_mirror(const moldT& mold) {
-        moldT mir{};
-        for_each_code([&](codeT code) {
-            const auto [q, w, e, a, s, d, z, x, c] = decode(code);
-            const codeT code_mir = encode({!q, !w, !e, //
-                                           !a, !s, !d, //
-                                           !z, !x, !c});
-            mir.lock[code_mir] = mold.lock[code];
-            mir.rule[code_mir] = (mold.rule[code] == s) ? !s : !(!s); // So that ->
-            assert((mir.rule[code_mir] == !s) == (mold.rule[code] == s));
-        });
-        return mir;
-    }
-
-    // TODO: add test that mirror->mirror->original...
-
-    // TODO: this is correct, but will open door to unsupported subsets
-    // (For example, rules in `hex` space will be mapped to `hex2` space, so all the symmetry checks are lost)
-    inline moldT trans_left_right(const moldT& mold) {
-        moldT lr{};
-        for_each_code([&](codeT code) {
-            const auto [q, w, e, a, s, d, z, x, c] = decode(code);
-            const codeT code_lr = encode({e, w, q, //
-                                          d, s, a, //
-                                          c, x, z});
-            lr.lock[code_lr] = mold.lock[code];
-            lr.rule[code_lr] = mold.rule[code];
-        });
-        return lr;
-    }
-
     inline namespace _make_subset {
         // TODO: better name ("make_mask" is too-general name)...
         inline maskT make_mask(codeT::bposE bpos) {
@@ -683,8 +651,8 @@ namespace legacy {
         inline const maskT mask_identity{make_mask(codeT::bpos_s)};
         // TODO: mask_copy_q/w/e/a/s(~mask_identity)/d/z/x/c etc?
 
-        // A mapperT defines a rule that maps each codeT to another codeT.
-        // Specifically, mapperT{"qweasdzxc"} maps any codeT to the same value.
+        // A mapperT maps each codeT to another codeT.
+        // Especially, mapperT{"qweasdzxc"} maps any codeT to the same value.
         class mapperT {
             struct takeT {
                 enum tagE { O, I, Get, NGet };
@@ -700,15 +668,20 @@ namespace legacy {
                 }
             };
 
-            // TODO: better name...
             takeT q, w, e;
             takeT a, s, d;
             takeT z, x, c;
 
         public:
+            codeT operator()(codeT code) const {
+                return encode({q(code), w(code), e(code), //
+                               a(code), s(code), d(code), //
+                               z(code), x(code), c(code)});
+            }
+
             // TODO: about consteval and the (obsolete) plan to support user-defined mappers / subsets...
             consteval mapperT(const char* str) {
-                // [01]|!?[qweasdzxc]
+                // [01], or [qweasdzxc], or ![qweasdzxc].
                 auto parse = [&]() -> takeT {
                     takeT::tagE tag = takeT::Get;
                     switch (*str) {
@@ -732,6 +705,8 @@ namespace legacy {
                         default: throw 0;
                     }
                 };
+                // ~ about `throw 0`:
+                // https://stackoverflow.com/questions/67320438/how-to-fail-a-consteval-function
                 q = parse(), w = parse(), e = parse();
                 a = parse(), s = parse(), d = parse();
                 z = parse(), x = parse(), c = parse();
@@ -739,21 +714,11 @@ namespace legacy {
                     throw 0;
                 }
             }
-
-            codeT operator()(codeT code) const {
-                return encode({q(code), w(code), e(code), //
-                               a(code), s(code), d(code), //
-                               z(code), x(code), c(code)});
-            }
         };
 
         // A pair of mapperT defines an equivalence relation.
-        struct mapperT_pair {
-            mapperT a, b;
-        };
-
-        inline void add_eq(equivT& eq, const mapperT_pair& mp) {
-            for_each_code([&](codeT code) { eq.add_eq(mp.a(code), mp.b(code)); });
+        inline void add_eq(equivT& eq, const mapperT& a, const mapperT& b) {
+            for_each_code([&](codeT code) { eq.add_eq(a(code), b(code)); });
         }
 
         // TODO: recheck these mappers...
@@ -879,7 +844,7 @@ namespace legacy {
         inline subsetT make_subset(std::initializer_list<mapperT> mappers, const maskT& mask = mask_zero) {
             equivT eq{};
             for (const mapperT& m : mappers) {
-                add_eq(eq, {mp_identity, m});
+                add_eq(eq, m, mp_identity);
             }
             return subsetT{mask, eq};
         }
@@ -924,5 +889,47 @@ namespace legacy {
         };
     }  // namespace _tests
 #endif // ENABLE_TESTS
+
+    // TODO: proper name...
+    inline moldT trans_mirror(const moldT& mold) {
+        moldT mir{};
+        for_each_code([&](codeT code) {
+            const auto [q, w, e, a, s, d, z, x, c] = decode(code);
+            const codeT code_mir = encode({!q, !w, !e, //
+                                           !a, !s, !d, //
+                                           !z, !x, !c});
+            mir.lock[code_mir] = mold.lock[code];
+            mir.rule[code_mir] = (mold.rule[code] == s) ? !s : !(!s); // So that ->
+            assert((mir.rule[code_mir] == !s) == (mold.rule[code] == s));
+        });
+        return mir;
+    }
+
+    // TODO: add test that mirror->mirror->original...
+
+#if 0
+    // The results are are easy to go out of control...
+    // For example, rules in `hex` space will be mapped to `hex2` space, so all the symmetry checks become
+    // unavailable...
+    inline moldT trans_left_right(const moldT& mold) {
+        moldT lr{};
+        for_each_code([&](codeT code) {
+            const codeT c = mp_refl_wsx(code); // |
+            lr.lock[c] = mold.lock[code];
+            lr.rule[c] = mold.rule[code];
+        });
+        return lr;
+    }
+
+    inline moldT trans_rotate(const moldT& mold) {
+        moldT ro{};
+        for_each_code([&](codeT code) {
+            const codeT c = mp_C4(code);
+            ro.lock[c] = mold.lock[code];
+            ro.rule[c] = mold.rule[code];
+        });
+        return ro;
+    }
+#endif
 
 } //  namespace legacy

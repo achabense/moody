@@ -415,8 +415,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
 
         // dist: The "distance" to the masking rule the randomization want to achieve.
         // (which does not make sense when !compatible)
-        static double density = 0.5;
-        int dist = c_locked_1 + round(density * c_free);
+        static double rate = 0.5;
+        int dist = c_locked_1 + round(rate * c_free);
 
         static bool exact_mode = true;
         if (ImGui::Button(exact_mode ? "Exactly###Mode" : "Around ###Mode")) {
@@ -426,15 +426,15 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
         ImGui::SetNextItemWidth(item_width);
         if (imgui_StepSliderInt("##Quantity", &dist, c_locked_1, c_locked_1 + c_free) && c_free != 0) {
-            density = double(dist - c_locked_1) / c_free;
-            assert(c_locked_1 + round(density * c_free) == dist);
+            rate = double(dist - c_locked_1) / c_free;
+            assert(c_locked_1 + round(rate * c_free) == dist);
         }
         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
         if (enter_button("Randomize")) {
             if (exact_mode) {
                 return_rule(legacy::randomize_c(subset, mask, mold, global_mt19937(), dist - c_locked_1));
             } else {
-                return_rule(legacy::randomize_d(subset, mask, mold, global_mt19937(), density));
+                return_rule(legacy::randomize_p(subset, mask, mold, global_mt19937(), rate));
             }
         }
     }
@@ -491,11 +491,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
     // TODO: move elsewhere
     if (ImGui::Button("Mir")) {
         return_mold(legacy::trans_mirror(mold));
-    }
-    ImGui::SameLine();
-    // TODO: temp, experimental; not too useful for now...
-    if (ImGui::Button("LR")) {
-        return_mold(legacy::trans_left_right(mold));
     }
 
     // TODO: support filtering?

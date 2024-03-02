@@ -99,7 +99,7 @@ public:
         set_current(path);
     }
 
-    [[nodiscard]] std::optional<pathT> display() {
+    std::optional<pathT> display() {
         std::optional<pathT> target = std::nullopt;
 
         if (m_valid) {
