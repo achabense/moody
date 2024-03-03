@@ -13,11 +13,11 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="imgui_sdl2">
-      <UniqueIdentifier>{0e591dea-4152-4672-a9bb-0a5370d10753}</UniqueIdentifier>
-    </Filter>
     <Filter Include="imgui">
       <UniqueIdentifier>{32c764ac-c205-473a-b291-91456c05a6b0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="imgui\backends">
+      <UniqueIdentifier>{0e591dea-4152-4672-a9bb-0a5370d10753}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -27,11 +27,11 @@
     <ClInclude Include="..\src\tile.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\imgui_sdl2\imgui_impl_sdl2.h">
-      <Filter>imgui_sdl2</Filter>
+    <ClInclude Include="..\imgui\backends\imgui_impl_sdl2.h">
+      <Filter>imgui\backends</Filter>
     </ClInclude>
-    <ClInclude Include="..\imgui_sdl2\imgui_impl_sdlrenderer2.h">
-      <Filter>imgui_sdl2</Filter>
+    <ClInclude Include="..\imgui\backends\imgui_impl_sdlrenderer2.h">
+      <Filter>imgui\backends</Filter>
     </ClInclude>
     <ClInclude Include="..\imgui\imgui.h">
       <Filter>imgui</Filter>
@@ -56,11 +56,11 @@
     <ClCompile Include="..\src\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\imgui_sdl2\imgui_impl_sdl2.cpp">
-      <Filter>imgui_sdl2</Filter>
+    <ClCompile Include="..\imgui\backends\imgui_impl_sdl2.cpp">
+      <Filter>imgui\backends</Filter>
     </ClCompile>
-    <ClCompile Include="..\imgui_sdl2\imgui_impl_sdlrenderer2.cpp">
-      <Filter>imgui_sdl2</Filter>
+    <ClCompile Include="..\imgui\backends\imgui_impl_sdlrenderer2.cpp">
+      <Filter>imgui\backends</Filter>
     </ClCompile>
     <ClCompile Include="..\imgui\imgui.cpp">
       <Filter>imgui</Filter>
