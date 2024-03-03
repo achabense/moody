@@ -149,8 +149,6 @@ int main(int, char**) {
         }
 
         file_nav_add_special_path(base_path, "Exe path");
-        // TODO: (Must) remove when finished...
-        file_nav_add_special_path(R"(C:\*redacted*\Desktop\rulelists_new)", "Temp");
 
         const std::string path = base_path;
         SDL_free(base_path);
