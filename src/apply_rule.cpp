@@ -10,6 +10,10 @@ static void refresh(screenT& screen, const legacy::tileT& tile) {
     screen.refresh(tile.width(), tile.height(), [&tile](int y) { return tile.line(y); });
 }
 
+// TODO: whether to support boundless space?
+// `tileT` can also be used as the building block for boundless space (`tileT::gather` was
+// initially designed to enable this extension) but that's complicated, and torus space is enough to
+// show the effect of the rules.
 static void run_torus(legacy::tileT& tile, legacy::tileT& temp, const legacy::rule_like auto& rule) {
     assert(&tile != &temp);
 
@@ -397,7 +401,6 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, screen
     // TODO: copy vs copy to clipboard; paste vs paste from clipboard? (don't want to pollute clipboard with small
     // rle strings...
     // TODO: should be able to recognize "rule = " part in the rle string.
-    // TODO: about the plan for boundless space and space period...
 
     const legacy::tileT::sizeT tile_size = runner.tile().size(); // TODO: which (vs init.size) is better?
     const ImVec2 screen_size(tile_size.width * screen_zoom, tile_size.height * screen_zoom);

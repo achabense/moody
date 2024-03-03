@@ -10,9 +10,6 @@
 #include <string>
 #include <vector>
 
-// Must: Must be done before initial release.
-// TODO: (Must) better name for namespace `legacy`.
-
 #ifndef NDEBUG
 #define ENABLE_TESTS
 #endif // !NDEBUG
@@ -152,7 +149,12 @@ namespace legacy {
         });
     }
 
-    // TODO: explain...
+    // `lockT`, together with the associated rule, captures the idea that the locked values in the rule
+    // are the "cause" for something to happen.
+    // For example, suppose we find an oscillator in a rule. It is likely to only invoke a subset of all
+    // codeT during all of its phases. We can record these invocations and say that's why the oscillator exists
+    // in this rule.
+    // The program uses `moldT` ~ (lockT, ruleT) pair as a constraint for generating new rules.
     struct moldT {
         using lockT = codeT::map_to<bool>;
 
@@ -168,6 +170,10 @@ namespace legacy {
 
         friend bool operator==(const moldT&, const moldT&) = default;
     };
+
+    // (Program-specific)
+    // The program stores `moldT` in a way compatible with normal MAP rules, see `to_MAP_str`
+    // and `extract_MAP_str` for details.
 
     namespace _misc {
         inline char to_base64(uint8_t b6) {

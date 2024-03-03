@@ -53,60 +53,6 @@ inline void imgui_StrCopyable(const std::string& str, void (*str_func)(std::stri
     }
 }
 
-inline float imgui_ItemInnerSpacingX() { return ImGui::GetStyle().ItemInnerSpacing.x; }
-
-// TODO: referring to ImGui::InputScalar; recheck...
-inline bool imgui_StepSliderInt(const char* label, int* v, int v_min, int v_max) {
-    if (ImGui::GetCurrentWindow()->SkipItems) {
-        return false;
-    }
-
-    int v2 = *v;
-
-    const float r = ImGui::GetFrameHeight();
-    const float s = imgui_ItemInnerSpacingX();
-    ImGui::BeginGroup();
-    ImGui::PushID(label);
-    ImGui::SetNextItemWidth(std::max(1.0f, ImGui::CalcItemWidth() - 2 * (r + s)));
-    ImGui::SliderInt("", &v2, v_min, v_max, "%d", ImGuiSliderFlags_NoInput);
-    ImGui::PushButtonRepeat(true);
-    ImGui::SameLine(0, s);
-    // TODO: whether to push&pop framepadding?
-    if (ImGui::Button("-", ImVec2(r, r))) {
-        --v2;
-    }
-    ImGui::SameLine(0, s);
-    if (ImGui::Button("+", ImVec2(r, r))) {
-        ++v2;
-    }
-    ImGui::PopButtonRepeat();
-    // TODO: FindRenderedTextEnd is a function in imgui_internal.h...
-    const char* label_end = ImGui::FindRenderedTextEnd(label);
-    if (label != label_end) {
-        ImGui::SameLine(0, s);
-        imgui_Str(std::string_view(label, label_end));
-    }
-    ImGui::PopID();
-    ImGui::EndGroup();
-
-    v2 = std::clamp(v2, v_min, v_max);
-    const bool changed = *v != v2;
-    *v = v2;
-    return changed;
-}
-
-// TODO: recheck `bool IsKeyPressed(ImGuiKey, ImGuiID, ImGuiInputFlags)` in "imgui_internal.h"
-inline bool imgui_KeyPressed(ImGuiKey key, bool repeat) {
-    return !ImGui::GetIO().WantCaptureKeyboard && ImGui::IsKeyPressed(key, repeat);
-};
-
-// TODO: doesn't work if adding `!ImGui::GetIO().WantCaptureMouse`...
-inline bool imgui_MouseScrolling() { return ImGui::GetIO().MouseWheel != 0; }
-
-inline bool imgui_MouseScrollingDown() { return ImGui::GetIO().MouseWheel < 0; }
-
-inline bool imgui_MouseScrollingUp() { return ImGui::GetIO().MouseWheel > 0; }
-
 struct [[nodiscard]] imgui_Window {
     imgui_Window(const imgui_Window&) = delete;
     imgui_Window& operator=(const imgui_Window&) = delete;
@@ -133,3 +79,55 @@ struct [[nodiscard]] imgui_ChildWindow {
     }
     explicit operator bool() const { return visible; }
 };
+
+inline float imgui_ItemInnerSpacingX() { return ImGui::GetStyle().ItemInnerSpacing.x; }
+
+// (Referring to ImGui::InputScalar.)
+inline bool imgui_StepSliderInt(const char* label, int* v, int v_min, int v_max) {
+    if (ImGui::GetCurrentWindow()->SkipItems) {
+        return false;
+    }
+
+    int v2 = *v;
+
+    const float r = ImGui::GetFrameHeight();
+    const float s = imgui_ItemInnerSpacingX();
+    ImGui::BeginGroup();
+    ImGui::PushID(label);
+    ImGui::SetNextItemWidth(std::max(1.0f, ImGui::CalcItemWidth() - 2 * (r + s)));
+    ImGui::SliderInt("", &v2, v_min, v_max, "%d", ImGuiSliderFlags_NoInput);
+    ImGui::PushButtonRepeat(true);
+    ImGui::SameLine(0, s);
+    // (`InputScalar` makes .FramePadding.x = y for these buttons, not added here.)
+    if (ImGui::Button("-", ImVec2(r, r))) {
+        --v2;
+    }
+    ImGui::SameLine(0, s);
+    if (ImGui::Button("+", ImVec2(r, r))) {
+        ++v2;
+    }
+    ImGui::PopButtonRepeat();
+    const char* label_end = ImGui::FindRenderedTextEnd(label);
+    if (label != label_end) {
+        ImGui::SameLine(0, s);
+        imgui_Str(std::string_view(label, label_end));
+    }
+    ImGui::PopID();
+    ImGui::EndGroup();
+
+    v2 = std::clamp(v2, v_min, v_max);
+    const bool changed = *v != v2;
+    *v = v2;
+    return changed;
+}
+
+// TODO: many controls in the program are relying on these functions (which are not well-designed)...
+inline bool imgui_KeyPressed(ImGuiKey key, bool repeat) {
+    return !ImGui::GetIO().WantCaptureKeyboard && ImGui::IsKeyPressed(key, repeat);
+};
+
+inline bool imgui_MouseScrolling() { return ImGui::GetIO().MouseWheel != 0; }
+
+inline bool imgui_MouseScrollingDown() { return ImGui::GetIO().MouseWheel < 0; }
+
+inline bool imgui_MouseScrollingUp() { return ImGui::GetIO().MouseWheel > 0; }

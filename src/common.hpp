@@ -9,6 +9,11 @@
 
 /* Not inline */ static const bool check_version = IMGUI_CHECKVERSION();
 
+inline std::mt19937& global_mt19937() {
+    static std::mt19937 rand{(uint32_t)time(0)};
+    return rand;
+}
+
 #if 0
 // Enforce that ordinary string literals are encoded with utf-8.
 // This requires certain compiler flags to be set (e.g. `/utf-8` in MSVC).
@@ -87,11 +92,6 @@ std::optional<legacy::extrT::valT> load_rule();
 std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_icons& icons);
 std::optional<legacy::moldT> static_constraints();
 std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, screenT& screen);
-
-inline std::mt19937& global_mt19937() {
-    static std::mt19937 rand{(uint32_t)time(0)};
-    return rand;
-}
 
 inline const int item_width = 220;
 

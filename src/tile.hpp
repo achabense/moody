@@ -6,7 +6,7 @@
 #include "rule.hpp"
 
 namespace legacy {
-    // TODO: explain layout.
+    // Building block for torus space etc.
     class tileT {
     public:
         struct posT {
@@ -142,9 +142,7 @@ namespace legacy {
         }
 
     public:
-        // TODO: const or not?
-        // (The problem is that, t.gather(t,t,t,t,t,t,t,t) is intentionally a valid operation, so passing by const&
-        // seems an over-promise...)
+        // (`q`, `w`, ... may refer to `*this`.)
         void gather(const tileT& q, const tileT& w, const tileT& e, //
                     const tileT& a, /*   *this   */ const tileT& d, //
                     const tileT& z, const tileT& x, const tileT& c) {
@@ -358,8 +356,7 @@ namespace legacy {
             bool v = 0;
             auto flush = [&] {
                 if (c != 0) {
-                    // TODO: (temp) changed to 58 as 60 may not always fit into a single line under `wrap_len`
-                    // line wrappinng... this is not a necessary change but also does no harm.
+                    // (58 is an arbitrary value that satisfies the line-length limit.)
                     if (str.size() > last_nl + 58) {
                         str += '\n';
                         last_nl = str.size();
