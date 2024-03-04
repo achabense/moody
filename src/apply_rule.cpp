@@ -134,12 +134,6 @@ public:
 };
 
 class runnerT {
-    static bool strobing(const legacy::ruleT& rule) {
-        constexpr legacy::codeT all_0{0}, all_1{511};
-        return rule[all_0] == 1 && rule[all_1] == 0;
-    }
-
-    // TODO: the constraint is arbitrary; are there more sensible ways to decide size constraint?
     static constexpr legacy::tileT::sizeT min_size{.width = 20, .height = 10};
     static constexpr legacy::tileT::sizeT max_size{.width = 1600, .height = 1200};
     static legacy::tileT::sizeT size_clamped(legacy::tileT::sizeT size) {
@@ -150,7 +144,6 @@ class runnerT {
     static constexpr int max_zoom = 8;
     static constexpr ImVec2 min_canvas_size{min_size.width * max_zoom, min_size.height* max_zoom};
 
-    // TODO: reduce to local lambdas...
     struct ctrlT {
         legacy::ruleT rule{};
 
@@ -158,13 +151,15 @@ class runnerT {
         int pace = 1;
         bool anti_strobing = true;
         int actual_pace() const {
-            if (anti_strobing && strobing(rule) && pace % 2) {
+            constexpr legacy::codeT all_0{0}, all_1{511};
+            const bool strobing = rule[all_0] == 1 && rule[all_1] == 0;
+            if (anti_strobing && strobing && pace % 2) {
                 return pace + 1;
             }
             return pace;
         }
 
-        // TODO: redesign?
+        // TODO: frame-based or timer-based?
         static constexpr int gap_min = 0, gap_max = 20;
         int gap_frame = 0;
 
@@ -172,8 +167,8 @@ class runnerT {
     };
 
     torusT::initT m_init{.size{.width = 500, .height = 400}, .seed = 0, .density = 0.5};
-    torusT runner{m_init};
-    ctrlT ctrl{.rule = {} /* was rule */, .pace = 1, .anti_strobing = true, .gap_frame = 0, .pause = false};
+    torusT m_torus{m_init};
+    ctrlT m_ctrl{.rule{}, .pace = 1, .anti_strobing = true, .gap_frame = 0, .pause = false};
 
     ImVec2 screen_off = {0, 0};
     int screen_zoom = 1;
@@ -199,11 +194,20 @@ class runnerT {
     std::optional<selectT> m_sel = std::nullopt;
 
 public:
+    void apply_rule(const legacy::ruleT& rule) {
+        if (m_ctrl.rule != rule) {
+            m_ctrl.rule = rule;
+            m_ctrl.anti_strobing = true;
+            m_ctrl.pause = false;
+            m_torus.restart(m_init);
+        }
+    }
+
     // TODO: the canvas part is horribly written, needs heavy refactorings in the future...
-    std::optional<legacy::moldT::lockT> display(const legacy::ruleT& rule, screenT& screen) {
+    std::optional<legacy::moldT::lockT> display(screenT& screen) {
         std::optional<legacy::moldT::lockT> out = std::nullopt;
 
-        assert(m_init.size == runner.tile().size());
+        assert(m_init.size == m_torus.tile().size());
         assert(m_init.size == size_clamped(m_init.size));
         assert(screen_off.x == int(screen_off.x) && screen_off.y == int(screen_off.y));
 
@@ -211,38 +215,34 @@ public:
         int extra_step = 0;
         auto restart = [&] {
             temp_pause = true;
-            runner.restart(m_init);
+            m_torus.restart(m_init);
         };
-
-        if (ctrl.rule != rule) {
-            ctrl.rule = rule;
-            ctrl.anti_strobing = true;
-            ctrl.pause = false;
-            restart();
-        }
 
         // TODO: better be controlled by frame()?
         ImGui::PushItemWidth(item_width);
 
         // TODO: redesign keyboard ctrl...
         if (imgui_KeyPressed(ImGuiKey_1, true)) {
-            ctrl.gap_frame = std::max(ctrl.gap_min, ctrl.gap_frame - 1);
+            m_ctrl.gap_frame = std::max(m_ctrl.gap_min, m_ctrl.gap_frame - 1);
         }
         if (imgui_KeyPressed(ImGuiKey_2, true)) {
-            ctrl.gap_frame = std::min(ctrl.gap_max, ctrl.gap_frame + 1);
+            m_ctrl.gap_frame = std::min(m_ctrl.gap_max, m_ctrl.gap_frame + 1);
         }
         if (imgui_KeyPressed(ImGuiKey_3, true)) {
-            ctrl.pace = std::max(ctrl.pace_min, ctrl.pace - 1);
+            m_ctrl.pace = std::max(m_ctrl.pace_min, m_ctrl.pace - 1);
         }
         if (imgui_KeyPressed(ImGuiKey_4, true)) {
-            ctrl.pace = std::min(ctrl.pace_max, ctrl.pace + 1);
+            m_ctrl.pace = std::min(m_ctrl.pace_max, m_ctrl.pace + 1);
+        }
+        if (imgui_KeyPressed(ImGuiKey_Space, false)) {
+            m_ctrl.pause = !m_ctrl.pause;
         }
         // Run by keystroke turns out to be necessary. (TODO: For example ...)
         if (imgui_KeyPressed(ImGuiKey_M, true)) {
-            if (ctrl.pause) {
-                extra_step = ctrl.actual_pace();
+            if (m_ctrl.pause) {
+                extra_step = m_ctrl.actual_pace();
             }
-            ctrl.pause = true;
+            m_ctrl.pause = true;
         }
 
         {
@@ -250,12 +250,12 @@ public:
             const float extra_w_sameline = ImGui::GetStyle().ItemSpacing.x * 1; // One SameLine...
             const float extra_w_padding = ImGui::GetStyle().FramePadding.x * 2; // One Button * two sides...
             const float extra_w = ImGui::CalcTextSize("Restart").x + extra_w_sameline + extra_w_padding;
-            const std::string str = std::format("Generation:{}, density:{:.4f}{}", runner.gen(),
-                                                float(legacy::count(runner.tile())) / runner.tile().area(),
-                                                runner.gen() < 10     ? "   "
-                                                : runner.gen() < 100  ? "  "
-                                                : runner.gen() < 1000 ? " "
-                                                                      : "");
+            const std::string str = std::format("Generation:{}, density:{:.4f}{}", m_torus.gen(),
+                                                float(legacy::count(m_torus.tile())) / m_torus.tile().area(),
+                                                m_torus.gen() < 10     ? "   "
+                                                : m_torus.gen() < 100  ? "  "
+                                                : m_torus.gen() < 1000 ? " "
+                                                                       : "");
             ImGui::SeparatorTextEx(0, str.c_str(), nullptr, extra_w);
             ImGui::SameLine();
             if (ImGui::Button("Restart") || imgui_KeyPressed(ImGuiKey_R, false)) {
@@ -265,7 +265,7 @@ public:
 
         ImGui::BeginGroup();
         {
-            ImGui::Checkbox("Pause", &ctrl.pause);
+            ImGui::Checkbox("Pause", &m_ctrl.pause);
             ImGui::SameLine();
             ImGui::PushButtonRepeat(true);
             if (ImGui::Button("+1")) {
@@ -273,31 +273,31 @@ public:
             }
             // TODO: finish.
             helper::show_help("Advance generation by 1 (instead of pace). This is useful for ...");
-            if (ctrl.pause) {
+            if (m_ctrl.pause) {
                 ImGui::SameLine();
-                if (ImGui::Button(std::format("+p({})###+p", ctrl.actual_pace()).c_str())) {
-                    extra_step = ctrl.actual_pace();
+                if (ImGui::Button(std::format("+p({})###+p", m_ctrl.actual_pace()).c_str())) {
+                    extra_step = m_ctrl.actual_pace();
                 }
             }
             ImGui::PopButtonRepeat();
 
             // TODO: Gap-frame shall be really timer-based...
-            imgui_StepSliderInt("Gap Frame (0~20)", &ctrl.gap_frame, ctrl.gap_min, ctrl.gap_max);
+            imgui_StepSliderInt("Gap Frame (0~20)", &m_ctrl.gap_frame, m_ctrl.gap_min, m_ctrl.gap_max);
 
-            imgui_StepSliderInt("Pace (1~20)", &ctrl.pace, ctrl.pace_min, ctrl.pace_max);
+            imgui_StepSliderInt("Pace (1~20)", &m_ctrl.pace, m_ctrl.pace_min, m_ctrl.pace_max);
 
             // TODO: should be interactive.
             // the rule has only all_0 and all_1 NOT flipped, and has interesting effect in extremely low/high
             // densities. (e.g. 0.01, 0.99)
-            ImGui::Checkbox("Anti-strobing", &ctrl.anti_strobing);
+            ImGui::Checkbox("Anti-strobing", &m_ctrl.anti_strobing);
             helper::show_help(
                 "Actually this is not enough to guarantee smooth visual effect. For example, the following "
                 "\"non-strobing\" rule has really terrible visual effect:\n\n"
                 "MAPf/8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAQ\n\n"
                 "In cases like this, it generally helps to set the pace to 2*n manually to remove bad visual effects.");
-            if (ctrl.anti_strobing) {
+            if (m_ctrl.anti_strobing) {
                 ImGui::SameLine();
-                ImGui::Text(" (Actual pace: %d)", ctrl.actual_pace());
+                ImGui::Text(" (Actual pace: %d)", m_ctrl.actual_pace());
             }
         }
         ImGui::EndGroup();
@@ -343,7 +343,7 @@ public:
                 }
 
                 ImGui::SameLine(0, s);
-                ImGui::Text("Width:%d, Height:%d", runner.tile().width(), runner.tile().height());
+                ImGui::Text("Width:%d, Height:%d", m_torus.tile().width(), m_torus.tile().height());
             }
 
             ImGui::AlignTextToFramePadding();
@@ -383,7 +383,7 @@ public:
         // rle strings...
         // TODO: should be able to recognize "rule = " part in the rle string.
 
-        const legacy::tileT::sizeT tile_size = runner.tile().size(); // TODO: which (vs init.size) is better?
+        const legacy::tileT::sizeT tile_size = m_torus.tile().size(); // TODO: which (vs init.size) is better?
         const ImVec2 screen_size(tile_size.width * screen_zoom, tile_size.height * screen_zoom);
 
         if (ImGui::Button("Corner")) {
@@ -434,7 +434,7 @@ public:
                 // Some logics rely on this to be done before rendering.
                 const ImGuiIO& io = ImGui::GetIO();
                 if (io.KeyCtrl && screen_zoom == 1) {
-                    runner.rotate(io.MouseDelta.x, io.MouseDelta.y);
+                    m_torus.rotate(io.MouseDelta.x, io.MouseDelta.y);
                 } else {
                     screen_off += io.MouseDelta;
                 }
@@ -448,7 +448,7 @@ public:
             drawlist->AddRectFilled(canvas_min, canvas_max, IM_COL32(20, 20, 20, 255));
 
             if (!paste) {
-                refresh(screen, runner.tile());
+                refresh(screen, m_torus.tile());
 
                 drawlist->AddImage(screen.texture(), screen_min, screen_max);
             } else {
@@ -461,10 +461,10 @@ public:
                 const legacy::tileT::rangeT range = {paste_beg, paste_beg + paste->size()};
 
                 legacy::tileT temp(paste->size()); // TODO: wasteful...
-                legacy::copy(temp, {0, 0}, runner.tile(), range);
-                legacy::copy<legacy::copyE::Or>(runner.tile(), paste_beg, *paste);
-                refresh(screen, runner.tile());
-                legacy::copy(runner.tile(), paste_beg, temp);
+                legacy::copy(temp, {0, 0}, m_torus.tile(), range);
+                legacy::copy<legacy::copyE::Or>(m_torus.tile(), paste_beg, *paste);
+                refresh(screen, m_torus.tile());
+                legacy::copy(m_torus.tile(), paste_beg, temp);
 
                 drawlist->AddImage(screen.texture(), screen_min, screen_max);
                 const ImVec2 paste_min = screen_min + ImVec2(range.begin.x, range.begin.y) * screen_zoom;
@@ -485,7 +485,7 @@ public:
             if (imgui_KeyPressed(ImGuiKey_V, false)) {
                 if (const char* text = ImGui::GetClipboardText()) {
                     try {
-                        // TODO: or ask whether to resize runner.tile?
+                        // TODO: or ask whether to resize m_torus.tile?
                         paste.emplace(legacy::from_RLE_str(text, tile_size));
                     } catch (const std::exception& err) {
                         messenger::add_msg("{}", err.what());
@@ -562,7 +562,7 @@ public:
                     paste_beg.y = std::clamp(cely, 0, tile_size.height - paste->height());
 
                     if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-                        legacy::copy<legacy::copyE::Or>(runner.tile(), paste_beg, *paste);
+                        legacy::copy<legacy::copyE::Or>(m_torus.tile(), paste_beg, *paste);
                         paste.reset();
                     }
                 }
@@ -623,7 +623,7 @@ public:
 
                 // TODO: what if these keys are pressed together?
                 if (imgui_KeyPressed(ImGuiKey_S, false) || op == Shrink) {
-                    const auto [begin, end] = legacy::bounding_box(runner.tile(), range);
+                    const auto [begin, end] = legacy::bounding_box(m_torus.tile(), range);
                     if (begin != end) {
                         m_sel = {.active = false, .beg = begin, .end = {.x = end.x - 1, .y = end.y - 1}};
                     } else {
@@ -632,21 +632,21 @@ public:
                 }
                 if (imgui_KeyPressed(ImGuiKey_C, false) || imgui_KeyPressed(ImGuiKey_X, false) || op == Copy ||
                     op == Cut) {
-                    ImGui::SetClipboardText(legacy::to_RLE_str(ctrl.rule, runner.tile(), range).c_str());
-                    // messenger::add_msg("{}", legacy::to_RLE_str(ctrl.rule, runner.tile(), range));
+                    ImGui::SetClipboardText(legacy::to_RLE_str(m_ctrl.rule, m_torus.tile(), range).c_str());
+                    // messenger::add_msg("{}", legacy::to_RLE_str(m_ctrl.rule, m_torus.tile(), range));
                 }
                 if (imgui_KeyPressed(ImGuiKey_Backspace, false) || imgui_KeyPressed(ImGuiKey_X, false) ||
                     op == Clear_inside || op == Cut) {
-                    legacy::clear_inside(runner.tile(), range);
+                    legacy::clear_inside(m_torus.tile(), range);
                 }
                 if (imgui_KeyPressed(ImGuiKey_Equal, false) || op == Random_fill) {
-                    legacy::random_fill(runner.tile(), global_mt19937(), fill_den, range);
+                    legacy::random_fill(m_torus.tile(), global_mt19937(), fill_den, range);
                 }
                 if (imgui_KeyPressed(ImGuiKey_0, false) || op == Clear_outside) {
-                    legacy::clear_outside(runner.tile(), range);
+                    legacy::clear_outside(m_torus.tile(), range);
                 }
                 if (imgui_KeyPressed(ImGuiKey_P, false) || op == Capture) {
-                    out = capture_closed(runner.tile(), range, ctrl.rule);
+                    out = capture_closed(m_torus.tile(), range, m_ctrl.rule);
                 }
             }
         }
@@ -658,11 +658,11 @@ public:
         ImGui::PopItemWidth();
 
         if (extra_step != 0) {
-            runner.run(rule, extra_step);
+            m_torus.run(m_ctrl.rule, extra_step);
         }
-        if (!ctrl.pause && !temp_pause) {
-            if (ImGui::GetFrameCount() % (ctrl.gap_frame + 1) == 0) {
-                runner.run(rule, ctrl.actual_pace());
+        if (!m_ctrl.pause && !temp_pause) {
+            if (ImGui::GetFrameCount() % (m_ctrl.gap_frame + 1) == 0) {
+                m_torus.run(m_ctrl.rule, m_ctrl.actual_pace());
             }
         }
 
@@ -672,5 +672,6 @@ public:
 
 std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, screenT& screen) {
     static runnerT runner;
-    return runner.display(rule, screen);
+    runner.apply_rule(rule);
+    return runner.display(screen);
 }
