@@ -81,6 +81,8 @@ public:
         legacy::tileT::sizeT size;
         uint32_t seed;
         float density; // ∈ [0.0f, 1.0f]
+
+        friend bool operator==(const initT&, const initT&) = default;
     };
 
     explicit torusT(const initT& init) : m_tile(init.size), m_temp(init.size), m_gen(0) { restart(init); }
@@ -140,9 +142,9 @@ class runnerT {
     // TODO: the constraint is arbitrary; are there more sensible ways to decide size constraint?
     static constexpr legacy::tileT::sizeT min_size{.width = 20, .height = 10};
     static constexpr legacy::tileT::sizeT max_size{.width = 1600, .height = 1200};
-    static legacy::tileT::sizeT size_clamped(int width, int height) {
-        return {.width = std::clamp(width, min_size.width, max_size.width),
-                .height = std::clamp(height, min_size.height, max_size.height)};
+    static legacy::tileT::sizeT size_clamped(legacy::tileT::sizeT size) {
+        return {.width = std::clamp(size.width, min_size.width, max_size.width),
+                .height = std::clamp(size.height, min_size.height, max_size.height)};
     }
 
     static constexpr int max_zoom = 8;
@@ -167,22 +169,19 @@ class runnerT {
         int gap_frame = 0;
 
         bool pause = false;
-        bool pause2 = false; // TODO: explain...
-
-        void run(torusT& runner, int extra) const {
-            if (extra != 0) {
-                runner.run(rule, extra);
-            }
-            if (!pause && !pause2) {
-                if (ImGui::GetFrameCount() % (gap_frame + 1) == 0) {
-                    runner.run(rule, actual_pace());
-                }
-            }
-        }
     };
 
-    // TODO (temp) Surprisingly nasty to deal with...
-    // TODO: explain...
+    torusT::initT m_init{.size{.width = 500, .height = 400}, .seed = 0, .density = 0.5};
+    torusT runner{m_init};
+    ctrlT ctrl{.rule = {} /* was rule */, .pace = 1, .anti_strobing = true, .gap_frame = 0, .pause = false};
+
+    ImVec2 screen_off = {0, 0};
+    int screen_zoom = 1;
+    ImVec2 last_known_canvas_size = min_canvas_size; // TODO: make std::optional?
+
+    std::optional<legacy::tileT> paste = std::nullopt;
+    legacy::tileT::posT paste_beg{0, 0}; // dbegin for copy... (TODO: this is confusing...)
+
     struct selectT {
         bool active = true;
         legacy::tileT::posT beg{0, 0}, end{0, 0}; // [] instead of [).
@@ -197,39 +196,29 @@ class runnerT {
         int width() const { return std::abs(beg.x - end.x) + 1; }
         int height() const { return std::abs(beg.y - end.y) + 1; }
     };
-
-    torusT::initT init{.size{.width = 500, .height = 400}, .seed = 0, .density = 0.5};
-    torusT runner{init};
-    ctrlT ctrl{.rule = {} /* was rule */, .pace = 1, .anti_strobing = true, .gap_frame = 0, .pause = false};
-
-    ImVec2 screen_off = {0, 0};
-    int screen_zoom = 1;
-    ImVec2 last_known_canvas_size = min_canvas_size; // TODO: make std::optional?
-
-    std::optional<legacy::tileT> paste = std::nullopt;
-    legacy::tileT::posT paste_beg{0, 0}; // dbegin for copy... (TODO: this is confusing...)
-
-    std::optional<selectT> sel = std::nullopt;
+    std::optional<selectT> m_sel = std::nullopt;
 
 public:
     // TODO: the canvas part is horribly written, needs heavy refactorings in the future...
-    std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, screenT& screen) {
+    std::optional<legacy::moldT::lockT> display(const legacy::ruleT& rule, screenT& screen) {
         std::optional<legacy::moldT::lockT> out = std::nullopt;
 
-        assert(init.size == runner.tile().size());
-        assert(init.size == size_clamped(init.size.width, init.size.height));
+        assert(m_init.size == runner.tile().size());
+        assert(m_init.size == size_clamped(m_init.size));
         assert(screen_off.x == int(screen_off.x) && screen_off.y == int(screen_off.y));
 
-        // TODO: not robust
-        // ~ runner.restart(...) shall not happen before rendering.
-        bool should_restart = false;
-        int extra = 0;
+        bool temp_pause = false;
+        int extra_step = 0;
+        auto restart = [&] {
+            temp_pause = true;
+            runner.restart(m_init);
+        };
 
         if (ctrl.rule != rule) {
             ctrl.rule = rule;
-            should_restart = true;
             ctrl.anti_strobing = true;
             ctrl.pause = false;
+            restart();
         }
 
         // TODO: better be controlled by frame()?
@@ -248,14 +237,10 @@ public:
         if (imgui_KeyPressed(ImGuiKey_4, true)) {
             ctrl.pace = std::min(ctrl.pace_max, ctrl.pace + 1);
         }
-        // TODO: explain... apply to other ctrls?
-        if ((ctrl.pause2 || !ImGui::GetIO().WantCaptureKeyboard) && ImGui::IsKeyPressed(ImGuiKey_Space, false)) {
-            ctrl.pause = !ctrl.pause;
-        }
         // Run by keystroke turns out to be necessary. (TODO: For example ...)
         if (imgui_KeyPressed(ImGuiKey_M, true)) {
             if (ctrl.pause) {
-                extra = ctrl.actual_pace();
+                extra_step = ctrl.actual_pace();
             }
             ctrl.pause = true;
         }
@@ -274,7 +259,7 @@ public:
             ImGui::SeparatorTextEx(0, str.c_str(), nullptr, extra_w);
             ImGui::SameLine();
             if (ImGui::Button("Restart") || imgui_KeyPressed(ImGuiKey_R, false)) {
-                should_restart = true;
+                restart();
             }
         }
 
@@ -282,20 +267,16 @@ public:
         {
             ImGui::Checkbox("Pause", &ctrl.pause);
             ImGui::SameLine();
-            ImGui::BeginDisabled();
-            ImGui::Checkbox("Pause2", &ctrl.pause2);
-            ImGui::EndDisabled();
-            ImGui::SameLine();
             ImGui::PushButtonRepeat(true);
             if (ImGui::Button("+1")) {
-                extra = 1;
+                extra_step = 1;
             }
             // TODO: finish.
             helper::show_help("Advance generation by 1 (instead of pace). This is useful for ...");
             if (ctrl.pause) {
                 ImGui::SameLine();
                 if (ImGui::Button(std::format("+p({})###+p", ctrl.actual_pace()).c_str())) {
-                    extra = ctrl.actual_pace();
+                    extra_step = ctrl.actual_pace();
                 }
             }
             ImGui::PopButtonRepeat();
@@ -323,16 +304,14 @@ public:
         ImGui::SameLine();
         ImGui::BeginGroup();
         {
-            if (int seed = init.seed; imgui_StepSliderInt("Init seed (0~99)", &seed, 0, 99)) {
-                init.seed = seed;
-                should_restart = true;
-            }
-
-            if (ImGui::SliderFloat("Init density (0~1)", &init.density, 0.0f, 1.0f, "%.2f", ImGuiSliderFlags_NoInput)) {
-                should_restart = true;
-            }
+            torusT::initT init = m_init;
+            int seed = init.seed;
+            imgui_StepSliderInt("Init seed (0~99)", &seed, 0, 99);
+            init.seed = seed;
+            ImGui::SliderFloat("Init density (0~1)", &init.density, 0.0f, 1.0f, "%.2f", ImGuiSliderFlags_NoInput);
 
             {
+                // TODO: make object-local? what about fill_den?
                 static char input_width[20]{}, input_height[20]{};
                 const auto filter = [](ImGuiInputTextCallbackData* data) -> int {
                     return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
@@ -357,13 +336,7 @@ public:
                     if (has_w || has_h) {
                         screen_off = {0, 0};
                         screen_zoom = 1;
-                        const legacy::tileT::sizeT size = size_clamped(width, height);
-                        if (init.size != size) {
-                            init.size = size;
-                            sel.reset();
-                            paste.reset();        // TODO: whether to show some message for these invalidation?
-                            runner.restart(init); // TODO: about vs setting should_restart...
-                        }
+                        init.size = size_clamped({.width = width, .height = height});
                     }
                     input_width[0] = '\0';
                     input_height[0] = '\0';
@@ -385,15 +358,17 @@ public:
                     screen_off = {0, 0};
 
                     // TODO: explain that `last_known_canvas_size` works well...
-                    const legacy::tileT::sizeT size = size_clamped((int)last_known_canvas_size.x / screen_zoom,
-                                                                   (int)last_known_canvas_size.y / screen_zoom);
-                    if (init.size != size) {
-                        init.size = size;
-                        sel.reset();
-                        paste.reset(); // TODO: whether to show some message for these invalidation?
-                        runner.restart(init);
-                    }
+                    init.size = size_clamped({.width = (int)last_known_canvas_size.x / screen_zoom,
+                                              .height = (int)last_known_canvas_size.y / screen_zoom});
                 }
+            }
+            if (init != m_init) {
+                if (init.size != m_init.size) {
+                    m_sel.reset();
+                    paste.reset(); // TODO: whether to show some message for these invalidation?
+                }
+                m_init = init;
+                restart();
             }
         }
         ImGui::EndGroup();
@@ -427,11 +402,11 @@ public:
             ImGui::OpenPopup("Tile_Menu"); // TODO: temp; when should the menu appear?
         }
         // TODO: whether to allow sel and paste to co-exist?
-        if (sel) {
+        if (m_sel) {
             ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
             if (ImGui::Button(
-                    std::format("Drop selection (w:{} h:{})###drop_sel", sel->width(), sel->height()).c_str())) {
-                sel.reset();
+                    std::format("Drop selection (w:{} h:{})###drop_sel", m_sel->width(), m_sel->height()).c_str())) {
+                m_sel.reset();
             }
         }
         if (paste) {
@@ -441,8 +416,6 @@ public:
                 paste.reset();
             }
         }
-
-        ctrl.pause2 = false; // TODO: recheck when to set pause2...
 
         {
             ImGui::InvisibleButton("Canvas", [] {
@@ -455,10 +428,10 @@ public:
             last_known_canvas_size = canvas_size;
 
             if (ImGui::IsItemActive()) {
-                ctrl.pause2 = true;
+                temp_pause = true;
             }
             if (ImGui::IsItemHovered() && ImGui::IsItemActive()) {
-                // Some logics rely on this to be done before rendering to work well.
+                // Some logics rely on this to be done before rendering.
                 const ImGuiIO& io = ImGui::GetIO();
                 if (io.KeyCtrl && screen_zoom == 1) {
                     runner.rotate(io.MouseDelta.x, io.MouseDelta.y);
@@ -499,8 +472,8 @@ public:
                 drawlist->AddRectFilled(paste_min, paste_max, IM_COL32(255, 0, 0, 60));
             }
 
-            if (sel) {
-                const auto range = sel->to_range();
+            if (m_sel) {
+                const auto range = m_sel->to_range();
                 const ImVec2 sel_min = screen_min + ImVec2(range.begin.x, range.begin.y) * screen_zoom;
                 const ImVec2 sel_max = screen_min + ImVec2(range.end.x, range.end.y) * screen_zoom;
                 drawlist->AddRectFilled(sel_min, sel_max, IM_COL32(0, 255, 0, 40));
@@ -520,12 +493,12 @@ public:
                 }
             }
 
-            if (sel && sel->active && !ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-                sel->active = false;
+            if (m_sel && m_sel->active && !ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+                m_sel->active = false;
                 // TODO: shrinking (bounding_box) has no size check like this. This is intentional.
                 // (to allow a single r-click to unselect the area.)
-                if (sel->width() <= 1 && sel->height() <= 1) {
-                    sel.reset();
+                if (m_sel->width() * m_sel->height() <= 2) {
+                    m_sel.reset();
                 }
                 // if (sel && ImGui::IsMouseReleased(ImGuiMouseButton_Right)) {
                 //     ImGui::OpenPopup("Tile_Menu");
@@ -575,10 +548,10 @@ public:
                 if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
                     const legacy::tileT::posT pos{.x = std::clamp(celx, 0, tile_size.width - 1),
                                                   .y = std::clamp(cely, 0, tile_size.height - 1)};
-                    sel = {.active = true, .beg = pos, .end = pos};
-                } else if (sel && sel->active && ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-                    sel->end.x = std::clamp(celx, 0, tile_size.width - 1);
-                    sel->end.y = std::clamp(cely, 0, tile_size.height - 1);
+                    m_sel = {.active = true, .beg = pos, .end = pos};
+                } else if (m_sel && m_sel->active && ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+                    m_sel->end.x = std::clamp(celx, 0, tile_size.width - 1);
+                    m_sel->end.y = std::clamp(cely, 0, tile_size.height - 1);
                 }
 
                 // TODO: refactor away this block...
@@ -598,7 +571,7 @@ public:
                     if (imgui_MouseScrollingDown() && screen_zoom != 1) {
                         screen_zoom /= 2;
                     }
-                    if (imgui_MouseScrollingUp() && screen_zoom != 8) {
+                    if (imgui_MouseScrollingUp() && screen_zoom != max_zoom) {
                         screen_zoom *= 2;
                     }
                     screen_off = (mouse_pos - cell_pos_raw * screen_zoom) - canvas_min;
@@ -608,11 +581,11 @@ public:
             }
 
             if (imgui_KeyPressed(ImGuiKey_A, false)) {
-                if (!sel || sel->width() != tile_size.width || sel->height() != tile_size.height) {
-                    sel = {
+                if (!m_sel || m_sel->width() != tile_size.width || m_sel->height() != tile_size.height) {
+                    m_sel = {
                         .active = false, .beg = {0, 0}, .end = {.x = tile_size.width - 1, .y = tile_size.height - 1}};
                 } else {
-                    sel.reset();
+                    m_sel.reset();
                 }
             }
 
@@ -623,7 +596,7 @@ public:
             opE op = None;
             // TODO: make this actually work...
             if (ImGui::BeginPopup("Tile_Menu")) {
-                ctrl.pause2 = true;
+                temp_pause = true;
                 ImGui::SliderFloat("Fill density", &fill_den, 0.0f, 1.0f, "%.2f", ImGuiSliderFlags_NoInput);
                 ImGui::Separator();
                 // These can be chained by `else if` without visual effect, as the popup will disappear after clicking.
@@ -645,16 +618,16 @@ public:
                 // TODO: document other keyboard-only operations...
                 ImGui::EndPopup();
             }
-            if (sel) {
-                const auto range = sel->to_range();
+            if (m_sel) {
+                const auto range = m_sel->to_range();
 
                 // TODO: what if these keys are pressed together?
                 if (imgui_KeyPressed(ImGuiKey_S, false) || op == Shrink) {
                     const auto [begin, end] = legacy::bounding_box(runner.tile(), range);
                     if (begin != end) {
-                        sel = {.active = false, .beg = begin, .end = {.x = end.x - 1, .y = end.y - 1}};
+                        m_sel = {.active = false, .beg = begin, .end = {.x = end.x - 1, .y = end.y - 1}};
                     } else {
-                        sel.reset();
+                        m_sel.reset();
                     }
                 }
                 if (imgui_KeyPressed(ImGuiKey_C, false) || imgui_KeyPressed(ImGuiKey_X, false) || op == Copy ||
@@ -678,16 +651,20 @@ public:
             }
         }
 
-        if (paste || (sel && sel->active)) {
-            ctrl.pause2 = true;
+        if (paste || (m_sel && m_sel->active)) {
+            temp_pause = true;
         }
 
         ImGui::PopItemWidth();
 
-        if (should_restart) {
-            runner.restart(init);
+        if (extra_step != 0) {
+            runner.run(rule, extra_step);
         }
-        ctrl.run(runner, extra); // TODO: able to result in low fps...
+        if (!ctrl.pause && !temp_pause) {
+            if (ImGui::GetFrameCount() % (ctrl.gap_frame + 1) == 0) {
+                runner.run(rule, ctrl.actual_pace());
+            }
+        }
 
         return out;
     }
@@ -695,5 +672,5 @@ public:
 
 std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, screenT& screen) {
     static runnerT runner;
-    return runner.apply_rule(rule, screen);
+    return runner.display(rule, screen);
 }
