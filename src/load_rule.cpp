@@ -7,8 +7,6 @@
 // TODO: whether to consider write access (file-editing etc)?
 // TODO: support saving into file? (without relying on the clipboard)
 
-#define ENABLE_MULTILINE_COPYING
-
 using pathT = std::filesystem::path;
 
 // (wontfix) After wasting so much time, I'd rather afford the extra copy than bothering with "more efficient"
@@ -211,11 +209,8 @@ class textT {
 
     std::vector<lineT> m_lines{};
     std::vector<legacy::extrT::valT> m_rules{};
-    int m_pos = 0; // Current pos (m_rules[m_pos]), valid if !m_rules.empty().
+    std::optional<int> m_pos = std::nullopt; // `display` returned m_rules[*m_pos] last time.
 
-    bool should_rewind = true;
-
-#ifdef ENABLE_MULTILINE_COPYING
     struct selT {
         int beg = 0, end = 0;
         bool contains(int l) const {
@@ -228,7 +223,6 @@ class textT {
         std::pair<int, int> minmax() const { return std::minmax(beg, end); }
     };
     std::optional<selT> m_sel = std::nullopt;
-#endif // ENABLE_MULTILINE_COPYING
 
 public:
     textT() {}
@@ -239,12 +233,8 @@ public:
     void clear() {
         m_lines.clear();
         m_rules.clear();
-        m_pos = 0;
-        should_rewind = true;
-
-#ifdef ENABLE_MULTILINE_COPYING
+        m_pos.reset();
         m_sel.reset();
-#endif
     }
 
     // `str` is assumed to be utf8-encoded.
@@ -264,51 +254,9 @@ public:
         }
     }
 
-    void display(std::optional<legacy::extrT::valT>& out) {
-        bool ret = false;
-        const int total = m_rules.size();
-
-        if (total != 0) {
-            if (ImGui::Button("Focus")) {
-                ret = true;
-            }
-            ImGui::SameLine();
-            iter_group(
-                "<|", "prev", "next", "|>",                                  //
-                [&] { ret = true, m_pos = 0; },                              //
-                [&] { ret = true, m_pos = std::max(0, m_pos - 1); },         //
-                [&] { ret = true, m_pos = std::min(total - 1, m_pos + 1); }, //
-                [&] { ret = true, m_pos = total - 1; });
-            ImGui::SameLine();
-            ImGui::Text("Total:%d At:%d", total, m_pos + 1);
-
-            // TODO: (temp) added back as this is very convenient; whether to require the window to be focused?
-            // (required if there are going to be multiple opened files in the gui)...
-            if (!ret) {
-                if (imgui_KeyPressed(ImGuiKey_UpArrow, true)) {
-                    ret = true, m_pos = std::max(0, m_pos - 1);
-                } else if (imgui_KeyPressed(ImGuiKey_DownArrow, true)) {
-                    ret = true, m_pos = std::min(total - 1, m_pos + 1);
-                }
-            }
-        } else {
-            ImGui::Text("No rules");
-        }
-
-        ImGui::Separator();
-
-        const bool locate = ret;
-
-        if (std::exchange(should_rewind, false)) {
-            ImGui::SetNextWindowScroll({0, 0});
-            assert(m_pos == 0);
-            if (total != 0) {
-                ret = true; // TODO: whether to set ret in this case?
-            }
-        }
-
-#ifdef ENABLE_MULTILINE_COPYING
-        if (ImGui::IsMouseReleased(ImGuiMouseButton_Right) && m_sel) {
+    // (Workaround: using `rewind` tag to reset the scroll after opening new files.)
+    void display(std::optional<legacy::extrT::valT>& out, bool rewind = false) {
+        if (m_sel && ImGui::IsMouseReleased(ImGuiMouseButton_Right) /* From anywhere */) {
             std::string str;
             const auto [min, max] = m_sel->minmax();
             for (int i = min; i <= max; ++i) {
@@ -320,8 +268,52 @@ public:
             messenger::add_msg("{}", str);
             m_sel.reset();
         }
-#endif // ENABLE_MULTILINE_COPYING
 
+        bool locate = false;
+        const int total = m_rules.size();
+
+        if (total != 0) {
+            std::optional<int> n_pos = std::nullopt;
+            if (ImGui::Button("Focus")) {
+                n_pos = m_pos.value_or(0);
+            }
+            ImGui::SameLine();
+            iter_group(
+                "<|", "prev", "next", "|>",                                   //
+                [&] { n_pos = 0; },                                           //
+                [&] { n_pos = std::max(0, m_pos.value_or(-1) - 1); },         //
+                [&] { n_pos = std::min(total - 1, m_pos.value_or(-1) + 1); }, //
+                [&] { n_pos = total - 1; });
+            ImGui::SameLine();
+            if (m_pos.has_value()) {
+                ImGui::Text("Total:%d At:%d", total, *m_pos + 1);
+            } else {
+                ImGui::Text("Total:%d At:N/A", total);
+            }
+
+            // TODO: (temp) added back as this is very convenient; whether to require the window to be focused?
+            // (required if there are going to be multiple opened files in the gui)...
+            if (imgui_KeyPressed(ImGuiKey_UpArrow, true)) {
+                n_pos = std::max(0, m_pos.value_or(-1) - 1);
+            } else if (imgui_KeyPressed(ImGuiKey_DownArrow, true)) {
+                n_pos = std::min(total - 1, m_pos.value_or(-1) + 1);
+            }
+
+            if (!m_sel && n_pos) {
+                assert(*n_pos >= 0 && *n_pos < total);
+                m_pos = *n_pos;
+                out = m_rules[*n_pos];
+                locate = true;
+            }
+        } else {
+            ImGui::Text("(No rules)");
+        }
+
+        ImGui::Separator();
+
+        if (rewind) {
+            ImGui::SetNextWindowScroll({0, 0});
+        }
         if (auto child = imgui_ChildWindow("Child")) {
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
             for (int l = 1; const auto& [text, id] : m_lines) {
@@ -329,45 +321,36 @@ public:
                 ImGui::SameLine();
                 imgui_StrWrapped(text);
 
-#ifdef ENABLE_MULTILINE_COPYING
                 const int this_l = l - 2;
-                if (ImGui::IsItemHovered()) {
-                    if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-                        m_sel = {this_l, this_l};
-                    } else if (m_sel && ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-                        m_sel->end = this_l;
-                    }
+                if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+                    m_sel = {this_l, this_l};
+                } else if (m_sel && ImGui::IsItemHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+                    m_sel->end = this_l;
                 }
                 if (m_sel && m_sel->contains(this_l)) {
                     imgui_ItemRectFilled(IM_COL32(255, 255, 255, 90));
-                    continue;
                 }
-#endif // ENABLE_MULTILINE_COPYING
 
                 if (id.has_value()) {
-                    const bool is_mold = m_rules[*id].lock.has_value();
+                    const bool has_lock = m_rules[*id].lock.has_value();
 
-                    if (id == m_pos) {
-                        imgui_ItemRectFilled(IM_COL32(is_mold ? 196 : 0, 255, 0, 60));
-                        if (!ImGui::IsItemVisible() && locate) {
+                    if (*id == m_pos) {
+                        imgui_ItemRectFilled(IM_COL32(has_lock ? 196 : 0, 255, 0, 60));
+                        if (locate && !ImGui::IsItemVisible()) {
                             ImGui::SetScrollHereY();
                         }
                     }
-                    if (ImGui::IsItemHovered()) {
-                        imgui_ItemRectFilled(IM_COL32(is_mold ? 196 : 0, 255, 0, 30));
+                    if (!m_sel && ImGui::IsItemHovered()) {
+                        imgui_ItemRectFilled(IM_COL32(has_lock ? 196 : 0, 255, 0, 30));
                         if (ImGui::IsItemClicked()) {
+                            assert(*id >= 0 && *id < total);
                             m_pos = *id;
-                            ret = true;
+                            out = m_rules[*id];
                         }
                     }
                 }
             }
             ImGui::PopStyleVar();
-        }
-
-        if (ret) {
-            assert(m_pos >= 0 && m_pos < total);
-            out = m_rules[m_pos];
         }
     }
 };
@@ -381,6 +364,7 @@ static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
         pathT path;
         textT text;
     };
+    static bool rewind = false;
     static std::optional<fileT> file;
 
     bool close = false, load = false;
@@ -391,6 +375,7 @@ static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
 
         if (auto sel = nav.display()) {
             file.emplace(*sel);
+            rewind = true;
             load = true;
         }
     } else {
@@ -399,7 +384,7 @@ static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
         load = ImGui::SmallButton("Reload");
         imgui_StrCopyable(cpp17_u8string(file->path), imgui_Str);
 
-        file->text.display(out);
+        file->text.display(out, std::exchange(rewind, false));
     }
 
     if (close) {
