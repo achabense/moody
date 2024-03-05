@@ -105,52 +105,83 @@ inline float wrap_len() {
     return ImGui::GetFontSize() * 35.0f;
 }
 
-// (Workaround; exposing `middle_button` for enter-binding in `edit_rule`)
-// (This was defined as a lambda; workaround for a parsing error in clang...)
-inline bool default_button(const char* label) { return ImGui::Button(label); }
+// TODO: refine; allow more bindings...
+// TODO: combine with help mode...
+class sequence {
+    enum tagE { None, First, Prev, Next, Last };
 
-inline void iter_group(const char* label_first, const char* label_prev, const char* label_next, const char* label_last,
-                       const auto& act_first, const auto& act_prev, const auto& act_next, const auto& act_last,
-                       bool (*const middle_button)(const char*) = default_button) {
-    if (ImGui::Button(label_first)) {
-        act_first();
+    // (`disable` is a workaround for dec/inc pair in `edit_rule`...)
+    static tagE seq(const char* label_first, const char* label_prev, const char* label_next, const char* label_last,
+                    bool disable) {
+        tagE tag = None;
+
+        if (ImGui::Button(label_first)) {
+            tag = First;
+        }
+
+        if (disable) {
+            ImGui::BeginDisabled();
+        }
+        static ImGuiID bound_id = 0;
+        const ImGuiID l_id = ImGui::GetID(label_prev);
+        const ImGuiID r_id = ImGui::GetID(label_next);
+        assert(l_id != 0 && r_id != 0);
+        const bool disabled = imgui_Disabled();
+        const bool bound = !disabled && bound_id != 0 && (bound_id == l_id || bound_id == r_id);
+
+        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+        if (ImGui::Button(label_prev) || (bound && imgui_KeyPressed(ImGuiKey_LeftArrow, false))) {
+            assert(ImGui::GetItemID() == l_id);
+            bound_id = l_id;
+            tag = Prev;
+        }
+        if (bound) {
+            imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_ButtonActive, tag == Prev ? 0.3 : 1.0));
+        }
+        ImGui::SameLine(0, 0), imgui_Str("/"), ImGui::SameLine(0, 0);
+        if (ImGui::Button(label_next) || (bound && imgui_KeyPressed(ImGuiKey_RightArrow, false))) {
+            assert(ImGui::GetItemID() == r_id);
+            bound_id = r_id;
+            tag = Next;
+        }
+        if (bound) {
+            imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_ButtonActive, tag == Next ? 0.3 : 1.0));
+        }
+        if (disable) {
+            ImGui::EndDisabled();
+        }
+
+        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+        if (ImGui::Button(label_last)) {
+            tag = Last;
+        }
+
+        return tag;
     }
 
-    // (Workaround; using middle_button = nullptr to mean "middle part uses default_button and is disabled")
-    // (This is only for a widget in edit_rule.cpp, and the appearance looks strange. Still needs redesign.)
-    ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-    bool enable_scrolling = true;
-    if (!middle_button) {
-        enable_scrolling = false;
-        ImGui::BeginDisabled();
-    }
-    ImGui::BeginGroup();
-    if ((middle_button ? middle_button : default_button)(label_prev)) {
-        enable_scrolling = false;
-        act_prev();
-    }
-    ImGui::SameLine(0, 0), imgui_Str("/"), ImGui::SameLine(0, 0);
-    if ((middle_button ? middle_button : default_button)(label_next)) {
-        enable_scrolling = false;
-        act_next();
-    }
-    ImGui::EndGroup();
-    if (!middle_button) {
-        ImGui::EndDisabled();
-    }
-    if (enable_scrolling && ImGui::IsItemHovered()) {
-        if (imgui_MouseScrollingUp()) {
-            act_prev();
-        } else if (imgui_MouseScrollingDown()) {
-            act_next();
+public:
+    static void seq(const char* label_first, const char* label_prev, const char* label_next, const char* label_last,
+                    const auto& act_first, const auto& act_prev, const auto& act_next, const auto& act_last,
+                    bool disable = false) {
+        switch (seq(label_first, label_prev, label_next, label_last, disable)) {
+            case First: act_first(); return;
+            case Prev: act_prev(); return;
+            case Next: act_next(); return;
+            case Last: act_last(); return;
         }
     }
-
-    ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-    if (ImGui::Button(label_last)) {
-        act_last();
-    }
 };
+
+inline bool button_with_shortcut(const char* label, ImGuiKey key) {
+    bool ret = ImGui::Button(label);
+
+    if (!imgui_Disabled()) {
+        const bool pressed = imgui_KeyPressed(key, false);
+        imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_ButtonActive, pressed ? 0.3 : 1.0));
+        ret = ret || pressed;
+    }
+    return ret;
+}
 
 // TODO: better name...
 class messenger {

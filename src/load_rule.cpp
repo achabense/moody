@@ -118,7 +118,13 @@ public:
                                              ImGuiInputTextFlags_EnterReturnsTrue)) {
                     // TODO: is the usage of / correct?
                     // TODO: is this still ok when !valid?
-                    set_current(m_current / cpp17_u8path(buf_path));
+                    const pathT p = m_current / cpp17_u8path(buf_path);
+                    std::error_code ec{};
+                    if (std::filesystem::is_regular_file(p, ec)) {
+                        target = p; // TODO: whether to call canonical?
+                    } else {
+                        set_current(p);
+                    }
                     buf_path[0] = '\0';
                 }
                 for (const auto& [path, title] : special_paths) {
@@ -278,7 +284,7 @@ public:
                 n_pos = m_pos.value_or(0);
             }
             ImGui::SameLine();
-            iter_group(
+            sequence::seq(
                 "<|", "prev", "next", "|>",                                   //
                 [&] { n_pos = 0; },                                           //
                 [&] { n_pos = std::max(0, m_pos.value_or(-1) - 1); },         //
@@ -289,14 +295,6 @@ public:
                 ImGui::Text("Total:%d At:%d", total, *m_pos + 1);
             } else {
                 ImGui::Text("Total:%d At:N/A", total);
-            }
-
-            // TODO: (temp) added back as this is very convenient; whether to require the window to be focused?
-            // (required if there are going to be multiple opened files in the gui)...
-            if (imgui_KeyPressed(ImGuiKey_UpArrow, true)) {
-                n_pos = std::max(0, m_pos.value_or(-1) - 1);
-            } else if (imgui_KeyPressed(ImGuiKey_DownArrow, true)) {
-                n_pos = std::min(total - 1, m_pos.value_or(-1) + 1);
             }
 
             if (!m_sel && n_pos) {

@@ -4,27 +4,6 @@
 
 #include "common.hpp"
 
-// TODO: support navigation among enter-buttons?
-static bool enter_button(const char* label) {
-    static ImGuiID bind_id = 0;
-    bool ret = ImGui::Button(label);
-    const ImGuiID button_id = ImGui::GetItemID();
-    if (ret) {
-        bind_id = button_id;
-    }
-    // TODO: instead of relying on Begin/EndDisabled, add click-protection
-    // on a button-by-button basis?
-    // TODO: are there public ways (not relying on imgui_internal.h)
-    // to detect whether in disabled block?
-    if (bind_id == button_id && (GImGui->CurrentItemFlags & ImGuiItemFlags_Disabled) == 0) {
-        if (imgui_KeyPressed(ImGuiKey_Enter, false)) {
-            ret = true;
-        }
-        imgui_ItemRect(ret ? IM_COL32(128, 128, 128, 255) : IM_COL32_WHITE);
-    }
-    return ret;
-}
-
 class subset_selector {
     legacy::subsetT current;
 
@@ -460,7 +439,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
             assert(c_locked_1 + round(rate * c_free) == dist);
         }
         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-        if (enter_button("Randomize")) {
+        if (button_with_shortcut("Randomize", ImGuiKey_Enter)) {
             if (exact_mode) {
                 return_rule(legacy::randomize_c(subset, mask, mold, global_mt19937(), dist - c_locked_1));
             } else {
@@ -470,23 +449,23 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
     }
 
     // TODO: it looks strange when only middle part is disabled...
-    iter_group(
+    sequence::seq(
         "<00..", "dec", "inc", "11..>", //
         [&] { return_rule(legacy::seq_int::min(subset, mask, mold)); },
         [&] { return_rule(legacy::seq_int::dec(subset, mask, mold)); },
         [&] { return_rule(legacy::seq_int::inc(subset, mask, mold)); },
-        [&] { return_rule(legacy::seq_int::max(subset, mask, mold)); }, contained ? enter_button : nullptr);
+        [&] { return_rule(legacy::seq_int::max(subset, mask, mold)); }, !contained);
     ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
 
     if (!contained) {
         ImGui::BeginDisabled();
     }
-    iter_group(
+    sequence::seq(
         "<1.0.", "prev", "next", "0.1.>", //
         [&] { return_rule(legacy::seq_perm::first(subset, mask, mold)); },
         [&] { return_rule(legacy::seq_perm::prev(subset, mask, mold)); },
         [&] { return_rule(legacy::seq_perm::next(subset, mask, mold)); },
-        [&] { return_rule(legacy::seq_perm::last(subset, mask, mold)); }, enter_button);
+        [&] { return_rule(legacy::seq_perm::last(subset, mask, mold)); });
 
     ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
     // TODO: better name for "dial"?

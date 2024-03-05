@@ -153,7 +153,7 @@ void frame_main(const code_icons& icons, screenT& screen) {
         // ImGui::Text("    (%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
         ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
         // TODO: simplify? unlike the one in fileT::display, this is mainly for undo/redo...
-        iter_group(
+        sequence::seq(
             "<|", "prev", "next", "|>", //
             [&] { recorder.set_first(); }, [&] { recorder.set_prev(); }, [&] { recorder.set_next(); },
             [&] { recorder.set_last(); });
