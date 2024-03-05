@@ -180,6 +180,7 @@ public:
     }
 };
 
+// TODO: inline to `load_rule_from_file`?
 static std::optional<std::string> load_binary(const pathT& path, int max_size) {
     std::error_code ec{};
     const auto size = std::filesystem::file_size(path, ec);
@@ -282,6 +283,7 @@ public:
             std::optional<int> n_pos = std::nullopt;
             if (ImGui::Button("Focus")) {
                 n_pos = m_pos.value_or(0);
+                sequence::bind_to("next");
             }
             ImGui::SameLine();
             sequence::seq(
@@ -353,6 +355,8 @@ public:
     }
 };
 
+static const int max_length = 100'000;
+
 // TODO: show the last opened file in file-nav?
 // TODO: support opening multiple files?
 static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
@@ -391,8 +395,9 @@ static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
     } else if (load) {
         assert(file);
         file->text.clear();
-        if (auto data = load_binary(file->path, 100'000)) {
+        if (auto data = load_binary(file->path, max_length)) {
             file->text.append(*data);
+            // TODO: whether to re-close?
             if (!file->text.has_rule()) {
                 file.reset();
                 messenger::add_msg("Found no rules");
@@ -402,6 +407,27 @@ static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
             // load_binary has done messenger::add_msg.
         }
     }
+}
+
+static void load_rule_from_clipboard(std::optional<legacy::extrT::valT>& out) {
+    static textT text;
+    if (ImGui::SmallButton("Refresh")) {
+        if (const char* str = ImGui::GetClipboardText()) {
+            std::string_view str_view(str);
+            if (str_view.size() > max_length) {
+                messenger::add_msg("Text too long: {} > {} (bytes)", str_view.size(), max_length);
+            } else {
+                text.clear();
+                text.append(str_view);
+            }
+        }
+    }
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Clear")) {
+        text.clear();
+    }
+
+    text.display(out);
 }
 
 static void load_rule_from_memory(std::optional<legacy::extrT::valT>& out) {
@@ -416,6 +442,10 @@ std::optional<legacy::extrT::valT> load_rule() {
     if (ImGui::BeginTabBar("Tabs")) {
         if (ImGui::BeginTabItem("Open file")) {
             load_rule_from_file(out);
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Clipboard")) {
+            load_rule_from_clipboard(out);
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("Documents")) {

@@ -107,8 +107,11 @@ inline float wrap_len() {
 
 // TODO: refine; allow more bindings...
 // TODO: combine with help mode...
+// TODO: better name...
 class sequence {
     enum tagE { None, First, Prev, Next, Last };
+
+    inline static ImGuiID bound_id = 0;
 
     // (`disable` is a workaround for dec/inc pair in `edit_rule`...)
     static tagE seq(const char* label_first, const char* label_prev, const char* label_next, const char* label_last,
@@ -122,17 +125,15 @@ class sequence {
         if (disable) {
             ImGui::BeginDisabled();
         }
-        static ImGuiID bound_id = 0;
         const ImGuiID l_id = ImGui::GetID(label_prev);
         const ImGuiID r_id = ImGui::GetID(label_next);
-        assert(l_id != 0 && r_id != 0);
+        assert(l_id != 0 && r_id != 0 && l_id != r_id);
         const bool disabled = imgui_Disabled();
         const bool bound = !disabled && bound_id != 0 && (bound_id == l_id || bound_id == r_id);
 
+        // TODO: restore scrolling control when bound?
         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
         if (ImGui::Button(label_prev) || (bound && imgui_KeyPressed(ImGuiKey_LeftArrow, false))) {
-            assert(ImGui::GetItemID() == l_id);
-            bound_id = l_id;
             tag = Prev;
         }
         if (bound) {
@@ -140,8 +141,6 @@ class sequence {
         }
         ImGui::SameLine(0, 0), imgui_Str("/"), ImGui::SameLine(0, 0);
         if (ImGui::Button(label_next) || (bound && imgui_KeyPressed(ImGuiKey_RightArrow, false))) {
-            assert(ImGui::GetItemID() == r_id);
-            bound_id = r_id;
             tag = Next;
         }
         if (bound) {
@@ -156,10 +155,18 @@ class sequence {
             tag = Last;
         }
 
+        if (tag != None) {
+            bound_id = l_id;
+        }
         return tag;
     }
 
 public:
+    // `label` should be either `label_prev` or `label_next`.
+    static void bind_to(const char* label) { //
+        bound_id = ImGui::GetID(label);
+    }
+
     static void seq(const char* label_first, const char* label_prev, const char* label_next, const char* label_last,
                     const auto& act_first, const auto& act_prev, const auto& act_next, const auto& act_last,
                     bool disable = false) {

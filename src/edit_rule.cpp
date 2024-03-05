@@ -473,6 +473,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
     if (ImGui::Button("dial")) {
         pass_custom_mask.emplace(mold.rule);
         return_rule(legacy::seq_int::one(subset, {mold.rule}, mold));
+        sequence::bind_to("next");
     }
     helper::show_help("Equivalent to..."); // TODO...
 
