@@ -430,10 +430,42 @@ static void load_rule_from_clipboard(std::optional<legacy::extrT::valT>& out) {
     text.display(out);
 }
 
-static void load_rule_from_memory(std::optional<legacy::extrT::valT>& out) {
-    static textT text("TODO");
+// Must keep in sync with "docs.cpp".
+struct docT {
+    const char* title;
+    const char* text;
+};
 
-    text.display(out);
+extern const docT docs[];
+extern const int doc_size;
+
+static void load_rule_from_memory(std::optional<legacy::extrT::valT>& out) {
+    static textT text;
+    static std::optional<int> doc_id = std::nullopt;
+    static bool rewind = false;
+
+    if (!doc_id) {
+        for (int i = 0; i < doc_size; ++i) {
+            if (ImGui::Selectable(docs[i].title)) {
+                text.clear();
+                text.append(docs[i].text);
+                rewind = true;
+                doc_id = i;
+            }
+        }
+    } else {
+        // assert(text.has_rule());
+
+        const bool close = ImGui::SmallButton("Close");
+        ImGui::SameLine();
+        imgui_Str(docs[*doc_id].title);
+        ImGui::Separator();
+        text.display(out, std::exchange(rewind, false));
+        if (close) {
+            text.clear();
+            doc_id.reset();
+        }
+    }
 }
 
 std::optional<legacy::extrT::valT> load_rule() {

@@ -172,6 +172,7 @@
     <ClCompile Include="..\imgui\imgui_draw.cpp" />
     <ClCompile Include="..\imgui\imgui_tables.cpp" />
     <ClCompile Include="..\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="..\src\docs.cpp" />
     <ClCompile Include="..\src\load_rule.cpp" />
     <ClCompile Include="..\src\main.cpp" />
     <ClCompile Include="..\imgui\backends\imgui_impl_sdl2.cpp" />

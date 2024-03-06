@@ -37,7 +37,7 @@ static legacy::moldT::lockT capture_closed(const legacy::tileT& source, const le
     // due to that `limit` is not large enough.
 
     // Loop until there has been `limit` generations without newly invoked mappings.
-    const int limit = 30;
+    const int limit = 100;
     for (int g = limit; g > 0; --g) {
         run_torus(tile, temp, [&](legacy::codeT code) {
             if (!lock[code]) {
