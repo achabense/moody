@@ -364,3 +364,5 @@ FodyWeavers.xsd
 
 # git rm --cached */imgui.ini
 imgui.ini
+
+sdl/*/
