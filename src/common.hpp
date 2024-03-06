@@ -116,6 +116,9 @@ class sequence {
     // (`disable` is a workaround for dec/inc pair in `edit_rule`...)
     static tagE seq(const char* label_first, const char* label_prev, const char* label_next, const char* label_last,
                     bool disable) {
+        const ImGuiKey key_prev = ImGuiKey_LeftArrow;
+        const ImGuiKey key_next = ImGuiKey_RightArrow;
+
         tagE tag = None;
 
         if (ImGui::Button(label_first)) {
@@ -125,22 +128,22 @@ class sequence {
         if (disable) {
             ImGui::BeginDisabled();
         }
-        const ImGuiID l_id = ImGui::GetID(label_prev);
-        const ImGuiID r_id = ImGui::GetID(label_next);
-        assert(l_id != 0 && r_id != 0 && l_id != r_id);
+        const ImGuiID id_prev = ImGui::GetID(label_prev);
+        const ImGuiID id_next = ImGui::GetID(label_next);
+        assert(id_prev != 0 && id_next != 0 && id_prev != id_next);
         const bool disabled = imgui_Disabled();
-        const bool bound = !disabled && bound_id != 0 && (bound_id == l_id || bound_id == r_id);
+        const bool bound = !disabled && (bound_id == id_prev || bound_id == id_next);
 
         // TODO: restore scrolling control when bound?
         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-        if (ImGui::Button(label_prev) || (bound && imgui_KeyPressed(ImGuiKey_LeftArrow, false))) {
+        if (ImGui::Button(label_prev) || (bound && imgui_KeyPressed(key_prev, false))) {
             tag = Prev;
         }
         if (bound) {
             imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_ButtonActive, tag == Prev ? 0.3 : 1.0));
         }
         ImGui::SameLine(0, 0), imgui_Str("/"), ImGui::SameLine(0, 0);
-        if (ImGui::Button(label_next) || (bound && imgui_KeyPressed(ImGuiKey_RightArrow, false))) {
+        if (ImGui::Button(label_next) || (bound && imgui_KeyPressed(key_next, false))) {
             tag = Next;
         }
         if (bound) {
@@ -156,7 +159,7 @@ class sequence {
         }
 
         if (tag != None) {
-            bound_id = l_id;
+            bound_id = id_prev;
         }
         return tag;
     }
@@ -171,6 +174,7 @@ public:
                     const auto& act_first, const auto& act_prev, const auto& act_next, const auto& act_last,
                     bool disable = false) {
         switch (seq(label_first, label_prev, label_next, label_last, disable)) {
+            case None: return;
             case First: act_first(); return;
             case Prev: act_prev(); return;
             case Next: act_next(); return;

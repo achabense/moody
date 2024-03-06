@@ -1,4 +1,4 @@
-const char* doc_1_intro = R"(An introduction to this program
+const char* doc_0_about = R"(About this program
 
 These documents are interactive. You can left-click the rules (or try the buttons above) to see their effects. Right-click to copy the text (on per-line basis; drag to select multiple lines).
 
@@ -6,8 +6,12 @@ These documents are interactive. You can left-click the rules (or try the button
 ...
 MAP+sQSUIzICkiQgAiAEKBAhrIGFgAUbAAA4AChgnAAAw6CAkAIgKCAlASgIACgIQBbqCqhEQAAkFQAARIDAQQRBA
 I hope this is impressive enough. It was picked from many randomized rules many years ago ... (... background of this program)
+)";
+
+const char* doc_1_intro = R"(Introduction to this program
 
 --- The subset
+(... use gol directly...)
 If you have tried the above rule, you may notice that in the left plane, some squares are lighted up with bright-green rings. This means the rule belongs to the "subsets" represented by them. More exactly, the isotropic rule in this example.
 https://conwaylife.com/wiki/Isotropic_non-totalistic_rule
 
@@ -64,6 +68,9 @@ struct docT {
     const char* text;
 };
 
-extern const docT docs[]{{"1. Introduction", doc_1_intro}};
+extern const docT docs[]{
+    {"0. About this program", doc_0_about}, //
+    {"1. Introduction", doc_1_intro},       //
+};
 
 extern const int doc_size = sizeof(docs) / sizeof(docT);

@@ -276,14 +276,13 @@ public:
             m_sel.reset();
         }
 
-        bool locate = false;
+        bool ret = false;
         const int total = m_rules.size();
 
         if (total != 0) {
             std::optional<int> n_pos = std::nullopt;
             if (ImGui::Button("Focus")) {
                 n_pos = m_pos.value_or(0);
-                sequence::bind_to("next");
             }
             ImGui::SameLine();
             sequence::seq(
@@ -302,13 +301,13 @@ public:
             if (!m_sel && n_pos) {
                 assert(*n_pos >= 0 && *n_pos < total);
                 m_pos = *n_pos;
-                out = m_rules[*n_pos];
-                locate = true;
+                ret = true;
             }
         } else {
             ImGui::Text("(No rules)");
         }
 
+        const bool locate = ret;
         ImGui::Separator();
 
         if (rewind) {
@@ -343,14 +342,19 @@ public:
                     if (!m_sel && ImGui::IsItemHovered()) {
                         imgui_ItemRectFilled(IM_COL32(has_lock ? 196 : 0, 255, 0, 30));
                         if (ImGui::IsItemClicked()) {
-                            assert(*id >= 0 && *id < total);
                             m_pos = *id;
-                            out = m_rules[*id];
+                            ret = true;
                         }
                     }
                 }
             }
             ImGui::PopStyleVar();
+        }
+
+        if (ret) {
+            assert(m_pos && *m_pos >= 0 && *m_pos < total);
+            sequence::bind_to("next");
+            out = m_rules[*m_pos];
         }
     }
 };

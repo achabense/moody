@@ -2,9 +2,6 @@
 
 // TODO: (Must) add help-mode coverage.
 
-// TODO: (Must) finish... should not be too ugly...
-static void about_this_program() { imgui_StrCopyable("TODO...", imgui_StrWrapped); }
-
 // TODO: improve recorder logic (especially `update`...)
 // Never empty.
 class recorderT {
@@ -84,7 +81,6 @@ void frame_main(const code_icons& icons, screenT& screen) {
 
     static bool show_load = true;
     static bool show_static = false;
-    static bool show_about = false;
 
     if (show_load) {
         // TODO: which is responsible for setting Size(Constraints)? frame_main or load_rule?
@@ -124,18 +120,6 @@ void frame_main(const code_icons& icons, screenT& screen) {
         ImGui::Checkbox("\"Load\"", &show_load);
         ImGui::SameLine();
         ImGui::Checkbox("\"Static\"", &show_static);
-        ImGui::SameLine();
-        if (ImGui::Checkbox("\"About\"", &show_about) && show_about) {
-            ImGui::OpenPopup("About this program");
-        }
-        // TODO: refine...
-        if (show_about) {
-            ImGui::SetNextWindowSize({500, 300}, ImGuiCond_Always);
-        }
-        if (ImGui::BeginPopupModal("About this program", &show_about, ImGuiWindowFlags_NoResize)) {
-            about_this_program();
-            ImGui::EndPopup();
-        }
 
         // TODO: whether to show FPS/Framecount? whether to show time-since-startup?
         // ImGui::Text("    (%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
@@ -187,15 +171,6 @@ void frame_main(const code_icons& icons, screenT& screen) {
                 if (auto out = edit_rule(current, icons)) {
                     current = *out;
                     update = true;
-                }
-
-                // TODO: (Must) every key-control must be documented in the help mode...
-                // TODO: better control...
-                if (imgui_KeyPressed(ImGuiKey_Semicolon, true)) {
-                    recorder.set_prev();
-                }
-                if (imgui_KeyPressed(ImGuiKey_Apostrophe, true)) {
-                    recorder.set_next();
                 }
             }
             ImGui::TableNextColumn();
