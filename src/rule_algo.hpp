@@ -2,6 +2,8 @@
 
 #include "rule.hpp"
 
+#define assert_implies(a, b) assert(!(a) || (b))
+
 namespace legacy {
     // TODO: defining `maskT` to emphasis which rule serves as the mask; it might be more
     // convenient to use `ruleT` directly.
@@ -419,8 +421,7 @@ namespace legacy {
 
         const ruleT res = mask ^ r;
         assert(subset.contains(res) && mold.compatible(res));
-        // subset.contains(mold.rule) -> mold.rule == res:
-        assert(!subset.contains(mold.rule) || (mold.rule == res));
+        assert_implies(subset.contains(mold.rule), res == mold.rule);
         return res;
     }
 
@@ -638,196 +639,195 @@ namespace legacy {
         }
     };
 
-    inline namespace _make_subset {
-        // TODO: better name ("make_mask" is too-general name)...
-        inline maskT make_mask(codeT::bposE bpos) {
-            return {make_rule([bpos](codeT code) { return code.get(bpos); })};
-        }
+    // TODO: better name ("make_mask" is too-general name)...
+    inline maskT make_mask(codeT::bposE bpos) {
+        return {make_rule([bpos](codeT code) { return code.get(bpos); })};
+    }
 
-        // TODO: explain the effects of these mask...
-        // rule ^ mask_zero -> TODO
-        inline const maskT mask_zero{{}};
-        // rule ^ mask_identity -> TODO
-        inline const maskT mask_identity{make_mask(codeT::bpos_s)};
-        // TODO: mask_copy_q/w/e/a/s(~mask_identity)/d/z/x/c etc?
+    // TODO: explain the effects of these mask...
+    // rule ^ mask_zero -> TODO
+    inline const maskT mask_zero{{}};
+    // rule ^ mask_identity -> TODO
+    inline const maskT mask_identity{make_mask(codeT::bpos_s)};
+    // TODO: mask_copy_q/w/e/a/s(~mask_identity)/d/z/x/c etc?
 
-        // A mapperT maps each codeT to another codeT.
-        // Especially, mapperT{"qweasdzxc"} maps any codeT to the same value.
-        class mapperT {
-            struct takeT {
-                enum tagE { O, I, Get, NGet };
-                tagE tag;
-                codeT::bposE bpos;
-                bool operator()(codeT code) const {
-                    switch (tag) {
-                        case O: return 0;
-                        case I: return 1;
-                        case Get: return code.get(bpos);
-                        default: assert(tag == NGet); return !code.get(bpos);
-                    }
-                }
-            };
-
-            takeT q, w, e;
-            takeT a, s, d;
-            takeT z, x, c;
-
-        public:
-            codeT operator()(codeT code) const {
-                return encode({q(code), w(code), e(code), //
-                               a(code), s(code), d(code), //
-                               z(code), x(code), c(code)});
-            }
-
-            // TODO: about consteval and the (obsolete) plan to support user-defined mappers / subsets...
-            consteval mapperT(const char* str) {
-                // [01], or [qweasdzxc], or ![qweasdzxc].
-                auto parse = [&]() -> takeT {
-                    takeT::tagE tag = takeT::Get;
-                    switch (*str) {
-                        case '0': ++str; return {takeT::O, {}};
-                        case '1': ++str; return {takeT::I, {}};
-                        case '!':
-                            ++str;
-                            tag = takeT::NGet;
-                            break;
-                    }
-                    switch (*str++) {
-                        case 'q': return {tag, codeT::bpos_q};
-                        case 'w': return {tag, codeT::bpos_w};
-                        case 'e': return {tag, codeT::bpos_e};
-                        case 'a': return {tag, codeT::bpos_a};
-                        case 's': return {tag, codeT::bpos_s};
-                        case 'd': return {tag, codeT::bpos_d};
-                        case 'z': return {tag, codeT::bpos_z};
-                        case 'x': return {tag, codeT::bpos_x};
-                        case 'c': return {tag, codeT::bpos_c};
-                        default: throw 0;
-                    }
-                };
-                // ~ about `throw 0`:
-                // https://stackoverflow.com/questions/67320438/how-to-fail-a-consteval-function
-                q = parse(), w = parse(), e = parse();
-                a = parse(), s = parse(), d = parse();
-                z = parse(), x = parse(), c = parse();
-                if (*str != '\0') {
-                    throw 0;
+    // A mapperT maps each codeT to another codeT.
+    // Especially, mapperT{"qweasdzxc"} maps any codeT to the same value.
+    class mapperT {
+        struct takeT {
+            enum tagE { O, I, Get, NGet };
+            tagE tag;
+            codeT::bposE bpos;
+            bool operator()(codeT code) const {
+                switch (tag) {
+                    case O: return 0;
+                    case I: return 1;
+                    case Get: return code.get(bpos);
+                    default: assert(tag == NGet); return !code.get(bpos);
                 }
             }
         };
 
-        // A pair of mapperT defines an equivalence relation.
-        inline void add_eq(equivT& eq, const mapperT& a, const mapperT& b) {
-            for_each_code([&](codeT code) { eq.add_eq(a(code), b(code)); });
+        takeT q, w, e;
+        takeT a, s, d;
+        takeT z, x, c;
+
+    public:
+        codeT operator()(codeT code) const {
+            return encode({q(code), w(code), e(code), //
+                           a(code), s(code), d(code), //
+                           z(code), x(code), c(code)});
         }
 
-        // TODO: recheck these mappers...
+        // TODO: about consteval and the (obsolete) plan to support user-defined mappers / subsets...
+        consteval mapperT(const char* str) {
+            // [01], or [qweasdzxc], or ![qweasdzxc].
+            auto parse = [&]() -> takeT {
+                takeT::tagE tag = takeT::Get;
+                switch (*str) {
+                    case '0': ++str; return {takeT::O, {}};
+                    case '1': ++str; return {takeT::I, {}};
+                    case '!':
+                        ++str;
+                        tag = takeT::NGet;
+                        break;
+                }
+                switch (*str++) {
+                    case 'q': return {tag, codeT::bpos_q};
+                    case 'w': return {tag, codeT::bpos_w};
+                    case 'e': return {tag, codeT::bpos_e};
+                    case 'a': return {tag, codeT::bpos_a};
+                    case 's': return {tag, codeT::bpos_s};
+                    case 'd': return {tag, codeT::bpos_d};
+                    case 'z': return {tag, codeT::bpos_z};
+                    case 'x': return {tag, codeT::bpos_x};
+                    case 'c': return {tag, codeT::bpos_c};
+                    default: throw 0;
+                }
+            };
+            // ~ about `throw 0`:
+            // https://stackoverflow.com/questions/67320438/how-to-fail-a-consteval-function
+            q = parse(), w = parse(), e = parse();
+            a = parse(), s = parse(), d = parse();
+            z = parse(), x = parse(), c = parse();
+            if (*str != '\0') {
+                throw 0;
+            }
+        }
+    };
 
-        // mp_identity(any code) -> the same code
-        inline constexpr mapperT mp_identity("qweasdzxc");
+    // A pair of mapperT defines an equivalence relation.
+    inline void add_eq(equivT& eq, const mapperT& a, const mapperT& b) {
+        for_each_code([&](codeT code) { eq.add_eq(a(code), b(code)); });
+    }
 
-        // The following mappers are defined relative to mp_identity.
-        // That is, the effects actually means the effects of mapperT_pair{mp_identity, mp_*}.
+    // TODO: recheck these mappers...
 
-        // TODO: about ignore_s and maskT...
-        inline constexpr mapperT mp_ignore_q("0weasdzxc");
-        inline constexpr mapperT mp_ignore_w("q0easdzxc");
-        inline constexpr mapperT mp_ignore_e("qw0asdzxc");
-        inline constexpr mapperT mp_ignore_a("qwe0sdzxc");
-        inline constexpr mapperT mp_ignore_s("qwea0dzxc");
-        inline constexpr mapperT mp_ignore_d("qweas0zxc");
-        inline constexpr mapperT mp_ignore_z("qweasd0xc");
-        inline constexpr mapperT mp_ignore_x("qweasdz0c");
-        inline constexpr mapperT mp_ignore_c("qweasdzx0");
+    // mp_identity(any code) -> the same code
+    inline constexpr mapperT mp_identity("qweasdzxc");
 
-        // TODO: clarify the [exact] meaning (&&effects) of these mappers...
-        // Native symmetry.
-        inline constexpr mapperT mp_refl_asd("zxc"
+    // The following mappers are defined relative to mp_identity.
+    // That is, the effects actually means the effects of mapperT_pair{mp_identity, mp_*}.
+
+    // TODO: about ignore_s and maskT...
+    inline constexpr mapperT mp_ignore_q("0weasdzxc");
+    inline constexpr mapperT mp_ignore_w("q0easdzxc");
+    inline constexpr mapperT mp_ignore_e("qw0asdzxc");
+    inline constexpr mapperT mp_ignore_a("qwe0sdzxc");
+    inline constexpr mapperT mp_ignore_s("qwea0dzxc");
+    inline constexpr mapperT mp_ignore_d("qweas0zxc");
+    inline constexpr mapperT mp_ignore_z("qweasd0xc");
+    inline constexpr mapperT mp_ignore_x("qweasdz0c");
+    inline constexpr mapperT mp_ignore_c("qweasdzx0");
+
+    // TODO: clarify the [exact] meaning (&&effects) of these mappers...
+    // Native symmetry.
+    inline constexpr mapperT mp_refl_asd("zxc"
+                                         "asd"
+                                         "qwe"); // '-'
+    inline constexpr mapperT mp_refl_wsx("ewq"
+                                         "dsa"
+                                         "cxz"); // '|'
+    inline constexpr mapperT mp_refl_qsc("qaz"
+                                         "wsx"
+                                         "edc"); // '\'
+    inline constexpr mapperT mp_refl_esz("cde"
+                                         "xsw"
+                                         "zaq"); // '/'
+    inline constexpr mapperT mp_C2("cxz"
+                                   "dsa"
+                                   "ewq"); // 180
+    inline constexpr mapperT mp_C4("zaq"
+                                   "xsw"
+                                   "cde"); // 90 (clockwise)
+
+    // Native totalistic.
+    // The `C8` mapper came from misconception of rotational symmetry (not more special than common C4 rules),
+    // but is useful to help define totalistic rules.
+    inline constexpr mapperT mp_C8("aqw"
+                                   "zse"
+                                   "xcd"); // "45" (clockwise)
+    inline constexpr mapperT mp_tot_exc_s("wqe"
+                                          "asd"
+                                          "zxc"); // swap(q,w); *C8 -> totalistic, excluding s
+    inline constexpr mapperT mp_tot_inc_s("qse"
+                                          "awd"
+                                          "zxc"); // swap(w,s); *C8 -> totalistic, including s
+
+    // TODO: explain. TODO: better name...
+    inline constexpr mapperT mp_dual("!q!w!e"
+                                     "!a!s!d"
+                                     "!z!x!c");
+
+    inline constexpr mapperT mp_von_ignore("0w0"
+                                           "asd"
+                                           "0x0"); // ignore_(q,e,z,c)
+
+    // Hexagonal emulation and emulated symmetry.
+    // q w -     q w
+    // a s d -> a s d
+    // - x c     x c
+    inline constexpr mapperT mp_hex_ignore("qw0"
+                                           "asd"
+                                           "0xc"); // ignore_(e,z)
+
+    inline constexpr mapperT mp_hex_refl_asd("xc0"
                                              "asd"
-                                             "qwe"); // '-'
-        inline constexpr mapperT mp_refl_wsx("ewq"
-                                             "dsa"
-                                             "cxz"); // '|'
-        inline constexpr mapperT mp_refl_qsc("qaz"
+                                             "0qw"); // swap(q,x), swap(w,c)
+    inline constexpr mapperT mp_hex_refl_qsc("qa0"
                                              "wsx"
-                                             "edc"); // '\'
-        inline constexpr mapperT mp_refl_esz("cde"
-                                             "xsw"
-                                             "zaq"); // '/'
-        inline constexpr mapperT mp_C2("cxz"
+                                             "0dc"); // swap(a,w), swap(x,d)
+    inline constexpr mapperT mp_hex_refl_wsx("dw0"
+                                             "csq"
+                                             "0xa"); // swap(q,d), swap(a,c)
+
+    inline constexpr mapperT mp_hex_refl_aq("ax0"
+                                            "qsc"
+                                            "0wd"); // swap(a,q), swap(x,w), swap(c,d)
+    inline constexpr mapperT mp_hex_refl_qw("wq0"
+                                            "dsa"
+                                            "0cx"); // swap(q,w), swap(a,d), swap(x,c)
+    inline constexpr mapperT mp_hex_refl_wd("cd0"
+                                            "xsw"
+                                            "0aq"); // swap(w,d), swap(q,c), swap(a,x)
+
+    inline constexpr mapperT mp_hex_C2("cx0"
                                        "dsa"
-                                       "ewq"); // 180
-        inline constexpr mapperT mp_C4("zaq"
+                                       "0wq"); // 180
+    inline constexpr mapperT mp_hex_C3("xa0"
+                                       "csq"
+                                       "0dw"); // 120 (clockwise)
+    inline constexpr mapperT mp_hex_C6("aq0"
                                        "xsw"
-                                       "cde"); // 90 (clockwise)
+                                       "0cd"); // 60 (clockwise)
 
-        // Native totalistic.
-        // The `C8` mapper came from misconception of rotational symmetry (not more special than common C4 rules),
-        // but is useful to help define totalistic rules.
-        inline constexpr mapperT mp_C8("aqw"
-                                       "zse"
-                                       "xcd"); // "45" (clockwise)
-        inline constexpr mapperT mp_tot_exc_s("wqe"
+    // Hexagonal totalistic.
+    inline constexpr mapperT mp_hex_tot_exc_s("wq0"
                                               "asd"
-                                              "zxc"); // swap(q,w); *C8 -> totalistic, excluding s
-        inline constexpr mapperT mp_tot_inc_s("qse"
+                                              "0xc"); // swap(q,w); *C6 -> totalistic, excluding s
+    inline constexpr mapperT mp_hex_tot_inc_s("qs0"
                                               "awd"
-                                              "zxc"); // swap(w,s); *C8 -> totalistic, including s
-
-        // TODO: explain. TODO: better name...
-        inline constexpr mapperT mp_dual("!q!w!e"
-                                         "!a!s!d"
-                                         "!z!x!c");
-
-        inline constexpr mapperT mp_von_ignore("0w0"
-                                               "asd"
-                                               "0x0"); // ignore_(q,e,z,c)
-
-        // Hexagonal emulation and emulated symmetry.
-        // q w -     q w
-        // a s d -> a s d
-        // - x c     x c
-        inline constexpr mapperT mp_hex_ignore("qw0"
-                                               "asd"
-                                               "0xc"); // ignore_(e,z)
-
-        inline constexpr mapperT mp_hex_refl_asd("xc0"
-                                                 "asd"
-                                                 "0qw"); // swap(q,x), swap(w,c)
-        inline constexpr mapperT mp_hex_refl_qsc("qa0"
-                                                 "wsx"
-                                                 "0dc"); // swap(a,w), swap(x,d)
-        inline constexpr mapperT mp_hex_refl_wsx("dw0"
-                                                 "csq"
-                                                 "0xa"); // swap(q,d), swap(a,c)
-
-        inline constexpr mapperT mp_hex_refl_aq("ax0"
-                                                "qsc"
-                                                "0wd"); // swap(a,q), swap(x,w), swap(c,d)
-        inline constexpr mapperT mp_hex_refl_qw("wq0"
-                                                "dsa"
-                                                "0cx"); // swap(q,w), swap(a,d), swap(x,c)
-        inline constexpr mapperT mp_hex_refl_wd("cd0"
-                                                "xsw"
-                                                "0aq"); // swap(w,d), swap(q,c), swap(a,x)
-
-        inline constexpr mapperT mp_hex_C2("cx0"
-                                           "dsa"
-                                           "0wq"); // 180
-        inline constexpr mapperT mp_hex_C3("xa0"
-                                           "csq"
-                                           "0dw"); // 120 (clockwise)
-        inline constexpr mapperT mp_hex_C6("aq0"
-                                           "xsw"
-                                           "0cd"); // 60 (clockwise)
-
-        // Hexagonal totalistic.
-        inline constexpr mapperT mp_hex_tot_exc_s("wq0"
-                                                  "asd"
-                                                  "0xc"); // swap(q,w); *C6 -> totalistic, excluding s
-        inline constexpr mapperT mp_hex_tot_inc_s("qs0"
-                                                  "awd"
-                                                  "0xc"); // swap(w,s); *C6 -> totalistic, including s
+                                              "0xc"); // swap(w,s); *C6 -> totalistic, including s
 
 #if 0
         // It's also valid to emulate hexagonal neighborhood by ignoring "q" and "c".
@@ -842,15 +842,13 @@ namespace legacy {
                                                 "zx0"); // ignore_(q,c)
 #endif
 
-        inline subsetT make_subset(std::initializer_list<mapperT> mappers, const maskT& mask = mask_zero) {
-            equivT eq{};
-            for (const mapperT& m : mappers) {
-                add_eq(eq, m, mp_identity);
-            }
-            return subsetT{mask, eq};
+    inline subsetT make_subset(std::initializer_list<mapperT> mappers, const maskT& mask = mask_zero) {
+        equivT eq{};
+        for (const mapperT& m : mappers) {
+            add_eq(eq, m, mp_identity);
         }
-
-    } // namespace _make_subset
+        return subsetT{mask, eq};
+    }
 
 #ifdef ENABLE_TESTS
     namespace _tests {

@@ -1,24 +1,99 @@
-#include <deque>
-
 #include "rule_algo.hpp"
 
 #include "common.hpp"
+
+namespace legacy {
+    namespace _subsets {
+        static const subsetT ignore_q = make_subset({mp_ignore_q});
+        static const subsetT ignore_w = make_subset({mp_ignore_w});
+        static const subsetT ignore_e = make_subset({mp_ignore_e});
+        static const subsetT ignore_a = make_subset({mp_ignore_a});
+        static const subsetT ignore_s_z = make_subset({mp_ignore_s}, mask_zero);
+        static const subsetT ignore_s_i = make_subset({mp_ignore_s}, mask_identity);
+        static const subsetT ignore_d = make_subset({mp_ignore_d});
+        static const subsetT ignore_z = make_subset({mp_ignore_z});
+        static const subsetT ignore_x = make_subset({mp_ignore_x});
+        static const subsetT ignore_c = make_subset({mp_ignore_c});
+
+        static const subsetT ignore_hex = make_subset({mp_hex_ignore});
+        static const subsetT ignore_von = make_subset({mp_von_ignore});
+
+        static const subsetT self_complementary = make_subset({mp_dual}, mask_identity);
+
+        static const subsetT native_isotropic = make_subset({mp_refl_wsx, mp_refl_qsc});
+        static const subsetT native_refl_wsx = make_subset({mp_refl_wsx});
+        static const subsetT native_refl_asd = make_subset({mp_refl_asd});
+        static const subsetT native_refl_qsc = make_subset({mp_refl_qsc});
+        static const subsetT native_refl_esz = make_subset({mp_refl_esz});
+        static const subsetT native_C2 = make_subset({mp_C2});
+        static const subsetT native_C4 = make_subset({mp_C4});
+
+        static const subsetT native_tot_exc_s = make_subset({mp_C8, mp_tot_exc_s});
+        static const subsetT native_tot_inc_s = make_subset({mp_C8, mp_tot_inc_s});
+
+        static const subsetT hex_isotropic = make_subset({mp_hex_refl_asd, mp_hex_refl_aq});
+        static const subsetT hex_refl_asd = make_subset({mp_hex_refl_asd});
+        static const subsetT hex_refl_qsc = make_subset({mp_hex_refl_qsc});
+        static const subsetT hex_refl_wsx = make_subset({mp_hex_refl_wsx});
+        static const subsetT hex_refl_aq = make_subset({mp_hex_refl_aq});
+        static const subsetT hex_refl_qw = make_subset({mp_hex_refl_qw});
+        static const subsetT hex_refl_wd = make_subset({mp_hex_refl_wd});
+        static const subsetT hex_C2 = make_subset({mp_hex_C2});
+        static const subsetT hex_C3 = make_subset({mp_hex_C3});
+        static const subsetT hex_C6 = make_subset({mp_hex_C6});
+
+        static const subsetT hex_tot_exc_s = make_subset({mp_hex_C6, mp_hex_tot_exc_s});
+        static const subsetT hex_tot_inc_s = make_subset({mp_hex_C6, mp_hex_tot_inc_s});
+    } // namespace _subsets
+
+#ifdef ENABLE_TESTS
+    namespace _tests {
+        static const testT test_subsets = [] {
+            using namespace _subsets;
+            assert(ignore_e.includes(ignore_hex));
+            assert(ignore_z.includes(ignore_hex));
+            assert(ignore_q.includes(ignore_von));
+            assert(ignore_e.includes(ignore_von));
+            assert(ignore_z.includes(ignore_von));
+            assert(ignore_c.includes(ignore_von));
+
+            assert(native_C2.includes(native_C4));
+            for (const subsetT* set :
+                 {&native_refl_wsx, &native_refl_asd, &native_refl_qsc, &native_refl_esz, &native_C2, &native_C4}) {
+                assert(set->includes(native_isotropic));
+            }
+            assert(native_isotropic.includes(native_tot_exc_s));
+            assert(native_tot_exc_s.includes(native_tot_inc_s));
+
+            assert(hex_C2.includes(hex_C6));
+            assert(hex_C3.includes(hex_C6));
+            for (const subsetT* set : {&hex_refl_asd, &hex_refl_qsc, &hex_refl_wsx, &hex_refl_aq, &hex_refl_qw,
+                                       &hex_refl_wd, &hex_C2, &hex_C3, &hex_C6}) {
+                assert(ignore_hex.includes(*set));
+                assert(set->includes(hex_isotropic));
+            }
+            assert(hex_isotropic.includes(hex_tot_exc_s));
+            assert(hex_tot_exc_s.includes(hex_tot_inc_s));
+
+            // TODO: add size assertion.
+        };
+    }
+#endif // ENABLE_TESTS
+
+} // namespace legacy
 
 class subset_selector {
     legacy::subsetT current;
 
     struct termT {
         const char* const title;
-        const legacy::subsetT set;
+        const legacy::subsetT* const set;
         const char* const description = nullptr;
         bool selected = false;
-        // bool includes_cur = false; // TODO: whether to cache this?
         bool disabled = false; // current & set -> empty.
-
-        bool includes(const termT& other) const { return set.includes(other.set); }
     };
 
-    using termT_list = std::deque<termT>;
+    using termT_list = std::vector<termT>;
 
     termT_list terms_ignore; // TODO: rename...
     termT_list terms_misc;
@@ -39,94 +114,68 @@ class subset_selector {
         current = legacy::subsetT::universal();
 
         for_each_term([&](termT& t) {
-            assert(!t.disabled || !t.selected); // disabled -> !selected
+            assert_implies(t.disabled, !t.selected);
             if (t.selected) {
-                current = current & t.set;
+                current = current & *t.set;
             }
         });
 
         assert(!current.empty());
 
         for_each_term([&](termT& t) { //
-            t.disabled = !legacy::subsetT::common_rule(t.set, current);
+            t.disabled = !legacy::subsetT::common_rule(*t.set, current);
         });
     }
 
 public:
     subset_selector() : current(legacy::subsetT::universal()) {
-        using namespace legacy::_make_subset;
+        using namespace legacy::_subsets;
         // TODO: add descriptions...
 
-        const termT& ignore_q = terms_ignore.emplace_back("q", make_subset({mp_ignore_q}));
-        terms_ignore.emplace_back("w", make_subset({mp_ignore_w}));
-        const termT& ignore_e = terms_ignore.emplace_back("e", make_subset({mp_ignore_e}));
-        terms_ignore.emplace_back("a", make_subset({mp_ignore_a}));
-        terms_ignore.emplace_back("s", make_subset({mp_ignore_s}, mask_zero),
+        terms_ignore.emplace_back("q", &ignore_q);
+        terms_ignore.emplace_back("w", &ignore_w);
+        terms_ignore.emplace_back("e", &ignore_e);
+        terms_ignore.emplace_back("a", &ignore_a);
+        terms_ignore.emplace_back("s", &ignore_s_z,
                                   "0->1, 1->1 or 0->0, 1->0"); // TODO: whether to put in terms_ignore?
-        terms_ignore.emplace_back("d", make_subset({mp_ignore_d}));
-        const termT& ignore_z = terms_ignore.emplace_back("z", make_subset({mp_ignore_z}));
-        terms_ignore.emplace_back("x", make_subset({mp_ignore_x}));
-        const termT& ignore_c = terms_ignore.emplace_back("c", make_subset({mp_ignore_c}));
+        terms_ignore.emplace_back("d", &ignore_d);
+        terms_ignore.emplace_back("z", &ignore_z);
+        terms_ignore.emplace_back("x", &ignore_x);
+        terms_ignore.emplace_back("c", &ignore_c);
 
-        terms_misc.emplace_back("S(f)", make_subset({mp_ignore_s}, mask_identity), "0->0, 1->1 or 0->1, 1->0");
-        const termT& ignore_hex = terms_misc.emplace_back("Hex", make_subset({mp_hex_ignore}));
-        const termT& ignore_von = terms_misc.emplace_back("Von", make_subset({mp_von_ignore}));
-        terms_misc.emplace_back("Dual", make_subset({mp_dual}, mask_identity)); // Self-complementary
-        // terms_misc.emplace_back("'C8'", make_subset({mp_C8}));
+        terms_misc.emplace_back("S(i)", &ignore_s_i, "0->0, 1->1 or 0->1, 1->0"); // TODO: better name...
+        terms_misc.emplace_back("Hex", &ignore_hex);
+        terms_misc.emplace_back("Von", &ignore_von);
+        terms_misc.emplace_back("Dual", &self_complementary); // TODO: better name...
 
-        const termT& native_isotropic = terms_native.emplace_back("All", make_subset({mp_refl_wsx, mp_refl_qsc}));
-        terms_native.emplace_back("|", make_subset({mp_refl_wsx}));
-        terms_native.emplace_back("-", make_subset({mp_refl_asd}));
-        terms_native.emplace_back("\\", make_subset({mp_refl_qsc}));
-        terms_native.emplace_back("/", make_subset({mp_refl_esz}));
-        const termT& native_C2 = terms_native.emplace_back("C2", make_subset({mp_C2}));
-        const termT& native_C4 = terms_native.emplace_back("C4", make_subset({mp_C4}));
+        terms_native.emplace_back("All", &native_isotropic);
+        terms_native.emplace_back("|", &native_refl_wsx);
+        terms_native.emplace_back("-", &native_refl_asd);
+        terms_native.emplace_back("\\", &native_refl_qsc);
+        terms_native.emplace_back("/", &native_refl_esz);
+        terms_native.emplace_back("C2", &native_C2);
+        terms_native.emplace_back("C4", &native_C4);
 
-        const termT& native_tot_exc_s = terms_totalistic.emplace_back("Tot", make_subset({mp_C8, mp_tot_exc_s}));
-        const termT& native_tot_inc_s = terms_totalistic.emplace_back("Tot(+s)", make_subset({mp_C8, mp_tot_inc_s}));
-        const termT& hex_tot_exc_s =
-            terms_totalistic.emplace_back("Hex_Tot", make_subset({mp_hex_C6, mp_hex_tot_exc_s}));
-        const termT& hex_tot_inc_s =
-            terms_totalistic.emplace_back("Hex_Tot(+s)", make_subset({mp_hex_C6, mp_hex_tot_inc_s}));
+        terms_totalistic.emplace_back("Tot", &native_tot_exc_s);
+        terms_totalistic.emplace_back("Tot(+s)", &native_tot_inc_s);
+        terms_totalistic.emplace_back("Hex_Tot", &hex_tot_exc_s);
+        terms_totalistic.emplace_back("Hex_Tot(+s)", &hex_tot_inc_s);
 
-        const termT& hex_isotropic = terms_hex.emplace_back("All", make_subset({mp_hex_refl_asd, mp_hex_refl_aq}));
-        terms_hex.emplace_back("a-d", make_subset({mp_hex_refl_asd}));
-        terms_hex.emplace_back("q-c", make_subset({mp_hex_refl_qsc}));
-        terms_hex.emplace_back("w-x", make_subset({mp_hex_refl_wsx}));
-        terms_hex.emplace_back("a|q", make_subset({mp_hex_refl_aq}));
-        terms_hex.emplace_back("q|w", make_subset({mp_hex_refl_qw}));
-        terms_hex.emplace_back("w|d", make_subset({mp_hex_refl_wd}));
-        const termT& hex_C2 = terms_hex.emplace_back("C2", make_subset({mp_hex_C2}));
-        const termT& hex_C3 = terms_hex.emplace_back("C3", make_subset({mp_hex_C3}));
-        const termT& hex_C6 = terms_hex.emplace_back("C6", make_subset({mp_hex_C6}));
+        // q w -    q w
+        // a s d ~ a s d
+        // - x c    x c"
+        terms_hex.emplace_back("All", &hex_isotropic);
+        terms_hex.emplace_back("a-d", &hex_refl_asd);
+        terms_hex.emplace_back("q-c", &hex_refl_qsc);
+        terms_hex.emplace_back("w-x", &hex_refl_wsx);
+        terms_hex.emplace_back("a|q", &hex_refl_aq);
+        terms_hex.emplace_back("q|w", &hex_refl_qw);
+        terms_hex.emplace_back("w|d", &hex_refl_wd);
+        terms_hex.emplace_back("C2", &hex_C2);
+        terms_hex.emplace_back("C3", &hex_C3);
+        terms_hex.emplace_back("C6", &hex_C6);
 
         update_current();
-
-        // [[maybe_unused]] will make lines too long...
-        (void)ignore_q, (void)ignore_e, (void)ignore_z, (void)ignore_c;
-        (void)ignore_hex, (void)ignore_von;
-        (void)native_isotropic, (void)native_C2, (void)native_C4;
-        (void)native_tot_exc_s, (void)native_tot_inc_s, (void)hex_tot_exc_s, (void)hex_tot_inc_s;
-        (void)hex_isotropic, (void)hex_C2, (void)hex_C3, (void)hex_C6;
-
-        assert(ignore_e.includes(ignore_hex));
-        assert(ignore_z.includes(ignore_hex));
-        assert(ignore_q.includes(ignore_von));
-        assert(ignore_e.includes(ignore_von));
-        assert(ignore_z.includes(ignore_von));
-        assert(ignore_c.includes(ignore_von));
-
-        assert(native_C2.set.includes(native_C4.set));
-        assert(std::ranges::all_of(terms_native, [&](const termT& t) { return t.includes(native_isotropic); }));
-        assert(native_isotropic.includes(native_tot_exc_s));
-        assert(native_tot_exc_s.includes(native_tot_inc_s));
-
-        assert(std::ranges::all_of(terms_hex, [&](const termT& t) { return ignore_hex.includes(t); }));
-        assert(hex_C2.includes(hex_C6));
-        assert(hex_C3.includes(hex_C6));
-        assert(std::ranges::all_of(terms_hex, [&](const termT& t) { return t.includes(hex_isotropic); }));
-        assert(hex_isotropic.includes(hex_tot_exc_s));
-        assert(hex_tot_exc_s.includes(hex_tot_inc_s));
     }
 
     // TODO: `mold` is the analysis target, rename and explain.
@@ -146,7 +195,7 @@ public:
             if (ImGui::Button("Recognize")) {
                 for_each_term([&](termT& t) {
                     t.disabled = false; // Will be updated by `update_current`.
-                    t.selected = t.set.contains(mold.rule);
+                    t.selected = t.set->contains(mold.rule);
                 });
                 update_current();
             }
@@ -179,13 +228,13 @@ public:
             // TODO: refine...
             // TODO: explain coloring scheme; redesign if necessary (especially ring col)
             // TODO: find better color for "disabled"/incompatible etc... currently too ugly.
-            const ImU32 cen_col = term.selected                ? ImGui::GetColorU32(ImGuiCol_ButtonHovered)
-                                  : term.set.includes(current) ? ImGui::GetColorU32(ImGuiCol_FrameBg)
-                                  : term.disabled              ? IM_COL32(120, 30, 0, 255)
-                                                               : IM_COL32_BLACK;
-            const ImU32 ring_col = term.set.contains(mold.rule) ? IM_COL32(0, 255, 0, 255)
-                                   : compatible(term.set, mold) ? IM_COL32(0, 100, 0, 255)
-                                                                : IM_COL32(200, 45, 0, 255);
+            const ImU32 cen_col = term.selected                 ? ImGui::GetColorU32(ImGuiCol_ButtonHovered)
+                                  : term.set->includes(current) ? ImGui::GetColorU32(ImGuiCol_FrameBg)
+                                  : term.disabled               ? IM_COL32(120, 30, 0, 255)
+                                                                : IM_COL32_BLACK;
+            const ImU32 ring_col = term.set->contains(mold.rule) ? IM_COL32(0, 255, 0, 255)
+                                   : compatible(*term.set, mold) ? IM_COL32(0, 100, 0, 255)
+                                                                 : IM_COL32(200, 45, 0, 255);
 
             imgui_ItemRectFilled(IM_COL32_BLACK);
             imgui_ItemRectFilled(cen_col, term.disabled ? ImVec2(5, 5) : ImVec2(4, 4));
@@ -371,7 +420,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
 
     const bool compatible = legacy::compatible(subset, mold);
     const bool contained = subset.contains(mold.rule);
-    assert(!contained || compatible); // contained -> compatible
+    assert_implies(contained, compatible);
 
     const auto scanlist = legacy::scan(par, mask, mold);
 
