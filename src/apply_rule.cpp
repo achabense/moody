@@ -26,10 +26,8 @@ static void run_torus(legacy::tileT& tile, legacy::tileT& temp, const legacy::ru
 // This is good at capturing "self-contained" patterns (oscillators/spaceships).
 static legacy::moldT::lockT capture_closed(const legacy::tileT& source, const legacy::tileT::rangeT& range,
                                            const legacy::ruleT& rule) {
-    legacy::tileT tile(range.size());
-    legacy::copy(tile, {0, 0}, source, range);
-
-    legacy::tileT temp(range.size());
+    legacy::tileT tile = legacy::copy(source, range);
+    legacy::tileT temp(tile.size());
 
     legacy::moldT::lockT lock{};
 
@@ -457,18 +455,16 @@ public:
                 assert(paste->width() <= tile_size.width && paste->height() <= tile_size.height);
                 paste_beg.x = std::clamp(paste_beg.x, 0, tile_size.width - paste->width());
                 paste_beg.y = std::clamp(paste_beg.y, 0, tile_size.height - paste->height());
-                // TODO: rename...
-                const legacy::tileT::rangeT range = {paste_beg, paste_beg + paste->size()};
+                const legacy::tileT::posT paste_end = paste_beg + paste->size();
 
-                legacy::tileT temp(paste->size()); // TODO: wasteful...
-                legacy::copy(temp, {0, 0}, m_torus.tile(), range);
-                legacy::copy<legacy::copyE::Or>(m_torus.tile(), paste_beg, *paste);
+                legacy::tileT temp = legacy::copy(m_torus.tile(), {{paste_beg, paste_end}}); // TODO: wasteful...
+                legacy::blit<legacy::blitE::Or>(m_torus.tile(), paste_beg, *paste);
                 refresh(screen, m_torus.tile());
-                legacy::copy(m_torus.tile(), paste_beg, temp);
+                legacy::blit<legacy::blitE::Copy>(m_torus.tile(), paste_beg, temp);
 
                 drawlist->AddImage(screen.texture(), screen_min, screen_max);
-                const ImVec2 paste_min = screen_min + ImVec2(range.begin.x, range.begin.y) * screen_zoom;
-                const ImVec2 paste_max = screen_min + ImVec2(range.end.x, range.end.y) * screen_zoom;
+                const ImVec2 paste_min = screen_min + ImVec2(paste_beg.x, paste_beg.y) * screen_zoom;
+                const ImVec2 paste_max = screen_min + ImVec2(paste_end.x, paste_end.y) * screen_zoom;
                 drawlist->AddRectFilled(paste_min, paste_max, IM_COL32(255, 0, 0, 60));
             }
 
@@ -488,7 +484,7 @@ public:
                         // TODO: or ask whether to resize m_torus.tile?
                         paste.emplace(legacy::from_RLE_str(text, tile_size));
                     } catch (const std::exception& err) {
-                        messenger::add_msg("{}", err.what());
+                        messenger::add_msg(err.what());
                     }
                 }
             }
@@ -562,7 +558,7 @@ public:
                     paste_beg.y = std::clamp(cely, 0, tile_size.height - paste->height());
 
                     if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-                        legacy::copy<legacy::copyE::Or>(m_torus.tile(), paste_beg, *paste);
+                        legacy::blit<legacy::blitE::Or>(m_torus.tile(), paste_beg, *paste);
                         paste.reset();
                     }
                 }
@@ -632,8 +628,9 @@ public:
                 }
                 if (imgui_KeyPressed(ImGuiKey_C, false) || imgui_KeyPressed(ImGuiKey_X, false) || op == Copy ||
                     op == Cut) {
-                    ImGui::SetClipboardText(legacy::to_RLE_str(m_ctrl.rule, m_torus.tile(), range).c_str());
-                    // messenger::add_msg("{}", legacy::to_RLE_str(m_ctrl.rule, m_torus.tile(), range));
+                    // TODO: whether to add rule?
+                    // ImGui::SetClipboardText(legacy::to_RLE_str(&m_ctrl.rule, m_torus.tile(), range).c_str());
+                    messenger::add_msg(legacy::to_RLE_str(nullptr, m_torus.tile(), range));
                 }
                 if (imgui_KeyPressed(ImGuiKey_Backspace, false) || imgui_KeyPressed(ImGuiKey_X, false) ||
                     op == Clear_inside || op == Cut) {

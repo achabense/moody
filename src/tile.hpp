@@ -108,8 +108,6 @@ namespace legacy {
         }
 
     public:
-        // TODO: at(posT)?
-
         bool* line(int y) {
             assert(y >= 0 && y < m_size.height);
             return _line(y + 1) + 1;
@@ -262,10 +260,9 @@ namespace legacy {
         return c;
     }
 
-    // TODO: is this "copy" or "paste"???
-    enum class copyE { Value, Or, Xor };
-    template <copyE mode = copyE::Value>
-    inline void copy(tileT& dest, tileT::posT d_begin, const tileT& source, const rangeT_opt& s_range_ = {}) {
+    enum class blitE { Copy, Or, Xor };
+    template <blitE mode>
+    inline void blit(tileT& dest, tileT::posT d_begin, const tileT& source, const rangeT_opt& s_range_ = {}) {
         assert(&source != &dest);
 
         const tileT::rangeT s_range = s_range_.value_or(source.entire_range());
@@ -274,16 +271,24 @@ namespace legacy {
         source.for_each_line(s_range, [&dest, &d_begin](int y, std::span<const bool> line) {
             bool* d = dest.line(d_begin.y + y) + d_begin.x;
             for (bool v : line) {
-                if constexpr (mode == copyE::Value) {
+                if constexpr (mode == blitE::Copy) {
                     *d++ = v;
-                } else if constexpr (mode == copyE::Or) {
+                } else if constexpr (mode == blitE::Or) {
                     *d++ |= v;
                 } else {
-                    static_assert(mode == copyE::Xor);
+                    static_assert(mode == blitE::Xor);
                     *d++ ^= v;
                 }
             }
         });
+    }
+
+    inline tileT copy(const tileT& source, const rangeT_opt& range_ = {}) {
+        const tileT::rangeT range = range_.value_or(source.entire_range());
+
+        tileT tile(range.size());
+        blit<blitE::Copy>(tile, {0, 0}, source, range);
+        return tile;
     }
 
     // TODO: Trying to guarantee that the result is independent of std implementation...
@@ -342,49 +347,53 @@ namespace legacy {
         }
     }
 
-    // https://conwaylife.com/wiki/Run_Length_Encoded
-    inline std::string to_RLE_str(const tileT& tile, const rangeT_opt& range = {}) {
-        // (wontfix) consecutive '$'s are not combined.
-        std::string str;
-        size_t last_nl = 0;
-        tile.for_each_line(range.value_or(tile.entire_range()), [&str, &last_nl](int y, std::span<const bool> line) {
-            if (y != 0) {
-                str += '$';
-            }
-
-            int c = 0;
-            bool v = 0;
-            auto flush = [&] {
-                if (c != 0) {
-                    // (58 is an arbitrary value that satisfies the line-length limit.)
-                    if (str.size() > last_nl + 58) {
-                        str += '\n';
-                        last_nl = str.size();
-                    }
-
-                    if (c != 1) {
-                        str += std::to_string(c);
-                    }
-                    str += "bo"[v];
-                    c = 0;
+    namespace _misc {
+        //  https://conwaylife.com/wiki/Run_Length_Encoded
+        inline void to_RLE(std::string& str, const tileT& tile, const tileT::rangeT& range) {
+            // (wontfix) consecutive '$'s are not combined.
+            size_t last_nl = 0;
+            tile.for_each_line(range, [&str, &last_nl](int y, std::span<const bool> line) {
+                if (y != 0) {
+                    str += '$';
                 }
-            };
-            for (const bool b : line) {
-                if (v != b) {
-                    flush();
-                    v = b;
-                }
-                ++c;
-            }
-            flush(); // (wontfix) trailing 0s are not omitted.
-        });
-        return str;
-    }
 
-    inline std::string to_RLE_str(const ruleT& rule, const tileT& tile, const rangeT_opt& range_ = {}) {
+                int c = 0;
+                bool v = 0;
+                auto flush = [&] {
+                    if (c != 0) {
+                        // (58 is an arbitrary value that satisfies the line-length limit.)
+                        if (str.size() > last_nl + 58) {
+                            str += '\n';
+                            last_nl = str.size();
+                        }
+
+                        if (c != 1) {
+                            str += std::to_string(c);
+                        }
+                        str += "bo"[v];
+                        c = 0;
+                    }
+                };
+                for (const bool b : line) {
+                    if (v != b) {
+                        flush();
+                        v = b;
+                    }
+                    ++c;
+                }
+                flush(); // (wontfix) trailing 0s are not omitted.
+            });
+        }
+    } // namespace _misc
+
+    inline std::string to_RLE_str(const ruleT* rule, const tileT& tile, const rangeT_opt& range_ = {}) {
         const tileT::rangeT range = range_.value_or(tile.entire_range());
-        return std::format("x = {}, y = {}, rule = {}\n{}!", range.width(), range.height(), to_MAP_str(rule),
-                           to_RLE_str(tile, range));
+        std::string str =
+            rule ? std::format("x = {}, y = {}, rule = {}\n", range.width(), range.height(), to_MAP_str(*rule))
+                 : std::format("x = {}, y = {}\n", range.width(), range.height());
+        _misc::to_RLE(str, tile, range);
+        str += '!';
+        return str;
     }
 
     // TODO: whether to skip lines leading with '#'?
@@ -480,7 +489,7 @@ namespace legacy {
         inline const testT test_RLE_str = [] {
             tileT tile({.width = 32, .height = 60});
             random_fill(tile, testT::rand, 0.5);
-            assert(tile == from_RLE_str(to_RLE_str(tile), tile.size()));
+            assert(tile == from_RLE_str(to_RLE_str(nullptr, tile), tile.size()));
         };
     }  // namespace _tests
 #endif // ENABLE_TESTS

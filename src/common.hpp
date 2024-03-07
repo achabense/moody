@@ -202,6 +202,8 @@ class messenger {
 public:
     messenger() = delete;
 
+    static void add_msg(std::string str) { m_strs.push_back(std::move(str)); }
+
     template <class... U>
     static void add_msg(std::format_string<const U&...> fmt, const U&... args) noexcept {
         m_strs.push_back(std::format(fmt, args...));

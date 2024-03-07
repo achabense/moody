@@ -250,7 +250,7 @@ public:
                 }
                 str += m_lines[i].text;
             }
-            messenger::add_msg("{}", str);
+            messenger::add_msg(str);
             m_sel.reset();
         }
 
@@ -399,7 +399,7 @@ static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
             file->text.append(load_binary(file->path, max_length));
         } catch (const std::exception& err) {
             file.reset();
-            messenger::add_msg("{}", err.what());
+            messenger::add_msg(err.what());
         }
     }
 }
