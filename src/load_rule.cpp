@@ -6,6 +6,7 @@
 
 // TODO: whether to consider write access (file-editing etc)?
 // TODO: support saving into file? (without relying on the clipboard)
+// TODO: show recently opened files/folders?
 
 using pathT = std::filesystem::path;
 
@@ -180,29 +181,6 @@ public:
     }
 };
 
-// TODO: inline to `load_rule_from_file`?
-static std::optional<std::string> load_binary(const pathT& path, int max_size) {
-    std::error_code ec{};
-    const auto size = std::filesystem::file_size(path, ec);
-    if (size != -1 && size < max_size) {
-        std::ifstream file(path, std::ios::in | std::ios::binary);
-        if (file) {
-            std::string data(size, '\0');
-            file.read(data.data(), size);
-            if (file && file.gcount() == size) {
-                return data;
-            }
-        }
-    }
-
-    if (size > max_size) {
-        messenger::add_msg("File too large: {} > {} (bytes)\n{}", size, max_size, cpp17_u8string(path));
-    } else {
-        messenger::add_msg("Cannot load file:\n{}", cpp17_u8string(path));
-    }
-    return {};
-}
-
 // It is easy to locate all rules in the text via `extract_MAP_str`.
 // However there are no easy ways to locate or highlight (only) the rule across the lines.
 // See: https://github.com/ocornut/imgui/issues/2313
@@ -359,9 +337,27 @@ public:
     }
 };
 
+static std::string load_binary(const pathT& path, int max_size) {
+    std::error_code ec{};
+    const auto size = std::filesystem::file_size(path, ec);
+    if (size != -1 && size < max_size) {
+        std::ifstream file(path, std::ios::in | std::ios::binary);
+        if (file) {
+            std::string data(size, '\0');
+            file.read(data.data(), size);
+            if (file && file.gcount() == size) {
+                return data;
+            }
+        }
+    }
+
+    throw std::runtime_error(
+        size > max_size ? std::format("File too large: {} > {} (bytes)\n{}", size, max_size, cpp17_u8string(path))
+                        : std::format("Failed to load file:\n{}", cpp17_u8string(path)));
+}
+
 static const int max_length = 100'000;
 
-// TODO: show the last opened file in file-nav?
 // TODO: support opening multiple files?
 static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
     static file_nav nav;
@@ -399,16 +395,11 @@ static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
     } else if (load) {
         assert(file);
         file->text.clear();
-        if (auto data = load_binary(file->path, max_length)) {
-            file->text.append(*data);
-            // TODO: whether to re-close?
-            if (!file->text.has_rule()) {
-                file.reset();
-                messenger::add_msg("Found no rules");
-            }
-        } else {
+        try {
+            file->text.append(load_binary(file->path, max_length));
+        } catch (const std::exception& err) {
             file.reset();
-            // load_binary has done messenger::add_msg.
+            messenger::add_msg("{}", err.what());
         }
     }
 }

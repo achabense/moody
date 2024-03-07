@@ -127,6 +127,25 @@ int main(int, char**) {
     // Setup Dear ImGui context
     ImGui::CreateContext();
 
+    const auto [ini_abs, log_abs] = [] {
+        char* base_path = SDL_GetBasePath();
+        if (!base_path) {
+            resource_failure();
+        }
+
+        file_nav_add_special_path(base_path, "Exe path");
+        std::string path = base_path;
+        SDL_free(base_path);
+
+        assert(path.ends_with('\\') || path.ends_with('/'));
+        return std::pair{path + "imgui.ini", path + "imgui_log.txt"};
+    }();
+
+    // Freeze to absolute path.
+    // (This is safe as `ini_abs` and `log_abs` will outlive the context.)
+    ImGui::GetIO().IniFilename = ini_abs.c_str();
+    ImGui::GetIO().LogFilename = log_abs.c_str();
+
     // Currently the controls of the program work poorly with navigation mode.
     assert(!(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_NavEnableKeyboard));
     assert(!(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_NavEnableGamepad));
@@ -141,30 +160,6 @@ int main(int, char**) {
     // Test-only.
     // ImGui::GetIO().Fonts->AddFontFromFileTTF(R"(C:\Windows\Fonts\Deng.ttf)", 13, nullptr,
     //                                          ImGui::GetIO().Fonts->GetGlyphRangesChineseFull());
-
-    {
-        char* base_path = SDL_GetBasePath();
-        if (!base_path) {
-            resource_failure();
-        }
-
-        file_nav_add_special_path(base_path, "Exe path");
-
-        const std::string path = base_path;
-        SDL_free(base_path);
-
-        const auto strdup = [](const std::string& str) {
-            char* buf = new char[str.size() + 1];
-            std::copy_n(str.c_str(), str.size() + 1, buf);
-            return buf;
-        };
-
-        // Freeze the absolute path of "imgui.ini" and "imgui_log.txt".
-        // (wontfix) These memory leaks are intentional, as it's hard to decide when to delete them...
-        assert(path.ends_with('\\') || path.ends_with('/'));
-        ImGui::GetIO().IniFilename = strdup(path + "imgui.ini");
-        ImGui::GetIO().LogFilename = strdup(path + "imgui_log.txt");
-    }
 
     auto begin_frame = [] {
         SDL_Event event;
