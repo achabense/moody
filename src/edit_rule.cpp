@@ -44,6 +44,9 @@ namespace legacy {
 
         static const subsetT hex_tot_exc_s = make_subset({mp_hex_C6, mp_hex_tot_exc_s});
         static const subsetT hex_tot_inc_s = make_subset({mp_hex_C6, mp_hex_tot_inc_s});
+
+        static const subsetT von_tot_exc_s = make_subset({mp_von_ignore, mp_C4, mp_von_tot_exc_s});
+        static const subsetT von_tot_inc_s = make_subset({mp_von_ignore, mp_C4, mp_von_tot_inc_s});
     } // namespace _subsets
 
 #ifdef ENABLE_TESTS
@@ -75,6 +78,16 @@ namespace legacy {
             assert(hex_isotropic.includes(hex_tot_exc_s));
             assert(hex_tot_exc_s.includes(hex_tot_inc_s));
 
+            assert(native_isotropic.get_par().k() == 102);
+            assert(hex_isotropic.get_par().k() == 26);
+            assert((native_isotropic & ignore_von).get_par().k() == 12); // von_isotropic
+
+            assert(native_tot_exc_s.get_par().k() == 9 * 2); // 0...8
+            assert(native_tot_inc_s.get_par().k() == 10);    // 0...9
+            assert(hex_tot_exc_s.get_par().k() == 7 * 2);    // 0...6
+            assert(hex_tot_inc_s.get_par().k() == 8);        // 0...7
+            assert(von_tot_exc_s.get_par().k() == 5 * 2);    // 0...4
+            assert(von_tot_inc_s.get_par().k() == 6);        // 0...5
             // TODO: add size assertion.
         };
     }
@@ -144,9 +157,9 @@ public:
         terms_ignore.emplace_back("c", &ignore_c);
 
         terms_misc.emplace_back("S(i)", &ignore_s_i, "0->0, 1->1 or 0->1, 1->0"); // TODO: better name...
+        terms_misc.emplace_back("Dual", &self_complementary);                     // TODO: better name...
         terms_misc.emplace_back("Hex", &ignore_hex);
         terms_misc.emplace_back("Von", &ignore_von);
-        terms_misc.emplace_back("Dual", &self_complementary); // TODO: better name...
 
         terms_native.emplace_back("All", &native_isotropic);
         terms_native.emplace_back("|", &native_refl_wsx);
@@ -156,10 +169,12 @@ public:
         terms_native.emplace_back("C2", &native_C2);
         terms_native.emplace_back("C4", &native_C4);
 
-        terms_totalistic.emplace_back("Tot", &native_tot_exc_s);
-        terms_totalistic.emplace_back("Tot(+s)", &native_tot_inc_s);
-        terms_totalistic.emplace_back("Hex_Tot", &hex_tot_exc_s);
-        terms_totalistic.emplace_back("Hex_Tot(+s)", &hex_tot_inc_s);
+        terms_totalistic.emplace_back("Nat", &native_tot_exc_s);
+        terms_totalistic.emplace_back("Nat(+s)", &native_tot_inc_s);
+        terms_totalistic.emplace_back("Hex", &hex_tot_exc_s);
+        terms_totalistic.emplace_back("Hex(+s)", &hex_tot_inc_s);
+        terms_totalistic.emplace_back("Von", &von_tot_exc_s);
+        terms_totalistic.emplace_back("Von(+s)", &von_tot_inc_s);
 
         // q w -    q w
         // a s d ~ a s d

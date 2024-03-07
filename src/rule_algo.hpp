@@ -779,10 +779,6 @@ namespace legacy {
                                      "!a!s!d"
                                      "!z!x!c");
 
-    inline constexpr mapperT mp_von_ignore("0w0"
-                                           "asd"
-                                           "0x0"); // ignore_(q,e,z,c)
-
     // Hexagonal emulation and emulated symmetry.
     // q w -     q w
     // a s d -> a s d
@@ -841,6 +837,18 @@ namespace legacy {
                                                 "asd"
                                                 "zx0"); // ignore_(q,c)
 #endif
+
+    inline constexpr mapperT mp_von_ignore("0w0"
+                                           "asd"
+                                           "0x0"); // ignore_(q,e,z,c)
+
+    // TODO: about von_refl/C...
+    inline constexpr mapperT mp_von_tot_exc_s("0d0"
+                                              "asw"
+                                              "0x0"); // swap(w,d); *C4 -> totalistic, excluding s
+    inline constexpr mapperT mp_von_tot_inc_s("0s0"
+                                              "awd"
+                                              "0x0"); // swap(w,s); *C4 -> totalistic, including s
 
     inline subsetT make_subset(std::initializer_list<mapperT> mappers, const maskT& mask = mask_zero) {
         equivT eq{};
