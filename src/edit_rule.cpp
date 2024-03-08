@@ -88,7 +88,6 @@ namespace legacy {
             assert(hex_tot_inc_s.get_par().k() == 8);        // 0...7
             assert(von_tot_exc_s.get_par().k() == 5 * 2);    // 0...4
             assert(von_tot_inc_s.get_par().k() == 6);        // 0...5
-            // TODO: add size assertion.
         };
     }
 #endif // ENABLE_TESTS
@@ -216,11 +215,9 @@ public:
             }
         }
 
-        // TODO: drop mutable id... use manually specified ids
         // TODO: tooltip...
         auto check = [&, id = 0, size = square_size()](termT& term) mutable {
             ImGui::PushID(id++);
-            // ImGui::PushID(&term); // TODO: is ptr id reliable? (will this possibly cause collisions?)
             if (ImGui::InvisibleButton("Check", size) && !term.disabled) {
                 term.selected = !term.selected;
                 update_current();

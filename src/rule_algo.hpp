@@ -559,7 +559,7 @@ namespace legacy {
             assert(subset.contains(mold.rule));
 
             return transform(subset, mask, mold, [](bool* begin, bool* end) {
-                // 11...0 -> 00...1; stop at 111...1 (last())
+                // 11...0 -> 00...1; stop at 111...1 (max())
                 bool* first_0 = std::find(begin, end, 0);
                 if (first_0 != end) {
                     std::fill(begin, first_0, 0);
@@ -572,7 +572,7 @@ namespace legacy {
             assert(subset.contains(mold.rule));
 
             return transform(subset, mask, mold, [](bool* begin, bool* end) {
-                // 00...1 -> 11...0; stop at 000...0 (first())
+                // 00...1 -> 11...0; stop at 000...0 (min())
                 bool* first_1 = std::find(begin, end, 1);
                 if (first_1 != end) {
                     std::fill(begin, first_1, 1);
@@ -644,12 +644,11 @@ namespace legacy {
         return {make_rule([bpos](codeT code) { return code.get(bpos); })};
     }
 
-    // TODO: explain the effects of these mask...
-    // rule ^ mask_zero -> TODO
+    // rule ^ mask_zero -> the masked values are identical to rule's.
     inline const maskT mask_zero{{}};
-    // rule ^ mask_identity -> TODO
+    // rule ^ mask_identity -> the masked values can mean whether the cell will "flip" in each situation.
     inline const maskT mask_identity{make_mask(codeT::bpos_s)};
-    // TODO: mask_copy_q/w/e/a/s(~mask_identity)/d/z/x/c etc?
+    // make_mask(codeT::bpos_q/w/...) are not defined as they are only useful in several rare cases.
 
     // A mapperT maps each codeT to another codeT.
     // Especially, mapperT{"qweasdzxc"} maps any codeT to the same value.
@@ -721,15 +720,15 @@ namespace legacy {
         for_each_code([&](codeT code) { eq.add_eq(a(code), b(code)); });
     }
 
-    // TODO: recheck these mappers...
-
     // mp_identity(any code) -> the same code
     inline constexpr mapperT mp_identity("qweasdzxc");
 
     // The following mappers are defined relative to mp_identity.
     // That is, the effects actually means the effects of mapperT_pair{mp_identity, mp_*}.
 
-    // TODO: about ignore_s and maskT...
+    // Independence.
+    // For example, mp_ignore_q * mask_zero -> the rules where the values are "independent of q".
+    // Notice that `mp_ignore_s * mask_zero` is different from `mp_ignore_s * mask_identity`.
     inline constexpr mapperT mp_ignore_q("0weasdzxc");
     inline constexpr mapperT mp_ignore_w("q0easdzxc");
     inline constexpr mapperT mp_ignore_e("qw0asdzxc");
@@ -740,8 +739,9 @@ namespace legacy {
     inline constexpr mapperT mp_ignore_x("qweasdz0c");
     inline constexpr mapperT mp_ignore_c("qweasdzx0");
 
-    // TODO: clarify the [exact] meaning (&&effects) of these mappers...
     // Native symmetry.
+    // For example, rules in `mp_refl_wsx * mask_zero` are able to preserve "leftside-right"
+    // symmetry in all cases.
     inline constexpr mapperT mp_refl_asd("zxc"
                                          "asd"
                                          "qwe"); // '-'
@@ -774,7 +774,9 @@ namespace legacy {
                                           "awd"
                                           "zxc"); // swap(w,s); *C8 -> totalistic, including s
 
-    // TODO: explain. TODO: better name...
+    // TODO: better name...
+    // * mask_identity -> the self-complementary rules.
+    // (Where every pair of [code] and [mp_dual(code)] have the same "flip-ness")
     inline constexpr mapperT mp_dual("!q!w!e"
                                      "!a!s!d"
                                      "!z!x!c");
@@ -828,7 +830,7 @@ namespace legacy {
 #if 0
         // It's also valid to emulate hexagonal neighborhood by ignoring "q" and "c".
         // However, the program is not going to support this, as it makes the program more complicated
-        // but without much benefit.
+        // without bringing essentialy different discoveries.
 
         // - w e     w e
         // a s d -> a s d
@@ -838,11 +840,13 @@ namespace legacy {
                                                 "zx0"); // ignore_(q,c)
 #endif
 
+    // Von-Neumann emulation.
+    // The neighborhood works naturally with native symmetry.
+    // For example, `mp_von_C4` is implicitly defined as mp_C4 * mp_von_ignore.
     inline constexpr mapperT mp_von_ignore("0w0"
                                            "asd"
                                            "0x0"); // ignore_(q,e,z,c)
 
-    // TODO: about von_refl/C...
     inline constexpr mapperT mp_von_tot_exc_s("0d0"
                                               "asw"
                                               "0x0"); // swap(w,d); *C4 -> totalistic, excluding s
@@ -871,7 +875,18 @@ namespace legacy {
 
                 assert(mp_dual(mp_dual(code)) == code);
 
-                // ... TODO...
+                const codeT hex = mp_hex_ignore(code);
+
+                for (const mapperT* m : {&mp_hex_refl_asd, &mp_hex_refl_qsc, &mp_hex_refl_wsx, &mp_hex_refl_aq,
+                                         &mp_hex_refl_qw, &mp_hex_refl_wd, &mp_hex_C2}) {
+                    assert((*m)((*m)(hex)) == hex);
+                }
+                assert(mp_hex_C6(mp_hex_C6(mp_hex_C6(hex))) == mp_hex_C2(hex));
+                assert(mp_hex_C3(mp_hex_C3(mp_hex_C3(hex))) == hex);
+
+                assert(mp_hex_C6(mp_hex_C6(hex)) == mp_hex_C3(hex)); // As both are defined clockwise.
+                // Otherwise will need to test:
+                // assert(mp_hex_C6(mp_hex_C6(hex)) == mp_hex_C3(mp_hex_C3(hex)));
             });
         };
 
