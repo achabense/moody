@@ -34,10 +34,13 @@ bool file_nav_add_special_path(const char* u8path, const char* title) {
     if (!ec) {
         special_paths.emplace_back(std::move(p), title);
         return true;
+    } else {
+        messenger::add_msg("Cannot add path:\n{}", u8path);
+        return false;
     }
-    return false;
 }
 
+// TODO: better layout...
 class file_nav {
     using entryT = std::filesystem::directory_entry;
 
@@ -114,17 +117,18 @@ public:
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             {
-                // TODO: better hint...
-                if (ImGui::InputTextWithHint("Path", "-> enter", buf_path, std::size(buf_path),
-                                             ImGuiInputTextFlags_EnterReturnsTrue)) {
-                    // TODO: is the usage of / correct?
+                ImGui::InputTextWithHint("##Path", "Path", buf_path, std::size(buf_path));
+                ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                if (ImGui::Button("Open") && buf_path[0] != '\0') {
                     // TODO: is this still ok when !valid?
                     const pathT p = m_current / cpp17_u8path(buf_path);
                     std::error_code ec{};
                     if (std::filesystem::is_regular_file(p, ec)) {
                         target = p; // TODO: whether to call canonical?
-                    } else {
+                    } else if (std::filesystem::is_directory(p, ec)) {
                         set_current(p);
+                    } else {
+                        messenger::add_msg("Invalid path:\n{}", buf_path);
                     }
                     buf_path[0] = '\0';
                 }
@@ -369,7 +373,7 @@ static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
     static bool rewind = false;
     static std::optional<fileT> file;
 
-    bool close = false, load = false;
+    bool load = false;
     if (!file) {
         if (ImGui::SmallButton("Refresh")) {
             nav.refresh_if_valid();
@@ -381,21 +385,21 @@ static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
             load = true;
         }
     } else {
-        close = ImGui::SmallButton("Close");
+        const bool close = ImGui::SmallButton("Close");
         ImGui::SameLine();
         load = ImGui::SmallButton("Reload");
         imgui_StrCopyable(cpp17_u8string(file->path), imgui_Str);
 
         file->text.display(out, std::exchange(rewind, false));
+        if (close) {
+            file.reset();
+        }
     }
 
-    if (close) {
+    if (load) {
         assert(file);
-        file.reset();
-    } else if (load) {
-        assert(file);
-        file->text.clear();
         try {
+            file->text.clear();
             file->text.append(load_binary(file->path, max_length));
         } catch (const std::exception& err) {
             file.reset();
@@ -406,7 +410,7 @@ static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
 
 static void load_rule_from_clipboard(std::optional<legacy::extrT::valT>& out) {
     static textT text;
-    if (ImGui::SmallButton("Refresh")) {
+    if (ImGui::SmallButton("Read clipboard")) {
         if (const char* str = ImGui::GetClipboardText()) {
             std::string_view str_view(str);
             if (str_view.size() > max_length) {

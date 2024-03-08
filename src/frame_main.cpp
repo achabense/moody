@@ -120,21 +120,21 @@ void frame_main(const code_icons& icons, screenT& screen) {
         ImGui::Checkbox("\"Load\"", &show_load);
         ImGui::SameLine();
         ImGui::Checkbox("\"Static\"", &show_static);
-
-        // TODO: whether to show FPS/Framecount? whether to show time-since-startup?
-        // ImGui::Text("    (%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
         ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
-        // TODO: simplify? unlike the one in fileT::display, this is mainly for undo/redo...
         sequence::seq(
             "<|", "prev", "next", "|>", //
             [&] { recorder.set_first(); }, [&] { recorder.set_prev(); }, [&] { recorder.set_next(); },
             [&] { recorder.set_last(); });
         ImGui::SameLine();
-        ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1); // TODO: +1 is clumsy
+        ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1); // TODO: about +1...
         ImGui::SameLine();
         if (ImGui::Button("Clear")) {
             recorder.clear();
         }
+#ifndef NDEBUG
+        ImGui::SameLine();
+        ImGui::Text("  (%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
+#endif // !NDEBUG
 
         // TODO: whether to do set_*(next etc) / update current eagerly during the frame?
         // (whether to postpone after gui logics?)
@@ -167,14 +167,14 @@ void frame_main(const code_icons& icons, screenT& screen) {
         if (ImGui::BeginTable("Layout", 2, ImGuiTableFlags_Resizable)) {
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            if (auto child = imgui_ChildWindow("Rul", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
+            if (auto child = imgui_ChildWindow("Edit", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
                 if (auto out = edit_rule(current, icons)) {
                     current = *out;
                     update = true;
                 }
             }
             ImGui::TableNextColumn();
-            if (auto child = imgui_ChildWindow("Til", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
+            if (auto child = imgui_ChildWindow("Apply", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
                 if (auto out = apply_rule(current.rule, screen)) {
                     current.lock = *out;
                     update = true;

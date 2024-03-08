@@ -197,7 +197,6 @@ inline bool button_with_shortcut(const char* label, ImGuiKey key) {
 // TODO: better name...
 class messenger {
     inline static std::vector<std::string> m_strs{};
-    inline static bool openable = true;
 
 public:
     messenger() = delete;
@@ -205,19 +204,21 @@ public:
     static void add_msg(std::string str) { m_strs.push_back(std::move(str)); }
 
     template <class... U>
-    static void add_msg(std::format_string<const U&...> fmt, const U&... args) noexcept {
+    static void add_msg(std::format_string<const U&...> fmt, const U&... args) {
         m_strs.push_back(std::format(fmt, args...));
     }
 
     // Managed by `frame_main`.
     static void display() {
-        if (openable && !m_strs.empty()) {
+        static bool opened = false;
+
+        if (!opened && !m_strs.empty()) {
             ImGui::OpenPopup("Message");
-            openable = false;
+            opened = true;
         }
 
         if (ImGui::BeginPopup("Message")) {
-            assert(!openable && !m_strs.empty());
+            assert(opened && !m_strs.empty());
             ImGui::PushTextWrapPos(wrap_len());
             for (bool first = true; const std::string& str : m_strs) {
                 if (!std::exchange(first, false)) {
@@ -229,7 +230,7 @@ public:
             ImGui::EndPopup();
         } else {
             m_strs.clear();
-            openable = true;
+            opened = false;
         }
     }
 };
