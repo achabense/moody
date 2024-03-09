@@ -436,7 +436,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
 
     const auto scanlist = legacy::scan(par, mask, mold);
 
-    {
+    // TODO: redesign layout...
+    const bool has_locked_groups = [&] {
         const auto [c_free, c_locked_0, c_locked_1] = [&] {
             const int c_group = par.k();
             int c_0 = 0, c_1 = 0, c_x = 0;
@@ -488,7 +489,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
         static double rate = 0.5;
         int dist = c_locked_1 + round(rate * c_free);
 
-        static bool exact_mode = true;
+        static bool exact_mode = false;
         if (ImGui::Button(exact_mode ? "Exactly###Mode" : "Around ###Mode")) {
             exact_mode = !exact_mode;
         }
@@ -507,7 +508,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
                 return_rule(legacy::randomize_p(subset, mask, mold, global_mt19937(), rate));
             }
         }
-    }
+        return c_free != par.k();
+    }();
 
     // TODO: it looks strange when only middle part is disabled...
     sequence::seq(
@@ -564,7 +566,13 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
         return_mold(legacy::trans_mirror(mold));
     }
 
-    // TODO: support filtering?
+    // TODO: more filtering modes
+    // TODO: this mode works poorly when !compatible...
+    static bool hide_locked = false;
+    if (has_locked_groups) {
+        ImGui::Checkbox("Hide locked groups", &hide_locked);
+    }
+
     if (auto child = imgui_ChildWindow("Details")) {
         const char labels[2][3]{{'-', chr_0, '\0'}, {'-', chr_1, '\0'}};
         const legacy::ruleT_masked masked = mask ^ mold.rule;
@@ -572,19 +580,25 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
         // Precise vertical alignment:
         // https://github.com/ocornut/imgui/issues/2064
         const auto align_text = [](float height) {
-            const float off = std::max(0.0f, -1.0f + (height - ImGui::GetTextLineHeight()) / 2);
+            const float off = std::max(0.0f, (height - ImGui::GetTextLineHeight()) / 2);
             ImGui::SetCursorPosY(floor(ImGui::GetCursorPos().y + off));
         };
 
         const int zoom = 7;
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
+        int n = 0;
         par.for_each_group([&](int j, const legacy::groupT& group) {
-            if (j % 8 != 0) {
+            if (hide_locked && scanlist[j].any_locked() /* && !(scanlist[j].locked_0 && scanlist[j].locked_1) */) {
+                return;
+            }
+            if (n % 8 != 0) {
                 ImGui::SameLine(0, 12);
             }
-            if (j != 0 && j % 64 == 0) {
+            if (n != 0 && n % 64 == 0) {
                 ImGui::Separator();
             }
+            ++n;
+
             const bool inconsistent = scanlist[j].inconsistent();
             const legacy::codeT head = group[0];
             const bool has_lock = scanlist[j].any_locked();
@@ -614,7 +628,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
             if (ImGui::BeginItemTooltip()) {
                 ImGui::Text("Group size: %d", (int)group.size());
                 const int max_to_show = 48;
-                for (int x = 0; auto code : group) {
+                for (int x = 0; const legacy::codeT code : group) {
                     if (x++ % 8 != 0) {
                         ImGui::SameLine();
                     }
@@ -648,6 +662,10 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
             }
         });
         ImGui::PopStyleVar(1);
+        // TODO: better message...
+        if (n == 0) {
+            imgui_Str("No free groups");
+        }
     }
 
     return out;
