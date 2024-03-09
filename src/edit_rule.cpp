@@ -317,8 +317,17 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
     auto return_rule = [&out, &mold](const legacy::ruleT& rule) { out.emplace(rule, mold.lock); };
     auto return_lock = [&out, &mold](const legacy::moldT::lockT& lock) { out.emplace(mold.rule, lock); };
     auto return_mold = [&out](const legacy::moldT& mold) { out.emplace(mold); };
+    auto guarded_block = [](const bool enable, const auto& fn) {
+        if (!enable) {
+            ImGui::BeginDisabled();
+        }
+        fn();
+        if (!enable) {
+            ImGui::EndDisabled();
+        }
+    };
 
-    // pass_* are data passed from the previous frame.
+    // Passed from the previous frame.
     static std::optional<legacy::moldT> pass_analysis_target = std::nullopt;
     static subset_selector selector;
     const legacy::subsetT& subset = selector.select_subset(pass_analysis_target.value_or(mold));
@@ -332,7 +341,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
     ImGui::Separator();
 
     // Select mask.
-    static std::optional<legacy::ruleT> pass_custom_mask = std::nullopt;
     char chr_0 = '0', chr_1 = '1';
     const legacy::maskT& mask = [&] {
         // TODO: finish...
@@ -360,12 +368,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
             "Custom rule; you can click \"Take current\" button to set this to the current rule.\n"
             "Important tip: ..."};
         static int mask_tag = 0;
-
-        if (pass_custom_mask) {
-            mask_tag = 3;
-            mask_custom = {*pass_custom_mask};
-            pass_custom_mask.reset();
-        }
 
         // TODO: the support for other make_mask(bpos_* (other than bpos_s)) was poorly designed and dropped.
         // Redesign to add back these masks.
@@ -434,144 +436,136 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
     const bool contained = subset.contains(mold.rule);
     assert_implies(contained, compatible);
 
+    guarded_block(compatible, [&] {
+        // TODO: it looks strange when only middle part is disabled...
+        sequence::seq(
+            "<00..", "dec", "inc", "11..>", //
+            [&] { return_rule(legacy::seq_int::min(subset, mask, mold)); },
+            [&] { return_rule(legacy::seq_int::dec(subset, mask, mold)); },
+            [&] { return_rule(legacy::seq_int::inc(subset, mask, mold)); },
+            [&] { return_rule(legacy::seq_int::max(subset, mask, mold)); }, !contained);
+    });
+
+    ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
+    guarded_block(contained, [&] {
+        sequence::seq(
+            "<1.0.", "prev", "next", "0.1.>", //
+            [&] { return_rule(legacy::seq_perm::first(subset, mask, mold)); },
+            [&] { return_rule(legacy::seq_perm::prev(subset, mask, mold)); },
+            [&] { return_rule(legacy::seq_perm::next(subset, mask, mold)); },
+            [&] { return_rule(legacy::seq_perm::last(subset, mask, mold)); });
+    });
+
     const auto scanlist = legacy::scan(par, mask, mold);
-
-    // TODO: redesign layout...
-    const bool has_locked_groups = [&] {
-        const auto [c_free, c_locked_0, c_locked_1] = [&] {
-            const int c_group = par.k();
-            int c_0 = 0, c_1 = 0, c_x = 0;
-            int c_free = 0;
-            int c_locked_0 = 0, c_locked_1 = 0, c_locked_x = 0;
-            for (const auto& scan : scanlist) {
-                if (scan.all_0()) {
-                    ++c_0;
-                } else if (scan.all_1()) {
-                    ++c_1;
-                } else {
-                    // c_x: number of groups that make `mold.rule` uncontained.
-                    ++c_x;
-                }
-
-                if (!scan.locked_0 && !scan.locked_1) {
-                    ++c_free;
-                } else if (!scan.locked_0 && scan.locked_1) {
-                    ++c_locked_1;
-                } else if (scan.locked_0 && !scan.locked_1) {
-                    ++c_locked_0;
-                } else {
-                    // c_locked_x: number of groups that make `mold` incompatible.
-                    ++c_locked_x;
-                }
-            }
-
-            assert(contained == !c_x);
-            assert(compatible == !c_locked_x);
-
-            // TODO: refine...
-            std::string summary = std::format("Groups:{} ({}:{} {}:{} x:{})", c_group, chr_0, c_0, chr_1, c_1, c_x);
-            if (c_free != c_group) {
-                summary += std::format(" [Locked:{} ({}:{} {}:{} x:{})]", c_group - c_free, chr_0, c_locked_0, chr_1,
-                                       c_locked_1, c_locked_x);
-            }
-            imgui_Str(summary);
-
-            assert(c_free + c_locked_0 + c_locked_1 + c_locked_x == c_group);
-            return std::array{c_free, c_locked_0, c_locked_1};
-        }();
-
-        if (!compatible) {
-            ImGui::BeginDisabled();
-        }
-
-        // dist: The "distance" to the masking rule the randomization want to achieve.
-        // (which does not make sense when !compatible)
-        static double rate = 0.5;
-        int dist = c_locked_1 + round(rate * c_free);
-
-        static bool exact_mode = false;
-        if (ImGui::Button(exact_mode ? "Exactly###Mode" : "Around ###Mode")) {
-            exact_mode = !exact_mode;
-        }
-
-        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-        ImGui::SetNextItemWidth(item_width);
-        if (imgui_StepSliderInt("##Quantity", &dist, c_locked_1, c_locked_1 + c_free) && c_free != 0) {
-            rate = double(dist - c_locked_1) / c_free;
-            assert(c_locked_1 + round(rate * c_free) == dist);
-        }
-        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-        if (button_with_shortcut("Randomize", ImGuiKey_Enter)) {
-            if (exact_mode) {
-                return_rule(legacy::randomize_c(subset, mask, mold, global_mt19937(), dist - c_locked_1));
-            } else {
-                return_rule(legacy::randomize_p(subset, mask, mold, global_mt19937(), rate));
-            }
-        }
-        return c_free != par.k();
-    }();
-
-    // TODO: it looks strange when only middle part is disabled...
-    sequence::seq(
-        "<00..", "dec", "inc", "11..>", //
-        [&] { return_rule(legacy::seq_int::min(subset, mask, mold)); },
-        [&] { return_rule(legacy::seq_int::dec(subset, mask, mold)); },
-        [&] { return_rule(legacy::seq_int::inc(subset, mask, mold)); },
-        [&] { return_rule(legacy::seq_int::max(subset, mask, mold)); }, !contained);
-    ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
-
-    if (!contained) {
-        ImGui::BeginDisabled();
-    }
-    sequence::seq(
-        "<1.0.", "prev", "next", "0.1.>", //
-        [&] { return_rule(legacy::seq_perm::first(subset, mask, mold)); },
-        [&] { return_rule(legacy::seq_perm::prev(subset, mask, mold)); },
-        [&] { return_rule(legacy::seq_perm::next(subset, mask, mold)); },
-        [&] { return_rule(legacy::seq_perm::last(subset, mask, mold)); });
-
-    ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
-    // TODO: better name for "dial"?
-    // TODO: when to use Abc vs abc?
-    if (ImGui::Button("dial")) {
-        pass_custom_mask.emplace(mold.rule);
-        return_rule(legacy::seq_int::one(subset, {mold.rule}, mold));
-        sequence::bind_to("next");
-    }
-    helper::show_help("Equivalent to..."); // TODO...
-
-    // TODO: enhance might be stricter than necessary...
-    if (ImGui::Button("Enhance lock")) {
-        return_lock(legacy::enhance_lock(subset, mold));
-    }
-    if (!contained) {
-        ImGui::EndDisabled();
-    }
-
-    ImGui::SameLine();
-    if (ImGui::Button("Approximate")) {
-        return_rule(legacy::approximate(subset, mold));
-    }
-    if (!compatible) {
-        ImGui::EndDisabled();
-    }
-
-    ImGui::SameLine();
-    if (ImGui::Button("Clear lock")) {
-        return_lock({});
-    }
-    ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
-    // TODO: move elsewhere
-    if (ImGui::Button("Mir")) {
-        return_mold(legacy::trans_mirror(mold));
-    }
 
     // TODO: more filtering modes
     // TODO: this mode works poorly when !compatible...
     static bool hide_locked = false;
-    if (has_locked_groups) {
-        ImGui::Checkbox("Hide locked groups", &hide_locked);
+
+    // TODO: redesign layout...
+    {
+        const int c_group = par.k();
+        int c_0 = 0, c_1 = 0, c_x = 0;
+        int c_free = 0;
+        int c_locked_0 = 0, c_locked_1 = 0, c_locked_x = 0;
+        for (const auto& scan : scanlist) {
+            if (scan.all_0()) {
+                ++c_0;
+            } else if (scan.all_1()) {
+                ++c_1;
+            } else {
+                // c_x: number of groups that make `mold.rule` uncontained.
+                ++c_x;
+            }
+
+            if (!scan.locked_0 && !scan.locked_1) {
+                ++c_free;
+            } else if (!scan.locked_0 && scan.locked_1) {
+                ++c_locked_1;
+            } else if (scan.locked_0 && !scan.locked_1) {
+                ++c_locked_0;
+            } else {
+                // c_locked_x: number of groups that make `mold` incompatible.
+                ++c_locked_x;
+            }
+        }
+
+        assert(contained == !c_x);
+        assert(compatible == !c_locked_x);
+        assert(c_free + c_locked_0 + c_locked_1 + c_locked_x == c_group);
+
+        guarded_block(compatible, [&] {
+            // dist: The "distance" to the masking rule the randomization want to achieve.
+            // (which does not make sense when !compatible)
+            static double rate = 0.5;
+            int dist = c_locked_1 + round(rate * c_free);
+
+            static bool exact_mode = false;
+            if (ImGui::Button(exact_mode ? "Exactly###Mode" : "Around ###Mode")) {
+                exact_mode = !exact_mode;
+            }
+
+            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+            ImGui::SetNextItemWidth(item_width);
+            if (imgui_StepSliderInt("##Quantity", &dist, c_locked_1, c_locked_1 + c_free) && c_free != 0) {
+                rate = double(dist - c_locked_1) / c_free;
+                assert(c_locked_1 + round(rate * c_free) == dist);
+            }
+            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+            if (button_with_shortcut("Randomize", ImGuiKey_Enter)) {
+                if (exact_mode) {
+                    return_rule(legacy::randomize_c(subset, mask, mold, global_mt19937(), dist - c_locked_1));
+                } else {
+                    return_rule(legacy::randomize_p(subset, mask, mold, global_mt19937(), rate));
+                }
+            }
+        });
+
+        guarded_block(true /* Unconditional */, [&] {
+            if (ImGui::Button("Mir")) {
+                return_mold(legacy::trans_mirror(mold));
+            }
+        });
+        ImGui::SameLine();
+        guarded_block(compatible, [&] {
+            if (ImGui::Button("Approximate")) {
+                return_rule(legacy::approximate(subset, mold));
+            }
+        });
+        ImGui::SameLine();
+        // TODO: this is hiding "clear lock" so it's less obvious what to do when !compatible...
+        ImGui::Button("Locks");
+        if (ImGui::BeginPopupContextItem(nullptr, ImGuiPopupFlags_MouseButtonLeft)) {
+            // TODO: say something...
+            imgui_Str("...");
+
+            guarded_block(contained, [&] {
+                // TODO: enhance might be stricter than necessary...
+                if (ImGui::Button("Enhance")) {
+                    return_lock(legacy::enhance_lock(subset, mold));
+                }
+            });
+            ImGui::SameLine();
+            guarded_block(true /* Unconditional */, [&] {
+                if (ImGui::Button("Clear")) {
+                    return_lock({});
+                }
+            });
+            ImGui::SameLine();
+            ImGui::Checkbox("Hide locked groups", &hide_locked);
+            ImGui::EndPopup();
+        }
+
+        // TODO: refine...
+        std::string summary = std::format("Groups:{} ({}:{} {}:{} x:{})", c_group, chr_0, c_0, chr_1, c_1, c_x);
+        if (c_free != c_group) {
+            summary += std::format(" [Locked:{} ({}:{} {}:{} x:{})]", c_group - c_free, chr_0, c_locked_0, chr_1,
+                                   c_locked_1, c_locked_x);
+        }
+        imgui_Str(summary);
     }
+
+    ImGui::Separator();
 
     if (auto child = imgui_ChildWindow("Details")) {
         const char labels[2][3]{{'-', chr_0, '\0'}, {'-', chr_1, '\0'}};
