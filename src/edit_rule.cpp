@@ -222,13 +222,6 @@ public:
                 term.selected = !term.selected;
                 update_current();
             }
-#if 0 // Convenient but not necessary...
-            else if (ImGui::IsItemHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Right) && term.selected) {
-                assert(!term.disabled);
-                term.selected = false;
-                update_current();
-            }
-#endif
             ImGui::PopID();
 
             // TODO: use helper::show_help instead.
@@ -240,10 +233,10 @@ public:
             // TODO: refine...
             // TODO: explain coloring scheme; redesign if necessary (especially ring col)
             // TODO: find better color for "disabled"/incompatible etc... currently too ugly.
-            const ImU32 cen_col = term.selected                 ? ImGui::GetColorU32(ImGuiCol_ButtonHovered)
-                                  : term.set->includes(current) ? ImGui::GetColorU32(ImGuiCol_FrameBg)
+            const ImU32 cen_col = term.selected                 ? IM_COL32(65, 150, 255, 255) // roughly _ButtonHovered
+                                  : term.set->includes(current) ? IM_COL32(25, 60, 100, 255)
                                   : term.disabled               ? IM_COL32(120, 30, 0, 255)
-                                                                : IM_COL32_BLACK;
+                                                                : IM_COL32_BLACK_TRANS;
             const ImU32 ring_col = term.set->contains(mold.rule) ? IM_COL32(0, 255, 0, 255)
                                    : compatible(*term.set, mold) ? IM_COL32(0, 100, 0, 255)
                                                                  : IM_COL32(200, 45, 0, 255);
@@ -327,16 +320,12 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
         }
     };
 
-    // Passed from the previous frame.
-    static std::optional<legacy::moldT> pass_analysis_target = std::nullopt;
+    // TODO: (temp) deleted as this is not very useful and is misleading in the "Native" and
+    // "Custom" case.
+    // static std::optional<legacy::moldT> pass_analysis_target = std::nullopt;
     static subset_selector selector;
-    const legacy::subsetT& subset = selector.select_subset(pass_analysis_target.value_or(mold));
+    const legacy::subsetT& subset = selector.select_subset(mold);
     assert(!subset.empty());
-    const legacy::partitionT& par = subset.get_par();
-
-    if (pass_analysis_target) {
-        pass_analysis_target.reset();
-    }
 
     ImGui::Separator();
 
@@ -385,14 +374,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
                 mask_tag = i;
             }
 
-            if (ImGui::IsItemHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-                pass_analysis_target.emplace(*mask_ptrs[i]);
-            }
-
             helper::show_help([&] {
-                // TODO: will unpaired push like this cause leakage? (is the style-stack regularly cleared, or will
-                // this accumulate?)
-                // ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 1.0);
                 imgui_Str(mask_descriptions[i]);
                 imgui_Str(legacy::to_MAP_str(*mask_ptrs[i]));
             });
@@ -407,7 +389,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
         // TODO: horrible...
         switch (mask_tag) {
             case 0: chr_0 = '0', chr_1 = '1'; break;
-            case 1: chr_0 = '.', chr_1 = '!'; break;
+            case 1: chr_0 = '.', chr_1 = 'f'; break;
             default: chr_0 = 'o', chr_1 = 'i'; break;
         }
 
@@ -417,18 +399,11 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
     ImGui::Separator();
 
     // Disable all edit operations if !subset.contains(mask), including those that do not really need
-    // the mask to be valid (or even do not depend on subsetT).
-    // (These operations include: ... TODO: list all)
-    // This makes sense as:
-    // 1. Such operations are not many, and they are typically used in combination with those that
-    // do need correct masks.
-    // 2. The program already provides a way to get always-usable mask (the "native" mode).
+    // the mask to be valid (for example, `trans_mirror`, which does not actually rely on subsets).
     if (!subset.contains(mask)) {
-        // TODO: complete message. other suggestions.
-        imgui_StrWrapped(
-            "This mask (?rule?) doesn't belong to the selected subsets. Try other masks ... the \"Native\" mask will "
-            "always work... Right-click the masks to see what subsets they apply to.");
-        // TODO: the native and custom mode has mutable mask, will the temp-analysis be misleading for them?
+        // TODO: add documentation for mask-selection; (then there can be "see ... for details")
+        imgui_StrWrapped("This mask does not belong to the selected subsets. Consider trying other masks. "
+                         "(The \"Native\" mask is known to belong to the selected subsets and will always work.)");
         return std::nullopt;
     }
 
@@ -437,7 +412,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
     assert_implies(contained, compatible);
 
     guarded_block(compatible, [&] {
-        // TODO: it looks strange when only middle part is disabled...
         sequence::seq(
             "<00..", "dec", "inc", "11..>", //
             [&] { return_rule(legacy::seq_int::min(subset, mask, mold)); },
@@ -456,13 +430,12 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
             [&] { return_rule(legacy::seq_perm::last(subset, mask, mold)); });
     });
 
+    const legacy::partitionT& par = subset.get_par();
     const auto scanlist = legacy::scan(par, mask, mold);
 
-    // TODO: more filtering modes
-    // TODO: this mode works poorly when !compatible...
+    // TODO: more filtering modes?
+    // Will not hide "impure" groups even when there are locks. TODO: add documentation...
     static bool hide_locked = false;
-
-    // TODO: redesign layout...
     {
         const int c_group = par.k();
         int c_0 = 0, c_1 = 0, c_x = 0;
@@ -474,8 +447,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
             } else if (scan.all_1()) {
                 ++c_1;
             } else {
-                // c_x: number of groups that make `mold.rule` uncontained.
-                ++c_x;
+                ++c_x; // Number of groups that make `mold.rule` uncontained.
             }
 
             if (!scan.locked_0 && !scan.locked_1) {
@@ -485,14 +457,12 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
             } else if (scan.locked_0 && !scan.locked_1) {
                 ++c_locked_0;
             } else {
-                // c_locked_x: number of groups that make `mold` incompatible.
-                ++c_locked_x;
+                ++c_locked_x; // Number of groups that make `mold` incompatible.
             }
         }
 
-        assert(contained == !c_x);
-        assert(compatible == !c_locked_x);
-        assert(c_free + c_locked_0 + c_locked_1 + c_locked_x == c_group);
+        assert(contained == (c_x == 0));
+        assert(compatible == (c_locked_x == 0));
 
         guarded_block(compatible, [&] {
             // dist: The "distance" to the masking rule the randomization want to achieve.
@@ -582,7 +552,9 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
         int n = 0;
         par.for_each_group([&](int j, const legacy::groupT& group) {
-            if (hide_locked && scanlist[j].any_locked() /* && !(scanlist[j].locked_0 && scanlist[j].locked_1) */) {
+            const bool has_lock = scanlist[j].any_locked();
+            const bool pure = scanlist[j].all_0() || scanlist[j].all_1();
+            if (hide_locked && has_lock && pure) {
                 return;
             }
             if (n % 8 != 0) {
@@ -593,15 +565,24 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
             }
             ++n;
 
-            const bool inconsistent = scanlist[j].inconsistent();
+            const bool incomptible = scanlist[j].locked_0 != 0 && scanlist[j].locked_1 != 0;
             const legacy::codeT head = group[0];
-            const bool has_lock = scanlist[j].any_locked();
 
-            if (inconsistent) {
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0, 0, 1));
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0, 0, 1));
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.9f, 0, 0, 1));
-            }
+            // TODO: better color... (will be ugly if using green colors...)
+            // _ButtonHovered: ImVec4(0.26f, 0.59f, 0.98f, 1.00f)
+            // [0]:Button, [1]:Hover, [2]:Active
+            static const ImVec4 button_col_normal[3]{
+                {0.26f, 0.59f, 0.98f, 0.70f}, {0.26f, 0.59f, 0.98f, 0.85f}, {0.26f, 0.59f, 0.98f, 1.00f}};
+            static const ImVec4 button_col_impure[3]{
+                {0.26f, 0.59f, 0.98f, 0.30f}, {0.26f, 0.59f, 0.98f, 0.40f}, {0.26f, 0.59f, 0.98f, 0.50f}};
+            static const ImVec4 button_col_incomptible[3]{{0.6f, 0, 0, 1}, {0.8f, 0, 0, 1}, {0.9f, 0, 0, 1}};
+            const ImVec4* const button_color = pure           ? button_col_normal
+                                               : !incomptible ? button_col_impure
+                                                              : button_col_incomptible;
+
+            ImGui::PushStyleColor(ImGuiCol_Button, button_color[0]);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, button_color[1]);
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, button_color[2]);
             if (icons.button(head, zoom)) {
                 legacy::ruleT rule = mold.rule;
                 for (legacy::codeT code : group) {
@@ -615,9 +596,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
                 }
                 return_lock(lock);
             }
-            if (inconsistent) {
-                ImGui::PopStyleColor(3);
-            }
+            ImGui::PopStyleColor(3);
 
             if (ImGui::BeginItemTooltip()) {
                 ImGui::Text("Group size: %d", (int)group.size());

@@ -316,7 +316,6 @@ namespace legacy {
 
             bool all_0() const { return !free_1 && !locked_1; }
             bool all_1() const { return !free_0 && !locked_0; }
-            bool inconsistent() const { return !all_0() && !all_1(); }
         };
 
         const ruleT_masked r = mask ^ mold.rule;
