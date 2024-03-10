@@ -86,7 +86,7 @@ inline bool imgui_Disabled() { return (GImGui->CurrentItemFlags & ImGuiItemFlags
 inline float imgui_ItemInnerSpacingX() { return ImGui::GetStyle().ItemInnerSpacing.x; }
 
 // (Referring to ImGui::InputScalar.)
-inline bool imgui_StepSliderInt(const char* label, int* v, int v_min, int v_max) {
+inline bool imgui_StepSliderInt(const char* label, int* v, int v_min, int v_max, const char* format = "%d") {
     if (ImGui::GetCurrentWindow()->SkipItems) {
         return false;
     }
@@ -98,7 +98,7 @@ inline bool imgui_StepSliderInt(const char* label, int* v, int v_min, int v_max)
     ImGui::BeginGroup();
     ImGui::PushID(label);
     ImGui::SetNextItemWidth(std::max(1.0f, ImGui::CalcItemWidth() - 2 * (r + s)));
-    ImGui::SliderInt("", &v2, v_min, v_max, "%d", ImGuiSliderFlags_NoInput);
+    ImGui::SliderInt("", &v2, v_min, v_max, format, ImGuiSliderFlags_NoInput);
     ImGui::PushButtonRepeat(true);
     ImGui::SameLine(0, s);
     // (`InputScalar` makes .FramePadding.x = y for these buttons, not added here.)

@@ -6,6 +6,8 @@
 
 #include "common.hpp"
 
+using clockT = std::chrono::steady_clock;
+
 static void refresh(screenT& screen, const legacy::tileT& tile) {
     screen.refresh(tile.width(), tile.height(), [&tile](int y) { return tile.line(y); });
 }
@@ -157,16 +159,33 @@ class runnerT {
             return pace;
         }
 
-        // TODO: frame-based or timer-based?
-        static constexpr int gap_min = 0, gap_max = 20;
-        int gap_frame = 0;
+        static constexpr int gap_unit = 50; // ms.
+        static constexpr int gap_min = 0, gap_max = 10;
+        int gap = 0;
 
         bool pause = false;
+
+        clockT::time_point last_written = {};
+        void mark_written() { last_written = clockT::now(); }
+
+        void run(torusT& torus, int extra_step, bool extra_pause) {
+            if (extra_step == 0) {
+                if (!pause && !extra_pause &&
+                    (last_written + std::chrono::milliseconds{gap * gap_unit} <= clockT::now())) {
+                    extra_step = actual_pace();
+                }
+            }
+
+            if (extra_step != 0) {
+                torus.run(rule, extra_step);
+                mark_written();
+            }
+        }
     };
 
     torusT::initT m_init{.size{.width = 500, .height = 400}, .seed = 0, .density = 0.5};
     torusT m_torus{m_init};
-    ctrlT m_ctrl{.rule{}, .pace = 1, .anti_strobing = true, .gap_frame = 0, .pause = false};
+    ctrlT m_ctrl{.rule{}, .pace = 1, .anti_strobing = true, .gap = 0, .pause = false};
 
     ImVec2 screen_off = {0, 0};
     int screen_zoom = 1;
@@ -198,6 +217,7 @@ public:
             m_ctrl.anti_strobing = true;
             m_ctrl.pause = false;
             m_torus.restart(m_init);
+            m_ctrl.mark_written();
         }
     }
 
@@ -214,6 +234,7 @@ public:
         auto restart = [&] {
             temp_pause = true;
             m_torus.restart(m_init);
+            m_ctrl.mark_written();
         };
 
         // TODO: better be controlled by frame()?
@@ -221,10 +242,10 @@ public:
 
         // TODO: redesign keyboard ctrl...
         if (imgui_KeyPressed(ImGuiKey_1, true)) {
-            m_ctrl.gap_frame = std::max(m_ctrl.gap_min, m_ctrl.gap_frame - 1);
+            m_ctrl.gap = std::max(m_ctrl.gap_min, m_ctrl.gap - 1);
         }
         if (imgui_KeyPressed(ImGuiKey_2, true)) {
-            m_ctrl.gap_frame = std::min(m_ctrl.gap_max, m_ctrl.gap_frame + 1);
+            m_ctrl.gap = std::min(m_ctrl.gap_max, m_ctrl.gap + 1);
         }
         if (imgui_KeyPressed(ImGuiKey_3, true)) {
             m_ctrl.pace = std::max(m_ctrl.pace_min, m_ctrl.pace - 1);
@@ -279,8 +300,8 @@ public:
             }
             ImGui::PopButtonRepeat();
 
-            // TODO: Gap-frame shall be really timer-based...
-            imgui_StepSliderInt("Gap Frame (0~20)", &m_ctrl.gap_frame, m_ctrl.gap_min, m_ctrl.gap_max);
+            imgui_StepSliderInt("Gap time (0~500ms)", &m_ctrl.gap, m_ctrl.gap_min, m_ctrl.gap_max,
+                                std::format("{} ms", m_ctrl.gap * m_ctrl.gap_unit).c_str());
 
             imgui_StepSliderInt("Pace (1~20)", &m_ctrl.pace, m_ctrl.pace_min, m_ctrl.pace_max);
 
@@ -509,7 +530,8 @@ public:
                 const int celx = floor(cell_pos_raw.x);
                 const int cely = floor(cell_pos_raw.y);
 
-                if (screen_zoom == 1 && !paste && !ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+                if (screen_zoom == 1 && !paste && !ImGui::IsMouseDown(ImGuiMouseButton_Right) &&
+                    !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
                     if (celx >= -10 && celx < tile_size.width + 10 && cely >= -10 && cely < tile_size.height + 10) {
                         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
                         if (ImGui::BeginItemTooltip()) {
@@ -635,12 +657,16 @@ public:
                 if (imgui_KeyPressed(ImGuiKey_Backspace, false) || imgui_KeyPressed(ImGuiKey_X, false) ||
                     op == Clear_inside || op == Cut) {
                     legacy::clear_inside(m_torus.tile(), range);
+                    // TODO: whether to set temp_pause? what about `apply_rule`?
+                    m_ctrl.mark_written();
                 }
                 if (imgui_KeyPressed(ImGuiKey_Equal, false) || op == Random_fill) {
                     legacy::random_fill(m_torus.tile(), global_mt19937(), fill_den, range);
+                    m_ctrl.mark_written();
                 }
                 if (imgui_KeyPressed(ImGuiKey_0, false) || op == Clear_outside) {
                     legacy::clear_outside(m_torus.tile(), range);
+                    m_ctrl.mark_written();
                 }
                 if (imgui_KeyPressed(ImGuiKey_P, false) || op == Capture) {
                     out = capture_closed(m_torus.tile(), range, m_ctrl.rule);
@@ -654,14 +680,7 @@ public:
 
         ImGui::PopItemWidth();
 
-        if (extra_step != 0) {
-            m_torus.run(m_ctrl.rule, extra_step);
-        }
-        if (!m_ctrl.pause && !temp_pause) {
-            if (ImGui::GetFrameCount() % (m_ctrl.gap_frame + 1) == 0) {
-                m_torus.run(m_ctrl.rule, m_ctrl.actual_pace());
-            }
-        }
+        m_ctrl.run(m_torus, extra_step, temp_pause);
 
         return out;
     }

@@ -126,7 +126,7 @@ void frame_main(const code_icons& icons, screenT& screen) {
             [&] { recorder.set_first(); }, [&] { recorder.set_prev(); }, [&] { recorder.set_next(); },
             [&] { recorder.set_last(); });
         ImGui::SameLine();
-        ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1); // TODO: about +1...
+        ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1 /* [1, size()] */);
         ImGui::SameLine();
         if (ImGui::Button("Clear")) {
             recorder.clear();
@@ -136,8 +136,6 @@ void frame_main(const code_icons& icons, screenT& screen) {
         ImGui::Text("  (%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
 #endif // !NDEBUG
 
-        // TODO: whether to do set_*(next etc) / update current eagerly during the frame?
-        // (whether to postpone after gui logics?)
         {
             // TODO: reconsider how to show help for the rule string...
             // TODO: about lock...
@@ -153,9 +151,9 @@ void frame_main(const code_icons& icons, screenT& screen) {
                 with_lock = ImGui::IsItemHovered();
             } else {
                 imgui_StrCopyable(legacy::to_MAP_str(current.rule), imgui_Str);
-                ImGui::SameLine(0, ImGui::CalcTextSize(" ").x - 1); // TODO: about -1...
+                ImGui::SameLine(0, ImGui::CalcTextSize(" ").x - 1 /* For correct alignment */);
                 std::string lock_str = "[";
-                legacy::_misc::to_MAP(lock_str, current.lock); // TODO: avoid raw calls like this...
+                legacy::_misc::to_MAP(lock_str, current.lock);
                 lock_str += "]";
                 imgui_StrDisabled(lock_str);
                 with_lock = ImGui::IsItemHovered();
