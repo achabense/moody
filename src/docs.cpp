@@ -1,5 +1,5 @@
 const char* const doc_0_about =
-    R"(These documents are interactive. You can left-click the rules (or try the buttons above) to see their effects. Right-click to copy the text (on per-line basis; drag to select multiple lines).
+    R"(These documents are interactive. You can left-click the rules to see their effects (or try the buttons above to do quick navigation). Right-click to copy the text (on per-line basis; drag to select multiple lines).
 
 --- The sentiment
 ...
@@ -7,23 +7,55 @@ MAP+sQSUIzICkiQgAiAEKBAhrIGFgAUbAAA4AChgnAAAw6CAkAIgKCAlASgIACgIQBbqCqhEQAAkFQAA
 I hope this is impressive enough. It was picked from many randomized rules many years ago ... (... background of this program)
 )";
 
-const char* const doc_1_intro = R"(--- The subset
-(... use gol directly...)
-If you have tried the above rule, you may notice that in the left plane, some squares are lighted up with bright-green rings. This means the rule belongs to the "subsets" represented by them. More exactly, the isotropic rule in this example.
-https://conwaylife.com/wiki/Isotropic_non-totalistic_rule
+const char* const doc_1_intro =
+    R"(TODO: reorganize; the formal definitions should be moved into a single document...
+To begin with, it's necessary to explain some key concepts in this program. They are subset, mask and lock.
 
-The program is based on "subsets" (...)
+(Not an arbitary subset of the MAP rules) A "subset" S (if not empty) is composed of:
+1. A MAP rule R that is designated to belong to S.
+2. A partition P of all "situations".
+Then, a MAP rule belongs to the subset iff XOR-masked by R, the masked values are the same in every group in P.
+
+The commonly recognized rules (e.g. isometric rules / totalistic rules) can be defined as such subsets. And most importantly, it can be proven that the intersection of such "subsets" are of the same structure, so in the program you are free to combine (essentially ...) any of the supported subsets as long as the result is not empty. (And the "mask" concept apply to the combined subsets). ... explain gui...
+
+A mask is any rule that belongs to the subset. Especially, R serves as a mask.
+This looks like a trivial definition, however, as you will see, (combined with "distance") this concept is powerful to help find interesting rules...
+
+A lock is ... You can find a lot of interesting rules without this feature, however ...
+Here is an example that are unlikely to be available without this feature...
+An isometric and self-complementary rule where gliders occur naturally:
+MAPARYSZxZtPVoUYRG2cMoGoxdsEtJst5ppcpLka9c/q58GKgMUKdi2sWmmEsm0t8kXOp+s8ZJ3edelQ0mXGbeXfw [/OI4QIQCgACAwBAAAAAQAIAAEMCLAAAAgIAAAAAAAACKAAAAgAKAgAAAAAAAAKAAgACAgAAAAACAAAAAAAAAAA]
+MAPARYTZxZsPVoQYRH2UMoGoxdkEtIst5p7coLka9c/r78CCgMUKdi+sSGmEsu0t9kXOp+s9ZB3efelQ8mXGTeXfw
+
+(Generation...)
+
+The program offers 3 generation mode that covers most needs...
+0. Randomized.
+1. Incremental / integral...
+2. Permutative.
+...
+
+(Typical use cases...)
+
+
+
+(Gui part)
+--- The subset
+You may have noticed that in the left plane, some squares are lighted up with bright-green rings. This means the rule belongs to the "subsets" represented by them. More exactly ...
+
 If you click the "Recognize" button, these subsets are selected automatically...
-If you select no subsets, the default one is the universal set (which contains all MAP rules). There is generally no limit what you can do in the universal set.
+If you select no subsets, the default one is the universal set (which contains all MAP rules). There is generally no limit what you can do in the universal set. By selecting more subsets ...
 
 --- The mask
 --- When the subset is very small
 --- Randomization
 --- Looking through "nearby" rules - the power of "custom mask"
+
+It's easy to define the "distance" between two rules if they belong to the same subset - the distance can be defined as the number of groups that have different values.
+Below are some interesting rules that are very "close" to the Game-of-Life rule (actually, distance = 1 in the "isometric" subset).
 MAPARYXbhZofOgWaH7oaIDogBZofuhogOiAaIDoAIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAAACAAIAAAAAAAA
 MAPARYXfhZofugWan7oaIDogBZofuhogOiAaIDogIgAgAAWaH7oeIDogGiA6ICAAIAAaMDogIAAgACAAIAAAAAAAA
 MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6YSAAIQAaIDogIAAgACAAIQAAAAAAA
-(Suppose you are familiar with the Game-of-Life rule) Well, they look similar to the Game-of-Life rule, with some interesting behaviors.
 
 For the subsets that are "small" enough (for example ...), you may want to "dial" through all of the nearby rules...
 
@@ -52,13 +84,25 @@ MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAA
 ...)";
 
 const char* const doc_2_subsets =
-    R"(The following rules are selected from randomized rules. They may or may not be representative of the subsets they belong to. You can click the "Recognize" button to select the subsets they belong to.
-The best way to get familiar with a subset is to generate randomized rules in it. ... (relation between the rules)
+    R"(The following rules are examples from certain subsets. They may or may not be representative of the subsets they belong to. You can click the "Recognize" button to select the subsets they belong to.
+The best way to get familiar with a subset is to generate randomized rules in it. ... (relation between the subsets)
+
+--- None
+MAPYaxTu9YJm9UZsagD9KrzcclQXH5nLwLTGALPMYhZeR6QeYRX6y7WoAw4DDpCQnTjY7k71qW7iQtvjMBxLGNBBg
+This is typically what you will get in default density (without any constraints).
+
+MAPBRAACkiAAUiATAhmCQkIEYMBgCBDCBFHUqQgJUQAAEAiAAmANgIkRAAISUA0ADgAAZAQAmAMFTCJgAAAYEYEgA
+
+It's possible to get non-trivial rules that do not belong to any well-defined subsets. See "Rules in the wild" part for details.
 
 --- Native symmetry
 
 Isometric:
 MAPEkAFDAgARAAAgXxAAgGAAAAASAAAAAASgAlAAAUEACIAEG6AgQEIAAACzIAQFoAAgAUIAEEEADABUoAAGkgAAQ
+
+\:
+MAPEUQRQDEGwsYQQAlGgBgAFAjB8AEAARBIEmARoA4aKABABHPAkqgQ5BwAAcQAABIQoGAwZQsCgBgggBAIgeYiCQ
+
 
 | & -:
 MAPIAJIChAAUMgAELFhAQCBgIAASWAABCgAAEZCAIIQhAAAAaOBAgApgAAQAAICIRAAAJAYhBwCAAAACWhIQQRIAA
@@ -66,18 +110,21 @@ MAPIAJIChAAUMgAELFhAQCBgIAASWAABCgAAEZCAIIQhAAAAaOBAgApgAAQAAICIRAAAJAYhBwCAAAAC
 \ & /:
 MAPAhghuAgQgyQsgCBAwliAAA0RiCAAAOCQgggQwAQABABBCEUgFAgeESlGQEIUAACBAEQCUKCIkWBkAMCRIAABRA
 
-Notice that both (| & -) and (\ & /) belongs to the C2 subset.
+Notice that both (| & -) and (\ & /) belong to the C2 subset (which is NOT true reversely - a rule that belongs to C2 may not belong to any of |, -, \ or /)
 
-C2:
-
+C2: (Temp from rul32.txt)
+MAP2AAAAQAAAQCAAAAQAAAAAAAAAAAAAAAAAAAAQAAAAACAAAAAAAACAAAAAAAAAAAAgAAAAAAACAAAAACAAACAAA
+Notice how "sparse" this rule is...
 
 C4:
-MAPEAIwoggp6GYGgSWMB4YYABBgivMgk6TACBw2BIA5pMAEURWFYQAk4lkcSmIGCFqApRDCDFYjIAAUSEgASLJgAA
+C4 is a strict subset of C2 (so every C4 rule will belong to C2). In C4...
+MAPAkMwkQDI20gEBSC4AtgYpzNEmgABABwookggwMACAA0FEhCAo8gCgEwAACAoAAALMADhuUAYmQFgYBCRiACRHg
+It's highly likely that there are "more interesting" rules close to it. This is a very important technique as described in TODO...
+MAPAkMwkQDI20gEBSS4AtAYpzNEmgABABwookggwMACAA0FEhSAo8gCgEwASCAoAAALIADhuUAYmQFgYBCRiACRHg
 
-Notice that C4 strictly belongs to the C2 subset.
-
-Totalistic:
-
+(Outer-) Totalistic:
+MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA
+Aah! The Game-of-Life rule.
 
 --- The self-complementary rule
 (...)
@@ -99,6 +146,13 @@ MAPiAAAAAAAACKIAAAAAAAAIgAAACIAMwAAAAAAIgAzAAAAERFVAGYAuwAREVUAZgC7ESIiMxFVACIRI
 a|q & q|w & w|d:
 MAPZoiZZogAZohmiJlmiABmiIgAd6oAAJnMiAB3qgAAmcyIAHeZAADMqogAd5kAAMyqAACIIgAARAAAAIgiAABEAA
 
+C2:
+
+C3:
+
+C6:
+MAPEUQRVSLdM4gRRBFVIt0ziCK7IswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHMRIiqIpnMEQ
+This is an amazing rule.
 
 MAP7ohmmYgAmWbuiGaZiACZZogAmWYAEWaIiACZZgARZoiIAJlmABFmiIgAmWYAEWaIABFmiBFmiAAAEWaIEWaIAA
 
@@ -109,7 +163,7 @@ MAP7ohmmYgAmWbuiGaZiACZZogAmWYAEWaIiACZZgARZoiIAJlmABFmiIgAmWYAEWaIABFmiBFmiAAAE
 const char* const doc_3_atypical =
     R"(Typically you will explore rules that belong to several of the "well-defined" subsets. These subsets, however, take up just a small part of all MAP rules. With the help of "lock" feature it's possible to generate very strange rules that do not belong to any well-defined subsets.
 
-Here is the example in ...(TODO: incorporate into doc_2)
+Here is the same example in ...
 MAPEUQRVSLdM4gRRBFVIt0ziCK7IswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHMRIiqIpnMEQ
 
 If you try to capture the oscillator, you'll get:
