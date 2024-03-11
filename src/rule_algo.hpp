@@ -332,61 +332,6 @@ namespace legacy {
         return vec;
     }
 
-    inline bool any_locked(const moldT::lockT& lock, const groupT& group) {
-        return std::ranges::any_of(group, [&lock](codeT code) { return lock[code]; });
-    }
-
-    inline bool all_locked(const moldT::lockT& lock, const groupT& group) {
-        return std::ranges::all_of(group, [&lock](codeT code) { return lock[code]; });
-    }
-
-    inline bool none_locked(const moldT::lockT& lock, const groupT& group) {
-        return std::ranges::none_of(group, [&lock](codeT code) { return lock[code]; });
-    }
-
-    // TODO: explain why requiring subset.contains(mold.rule).
-    inline moldT::lockT enhance_lock(const subsetT& subset, const moldT& mold) {
-        assert(subset.contains(mold.rule));
-
-        moldT::lockT lock{};
-        subset.get_par().for_each_group([&](const groupT& group) {
-            if (any_locked(mold.lock, group)) {
-                for (codeT code : group) {
-                    lock[code] = true;
-                }
-            }
-        });
-        return lock;
-    }
-
-    // TODO: it's helpful to support in-lock transformations; however, simply inverting the lock like
-    // this does not work well in some situations. Especially, there may need to be a mode that modifies
-    // both locked and free groups.
-#if 0
-    inline moldT::lockT invert_lock(const subsetT& subset, const moldT& mold) {
-        assert(subset.contains(mold.rule));
-
-        moldT::lockT lock{};
-        subset.get_par().for_each_group([&](const groupT& group) {
-            if (none_locked(mold.lock, group)) {
-                for (codeT code : group) {
-                    lock[code] = true;
-                }
-            }
-        });
-        return lock;
-    }
-
-    // Equivalent to:
-    inline moldT::lockT invert_lock_v2(const subsetT& subset, const moldT& mold) {
-        assert(subset.contains(mold.rule));
-        moldT::lockT lock = enhance_lock(subset, mold);
-        for_each_code([&](codeT code) { lock[code] = !lock[code]; });
-
-        return lock;
-    }
-#endif
-
     // Test whether there exists any rule that belongs to both `subset` and `mold`.
     // (subset.contains(rule) && mold.compatible(rule))
     inline bool compatible(const subsetT& subset, const moldT& mold) {
@@ -426,116 +371,126 @@ namespace legacy {
         return res;
     }
 
-#if 1
-    // Firstly get rule = approximate(subset, mold), then transform the rule to another one:
-    // 1. The locked groups are not affected.
-    // 2. The free groups are listed as a sequence of values (relative to `mask`), and re-assigned by `fn`.
-    inline ruleT transform(const subsetT& subset, const maskT& mask, const moldT& mold,
-                           std::invocable<bool*, bool*> auto fn) {
-        assert(subset.contains(mask));
-        assert(compatible(subset, mold));
+    using lock_pred = bool (*)(const moldT::lockT&, const groupT&);
 
-        const partitionT& par = subset.get_par();
+    inline bool any_locked(const moldT::lockT& lock, const groupT& group) {
+        return std::ranges::any_of(group, [&lock](codeT code) { return lock[code]; });
+    }
 
-        ruleT_masked r = mask ^ approximate(subset, mold);
+    // inline bool all_locked(const moldT::lockT& lock, const groupT& group) {
+    //     return std::ranges::all_of(group, [&lock](codeT code) { return lock[code]; });
+    // }
 
-        // `seq` is not a codeT::map_to<bool>.
-        assert(par.k() <= 512);
-        std::array<bool, 512> seq{};
-        int z = 0;
-        par.for_each_group([&](const groupT& group) {
-            if (none_locked(mold.lock, group)) {
-                seq[z] = r[group[0]];
-                ++z;
-            }
-        });
+    inline bool none_locked(const moldT::lockT& lock, const groupT& group) {
+        return std::ranges::none_of(group, [&lock](codeT code) { return lock[code]; });
+    }
 
-        fn(seq.data(), seq.data() + z);
+    // TODO: explain why requiring subset.contains(mold.rule).
+    inline moldT::lockT enhance_lock(const subsetT& subset, const moldT& mold) {
+        assert(subset.contains(mold.rule));
 
-        z = 0;
-        par.for_each_group([&](const groupT& group) {
-            if (none_locked(mold.lock, group)) {
+        moldT::lockT lock{};
+        subset.get_par().for_each_group([&](const groupT& group) {
+            if (any_locked(mold.lock, group)) {
                 for (codeT code : group) {
-                    r[code] = seq[z];
+                    lock[code] = true;
                 }
-                ++z;
             }
         });
-
-        const ruleT res = mask ^ r;
-        assert(subset.contains(res) && mold.compatible(res));
-        return res;
-    }
-#else
-    // It's possible to support in-lock transformation without touching the locks like this:
-    // (However, this partially defeats the purpose of "lock" so is harder to control...)
-    inline ruleT transform_v2(const subsetT& subset, const maskT& mask, const moldT& mold,
-                              const std::invocable<bool*, bool*> auto& fn_free,
-                              const std::invocable<bool*, bool*> auto& fn_locked) {
-        assert(subset.contains(mask));
-        assert(compatible(subset, mold));
-
-        const partitionT& par = subset.get_par();
-
-        ruleT_masked r = mask ^ approximate(subset, mold);
-
-        assert(par.k() <= 512);
-        std::array<bool, 512> seq_free{}, seq_locked{};
-        int z_free = 0, z_locked = 0;
-        par.for_each_group([&](const groupT& group) {
-            if (none_locked(mold.lock, group)) {
-                seq_free[z_free++] = r[group[0]];
-            } else {
-                seq_locked[z_locked++] = r[group[0]];
-            }
-        });
-
-        fn_free(seq_free.data(), seq_free.data() + z_free);
-        fn_locked(seq_locked.data(), seq_locked.data() + z_locked);
-
-        z_free = 0, z_locked = 0;
-        par.for_each_group([&](const groupT& group) {
-            bool v = 0;
-            if (none_locked(mold.lock, group)) {
-                v = seq_free[z_free++];
-            } else {
-                v = seq_locked[z_locked++];
-            }
-            for (codeT code : group) {
-                r[code] = v;
-            }
-        });
-
-        const ruleT res = mask ^ r;
-        assert(subset.contains(res));
-        return res;
+        return lock;
     }
 
+    namespace _misc {
+        // Firstly get rule = approximate(subset, mold), then transform the rule to another one:
+        // 1. The out-of-channel groups are not affected.
+        // 2. The in-channel groups are listed as a sequence of values (relative to `mask`) and re-assigned by `fn`.
+        inline ruleT transform(const subsetT& subset, const maskT& mask, const moldT& mold, lock_pred channel,
+                               const std::invocable<bool*, bool*> auto& fn) {
+            assert(subset.contains(mask));
+            assert(compatible(subset, mold));
+
+            const partitionT& par = subset.get_par();
+
+            ruleT_masked r = mask ^ approximate(subset, mold);
+
+            // `seq` is not a codeT::map_to<bool>.
+            assert(par.k() <= 512);
+            std::array<bool, 512> seq{};
+            int z = 0;
+            par.for_each_group([&](const groupT& group) {
+                if (channel(mold.lock, group)) {
+                    seq[z] = r[group[0]];
+                    ++z;
+                }
+            });
+
+            fn(seq.data(), seq.data() + z);
+
+            z = 0;
+            par.for_each_group([&](const groupT& group) {
+                if (channel(mold.lock, group)) {
+                    for (codeT code : group) {
+                        r[code] = seq[z];
+                    }
+                    ++z;
+                }
+            });
+
+            const ruleT res = mask ^ r;
+            assert(subset.contains(res) && mold.compatible(res));
+            return res;
+        }
+
+        inline ruleT randomize_c(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand,
+                                 int count, lock_pred channel) {
+            return transform(subset, mask, mold, channel, [&rand, count](bool* begin, bool* end) {
+                int c = std::clamp(count, 0, int(end - begin));
+                std::fill(begin, end, 0);
+                std::fill_n(begin, c, 1);
+                std::shuffle(begin, end, rand);
+            });
+        }
+
+        inline ruleT randomize_p(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand,
+                                 double p, lock_pred channel) {
+            return transform(subset, mask, mold, channel, [&rand, p](bool* begin, bool* end) {
+                std::bernoulli_distribution dist(std::clamp(p, 0.0, 1.0));
+                std::generate(begin, end, [&] { return dist(rand); });
+            });
+        }
+    } // namespace _misc
+
+    // Do transformation among the free groups.
     inline ruleT transform(const subsetT& subset, const maskT& mask, const moldT& mold,
-                           const std::invocable<bool*, bool*> auto& fn_free) {
-        const ruleT res = transform_v2(subset, mask, mold, fn_free, [](bool*, bool*) {});
-        assert(mold.compatible(res));
-        return res;
+                           const std::invocable<bool*, bool*> auto& fn) {
+        return _misc::transform(subset, mask, mold, none_locked, fn);
     }
-#endif
 
     inline ruleT randomize_c(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand,
                              int count) {
-        return transform(subset, mask, mold, [&rand, count](bool* begin, bool* end) {
-            int c = std::clamp(count, 0, int(end - begin));
-            std::fill(begin, end, 0);
-            std::fill_n(begin, c, 1);
-            std::shuffle(begin, end, rand);
-        });
+        return _misc::randomize_c(subset, mask, mold, rand, count, none_locked);
     }
 
     inline ruleT randomize_p(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand,
                              double p) {
-        return transform(subset, mask, mold, [&rand, p](bool* begin, bool* end) {
-            std::bernoulli_distribution dist(std::clamp(p, 0.0, 1.0));
-            std::generate(begin, end, [&] { return dist(rand); });
-        });
+        return _misc::randomize_p(subset, mask, mold, rand, p, none_locked);
     }
+
+#if 0
+    // Sometimes it will be useful to randomize both sides.
+    // (For example, to work with `static_constraints` to get "partially stable" structures.)
+    inline ruleT randomize_c2(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand,
+                              int count_free, int count_locked = 0) {
+        const ruleT rule = _misc::randomize_c(subset, mask, mold, rand, count_free, none_locked);
+        return _misc::randomize_c(subset, mask, {rule, mold.lock}, rand, count_locked, any_locked);
+    }
+
+    inline ruleT randomize_p2(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand,
+                              double p_free, double p_locked = 0.0) {
+        const ruleT rule = _misc::randomize_p(subset, mask, mold, rand, p_free, none_locked);
+        return _misc::randomize_p(subset, mask, {rule, mold.lock}, rand, p_locked, any_locked);
+    }
+#endif
 
     // Integral.
     struct seq_int {
