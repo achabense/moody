@@ -104,6 +104,16 @@ public:
     void run(const legacy::ruleT& rule, int count = 1) {
         for (int c = 0; c < count; ++c) {
             run_torus(m_tile, m_temp, rule);
+#if 0
+            // Add salt; the effect is amazing sometimes...
+            // This is mostly an "off-topic" feature; whether to add a mode to enable this?
+            m_tile.for_each_line(m_tile.entire_range(), [](std::span<bool> line) {
+                static std::mt19937 rand{1};
+                for (bool& b : line) {
+                    b ^= ((rand() & 0x1fff) == 0);
+                }
+            });
+#endif
             ++m_gen;
         }
     }
@@ -177,8 +187,8 @@ class runnerT {
             }
 
             if (extra_step != 0) {
-                torus.run(rule, extra_step);
                 mark_written();
+                torus.run(rule, extra_step);
             }
         }
     };
@@ -290,8 +300,8 @@ public:
             if (ImGui::Button("+1")) {
                 extra_step = 1;
             }
-            // TODO: finish.
-            helper::show_help("Advance generation by 1 (instead of pace). This is useful for ...");
+            helper::show_help("Advance generation by 1 (instead of pace). This is useful for changing the parity "
+                              "of generation when pace != 1.");
             if (m_ctrl.pause) {
                 ImGui::SameLine();
                 if (ImGui::Button(std::format("+p({})###+p", m_ctrl.actual_pace()).c_str())) {
@@ -368,7 +378,8 @@ public:
             ImGui::AlignTextToFramePadding();
             imgui_Str("Fit with zoom =");
             ImGui::SameLine();
-            for (const ImVec2 size = square_size(); int z : {1, 2, 4, 8}) {
+            assert(max_zoom == 8);
+            for (const ImVec2 size = square_size(); const int z : {1, 2, 4, 8}) {
                 if (z != 1) {
                     ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                 }
@@ -396,7 +407,6 @@ public:
 
         // TODO: set pattern as init state? what if size is already changed?
         // TODO: specify mouse-dragging behavior (especially, no-op must be an option)
-        // TODO: range-selected randomization don't need fixed seed. However, there should be a way to specify density.
         // TODO: support drawing as a dragging behavior if easy.
         // TODO: copy vs copy to clipboard; paste vs paste from clipboard? (don't want to pollute clipboard with small
         // rle strings...
@@ -453,6 +463,7 @@ public:
                 // Some logics rely on this to be done before rendering.
                 const ImGuiIO& io = ImGui::GetIO();
                 if (io.KeyCtrl && screen_zoom == 1) {
+                    // (This does not need `mark_written`.)
                     m_torus.rotate(io.MouseDelta.x, io.MouseDelta.y);
                 } else {
                     screen_off += io.MouseDelta;
@@ -581,6 +592,7 @@ public:
 
                     if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
                         legacy::blit<legacy::blitE::Or>(m_torus.tile(), paste_beg, *paste);
+                        m_ctrl.mark_written();
                         paste.reset();
                     }
                 }
@@ -608,11 +620,9 @@ public:
             }
 
             // TODO: redesign keyboard ctrl...
-            // TODO: (Must) finish...
             static float fill_den = 0.5;
             enum opE { None, Random_fill, Clear_inside, Clear_outside, Shrink, Copy, Cut, Capture };
             opE op = None;
-            // TODO: make this actually work...
             if (ImGui::BeginPopup("Tile_Menu")) {
                 temp_pause = true;
                 ImGui::SliderFloat("Fill density", &fill_den, 0.0f, 1.0f, "%.2f", ImGuiSliderFlags_NoInput);
@@ -622,7 +632,7 @@ public:
                     op = Random_fill;
                 } else if (ImGui::MenuItem("Clear", "backspace")) { // TODO: 0/1
                     op = Clear_inside;
-                } else if (ImGui::MenuItem("Clear outside", "0")) { // TODO: 0/1
+                } else if (ImGui::MenuItem("Clear outside", "0 (zero)")) { // TODO: 0/1
                     op = Clear_outside;
                 } else if (ImGui::MenuItem("Shrink", "s")) { // TODO: 0/1
                     op = Shrink;
@@ -636,40 +646,54 @@ public:
                 // TODO: document other keyboard-only operations...
                 ImGui::EndPopup();
             }
+
+            if (m_sel) {
+                if (imgui_KeyPressed(ImGuiKey_Equal, false)) {
+                    op = Random_fill;
+                } else if (imgui_KeyPressed(ImGuiKey_Backspace, false)) {
+                    op = Clear_inside;
+                } else if (imgui_KeyPressed(ImGuiKey_0, false)) {
+                    op == Clear_outside;
+                } else if (imgui_KeyPressed(ImGuiKey_S, false)) {
+                    op = Shrink;
+                } else if (imgui_KeyPressed(ImGuiKey_C, false)) {
+                    op = Copy;
+                } else if (imgui_KeyPressed(ImGuiKey_X, false)) {
+                    op = Cut;
+                } else if (imgui_KeyPressed(ImGuiKey_P, false)) {
+                    op = Capture;
+                }
+            }
+
             if (m_sel) {
                 const auto range = m_sel->to_range();
 
-                // TODO: what if these keys are pressed together?
-                if (imgui_KeyPressed(ImGuiKey_S, false) || op == Shrink) {
+                if (op == Shrink) {
                     const auto [begin, end] = legacy::bounding_box(m_torus.tile(), range);
                     if (begin != end) {
                         m_sel = {.active = false, .beg = begin, .end = {.x = end.x - 1, .y = end.y - 1}};
                     } else {
                         m_sel.reset();
                     }
-                }
-                if (imgui_KeyPressed(ImGuiKey_C, false) || imgui_KeyPressed(ImGuiKey_X, false) || op == Copy ||
-                    op == Cut) {
-                    // TODO: whether to add rule?
-                    // ImGui::SetClipboardText(legacy::to_RLE_str(&m_ctrl.rule, m_torus.tile(), range).c_str());
-                    messenger::add_msg(legacy::to_RLE_str(nullptr, m_torus.tile(), range));
-                }
-                if (imgui_KeyPressed(ImGuiKey_Backspace, false) || imgui_KeyPressed(ImGuiKey_X, false) ||
-                    op == Clear_inside || op == Cut) {
-                    legacy::clear_inside(m_torus.tile(), range);
-                    // TODO: whether to set temp_pause? what about `apply_rule`?
-                    m_ctrl.mark_written();
-                }
-                if (imgui_KeyPressed(ImGuiKey_Equal, false) || op == Random_fill) {
-                    legacy::random_fill(m_torus.tile(), global_mt19937(), fill_den, range);
-                    m_ctrl.mark_written();
-                }
-                if (imgui_KeyPressed(ImGuiKey_0, false) || op == Clear_outside) {
+                } else if (op == Capture) {
+                    out = capture_closed(m_torus.tile(), range, m_ctrl.rule);
+                } else if (op == Copy || op == Cut || op == Clear_inside) {
+                    if (op == Copy || op == Cut) {
+                        // TODO: whether to add rule?
+                        // ImGui::SetClipboardText(legacy::to_RLE_str(&m_ctrl.rule, m_torus.tile(), range).c_str());
+                        messenger::add_msg(legacy::to_RLE_str(nullptr, m_torus.tile(), range));
+                    }
+                    if (op == Cut || op == Clear_inside) {
+                        legacy::clear_inside(m_torus.tile(), range);
+                        // TODO: whether to set temp_pause? what about `apply_rule`?
+                        m_ctrl.mark_written();
+                    }
+                } else if (op == Clear_outside) {
                     legacy::clear_outside(m_torus.tile(), range);
                     m_ctrl.mark_written();
-                }
-                if (imgui_KeyPressed(ImGuiKey_P, false) || op == Capture) {
-                    out = capture_closed(m_torus.tile(), range, m_ctrl.rule);
+                } else if (op == Random_fill) {
+                    legacy::random_fill(m_torus.tile(), global_mt19937(), fill_den, range);
+                    m_ctrl.mark_written();
                 }
             }
         }
