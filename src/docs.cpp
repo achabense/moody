@@ -16,14 +16,14 @@ To begin with, it's necessary to explain some key concepts in this program. They
 2. A partition P of all "situations".
 Then, a MAP rule belongs to the subset iff XOR-masked by R, the masked values are the same in every group in P.
 
-The commonly recognized rules (e.g. isometric rules / totalistic rules) can be defined as such subsets. And most importantly, it can be proven that the intersection of such "subsets" are of the same structure, so in the program you are free to combine (essentially ...) any of the supported subsets as long as the result is not empty. (And the "mask" concept apply to the combined subsets). ... explain gui...
+The commonly recognized rules (e.g. isotropic rules / totalistic rules) can be defined as such subsets. And most importantly, it can be proven that the intersection of such "subsets" are of the same structure, so in the program you are free to combine (essentially ...) any of the supported subsets as long as the result is not empty. (And the "mask" concept apply to the combined subsets). ... explain gui...
 
 A mask is any rule that belongs to the subset. Especially, R serves as a mask.
 This looks like a trivial definition, however, as you will see, (combined with "distance") this concept is powerful to help find interesting rules...
 
 A lock is ... You can find a lot of interesting rules without this feature, however ...
 Here is an example that are unlikely to be available without this feature...
-An isometric and self-complementary rule where gliders occur naturally:
+An isotropic and self-complementary rule where gliders occur naturally:
 MAPARYSZxZtPVoUYRG2cMoGoxdsEtJst5ppcpLka9c/q58GKgMUKdi2sWmmEsm0t8kXOp+s8ZJ3edelQ0mXGbeXfw [/OI4QIQCgACAwBAAAAAQAIAAEMCLAAAAgIAAAAAAAACKAAAAgAKAgAAAAAAAAKAAgACAgAAAAACAAAAAAAAAAA]
 MAPARYTZxZsPVoQYRH2UMoGoxdkEtIst5p7coLka9c/r78CCgMUKdi+sSGmEsu0t9kXOp+s9ZB3efelQ8mXGTeXfw
 
@@ -52,7 +52,7 @@ If you select no subsets, the default one is the universal set (which contains a
 --- Looking through "nearby" rules - the power of "custom mask"
 
 It's easy to define the "distance" between two rules if they belong to the same subset - the distance can be defined as the number of groups that have different values.
-Below are some interesting rules that are very "close" to the Game-of-Life rule (actually, distance = 1 in the "isometric" subset).
+Below are some interesting rules that are very "close" to the Game-of-Life rule (actually, distance = 1 in the "isotropic" subset).
 MAPARYXbhZofOgWaH7oaIDogBZofuhogOiAaIDoAIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAAACAAIAAAAAAAA
 MAPARYXfhZofugWan7oaIDogBZofuhogOiAaIDogIgAgAAWaH7oeIDogGiA6ICAAIAAaMDogIAAgACAAIAAAAAAAA
 MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6YSAAIQAaIDogIAAgACAAIQAAAAAAA
@@ -97,7 +97,7 @@ It's possible to get non-trivial rules that do not belong to any well-defined su
 
 --- Native symmetry
 
-Isometric:
+Isotropic:
 MAPEkAFDAgARAAAgXxAAgGAAAAASAAAAAASgAlAAAUEACIAEG6AgQEIAAACzIAQFoAAgAUIAEEEADABUoAAGkgAAQ
 
 \:
@@ -135,7 +135,7 @@ Well, that's not many! I'd recommend trying all the rules in this set.
 
 --- Native symmetry, but in Von-Neumann neighborhood
 
-Isometric:
+Isotropic:
 MAPzAAzzAAzzMzMADPMADPMzAAz/wAz/wAzADP/ADP/ADPMADPMADPMzMwAM8wAM8zMADP/ADP/ADMAM/8AM/8AMw
 
 --- Hexagonal neighborhood

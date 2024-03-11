@@ -320,9 +320,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
         }
     };
 
-    // TODO: (temp) deleted as this is not very useful and is misleading in the "Native" and
-    // "Custom" case.
-    // static std::optional<legacy::moldT> pass_analysis_target = std::nullopt;
     static subset_selector selector;
     const legacy::subsetT& subset = selector.select_subset(mold);
     assert(!subset.empty());
@@ -341,6 +338,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
         static legacy::maskT mask_custom{{}};
 
         // TODO: finish descriptions (use cases etc)
+        enum maskE { Zero, Identity, Native, Custom };
         static const char* const mask_labels[]{"Zero", "Identity", "Native", "Custom"};
         static const char* const mask_descriptions[]{
             "The all-zero rule.\n"
@@ -348,7 +346,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
 
             "The rule that maps each situation to the center cell itself, so any pattern will keep unchanged under "
             "this rule. (Click \"<00..\" button to set to it for test.)\n"
-            "As the masking rule it shows how \"volatile\" a rule is ...", // TODO: "<00.." is not a good label...
+            "As the masking rule it shows how \"volatile\" a rule is ...",
 
             "A specific rule known to belong to the selected subsets, so that it is guaranteed to be able to support "
             "editions...", // (may or may not be the all-zero rule/identity rule depending on the subsets you have
@@ -356,10 +354,9 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
 
             "Custom rule; you can click \"Take current\" button to set this to the current rule.\n"
             "Important tip: ..."};
-        static int mask_tag = 0;
 
-        // TODO: the support for other make_mask(bpos_* (other than bpos_s)) was poorly designed and dropped.
-        // Redesign to add back these masks.
+        // TODO: whether to support mask_mask(bpos_q) etc?
+        static maskE mask_tag = Zero;
         const legacy::maskT* const mask_ptrs[]{&legacy::mask_zero, &legacy::mask_identity, &subset.get_mask(),
                                                &mask_custom};
 
@@ -367,29 +364,28 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
         imgui_Str("Mask");
         helper::show_help(about_mask);
 
-        for (int i = 0; i < 4; ++i) {
+        for (const maskE m : {Zero, Identity, Native, Custom}) {
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
 
-            if (ImGui::RadioButton(mask_labels[i], mask_tag == i)) {
-                mask_tag = i;
+            if (ImGui::RadioButton(mask_labels[m], mask_tag == m)) {
+                mask_tag = m;
             }
 
             helper::show_help([&] {
-                imgui_Str(mask_descriptions[i]);
-                imgui_Str(legacy::to_MAP_str(*mask_ptrs[i]));
+                imgui_Str(mask_descriptions[m]);
+                imgui_Str(legacy::to_MAP_str(*mask_ptrs[m]));
             });
         }
 
         ImGui::SameLine();
         if (ImGui::Button("Take current")) {
-            mask_tag = 3;
             mask_custom = {mold.rule};
+            mask_tag = Custom;
         }
 
-        // TODO: horrible...
         switch (mask_tag) {
-            case 0: chr_0 = '0', chr_1 = '1'; break;
-            case 1: chr_0 = '.', chr_1 = 'f'; break;
+            case Zero: chr_0 = '0', chr_1 = '1'; break;
+            case Identity: chr_0 = '.', chr_1 = 'f'; break;
             default: chr_0 = 'o', chr_1 = 'i'; break;
         }
 
@@ -605,8 +601,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
                     if (x++ % 8 != 0) {
                         ImGui::SameLine();
                     }
-                    // TODO: change color?
-                    // ImGui::GetStyle().Colors[ImGuiCol_Button]
                     icons.image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
                     ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                     align_text(ImGui::GetItemRectSize().y);

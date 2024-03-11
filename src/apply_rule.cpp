@@ -372,7 +372,7 @@ public:
                 }
 
                 ImGui::SameLine(0, s);
-                ImGui::Text("Width:%d, Height:%d", m_torus.tile().width(), m_torus.tile().height());
+                ImGui::Text("Width:%d, height:%d", m_torus.tile().width(), m_torus.tile().height());
             }
 
             ImGui::AlignTextToFramePadding();
@@ -653,7 +653,7 @@ public:
                 } else if (imgui_KeyPressed(ImGuiKey_Backspace, false)) {
                     op = Clear_inside;
                 } else if (imgui_KeyPressed(ImGuiKey_0, false)) {
-                    op == Clear_outside;
+                    op = Clear_outside;
                 } else if (imgui_KeyPressed(ImGuiKey_S, false)) {
                     op = Shrink;
                 } else if (imgui_KeyPressed(ImGuiKey_C, false)) {
