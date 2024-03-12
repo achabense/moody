@@ -201,7 +201,7 @@ public:
             const float extra_w = ImGui::CalcTextSize("ClearRecognize").x + extra_w_sameline + extra_w_padding;
             ImGui::SeparatorTextEx(0, "Select subsets", nullptr, extra_w);
             ImGui::SameLine();
-            if (ImGui::Button("Clear")) {
+            if (ImGui::Button("Clear")) { // TODO: is "Reset" more suitable?
                 for_each_term([&](termT& t) { t.disabled = t.selected = false; });
                 update_current();
             }
@@ -594,7 +594,17 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
             }
             ImGui::PopStyleColor(3);
 
-            if (ImGui::BeginItemTooltip()) {
+            const bool show_group = ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip);
+
+            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+            align_text(ImGui::GetItemRectSize().y);
+            imgui_Str(labels[masked[head]]);
+            if (has_lock) {
+                const ImU32 col = scanlist[j].all_locked() ? IM_COL32_WHITE : IM_COL32(128, 128, 128, 255);
+                imgui_ItemRect(col, ImVec2(-2, -2));
+            }
+
+            if (show_group && ImGui::BeginTooltip()) {
                 ImGui::Text("Group size: %d", (int)group.size());
                 const int max_to_show = 48;
                 for (int x = 0; const legacy::codeT code : group) {
@@ -616,16 +626,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
                     imgui_Str("...");
                 }
                 ImGui::EndTooltip();
-            }
-
-            const float button_height = ImGui::GetItemRectSize().y;
-            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-            align_text(button_height);
-            imgui_Str(labels[masked[head]]);
-
-            if (has_lock) {
-                const ImU32 col = scanlist[j].all_locked() ? IM_COL32_WHITE : IM_COL32(128, 128, 128, 255);
-                imgui_ItemRect(col, ImVec2(-2, -2));
             }
         });
         ImGui::PopStyleVar(1);

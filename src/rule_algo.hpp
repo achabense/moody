@@ -498,6 +498,7 @@ namespace legacy {
             return transform(subset, mask, mold, [](bool* begin, bool* end) { std::fill(begin, end, 0); });
         }
 
+#if 0
         static ruleT one(const subsetT& subset, const maskT& mask, const moldT& mold) {
             return transform(subset, mask, mold, [](bool* begin, bool* end) {
                 if (begin != end) {
@@ -506,6 +507,7 @@ namespace legacy {
                 }
             });
         }
+#endif
 
         static ruleT max(const subsetT& subset, const maskT& mask, const moldT& mold) {
             return transform(subset, mask, mold, [](bool* begin, bool* end) { std::fill(begin, end, 1); });

@@ -27,37 +27,75 @@ An isotropic and self-complementary rule where gliders occur naturally:
 MAPARYSZxZtPVoUYRG2cMoGoxdsEtJst5ppcpLka9c/q58GKgMUKdi2sWmmEsm0t8kXOp+s8ZJ3edelQ0mXGbeXfw [/OI4QIQCgACAwBAAAAAQAIAAEMCLAAAAgIAAAAAAAACKAAAAgAKAgAAAAAAAAKAAgACAgAAAAACAAAAAAAAAAA]
 MAPARYTZxZsPVoQYRH2UMoGoxdkEtIst5p7coLka9c/r78CCgMUKdi+sSGmEsu0t9kXOp+s9ZB3efelQ8mXGTeXfw
 
-(Generation...)
+(Distance)...
 
-The program offers 3 generation mode that covers most needs...
-0. Randomized.
-1. Incremental / integral...
-2. Permutative.
-...
-
-(Typical use cases...)
-
-
-
+....
 (Gui part)
 --- The subset
 You may have noticed that in the left plane, some squares are lighted up with bright-green rings. This means the rule belongs to the "subsets" represented by them. More exactly ...
 
 If you click the "Recognize" button, these subsets are selected automatically...
 If you select no subsets, the default one is the universal set (which contains all MAP rules). There is generally no limit what you can do in the universal set. By selecting more subsets ...
+Current rule: The rule shown in the right plane. At the top ... (about "sequence"/undo/redo)
 
---- The mask
---- When the subset is very small
---- Randomization
---- Looking through "nearby" rules - the power of "custom mask"
+TODO: Operation precondition (contained/compatible etc)...
 
-It's easy to define the "distance" between two rules if they belong to the same subset - the distance can be defined as the number of groups that have different values.
-Below are some interesting rules that are very "close" to the Game-of-Life rule (actually, distance = 1 in the "isotropic" subset).
+Rule-generation
+The program has 3 generation modes that covers most needs. All the 3 modes will skip locked groups, and will do nothing if there are no free groups.
+
+1. Integral mode (<00.. [dec/inc] 11..>)
+Treat the free groups as a sequence of 0/1 relative to the mask, and apply integral increment/decrement. With this mode you can iterate through all rules in a subset. It does not matter which mask is used (as long as it's valid) in this case.
+
+Example:
+MAPAAAAAQABARcAAQEXARcXfwABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf3//f////w (whether to add {} lock to ensure the effect?)
+This rule belongs to both self-complementary rule and inner-totalistic rule. (whether to explain here?) If you do "Recognize", you wil find both "Zero" and "Identity" mask do not work (... native mask). It's a fairly small subset - only 5 groups exist, which means there are only 2^5 = 32 rules that belongs to the subset.
+You can:
+1. Select "Native" mask (or custom mask, if the current rule is the above one)
+2. "<00.." to set the masked sequence to "0...", which means the result is the same as the masking rule.
+3. "inc" until the sequence reached to the end (111...).
+
+2. Permutative mode (<1.0. [prev/next] 0.1.>)
+Treat the free groups as a sequence of 0/1 relative to the mask, and reshuffle (?permute) them without changing the distance to the mask. With this mode you can iterate through all rules that have the same distance to the masking rule.
+
+This is especially useful when combining with custom mask. You can check all rules that have distance = 1 to an existing rule.
+0. (Correct subset)
+1. "Take current" to set the current rule to custom mask. The distance is now 0 (the rule to itself).
+2. "inc" to increase the current rule by "1". The distance is now 1.
+3. "next"... until the "1" reach to the end. (... About key-binding)
+
+For example, here is several rules that have interesting behaviors that have distance = 1 (in the isotropic subset) to the Game-of-Life rule.
 MAPARYXbhZofOgWaH7oaIDogBZofuhogOiAaIDoAIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAAACAAIAAAAAAAA
 MAPARYXfhZofugWan7oaIDogBZofuhogOiAaIDogIgAgAAWaH7oeIDogGiA6ICAAIAAaMDogIAAgACAAIAAAAAAAA
 MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6YSAAIQAaIDogIAAgACAAIQAAAAAAA
 
-For the subsets that are "small" enough (for example ...), you may want to "dial" through all of the nearby rules...
+
+3. Randomization.
+Get an arbitrary rule that belongs to the selected subsets, and whose distance to the masking rule (including those that are locked) is exactly / around "C" as set in the program.
+(& Zero/Identity mask) ... Again, the masking rule can be the Custom rule ... which means if you have interesting rules you can do randomization with a small distance...
+
+For example, suppose the "Zero" mask belongs to the subset (which is true in most cases), then randomize with dist = ... (effect)
+
+(~ bind to undo/redo)
+
+
+In a small subset, ...
+In a large subset...
+Starting from one of Zero or Identity, (or Native if necessary) mask, get randomized rules until you find interesting ones.
+Then you can try to find nearby rules with permutative mode/ randomization.
+
+Random-access edition
+Each group is shown by one of the that belongs to it.
+By left-clicking the buttons you flip the values of each situation in the group, so that:
+This result is actually independent of the mask you select, whether there exists locks in the group, or whether the current rule belongs to the subsets or even compatible...
+(Effects...)
+In any case (whether !compatible or !contained), you will switch back if you click on the same button twice.
+If the rule already belongs to the subsets ...
+....
+By right clicking the buttons ...
+(use cases with examples...)
+Turn-off the clobbering bit.
+Lock some groups manually.
+...
 
 Here is a very important tip. Sometimes you may find rules like this:
 (from rul33.txt; better example...)
