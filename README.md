@@ -1,43 +1,24 @@
 #### About this program
-The program provides many tools to explore subsets of 2-state anisotropic rules in range-1 Moore neighborhood (also known as MAP rules).
+This program is designed to help explore subsets of 2-state CA rules in range-1 Moore neighborhood (also known as MAP rules).
 (Link...)
 
-In this program, it's easy to:
-- Test what subsets a MAP rule belongs to.
-- Generate rules in the specified subsets. (Explain...)
-- Look through all the rules in a subset.
-- Look through all the rules that are ...
-- The above things, with the extra constraints that some ...
-- Look through all MAP-encoded rules in a file.
-- ... and so on.
-
-The supported subsets are many, including:
-- Totalistic rules (with or without the center cell)
-- Isotropic non-totalistic rules.
-- Self-complementary rules.
-- Rules in hexagonal neighborhood.
-- ... (Full list, with link)
-
-And you can combine these subsets freely to explore intersections of these subsets.
+With this program, it's easy to test the effect of a MAP rule, tell what subsets the rule belongs to, and generate rules in the specified subsets in non-trivial ways.
+The supported subsets include self-complementary rules, isotropic/totalistic rules in Moore/hexagonal/Von-Neumann neighborhood, and so on. You can combine these subsets freely to explore rules in the intersections of these subsets.
 
 #### What can be saved & how to save
-- The program uses normal MAP-strings (TODO...) to store rules. This means you can try these rules in other programs like Golly.
-- It's easy to copy the rule to the clipboard: right-click the text and it's there.
-- For now the program cannot ..., which means you'd have to use this program with a text-editor.
-- The program is able to load all MAP rules from a file (on a per-line basis) (Explain...) There are no specific requirements for the file format...
+The program uses normal MAP-strings (Link) to store rules. This means you can try these rules in other programs like Golly.
+The program also has an extension called "lock" to help generate specific rules. A lock is encoded the same way as MAP rule and is always associated with a MAP rule.
 
-#### Concepts
-(masks, locks etc...)
+For now the program cannot save the rule to the file directly. However, it's easy to copy the rule to the clipboard: right-click the rule-string and that's done.
+The program is able to load all MAP rules from a file or from the clipboard. Rules are loaded on a per-line basis. There are no specific requirements for the file format.
 
-#### Typical use cases
-(Should be supported interactively by the program)
-(Should begin with the gol rule)
-(As to capture, the glider-only rule is the best beginning example)
-(Should document how to capture, especially bounding-box is not large enough)
+#### Examples found by this program
+(Rule with pics)
 
-#### Dependency
-* ImGui (which is carried by this project) (Link)
-* SDL2 (Link)
-* C++20
-* VS project (will consider cmake build in the future)
-* ...
+#### Getting started
+As a starting point, it will help a lot if you are familiar with Convay's Game-of-Life rule.
+See the "Documents" part in the program to get familiar with the concepts and operations.
+
+#### How to build & Dependency
+The program is written in C++20, and developed with the help of ImGui (Link) (which is carried by this project) and SDL2 (there is a zip in ...).
+The project is currently organized as a VS project. ...

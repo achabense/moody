@@ -1,41 +1,51 @@
-const char* const doc_0_about =
-    R"(These documents are interactive. You can left-click the rules to see their effects (or try the buttons above to do quick navigation). Right-click to copy the text (on per-line basis; drag to select multiple lines).
+const char* const doc_about =
+    R"(In these documents, you can left-click the rules (which will be highlighted if you hover on them) to see their effects, or try the buttons above to do quick navigation. Right-click to copy the text (on per-line basis; drag to select multiple lines).
 
 --- The sentiment
 ...
 MAP+sQSUIzICkiQgAiAEKBAhrIGFgAUbAAA4AChgnAAAw6CAkAIgKCAlASgIACgIQBbqCqhEQAAkFQAARIDAQQRBA
 I hope this is impressive enough. It was picked from many randomized rules many years ago ... (... background of this program)
-)";
 
-const char* const doc_1_intro =
-    R"(TODO: reorganize; the formal definitions should be moved into a single document...
-To begin with, it's necessary to explain some key concepts in this program. They are subset, mask and lock.
+MAP7KV6wLHQiAHIPICBCAhlIqKAhAuKAFBoYmCFEAACIUzbAIAsAsCBJoAANhiIBEBSUICEMQiQFgRBgAJKgAA4gA)";
 
-(Not an arbitary subset of the MAP rules) A "subset" S (if not empty) is composed of:
-1. A MAP rule R that is designated to belong to S.
-2. A partition P of all "situations".
-Then, a MAP rule belongs to the subset iff XOR-masked by R, the masked values are the same in every group in P.
+const char* const doc_concepts =
+    R"(The program is based on several key concepts. They are subset, distance, mask and lock.
 
-The commonly recognized rules (e.g. isotropic rules / totalistic rules) can be defined as such subsets. And most importantly, it can be proven that the intersection of such "subsets" are of the same structure, so in the program you are free to combine (essentially ...) any of the supported subsets as long as the result is not empty. (And the "mask" concept apply to the combined subsets). ... explain gui...
+------
+The "subset" in this program refers to a special type of subsets that can be defined as:
+S = empty set or (R, P), where:
+1. R is a MAP rule that is designated to belong to S.
+2. P is a partition of all "cases".
+3. A MAP rule belongs to S iff XOR-masked by R, the masked values are the same in every group in P.
 
-A mask is any rule that belongs to the subset. Especially, R serves as a mask.
-This looks like a trivial definition, however, as you will see, (combined with "distance") this concept is powerful to help find interesting rules...
+A lot of categories of rules (e.g. isotropic rules / totalistic rules / self-complementary rules etc) can be composed this way. And most importantly, it can be proven that the intersection of such subsets are of the same structure (empty set or (R', P')), so in the program you are free to combine any of the supported subsets as long as the result is not empty.
 
-A lock is ... You can find a lot of interesting rules without this feature, however ...
-Here is an example that are unlikely to be available without this feature...
-An isotropic and self-complementary rule where gliders occur naturally:
+It's also obvious that any rule in S can equally serve as the defining mask R.
+
+------
+If two rules belong to the same subset S = (R, P), then in every group of P their values are either all-same or all-different. As a result, it's natural to define the distance (in subset S) as the number of groups where the two rules have different values.
+
+For example, the following rules have distance = 1 from the Game-of-Life rule in the isotropic subset.
+MAPARYXbhZofOgWaH7oaIDogBZofuhogOiAaIDoAIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAAACAAIAAAAAAAA
+MAPARYXfhZofugWan7oaIDogBZofuhogOiAaIDogIgAgAAWaH7oeIDogGiA6ICAAIAAaMDogIAAgACAAIAAAAAAAA
+MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6YSAAIQAaIDogIAAgACAAIQAAAAAAA
+------
+A lock is an array associated with a MAP rule, that marks some parts of the rule as contributor for something to happen.
+
+(TODO more explanations...)
+
+You can find a lot of interesting rules without "lock". However, some rules are unlikely discoverable by chance without this feature. Here is an example - an isotropic and self-complementary rule where gliders occur naturally:
 MAPARYSZxZtPVoUYRG2cMoGoxdsEtJst5ppcpLka9c/q58GKgMUKdi2sWmmEsm0t8kXOp+s8ZJ3edelQ0mXGbeXfw [/OI4QIQCgACAwBAAAAAQAIAAEMCLAAAAgIAAAAAAAACKAAAAgAKAgAAAAAAAAKAAgACAgAAAAACAAAAAAAAAAA]
-MAPARYTZxZsPVoQYRH2UMoGoxdkEtIst5p7coLka9c/r78CCgMUKdi+sSGmEsu0t9kXOp+s9ZB3efelQ8mXGTeXfw
+MAPARYTZxZsPVoQYRH2UMoGoxdkEtIst5p7coLka9c/r78CCgMUKdi+sSGmEsu0t9kXOp+s9ZB3efelQ8mXGTeXfw)";
 
-(Distance)...
-
-....
-(Gui part)
---- The subset
-You may have noticed that in the left plane, some squares are lighted up with bright-green rings. This means the rule belongs to the "subsets" represented by them. More exactly ...
-
+const char* const doc_intro =
+    R"(Subset recognition and selection
+(Example rule)
+You may have noticed that in the left plane, some buttons are lighted up with bright-green rings. This means the rule belongs to the subsets represented by them. You may know that the Game-of-Life rule is a totalistic rule (which is also isotropic rule). ...
+...
 If you click the "Recognize" button, these subsets are selected automatically...
-If you select no subsets, the default one is the universal set (which contains all MAP rules). There is generally no limit what you can do in the universal set. By selecting more subsets ...
+If you select no subsets, the default one is the universal set (which contains all MAP rules). There is no limit what you can do in the universal set. By selecting more subsets...
+
 Current rule: The rule shown in the right plane. At the top ... (about "sequence"/undo/redo)
 
 TODO: Operation precondition (contained/compatible etc)...
@@ -43,7 +53,7 @@ TODO: Operation precondition (contained/compatible etc)...
 Rule-generation
 The program has 3 generation modes that covers most needs. All the 3 modes will skip locked groups, and will do nothing if there are no free groups.
 
-1. Integral mode (<00.. [dec/inc] 11..>)
+---- Integral mode (<00.. [dec/inc] 11..>)
 Treat the free groups as a sequence of 0/1 relative to the mask, and apply integral increment/decrement. With this mode you can iterate through all rules in a subset. It does not matter which mask is used (as long as it's valid) in this case.
 
 Example:
@@ -54,7 +64,7 @@ You can:
 2. "<00.." to set the masked sequence to "0...", which means the result is the same as the masking rule.
 3. "inc" until the sequence reached to the end (111...).
 
-2. Permutative mode (<1.0. [prev/next] 0.1.>)
+---- Permutative mode (<1.0. [prev/next] 0.1.>)
 Treat the free groups as a sequence of 0/1 relative to the mask, and reshuffle (?permute) them without changing the distance to the mask. With this mode you can iterate through all rules that have the same distance to the masking rule.
 
 This is especially useful when combining with custom mask. You can check all rules that have distance = 1 to an existing rule.
@@ -63,13 +73,7 @@ This is especially useful when combining with custom mask. You can check all rul
 2. "inc" to increase the current rule by "1". The distance is now 1.
 3. "next"... until the "1" reach to the end. (... About key-binding)
 
-For example, here is several rules that have interesting behaviors that have distance = 1 (in the isotropic subset) to the Game-of-Life rule.
-MAPARYXbhZofOgWaH7oaIDogBZofuhogOiAaIDoAIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAAACAAIAAAAAAAA
-MAPARYXfhZofugWan7oaIDogBZofuhogOiAaIDogIgAgAAWaH7oeIDogGiA6ICAAIAAaMDogIAAgACAAIAAAAAAAA
-MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6YSAAIQAaIDogIAAgACAAIQAAAAAAA
-
-
-3. Randomization.
+---- Randomization.
 Get an arbitrary rule that belongs to the selected subsets, and whose distance to the masking rule (including those that are locked) is exactly / around "C" as set in the program.
 (& Zero/Identity mask) ... Again, the masking rule can be the Custom rule ... which means if you have interesting rules you can do randomization with a small distance...
 
@@ -84,10 +88,10 @@ Starting from one of Zero or Identity, (or Native if necessary) mask, get random
 Then you can try to find nearby rules with permutative mode/ randomization.
 
 Random-access edition
-Each group is shown by one of the that belongs to it.
-By left-clicking the buttons you flip the values of each situation in the group, so that:
-This result is actually independent of the mask you select, whether there exists locks in the group, or whether the current rule belongs to the subsets or even compatible...
-(Effects...)
+Each group is shown by one of the cases that belongs to it.
+
+By left-clicking the buttons you flip the values for each case in the group, so the result is actually independent of which mask you have selected / whether there exists locks in the group / or whether the current rule belongs to the subsets or even compatible.
+As a result...
 In any case (whether !compatible or !contained), you will switch back if you click on the same button twice.
 If the rule already belongs to the subsets ...
 ....
@@ -121,7 +125,7 @@ MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAA
 --- Static constraints
 ...)";
 
-const char* const doc_2_subsets =
+const char* const doc_subsets =
     R"(The following rules are examples from certain subsets. They may or may not be representative of the subsets they belong to. You can click the "Recognize" button to select the subsets they belong to.
 The best way to get familiar with a subset is to generate randomized rules in it. ... (relation between the subsets)
 
@@ -198,7 +202,7 @@ MAP7ohmmYgAmWbuiGaZiACZZogAmWYAEWaIiACZZgARZoiIAJlmABFmiIgAmWYAEWaIABFmiBFmiAAAE
 
 )";
 
-const char* const doc_3_atypical =
+const char* const doc_atypical =
     R"(Typically you will explore rules that belong to several of the "well-defined" subsets. These subsets, however, take up just a small part of all MAP rules. With the help of "lock" feature it's possible to generate very strange rules that do not belong to any well-defined subsets.
 
 Here is the same example in ...
@@ -234,9 +238,10 @@ struct docT {
     const char* text;
 };
 
-extern const docT docs[]{{"0. About this program", doc_0_about}, //
-                         {"1. Introduction", doc_1_intro},       //
-                         {"2. Typical subsets", doc_2_subsets},  //
-                         {"3. Rules in the wild", doc_3_atypical}};
+extern const docT docs[]{{"0. About this program", doc_about}, //
+                         {"1. Concepts", doc_concepts},        //
+                         {"2. Rule operations", doc_intro},    //
+                         {"3. Typical subsets", doc_subsets},  //
+                         {"4. Rules in the wild", doc_atypical}};
 
 extern const int doc_size = sizeof(docs) / sizeof(docT);
