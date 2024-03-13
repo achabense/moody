@@ -105,9 +105,6 @@ inline float wrap_len() {
     return ImGui::GetFontSize() * 35.0f;
 }
 
-// TODO: refine; allow more bindings...
-// TODO: combine with help mode...
-// TODO: better name...
 class sequence {
     enum tagE { None, First, Prev, Next, Last };
 
@@ -134,7 +131,6 @@ class sequence {
         const bool disabled = imgui_Disabled();
         const bool bound = !disabled && (bound_id == id_prev || bound_id == id_next);
 
-        // TODO: restore scrolling control when bound?
         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
         if (ImGui::Button(label_prev) || (bound && imgui_KeyPressed(key_prev, false))) {
             tag = Prev;
@@ -194,7 +190,6 @@ inline bool button_with_shortcut(const char* label, ImGuiKey key) {
     return ret;
 }
 
-// TODO: better name...
 class messenger {
     inline static std::vector<std::string> m_strs{};
 
@@ -232,36 +227,5 @@ public:
             m_strs.clear();
             opened = false;
         }
-    }
-};
-
-// TODO: override the transparency? (so will be normally displayed even in disabled block...)
-// TODO: better name... app_helper? (is this program an "app"?)
-class helper {
-    friend void frame_main(const code_icons&, screenT&);
-    static inline bool enable_help = false;
-
-public:
-    // TODO: (temp) returning `enable_help` as an awkward workaround to detect whether the helpmark is shown (to decide
-    // whether to call sameline when the helpmark is shown before the widget...)... redesign if possible...
-    // TODO: specify helpmark?
-    static bool show_help(const std::invocable<> auto& desc, bool sameline = true) {
-        if (enable_help) {
-            if (sameline) {
-                ImGui::SameLine(0, 0); // TODO: reconsider spacing when help mode is mostly finished...
-            }
-            imgui_StrDisabled("(?)");
-            if (ImGui::BeginItemTooltip()) {
-                ImGui::PushTextWrapPos(wrap_len());
-                desc();
-                ImGui::PopTextWrapPos();
-                ImGui::EndTooltip();
-            }
-        }
-        return enable_help;
-    }
-
-    static bool show_help(const char* desc, bool sameline = true) { //
-        return show_help([desc] { imgui_Str(desc); }, sameline);
     }
 };

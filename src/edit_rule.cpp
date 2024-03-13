@@ -362,7 +362,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
 
         ImGui::AlignTextToFramePadding();
         imgui_Str("Mask");
-        helper::show_help(about_mask);
+        ImGui::SameLine(0, 0);
+        imgui_StrTooltip("?", about_mask);
 
         for (const maskE m : {Zero, Identity, Native, Custom}) {
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
@@ -371,7 +372,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
                 mask_tag = m;
             }
 
-            helper::show_help([&] {
+            ImGui::SameLine(0, 0);
+            imgui_StrTooltip("?", [&] {
                 imgui_Str(mask_descriptions[m]);
                 imgui_Str(legacy::to_MAP_str(*mask_ptrs[m]));
             });

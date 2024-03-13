@@ -53,6 +53,21 @@ inline void imgui_StrCopyable(const std::string& str, void (*str_func)(std::stri
     }
 }
 
+// Similar to `HelpMarker` in "imgui_demo.cpp".
+inline void imgui_StrTooltip(std::string_view str, const std::invocable<> auto& desc) {
+    imgui_StrDisabled(str);
+    if (ImGui::BeginItemTooltip()) {
+        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+        desc();
+        ImGui::PopTextWrapPos();
+        ImGui::EndTooltip();
+    }
+}
+
+inline void imgui_StrTooltip(std::string_view str, std::string_view desc) { //
+    imgui_StrTooltip(str, [desc] { imgui_Str(desc); });
+}
+
 struct [[nodiscard]] imgui_Window {
     imgui_Window(const imgui_Window&) = delete;
     imgui_Window& operator=(const imgui_Window&) = delete;

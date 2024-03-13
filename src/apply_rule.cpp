@@ -199,10 +199,13 @@ class runnerT {
 
     ImVec2 screen_off = {0, 0};
     int screen_zoom = 1;
-    ImVec2 last_known_canvas_size = min_canvas_size; // TODO: make std::optional?
+
+    // (Workaround: it's hard to get canvas-size in this frame when it's needed; this looks horrible but
+    // will work well in all cases)
+    ImVec2 last_known_canvas_size = min_canvas_size;
 
     std::optional<legacy::tileT> paste = std::nullopt;
-    legacy::tileT::posT paste_beg{0, 0}; // dbegin for copy... (TODO: this is confusing...)
+    legacy::tileT::posT paste_beg{0, 0}; // Valid if paste.has_value().
 
     struct selectT {
         bool active = true;
@@ -231,7 +234,7 @@ public:
         }
     }
 
-    // TODO: the canvas part is horribly written, needs heavy refactorings in the future...
+    // TODO: horribly written...
     std::optional<legacy::moldT::lockT> display(screenT& screen) {
         std::optional<legacy::moldT::lockT> out = std::nullopt;
 
@@ -239,6 +242,7 @@ public:
         assert(m_init.size == size_clamped(m_init.size));
         assert(screen_off.x == int(screen_off.x) && screen_off.y == int(screen_off.y));
 
+        // TODO: whether to set temp_pause for all editing operations?
         bool temp_pause = false;
         int extra_step = 0;
         auto restart = [&] {
@@ -250,32 +254,8 @@ public:
         // TODO: better be controlled by frame()?
         ImGui::PushItemWidth(item_width);
 
-        // TODO: redesign keyboard ctrl...
-        if (imgui_KeyPressed(ImGuiKey_1, true)) {
-            m_ctrl.gap = std::max(m_ctrl.gap_min, m_ctrl.gap - 1);
-        }
-        if (imgui_KeyPressed(ImGuiKey_2, true)) {
-            m_ctrl.gap = std::min(m_ctrl.gap_max, m_ctrl.gap + 1);
-        }
-        if (imgui_KeyPressed(ImGuiKey_3, true)) {
-            m_ctrl.pace = std::max(m_ctrl.pace_min, m_ctrl.pace - 1);
-        }
-        if (imgui_KeyPressed(ImGuiKey_4, true)) {
-            m_ctrl.pace = std::min(m_ctrl.pace_max, m_ctrl.pace + 1);
-        }
-        if (imgui_KeyPressed(ImGuiKey_Space, false)) {
-            m_ctrl.pause = !m_ctrl.pause;
-        }
-        // Run by keystroke turns out to be necessary. (TODO: For example ...)
-        if (imgui_KeyPressed(ImGuiKey_M, true)) {
-            if (m_ctrl.pause) {
-                extra_step = m_ctrl.actual_pace();
-            }
-            m_ctrl.pause = true;
-        }
-
         {
-            // TODO: (temp) keeping in-line with edit-rule's
+            // (Keeping in line with edit-rule's.)
             const float extra_w_sameline = ImGui::GetStyle().ItemSpacing.x * 1; // One SameLine...
             const float extra_w_padding = ImGui::GetStyle().FramePadding.x * 2; // One Button * two sides...
             const float extra_w = ImGui::CalcTextSize("Restart").x + extra_w_sameline + extra_w_padding;
@@ -287,7 +267,7 @@ public:
                                                                        : "");
             ImGui::SeparatorTextEx(0, str.c_str(), nullptr, extra_w);
             ImGui::SameLine();
-            if (ImGui::Button("Restart") || imgui_KeyPressed(ImGuiKey_R, false)) {
+            if (ImGui::Button("Restart")) {
                 restart();
             }
         }
@@ -300,8 +280,9 @@ public:
             if (ImGui::Button("+1")) {
                 extra_step = 1;
             }
-            helper::show_help("Advance generation by 1 (instead of pace). This is useful for changing the parity "
-                              "of generation when pace != 1.");
+            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+            imgui_StrTooltip("(?)", "Advance generation by 1 (instead of pace). This is useful for changing the parity "
+                                    "of generation when pace != 1.");
             if (m_ctrl.pause) {
                 ImGui::SameLine();
                 if (ImGui::Button(std::format("+p({})###+p", m_ctrl.actual_pace()).c_str())) {
@@ -318,16 +299,20 @@ public:
             // TODO: should be interactive.
             // the rule has only all_0 and all_1 NOT flipped, and has interesting effect in extremely low/high
             // densities. (e.g. 0.01, 0.99)
+            ImGui::BeginDisabled();
             ImGui::Checkbox("Anti-strobing", &m_ctrl.anti_strobing);
-            helper::show_help(
+            if (m_ctrl.anti_strobing) {
+                ImGui::SameLine();
+                ImGui::Text("(Actual pace: %d)", m_ctrl.actual_pace());
+            }
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+            imgui_StrTooltip(
+                "(?)",
                 "Actually this is not enough to guarantee smooth visual effect. For example, the following "
                 "\"non-strobing\" rule has really terrible visual effect:\n\n"
                 "MAPf/8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAQ\n\n"
                 "In cases like this, it generally helps to set the pace to 2*n manually to remove bad visual effects.");
-            if (m_ctrl.anti_strobing) {
-                ImGui::SameLine();
-                ImGui::Text(" (Actual pace: %d)", m_ctrl.actual_pace());
-            }
         }
         ImGui::EndGroup();
         ImGui::SameLine();
@@ -340,7 +325,7 @@ public:
             ImGui::SliderFloat("Init density (0~1)", &init.density, 0.0f, 1.0f, "%.2f", ImGuiSliderFlags_NoInput);
 
             {
-                // TODO: make object-local? what about fill_den?
+                // TODO: make object-local? what about fill_den? and especially, other_op...
                 static char input_width[20]{}, input_height[20]{};
                 const auto filter = [](ImGuiInputTextCallbackData* data) -> int {
                     return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
@@ -376,7 +361,7 @@ public:
             }
 
             ImGui::AlignTextToFramePadding();
-            imgui_Str("Fit with zoom =");
+            imgui_Str("Fullscreen with zoom =");
             ImGui::SameLine();
             assert(max_zoom == 8);
             for (const ImVec2 size = square_size(); const int z : {1, 2, 4, 8}) {
@@ -387,7 +372,6 @@ public:
                     screen_zoom = z;
                     screen_off = {0, 0};
 
-                    // TODO: explain that `last_known_canvas_size` works well...
                     init.size = size_clamped({.width = (int)last_known_canvas_size.x / screen_zoom,
                                               .height = (int)last_known_canvas_size.y / screen_zoom});
                 }
@@ -395,7 +379,7 @@ public:
             if (init != m_init) {
                 if (init.size != m_init.size) {
                     m_sel.reset();
-                    paste.reset(); // TODO: whether to show some message for these invalidation?
+                    paste.reset();
                 }
                 m_init = init;
                 restart();
@@ -420,17 +404,17 @@ public:
         }
         ImGui::SameLine();
         if (ImGui::Button("Center")) {
+            // "Center" will have the same effect as "Corner" (screen_off == {0, 0}) if fullscreen-resized.
             screen_off = last_known_canvas_size / 2 - screen_size / 2;
-            // TODO (temp) /screen_zoom->floor->*screen_zoom, so that screen_off will be {0, 0} after fitting.
             screen_off.x = floor(screen_off.x / screen_zoom) * screen_zoom;
             screen_off.y = floor(screen_off.y / screen_zoom) * screen_zoom;
         }
-        // TODO: select all, unselect button...
         ImGui::SameLine();
-        if (ImGui::Button("...")) {
-            ImGui::OpenPopup("Tile_Menu"); // TODO: temp; when should the menu appear?
-        }
-        // TODO: whether to allow sel and paste to co-exist?
+        static bool other_op = true;
+        ImGui::Checkbox("Other operations", &other_op);
+        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+        imgui_StrTooltip("(!)", "The keyboard shortcuts are available only when the window is open.");
+
         if (m_sel) {
             ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
             if (ImGui::Button(
@@ -489,10 +473,16 @@ public:
                 paste_beg.y = std::clamp(paste_beg.y, 0, tile_size.height - paste->height());
                 const legacy::tileT::posT paste_end = paste_beg + paste->size();
 
-                legacy::tileT temp = legacy::copy(m_torus.tile(), {{paste_beg, paste_end}}); // TODO: wasteful...
+                // (wontfix) Wasteful, but after all this works...
+                legacy::tileT temp = legacy::copy(m_torus.tile(), {{paste_beg, paste_end}});
                 legacy::blit<legacy::blitE::Or>(m_torus.tile(), paste_beg, *paste);
                 refresh(screen, m_torus.tile());
-                legacy::blit<legacy::blitE::Copy>(m_torus.tile(), paste_beg, temp);
+                if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
+                    m_ctrl.mark_written();
+                    paste.reset();
+                } else { // Restore.
+                    legacy::blit<legacy::blitE::Copy>(m_torus.tile(), paste_beg, temp);
+                }
 
                 drawlist->AddImage(screen.texture(), screen_min, screen_max);
                 const ImVec2 paste_min = screen_min + ImVec2(paste_beg.x, paste_beg.y) * screen_zoom;
@@ -509,18 +499,6 @@ public:
             }
             drawlist->PopClipRect();
 
-            // TODO: temporarily put here...
-            if (imgui_KeyPressed(ImGuiKey_V, false)) {
-                if (const char* text = ImGui::GetClipboardText()) {
-                    try {
-                        // TODO: or ask whether to resize m_torus.tile?
-                        paste.emplace(legacy::from_RLE_str(text, tile_size));
-                    } catch (const std::exception& err) {
-                        messenger::add_msg(err.what());
-                    }
-                }
-            }
-
             if (m_sel && m_sel->active && !ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
                 m_sel->active = false;
                 // TODO: shrinking (bounding_box) has no size check like this. This is intentional.
@@ -528,9 +506,6 @@ public:
                 if (m_sel->width() * m_sel->height() <= 2) {
                     m_sel.reset();
                 }
-                // if (sel && ImGui::IsMouseReleased(ImGuiMouseButton_Right)) {
-                //     ImGui::OpenPopup("Tile_Menu");
-                // }
             }
 
             if (ImGui::IsItemHovered()) {
@@ -583,18 +558,10 @@ public:
                     m_sel->end.y = std::clamp(cely, 0, tile_size.height - 1);
                 }
 
-                // TODO: refactor away this block...
-                // TODO: the logic will be simplified if invisible button goes before the image...
                 if (paste) {
                     assert(paste->width() <= tile_size.width && paste->height() <= tile_size.height);
                     paste_beg.x = std::clamp(celx, 0, tile_size.width - paste->width());
                     paste_beg.y = std::clamp(cely, 0, tile_size.height - paste->height());
-
-                    if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-                        legacy::blit<legacy::blitE::Or>(m_torus.tile(), paste_beg, *paste);
-                        m_ctrl.mark_written();
-                        paste.reset();
-                    }
                 }
 
                 if (imgui_MouseScrolling()) {
@@ -610,90 +577,114 @@ public:
                 }
             }
 
-            if (imgui_KeyPressed(ImGuiKey_A, false)) {
-                if (!m_sel || m_sel->width() != tile_size.width || m_sel->height() != tile_size.height) {
-                    m_sel = {
-                        .active = false, .beg = {0, 0}, .end = {.x = tile_size.width - 1, .y = tile_size.height - 1}};
-                } else {
-                    m_sel.reset();
-                }
-            }
-
-            // TODO: redesign keyboard ctrl...
+            // TODO: better keyboard ctrl...
             static float fill_den = 0.5;
-            enum opE { None, Random_fill, Clear_inside, Clear_outside, Shrink, Copy, Cut, Capture };
-            opE op = None;
-            if (ImGui::BeginPopup("Tile_Menu")) {
-                temp_pause = true;
-                ImGui::SliderFloat("Fill density", &fill_den, 0.0f, 1.0f, "%.2f", ImGuiSliderFlags_NoInput);
-                ImGui::Separator();
-                // These can be chained by `else if` without visual effect, as the popup will disappear after clicking.
-                if (ImGui::MenuItem("Random fill", "=")) {
-                    op = Random_fill;
-                } else if (ImGui::MenuItem("Clear", "backspace")) { // TODO: 0/1
-                    op = Clear_inside;
-                } else if (ImGui::MenuItem("Clear outside", "0 (zero)")) { // TODO: 0/1
-                    op = Clear_outside;
-                } else if (ImGui::MenuItem("Shrink", "s")) { // TODO: 0/1
-                    op = Shrink;
-                } else if (ImGui::MenuItem("Copy", "c")) {
-                    op = Copy;
-                } else if (ImGui::MenuItem("Cut", "x")) {
-                    op = Cut;
-                } else if (ImGui::MenuItem("Capture", "p")) {
-                    op = Capture;
-                }
-                // TODO: document other keyboard-only operations...
-                ImGui::EndPopup();
-            }
-
-            if (m_sel) {
-                if (imgui_KeyPressed(ImGuiKey_Equal, false)) {
-                    op = Random_fill;
-                } else if (imgui_KeyPressed(ImGuiKey_Backspace, false)) {
-                    op = Clear_inside;
-                } else if (imgui_KeyPressed(ImGuiKey_0, false)) {
-                    op = Clear_outside;
-                } else if (imgui_KeyPressed(ImGuiKey_S, false)) {
-                    op = Shrink;
-                } else if (imgui_KeyPressed(ImGuiKey_C, false)) {
-                    op = Copy;
-                } else if (imgui_KeyPressed(ImGuiKey_X, false)) {
-                    op = Cut;
-                } else if (imgui_KeyPressed(ImGuiKey_P, false)) {
-                    op = Capture;
-                }
-            }
-
-            if (m_sel) {
-                const auto range = m_sel->to_range();
-
-                if (op == Shrink) {
-                    const auto [begin, end] = legacy::bounding_box(m_torus.tile(), range);
-                    if (begin != end) {
-                        m_sel = {.active = false, .beg = begin, .end = {.x = end.x - 1, .y = end.y - 1}};
-                    } else {
-                        m_sel.reset();
+            if (other_op) {
+                if (auto window = imgui_Window("Operations", nullptr,
+                                               ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse)) {
+                    if (imgui_KeyPressed(ImGuiKey_1, true)) {
+                        m_ctrl.gap = std::max(m_ctrl.gap_min, m_ctrl.gap - 1);
+                    } else if (imgui_KeyPressed(ImGuiKey_2, true)) {
+                        m_ctrl.gap = std::min(m_ctrl.gap_max, m_ctrl.gap + 1);
+                    } else if (imgui_KeyPressed(ImGuiKey_3, true)) {
+                        m_ctrl.pace = std::max(m_ctrl.pace_min, m_ctrl.pace - 1);
+                    } else if (imgui_KeyPressed(ImGuiKey_4, true)) {
+                        m_ctrl.pace = std::min(m_ctrl.pace_max, m_ctrl.pace + 1);
+                    } else if (imgui_KeyPressed(ImGuiKey_Space, false)) {
+                        m_ctrl.pause = !m_ctrl.pause;
+                    } else if (imgui_KeyPressed(ImGuiKey_M, true)) {
+                        if (m_ctrl.pause) {
+                            extra_step = m_ctrl.actual_pace();
+                        }
+                        m_ctrl.pause = true;
+                    } else if (imgui_KeyPressed(ImGuiKey_R, false)) {
+                        restart();
                     }
-                } else if (op == Capture) {
-                    out = capture_closed(m_torus.tile(), range, m_ctrl.rule);
-                } else if (op == Copy || op == Cut || op == Clear_inside) {
-                    if (op == Copy || op == Cut) {
-                        // TODO: whether to add rule?
-                        // ImGui::SetClipboardText(legacy::to_RLE_str(&m_ctrl.rule, m_torus.tile(), range).c_str());
-                        messenger::add_msg(legacy::to_RLE_str(nullptr, m_torus.tile(), range));
-                    }
-                    if (op == Cut || op == Clear_inside) {
-                        legacy::clear_inside(m_torus.tile(), range);
-                        // TODO: whether to set temp_pause? what about `apply_rule`?
-                        m_ctrl.mark_written();
-                    }
-                } else if (op == Clear_outside) {
-                    legacy::clear_outside(m_torus.tile(), range);
-                    m_ctrl.mark_written();
-                } else if (op == Random_fill) {
-                    legacy::random_fill(m_torus.tile(), global_mt19937(), fill_den, range);
-                    m_ctrl.mark_written();
+
+                    // TODO: whether to explain the effects?
+                    imgui_Str("Other shortcuts: 1, 2, 3, 4, Space, M, R");
+                    ImGui::Separator();
+
+                    auto term = [any_called = false](const char* label, const char* shortcut, ImGuiKey key,
+                                                     const auto& op) mutable {
+                        if (ImGui::MenuItem(label, shortcut) || imgui_KeyPressed(key, false)) {
+                            if (!any_called) {
+                                any_called = true;
+                                op();
+                            }
+                        }
+                    };
+
+                    ImGui::SliderFloat("Fill density", &fill_den, 0.0f, 1.0f, "%.2f", ImGuiSliderFlags_NoInput);
+                    term("Random fill", "=", ImGuiKey_Equal, [&] {
+                        if (m_sel) {
+                            legacy::random_fill(m_torus.tile(), global_mt19937(), fill_den, m_sel->to_range());
+                            m_ctrl.mark_written();
+                        }
+                    });
+                    term("Clear inside", "backspace", ImGuiKey_Backspace, [&] {
+                        if (m_sel) {
+                            legacy::clear_inside(m_torus.tile(), m_sel->to_range());
+                            m_ctrl.mark_written();
+                        }
+                    });
+                    term("Clear outside", "0 (zero)", ImGuiKey_0, [&] {
+                        if (m_sel) {
+                            legacy::clear_outside(m_torus.tile(), m_sel->to_range());
+                            m_ctrl.mark_written();
+                        }
+                    });
+                    ImGui::Separator();
+                    term("Select all", "A", ImGuiKey_A, [&] {
+                        if (!m_sel || m_sel->width() != tile_size.width || m_sel->height() != tile_size.height) {
+                            m_sel = {.active = false,
+                                     .beg = {0, 0},
+                                     .end = {.x = tile_size.width - 1, .y = tile_size.height - 1}};
+                        } else {
+                            m_sel.reset();
+                        }
+                    });
+                    term("Shrink", "S", ImGuiKey_S, [&] {
+                        if (m_sel) {
+                            const auto [begin, end] = legacy::bounding_box(m_torus.tile(), m_sel->to_range());
+                            if (begin != end) {
+                                m_sel = {.active = false, .beg = begin, .end = {.x = end.x - 1, .y = end.y - 1}};
+                            } else {
+                                m_sel.reset();
+                            }
+                        }
+                    });
+                    ImGui::Separator();
+                    term("Copy", "C", ImGuiKey_C, [&] {
+                        if (m_sel) {
+                            // TODO: whether to add rule?
+                            // ImGui::SetClipboardText(legacy::to_RLE_str(&m_ctrl.rule, m_torus.tile(),
+                            // range).c_str());
+                            messenger::add_msg(legacy::to_RLE_str(nullptr, m_torus.tile(), m_sel->to_range()));
+                        }
+                    });
+                    term("Cut", "X", ImGuiKey_X, [&] {
+                        if (m_sel) {
+                            messenger::add_msg(legacy::to_RLE_str(nullptr, m_torus.tile(), m_sel->to_range()));
+                            legacy::clear_inside(m_torus.tile(), m_sel->to_range());
+                            m_ctrl.mark_written();
+                        }
+                    });
+                    term("Paste", "V", ImGuiKey_V, [&] {
+                        if (const char* text = ImGui::GetClipboardText()) {
+                            try {
+                                // TODO: or ask whether to resize m_torus.tile?
+                                paste.emplace(legacy::from_RLE_str(text, tile_size));
+                            } catch (const std::exception& err) {
+                                messenger::add_msg(err.what());
+                            }
+                        }
+                    });
+                    term("Capture", "P", ImGuiKey_P, [&] {
+                        if (m_sel) {
+                            out = capture_closed(m_torus.tile(), m_sel->to_range(), m_ctrl.rule);
+                        }
+                    });
                 }
             }
         }

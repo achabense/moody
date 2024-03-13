@@ -110,13 +110,6 @@ void frame_main(const code_icons& icons, screenT& screen) {
     ImGui::SetNextWindowPos(viewport->WorkPos);
     ImGui::SetNextWindowSize(viewport->WorkSize);
     if (auto window = imgui_Window("Main", nullptr, flags)) {
-        if (imgui_KeyPressed(ImGuiKey_H, false)) {
-            helper::enable_help = !helper::enable_help;
-        }
-
-        ImGui::Checkbox("\"Help\"", &helper::enable_help);
-        helper::show_help("Or press 'H' to toggle this mode.");
-        ImGui::SameLine();
         ImGui::Checkbox("\"Load\"", &show_load);
         ImGui::SameLine();
         ImGui::Checkbox("\"Static\"", &show_static);
@@ -137,12 +130,6 @@ void frame_main(const code_icons& icons, screenT& screen) {
 #endif // !NDEBUG
 
         {
-            // TODO: reconsider how to show help for the rule string...
-            // TODO: about lock...
-            if (helper::show_help("Current rule. You can hover on the text and right-click to copy to the clipboard.",
-                                  false)) {
-                ImGui::SameLine(0, 0);
-            }
             // TODO: add a shortcut for quick rule-saving...
             // (As the rule may be gotten from enter-bound buttons)
             static bool with_lock = false;

@@ -188,7 +188,7 @@ namespace legacy {
         }
 
 #if 0
-        // TODO: (temp) for `capture_open`.
+        // (For `capture_open`.)
         void record(moldT::lockT& lock, const rangeT& range) const {
             assert(has_range(range));
 
