@@ -110,9 +110,9 @@ void frame_main(const code_icons& icons, screenT& screen) {
     ImGui::SetNextWindowPos(viewport->WorkPos);
     ImGui::SetNextWindowSize(viewport->WorkSize);
     if (auto window = imgui_Window("Main", nullptr, flags)) {
-        ImGui::Checkbox("\"Load\"", &show_load);
+        ImGui::Checkbox("Load", &show_load);
         ImGui::SameLine();
-        ImGui::Checkbox("\"Static\"", &show_static);
+        ImGui::Checkbox("Static", &show_static);
         ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
         sequence::seq(
             "<|", "prev", "next", "|>", //

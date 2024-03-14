@@ -13,7 +13,7 @@ static void refresh(screenT& screen, const legacy::tileT& tile) {
 }
 
 // TODO: whether to support boundless space?
-// `tileT` can also be used as the building block for boundless space (`tileT::gather` was
+// `tileT` is able to serve as the building block for boundless space (`tileT::gather` was
 // initially designed to enable this extension) but that's complicated, and torus space is enough to
 // show the effect of the rules.
 static void run_torus(legacy::tileT& tile, legacy::tileT& temp, const legacy::rule_like auto& rule) {
@@ -394,7 +394,6 @@ public:
         // TODO: support drawing as a dragging behavior if easy.
         // TODO: copy vs copy to clipboard; paste vs paste from clipboard? (don't want to pollute clipboard with small
         // rle strings...
-        // TODO: should be able to recognize "rule = " part in the rle string.
 
         const legacy::tileT::sizeT tile_size = m_torus.tile().size(); // TODO: which (vs init.size) is better?
         const ImVec2 screen_size(tile_size.width * screen_zoom, tile_size.height * screen_zoom);
@@ -579,8 +578,9 @@ public:
 
             // TODO: better keyboard ctrl...
             static float fill_den = 0.5;
+            static bool add_rule = false;
             if (other_op) {
-                if (auto window = imgui_Window("Operations", nullptr,
+                if (auto window = imgui_Window("Operations", &other_op,
                                                ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse)) {
                     if (imgui_KeyPressed(ImGuiKey_1, true)) {
                         m_ctrl.gap = std::max(m_ctrl.gap_min, m_ctrl.gap - 1);
@@ -655,17 +655,19 @@ public:
                         }
                     });
                     ImGui::Separator();
+                    ImGui::Checkbox("Add rule", &add_rule);
+                    ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                    imgui_StrTooltip("(?)", "Affects whether to append the current rule when copying patterns.");
                     term("Copy", "C", ImGuiKey_C, [&] {
                         if (m_sel) {
-                            // TODO: whether to add rule?
-                            // ImGui::SetClipboardText(legacy::to_RLE_str(&m_ctrl.rule, m_torus.tile(),
-                            // range).c_str());
-                            messenger::add_msg(legacy::to_RLE_str(nullptr, m_torus.tile(), m_sel->to_range()));
+                            messenger::add_msg(legacy::to_RLE_str(add_rule ? &m_ctrl.rule : nullptr, m_torus.tile(),
+                                                                  m_sel->to_range()));
                         }
                     });
                     term("Cut", "X", ImGuiKey_X, [&] {
                         if (m_sel) {
-                            messenger::add_msg(legacy::to_RLE_str(nullptr, m_torus.tile(), m_sel->to_range()));
+                            messenger::add_msg(legacy::to_RLE_str(add_rule ? &m_ctrl.rule : nullptr, m_torus.tile(),
+                                                                  m_sel->to_range()));
                             legacy::clear_inside(m_torus.tile(), m_sel->to_range());
                             m_ctrl.mark_written();
                         }
