@@ -36,24 +36,53 @@ A lock is an array associated with a MAP rule, that marks some parts of the rule
 
 You can find a lot of interesting rules without "lock". However, some rules are unlikely discoverable by chance without this feature. Here is an example - an isotropic and self-complementary rule where gliders occur naturally:
 MAPARYSZxZtPVoUYRG2cMoGoxdsEtJst5ppcpLka9c/q58GKgMUKdi2sWmmEsm0t8kXOp+s8ZJ3edelQ0mXGbeXfw [/OI4QIQCgACAwBAAAAAQAIAAEMCLAAAAgIAAAAAAAACKAAAAgAKAgAAAAAAAAKAAgACAgAAAAACAAAAAAAAAAA]
-MAPARYTZxZsPVoQYRH2UMoGoxdkEtIst5p7coLka9c/r78CCgMUKdi+sSGmEsu0t9kXOp+s9ZB3efelQ8mXGTeXfw)";
+MAPARYTZxZsPVoQYRH2UMoGoxdkEtIst5p7coLka9c/r78CCgMUKdi+sSGmEsu0t9kXOp+s9ZB3efelQ8mXGTeXfw
 
-const char* const doc_intro =
-    R"(Subset recognition and selection
-(Example rule)
-You may have noticed that in the left plane, some buttons are lighted up with bright-green rings. This means the rule belongs to the subsets represented by them. You may know that the Game-of-Life rule is a totalistic rule (which is also isotropic rule). ...
-...
-If you click the "Recognize" button, these subsets are selected automatically...
-If you select no subsets, the default one is the universal set (which contains all MAP rules). There is no limit what you can do in the universal set. By selecting more subsets...
+You will learn about how to find rules like this in the "Lock and capture" section.)";
 
-Current rule: The rule shown in the right plane. At the top ... (about "sequence"/undo/redo)
+const char* const doc_workflow =
+    R"(---- The current rule
+The current rule is shown in the right plane. At the top ... (about "sequence"/undo/redo/lock/...)
 
-TODO: Operation precondition (contained/compatible etc)...
+---- Subset recognition and selection
 
-Rule-generation
-The program has 3 generation modes that covers most needs. All the 3 modes will skip locked groups, and will do nothing if there are no free groups.
+You may have noticed that in the left plane, some buttons are lighted up with bright-green rings. This means the rule belongs to the subsets represented by them. For example, the Game-of-Life rule is a totalistic rule (which is also isotropic rule). As a result, the second line (which represent native symmetry) and the first button in the third line are lighted up.
 
----- Integral mode (<00.. [dec/inc] 11..>)
+If you click the "Recognize" button, the subsets that the current rule belongs to are selected automatically...
+Or, you can select the subsets manually to ...
+
+(TODO: "working set"; rename "current" as "working" in edit_rule.cpp)
+By selecting these subsets the program is actually performing the intersection of them. The subsets that are bright blue are explicitly selected; the subsets that are marked dull-blue ... The subsets that are marked red ... Feel free to combine the subsets at will to get familiar with their relations.
+
+By default no subsets are selected, which means the universal set (which contains all MAP rules). There is no limit what you can do in the universal set, however, as there is no restrictions the outputs are also unlikely interesting. For example, ...
+
+---- Mask selection
+
+After selecting the subsets you are required to select a mask, which is an arbitrary rule ... based on which you can observe other rules (the current rule) and generate rules based on the mask...
+
+There are four modes that you can select, they are:
+1. Zero mask:
+....
+2. Identity mask:
+....
+3. Native mask...
+Is guaranteed to belong to the [working set]. It is calculated by the program ...
+... unless both Zero mask and Identity mask does not work.
+(Example when the native mask is necessary).
+4. Custom mask: which is an arbitrary rule you select to serve as a mask. It is a powerful tool to help find "nearby" rules...
+....
+
+The relation between a rule-lock and subset.
+1. contained.
+2. compatible.
+3. incompatible.
+
+For universal set ...
+
+---- Rule-generation
+There are 3 generation modes that cover most needs. All the 3 modes will skip locked groups, and will do nothing if there are no free groups.
+
+-- Integral mode (<00.. [dec/inc] 11..>)
 Treat the free groups as a sequence of 0/1 relative to the mask, and apply integral increment/decrement. With this mode you can iterate through all rules in a subset. It does not matter which mask is used (as long as it's valid) in this case.
 
 Example:
@@ -64,7 +93,7 @@ You can:
 2. "<00.." to set the masked sequence to "0...", which means the result is the same as the masking rule.
 3. "inc" until the sequence reached to the end (111...).
 
----- Permutative mode (<1.0. [prev/next] 0.1.>)
+-- Permutative mode (<1.0. [prev/next] 0.1.>)
 Treat the free groups as a sequence of 0/1 relative to the mask, and reshuffle (?permute) them without changing the distance to the mask. With this mode you can iterate through all rules that have the same distance to the masking rule.
 
 This is especially useful when combining with custom mask. You can check all rules that have distance = 1 to an existing rule.
@@ -73,21 +102,32 @@ This is especially useful when combining with custom mask. You can check all rul
 2. "inc" to increase the current rule by "1". The distance is now 1.
 3. "next"... until the "1" reach to the end. (... About key-binding)
 
----- Randomization.
+-- Randomization.
 Get an arbitrary rule that belongs to the selected subsets, and whose distance to the masking rule (including those that are locked) is exactly / around "C" as set in the program.
 (& Zero/Identity mask) ... Again, the masking rule can be the Custom rule ... which means if you have interesting rules you can do randomization with a small distance...
 
 For example, suppose the "Zero" mask belongs to the subset (which is true in most cases), then randomize with dist = ... (effect)
 
-(~ bind to undo/redo)
+Here is a useful tip: when doing randomize, you can bind the <- -> key to undo/redo and set a larger pace, then you can ...
 
 
 In a small subset, ...
 In a large subset...
-Starting from one of Zero or Identity, (or Native if necessary) mask, get randomized rules until you find interesting ones.
-Then you can try to find nearby rules with permutative mode/ randomization.
+Starting from one of Zero or Identity, (or Native if necessary) mask, get randomized rules until you find interesting ones. Then you can try to find nearby rules with permutative mode / randomization with small distance.
 
-Random-access edition
+In some subsets, sometimes you may find rules like this:
+(from rul33.txt; better example...)
+MAPA0wFEBBTV2EGZnFywDNkKEYRDigbKHiJ6DIklgrKDhYnSAit2JIckGwBtsuJBFMGAPAc5TPYilLBNImEJIhUoA
+However (... -> dist=1)
+MAPA0wFEBFTV2EGdnFywDNkKEYRDigbKHiJ6DIklgrKDhYnSAit2JIckGwBtsuJBFMGAPAc5TvYilLBtImEJIhUoA
+
+There is no need to stick to the original mask. You can switch to a new mask whenever you find a "better" rule. This way you are going to "wander" in the , with each important step "fixed" by the identity mask. This turns out to be able to help find a lot of interesting rules.
+...
+MAPA00FARBSVXAPZnFywDNmKEYRDigbKHqJ6GIkbgrKDhZnSAi93pIekGxBtsuJBFMGAPAc5THYSNLJNImEpAjUIA
+x = 6, y = 4
+4bob$6b$4obo$5bo!
+
+---- Random-access edition
 Each group is shown by one of the cases that belongs to it.
 
 By left-clicking the buttons you flip the values for each case in the group, so the result is actually independent of which mask you have selected / whether there exists locks in the group / or whether the current rule belongs to the subsets or even compatible.
@@ -101,17 +141,6 @@ Turn-off the clobbering bit.
 Lock some groups manually.
 ...
 
-Here is a very important tip. Sometimes you may find rules like this:
-(from rul33.txt; better example...)
-MAPA0wFEBBTV2EGZnFywDNkKEYRDigbKHiJ6DIklgrKDhYnSAit2JIckGwBtsuJBFMGAPAc5TPYilLBNImEJIhUoA
-However (... -> dist=1)
-MAPA0wFEBFTV2EGdnFywDNkKEYRDigbKHiJ6DIklgrKDhYnSAit2JIckGwBtsuJBFMGAPAc5TvYilLBtImEJIhUoA
-
-There is no need to stick to the original mask. You can switch to a new mask whenever you find a "better" rule.
-...
-MAPA00FARBSVXAPZnFywDNmKEYRDigbKHqJ6GIkbgrKDhZnSAi93pIekGxBtsuJBFMGAPAc5THYSNLJNImEpAjUIA
-x = 6, y = 4
-4bob$6b$4obo$5bo!
 
 --- The "lock" and capture
 The following "glider"-ish rule is apparently not found by chance. As you'd expect, there are ways to "reach" to rules like this in this program...
@@ -122,7 +151,7 @@ Below is the Game-of-life rule, with some additional information about glider.
 MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA [/OI4QIQCgACAwBAAAAAQAIAAEMCLAAAAgIAAAAAAAACKAAAAgAKAgAAAAAAAAKAAgACAgAAAAACAAAAAAAAAAA]
 MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA [//Z65r4SvEjQ4JCgABAQgIDRksSLAIwAwKDgAIDAwACKAIICqAKggICAAKCAAKAAiICoiKCIAACAIAAAIAAAAA]
 
---- Static constraints
+--- Static constraints / Mir
 ...)";
 
 const char* const doc_subsets =
@@ -202,6 +231,57 @@ MAP7ohmmYgAmWbuiGaZiACZZogAmWYAEWaIiACZZgARZoiIAJlmABFmiIgAmWYAEWaIABFmiBFmiAAAE
 
 )";
 
+const char* const doc_lock_and_capture = R"(...
+
+About how the lock is set for plain rules when reading from these documents...
+
+MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA [AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA]
+
+---- Pattern capture
+Below is a glider that travels "southwest". If you copy the following 3 lines and paste...
+x = 12, y = 15
+12b$12b$12b$12b$12b$12b$12b$4bo7b$3bo8b$3b3o6b$12b$12b$12b$
+12b$12b!
+
+(vs - ; the bounding-box is not enough for capture...)
+x = 3, y = 3
+bob$o2b$3o!
+
+By pressing 'P'... (about how "capture" works ...)
+As a result, you will get:
+MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA [/OI4QIQCgACAwBAAAAAQAIAAEMCLAAAAgIAAAAAAAACKAAAAgAKAgAAAAAAAAKAAgACAgAAAAACAAAAAAAAAAA]
+
+Selecting self-complementary and isotropic subset...
+(About dull-green ring and red ring (totalistic rule has dull green ring but does not work with self-complementary...))
+
+The "Zero" mask does not fit at this time (as it's not a self-complementary rule). As a result, select "Identity" mask...
+
+"Randomize"... though every rule satisfies the lock (which means given the same initial state the capture uses, the result will be the same) this does not mean the captured thing is easy to [emerge] naturally...
+
+Finally we find:
+MAPARcSZhehPEwRdxeuNABMzyBsF8BsoYg3RND/A80Xmz8DJhdMPwD03RPuesn8F8n7DM3/04oXEXfNw3oXmbcXfw
+
+It will be much easier to find similar rules based on this rule - you can set the rule as the mask ("Take current"), and set a low distance ... For example, ...
+MAPARcTZhegPEwRdxPuFCBIzyBmF8A8+4g3RMD7A+03nz8DBhNIPyD83RPuIMP8F5n7DO3714g3EXfNw/oXmTcXfw
+
+---- Lock-enhancement
+Let's go back to this lock.
+MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA [/OI4QIQCgACAwBAAAAAQAIAAEMCLAAAAgIAAAAAAAACKAAAAgAKAgAAAAAAAAKAAgACAgAAAAACAAAAAAAAAAA]
+
+If you "Enhance" the lock in the isotropic subset, you will get:
+MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA [//Z65r4SvEjQ4JCgABAQgIDRksSLAIwAwKDgAIDAwACKAIICqAKggICAAKCAAKAAiICoiKCIAACAIAAAIAAAAA]
+
+In the isotropic subset the two lock have the same effect - the transformation operations will skip any groups that have locked cases. When you switch to a "wider" subset, however...
+For example, if you clear the selected subsets (the largest set - the MAP ruleset itself) you will find the locked groups...
+Below are two rules randomly generated in the MAP set
+MAPABJSQAQAAgBgQBCghAIEAGAAUMEIAAAEAZIAEAJBEIFCAAAABCCAzQChEgEAAIAAQACCgICAkRCCAFISAoAIBA
+
+MAPARcTZhYBPMgVYRCgAAAAyXBAUsEIYIgCQIrwgIQCgQQCIAIUaEDikAmBGICCQJgBSYGugNgDKACJEABhAlIAAA
+
+---- Static constraints
+This is a feature similar to "Capture" to help find still-life based patterns...
+)";
+
 const char* const doc_atypical =
     R"(Typically you will explore rules that belong to several of the "well-defined" subsets. These subsets, however, take up just a small part of all MAP rules. With the help of "lock" feature it's possible to generate very strange rules that do not belong to any well-defined subsets.
 
@@ -238,10 +318,11 @@ struct docT {
     const char* text;
 };
 
-extern const docT docs[]{{"0. About this program", doc_about}, //
-                         {"1. Concepts", doc_concepts},        //
-                         {"2. Rule operations", doc_intro},    //
-                         {"3. Typical subsets", doc_subsets},  //
+extern const docT docs[]{{"0. About this program", doc_about},          //
+                         {"1. Concepts", doc_concepts},                 //
+                         {"2. Workflow", doc_workflow},                 //
+                         {"3. Typical subsets", doc_subsets},           //
+                         {"4. Lock and capture", doc_lock_and_capture}, //
                          {"4. Rules in the wild", doc_atypical}};
 
 extern const int doc_size = sizeof(docs) / sizeof(docT);
