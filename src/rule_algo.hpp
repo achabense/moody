@@ -385,7 +385,6 @@ namespace legacy {
         return std::ranges::none_of(group, [&lock](codeT code) { return lock[code]; });
     }
 
-    // TODO: explain why requiring subset.contains(mold.rule).
     inline moldT::lockT enhance_lock(const subsetT& subset, const moldT& mold) {
         assert(subset.contains(mold.rule));
 

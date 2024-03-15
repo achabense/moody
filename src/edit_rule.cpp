@@ -100,7 +100,7 @@ class subset_selector {
     struct termT {
         const char* const title;
         const legacy::subsetT* const set;
-        const char* const description = nullptr;
+        const char* const description = "TODO";
         bool selected = false;
         bool disabled = false; // current & set -> empty.
     };
@@ -155,8 +155,9 @@ public:
         terms_ignore.emplace_back("x", &ignore_x);
         terms_ignore.emplace_back("c", &ignore_c);
 
-        terms_misc.emplace_back("S(i)", &ignore_s_i, "0->0, 1->1 or 0->1, 1->0"); // TODO: better name...
-        terms_misc.emplace_back("Dual", &self_complementary);                     // TODO: better name...
+        // TODO: better name...
+        terms_misc.emplace_back("S(i)", &ignore_s_i, "0->0, 1->1 or 0->1, 1->0");
+        terms_misc.emplace_back("Dual", &self_complementary, "Self-complementary rules.");
         terms_misc.emplace_back("Hex", &ignore_hex);
         terms_misc.emplace_back("Von", &ignore_von);
 
@@ -215,7 +216,6 @@ public:
             }
         }
 
-        // TODO: tooltip...
         auto check = [&, id = 0, size = square_size()](termT& term) mutable {
             ImGui::PushID(id++);
             if (ImGui::InvisibleButton("Check", size) && !term.disabled) {
@@ -224,25 +224,22 @@ public:
             }
             ImGui::PopID();
 
-            // TODO: use helper::show_help instead.
             if (ImGui::BeginItemTooltip()) {
-                imgui_Str(term.description ? term.description : "TODO");
+                imgui_Str(term.description);
                 ImGui::EndTooltip();
             }
 
-            // TODO: refine...
-            // TODO: explain coloring scheme; redesign if necessary (especially ring col)
-            // TODO: find better color for "disabled"/incompatible etc... currently too ugly.
-            const ImU32 cen_col = term.selected                 ? IM_COL32(65, 150, 255, 255) // roughly _ButtonHovered
-                                  : term.set->includes(current) ? IM_COL32(25, 60, 100, 255)
-                                  : term.disabled               ? IM_COL32(120, 30, 0, 255)
-                                                                : IM_COL32_BLACK_TRANS;
-            const ImU32 ring_col = term.set->contains(mold.rule) ? IM_COL32(0, 255, 0, 255)
-                                   : compatible(*term.set, mold) ? IM_COL32(0, 100, 0, 255)
-                                                                 : IM_COL32(200, 45, 0, 255);
+            // TODO: better coloring scheme...
+            const ImU32 cent_col = term.selected                 ? IM_COL32(65, 150, 255, 255) // Roughly _ButtonHovered
+                                   : term.set->includes(current) ? IM_COL32(25, 60, 100, 255)  // Roughly _Button
+                                   : term.disabled               ? IM_COL32(120, 30, 0, 255)   // Red
+                                                                 : IM_COL32_BLACK_TRANS;
+            const ImU32 ring_col = term.set->contains(mold.rule) ? IM_COL32(0, 255, 0, 255)   // Light green
+                                   : compatible(*term.set, mold) ? IM_COL32(0, 100, 0, 255)   // Dull green
+                                                                 : IM_COL32(200, 45, 0, 255); // Red
 
             imgui_ItemRectFilled(IM_COL32_BLACK);
-            imgui_ItemRectFilled(cen_col, term.disabled ? ImVec2(5, 5) : ImVec2(4, 4));
+            imgui_ItemRectFilled(cent_col, term.disabled ? ImVec2(5, 5) : ImVec2(4, 4));
             imgui_ItemRect(ring_col);
             if (!term.disabled && ImGui::IsItemHovered()) {
                 imgui_ItemRectFilled(IM_COL32(255, 255, 255, 45));
@@ -272,8 +269,6 @@ public:
             };
 
             put_row("Ignore & Misc", [&] {
-                // TODO: slightly confusing; light color should represent "take-into-account" instead of
-                // "ignore" Is this solvable by applying specific coloring scheme?
                 ImGui::BeginGroup();
                 ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 2));
                 for (int l = 0; l < 3; ++l) {
@@ -330,9 +325,10 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
     char chr_0 = '0', chr_1 = '1';
     const legacy::maskT& mask = [&] {
         // TODO: finish...
-        const char* const about_mask = "About mask:\n"
-                                       "A mask is an arbitrary rule used to do XOR masking for other rules...\n"
-                                       "When the rule doesn't actually belong to the selected subsets ...";
+        const char* const about_mask =
+            "About mask:\n"
+            "A mask is an arbitrary rule used to do XOR masking for other rules...\n"
+            "The editions are available only when the mask belongs to the selected subsets .";
 
         // TODO: support rollbacking custom masks?
         static legacy::maskT mask_custom{{}};
@@ -399,9 +395,10 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
     // Disable all edit operations if !subset.contains(mask), including those that do not really need
     // the mask to be valid (for example, `trans_mirror`, which does not actually rely on subsets).
     if (!subset.contains(mask)) {
-        // TODO: add documentation for mask-selection; (then there can be "see ... for details")
+        // TODO: refine message...
         imgui_StrWrapped("This mask does not belong to the selected subsets. Consider trying other masks. "
-                         "(The \"Native\" mask is known to belong to the selected subsets and will always work.)");
+                         "(The \"Native\" mask is known to belong to the selected subsets and will always work.) "
+                         "For more details see the \"Workflow\" part in \"Documents\"");
         return std::nullopt;
     }
 
@@ -432,7 +429,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
     const auto scanlist = legacy::scan(par, mask, mold);
 
     // TODO: more filtering modes?
-    // Will not hide "impure" groups even when there are locks. TODO: add documentation...
+    // Will not hide "impure" groups even when there are locks.
     static bool hide_locked = false;
     {
         const int c_group = par.k();
@@ -509,7 +506,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
             imgui_Str("...");
 
             guarded_block(contained, [&] {
-                // TODO: enhance might be stricter than necessary...
                 if (ImGui::Button("Enhance")) {
                     return_lock(legacy::enhance_lock(subset, mold));
                 }
@@ -522,6 +518,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
             });
             ImGui::SameLine();
             ImGui::Checkbox("Hide locked groups", &hide_locked);
+            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+            imgui_StrTooltip("(!)", "The \"?TODO?\" groups will not be hidden even when there are locks.");
             ImGui::EndPopup();
         }
 
@@ -632,7 +630,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
             }
         });
         ImGui::PopStyleVar(1);
-        // TODO: better message...
         if (n == 0) {
             imgui_Str("No free groups");
         }
@@ -644,7 +641,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
 std::optional<legacy::moldT> static_constraints() {
     enum stateE { Any_background, O, I, O_background, I_background };
     const int r = 9;
-    static stateE board[r][r]{/*Any_background...*/};
+    static stateE board[r][r]{/* Any_background... */};
     static stateE state_lbutton = I;
     const stateE state_rbutton = Any_background;
     static const ImU32 cols[5]{IM_COL32(100, 100, 100, 255), //
