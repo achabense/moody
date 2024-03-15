@@ -251,8 +251,6 @@ public:
             m_ctrl.mark_written();
         };
 
-        // TODO: better be controlled by frame()?
-        ImGui::PushItemWidth(item_width);
 
         {
             // (Keeping in line with edit-rule's.)
@@ -272,6 +270,7 @@ public:
             }
         }
 
+        ImGui::PushItemWidth(item_width);
         ImGui::BeginGroup();
         {
             ImGui::Checkbox("Pause", &m_ctrl.pause);
@@ -333,12 +332,12 @@ public:
                 const float s = imgui_ItemInnerSpacingX();
                 const float w = (ImGui::CalcItemWidth() - s * 2 - ImGui::CalcTextSize("Resize").x -
                                  ImGui::GetStyle().FramePadding.x * 2) /
-                                2; // TODO: is floor/ceil needed?
-                ImGui::SetNextItemWidth(w);
+                                2;
+                ImGui::SetNextItemWidth(floor(w));
                 ImGui::InputTextWithHint("##Width", "width", input_width, std::size(input_width),
                                          ImGuiInputTextFlags_CallbackCharFilter, filter);
                 ImGui::SameLine(0, s);
-                ImGui::SetNextItemWidth(w);
+                ImGui::SetNextItemWidth(ceil(w));
                 ImGui::InputTextWithHint("##Height", "height", input_height, std::size(input_height),
                                          ImGuiInputTextFlags_CallbackCharFilter, filter);
                 ImGui::SameLine(0, s);
@@ -386,6 +385,7 @@ public:
             }
         }
         ImGui::EndGroup();
+        ImGui::PopItemWidth();
 
         ImGui::Separator();
 
@@ -500,8 +500,8 @@ public:
 
             if (m_sel && m_sel->active && !ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
                 m_sel->active = false;
-                // TODO: shrinking (bounding_box) has no size check like this. This is intentional.
-                // (to allow a single r-click to unselect the area.)
+                // Allow a single right-click to unselect the area.
+                // (Shrinking (`bounding_box`) has no size check like this. This is intentional.)
                 if (m_sel->width() * m_sel->height() <= 2) {
                     m_sel.reset();
                 }
@@ -694,8 +694,6 @@ public:
         if (paste || (m_sel && m_sel->active)) {
             temp_pause = true;
         }
-
-        ImGui::PopItemWidth();
 
         m_ctrl.run(m_torus, extra_step, temp_pause);
 

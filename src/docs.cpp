@@ -9,30 +9,36 @@ I hope this is impressive enough. It was picked from many randomized rules many 
 MAP7KV6wLHQiAHIPICBCAhlIqKAhAuKAFBoYmCFEAACIUzbAIAsAsCBJoAANhiIBEBSUICEMQiQFgRBgAJKgAA4gA)";
 
 const char* const doc_concepts =
-    R"(The program is based on several key concepts. They are subset, distance, mask and lock.
+    R"(The program is based on several key concepts. They are mask, subset, distance and lock.
 
 ------
-The "subset" in this program refers to a special type of subsets that can be defined as:
+TODO: whether to weaken this concept?
+As MAP rules are two-state rules, every rule can serve as an "XOR mask" to "measure" other rules.
+...
+
+------
+TODO: it's problematic to call these things "subset"... better name? category?
+The "subset" in this program refers to a special type of subsets of MAP rules that can be defined as:
 S = empty set or (R, P), where:
 1. R is a MAP rule that is designated to belong to S.
 2. P is a partition of all "cases".
-3. A MAP rule belongs to S iff XOR-masked by R, the masked values are the same in every group in P.
+3. A MAP rule belongs to S iff in each group the values are either all-same or all-different to R. (In other words, if XOR-masked by R, the masked values are the same in every group.)
 
-A lot of categories of rules (e.g. isotropic rules / totalistic rules / self-complementary rules etc) can be composed this way. And most importantly, it can be proven that the intersection of such subsets are of the same structure (empty set or (R', P')), so in the program you are free to combine any of the supported subsets as long as the result is not empty.
+As a result:
+If P has K groups, then there are 2^K rules in S.
+For any two rules in S, they have either all-same or all-different values in each group. (So actually, any rule in S can equally serve as the defining rule R.)
 
-It's also obvious that any rule in S can equally serve as the defining mask R.
-
+A lot of categories of rules (e.g. isotropic rules / totalistic rules / self-complementary rules etc) can be composed this way. And more importantly, it can be proven that the intersection of such subsets are of the same structure (empty set or (R', P')), so in the program you are free to combine any of the supported subsets as long as the result is not empty.
 ------
 If two rules belong to the same subset S = (R, P), then in every group of P their values are either all-same or all-different. As a result, it's natural to define the distance (in subset S) as the number of groups where the two rules have different values.
 
-For example, the following rules have distance = 1 from the Game-of-Life rule in the isotropic subset.
+For example, the following rules have distance = 1 to the Game-of-Life rule in the isotropic subset.
 MAPARYXbhZofOgWaH7oaIDogBZofuhogOiAaIDoAIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAAACAAIAAAAAAAA
 MAPARYXfhZofugWan7oaIDogBZofuhogOiAaIDogIgAgAAWaH7oeIDogGiA6ICAAIAAaMDogIAAgACAAIAAAAAAAA
 MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6YSAAIQAaIDogIAAgACAAIQAAAAAAA
 ------
 A lock is an array associated with a MAP rule, that marks some parts of the rule as contributor for something to happen.
-
-(TODO more explanations...)
+Essentially this defines another kind of subsets R[L] - a MAP rule "is compatible with" (belongs to) it iff the rule has the same value as R for any "locked" case.
 
 You can find a lot of interesting rules without "lock". However, some rules are unlikely discoverable by chance without this feature. Here is an example - an isotropic and self-complementary rule where gliders occur naturally:
 MAPARYSZxZtPVoUYRG2cMoGoxdsEtJst5ppcpLka9c/q58GKgMUKdi2sWmmEsm0t8kXOp+s8ZJ3edelQ0mXGbeXfw [/OI4QIQCgACAwBAAAAAQAIAAEMCLAAAAgIAAAAAAAACKAAAAgAKAgAAAAAAAAKAAgACAgAAAAACAAAAAAAAAAA]

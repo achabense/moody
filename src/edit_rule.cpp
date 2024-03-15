@@ -481,6 +481,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
             }
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
             if (button_with_shortcut("Randomize", ImGuiKey_Enter)) {
+                // TODO: bind to global undo/redo?
                 if (exact_mode) {
                     return_rule(legacy::randomize_c(subset, mask, mold, global_mt19937(), dist - c_locked_1));
                 } else {

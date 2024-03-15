@@ -12,6 +12,8 @@ The program also has an extension called "lock" to help generate specific rules.
 For now the program cannot save the rule to the file directly. However, it's easy to copy the rule to the clipboard: right-click the rule-string and that's done.
 The program is able to load all MAP rules from a file or from the clipboard. Rules are loaded on a per-line basis. There are no specific requirements for the file format.
 
+(TODO: forgot to mention RLE...)
+
 #### Examples found by this program
 (Rule with pics)
 

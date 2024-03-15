@@ -161,10 +161,8 @@ class sequence {
     }
 
 public:
-    // `label` should be either `label_prev` or `label_next`.
-    static void bind_to(const char* label) { //
-        bound_id = ImGui::GetID(label);
-    }
+    // `id` should be the same as one of prev/next button.
+    static void bind_to(ImGuiID id) { bound_id = id; }
 
     static void seq(const char* label_first, const char* label_prev, const char* label_next, const char* label_last,
                     const auto& act_first, const auto& act_prev, const auto& act_next, const auto& act_last,

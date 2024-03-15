@@ -335,7 +335,8 @@ public:
 
         if (ret) {
             assert(m_pos && *m_pos >= 0 && *m_pos < total);
-            sequence::bind_to("next");
+            // (Relying on `sequence::seq` to be in the same level in the id-stack.)
+            sequence::bind_to(ImGui::GetID("next"));
             out = m_rules[*m_pos];
         }
     }
