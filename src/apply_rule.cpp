@@ -251,7 +251,6 @@ public:
             m_ctrl.mark_written();
         };
 
-
         {
             // (Keeping in line with edit-rule's.)
             const float extra_w_sameline = ImGui::GetStyle().ItemSpacing.x * 1; // One SameLine...
