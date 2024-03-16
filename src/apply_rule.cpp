@@ -225,6 +225,7 @@ class runnerT {
 
 public:
     void apply_rule(const legacy::ruleT& rule) {
+        // TODO: whether to pause for one frame?
         if (m_ctrl.rule != rule) {
             m_ctrl.rule = rule;
             m_ctrl.anti_strobing = true;
@@ -242,13 +243,13 @@ public:
         assert(m_init.size == size_clamped(m_init.size));
         assert(screen_off.x == int(screen_off.x) && screen_off.y == int(screen_off.y));
 
-        // TODO: whether to set temp_pause for all editing operations?
+        // TODO: recheck and refine temp_pause logic...
         bool temp_pause = false;
         int extra_step = 0;
         auto restart = [&] {
-            temp_pause = true;
             m_torus.restart(m_init);
             m_ctrl.mark_written();
+            temp_pause = true;
         };
 
         {
@@ -319,8 +320,14 @@ public:
             torusT::initT init = m_init;
             int seed = init.seed;
             imgui_StepSliderInt("Init seed (0~99)", &seed, 0, 99);
+            if (ImGui::IsItemActive()) {
+                temp_pause = true;
+            }
             init.seed = seed;
             ImGui::SliderFloat("Init density (0~1)", &init.density, 0.0f, 1.0f, "%.2f", ImGuiSliderFlags_NoInput);
+            if (ImGui::IsItemActive()) {
+                temp_pause = true;
+            }
 
             {
                 // TODO: make object-local? what about fill_den? and especially, other_op...
@@ -394,7 +401,7 @@ public:
         // TODO: copy vs copy to clipboard; paste vs paste from clipboard? (don't want to pollute clipboard with small
         // rle strings...
 
-        const legacy::tileT::sizeT tile_size = m_torus.tile().size(); // TODO: which (vs init.size) is better?
+        const legacy::tileT::sizeT tile_size = m_torus.tile().size();
         const ImVec2 screen_size(tile_size.width * screen_zoom, tile_size.height * screen_zoom);
 
         if (ImGui::Button("Corner")) {
@@ -477,6 +484,7 @@ public:
                 refresh(screen, m_torus.tile());
                 if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
                     m_ctrl.mark_written();
+                    temp_pause = true;
                     paste.reset();
                 } else { // Restore.
                     legacy::blit<legacy::blitE::Copy>(m_torus.tile(), paste_beg, temp);
@@ -619,18 +627,21 @@ public:
                         if (m_sel) {
                             legacy::random_fill(m_torus.tile(), global_mt19937(), fill_den, m_sel->to_range());
                             m_ctrl.mark_written();
+                            temp_pause = true;
                         }
                     });
                     term("Clear inside", "backspace", ImGuiKey_Backspace, [&] {
                         if (m_sel) {
                             legacy::clear_inside(m_torus.tile(), m_sel->to_range());
                             m_ctrl.mark_written();
+                            temp_pause = true;
                         }
                     });
                     term("Clear outside", "0 (zero)", ImGuiKey_0, [&] {
                         if (m_sel) {
                             legacy::clear_outside(m_torus.tile(), m_sel->to_range());
                             m_ctrl.mark_written();
+                            temp_pause = true;
                         }
                     });
                     ImGui::Separator();
@@ -669,6 +680,7 @@ public:
                                                                   m_sel->to_range()));
                             legacy::clear_inside(m_torus.tile(), m_sel->to_range());
                             m_ctrl.mark_written();
+                            temp_pause = true;
                         }
                     });
                     term("Paste", "V", ImGuiKey_V, [&] {

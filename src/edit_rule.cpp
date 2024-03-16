@@ -203,7 +203,6 @@ public:
         update_current();
     }
 
-    // TODO: `mold` is the analysis target, rename and explain.
     const legacy::subsetT& select_subset(const legacy::moldT& mold) {
         {
             // https://github.com/ocornut/imgui/issues/6902
@@ -212,7 +211,7 @@ public:
             const float extra_w = ImGui::CalcTextSize("ClearRecognize").x + extra_w_sameline + extra_w_padding;
             ImGui::SeparatorTextEx(0, "Select subsets", nullptr, extra_w);
             ImGui::SameLine();
-            if (ImGui::Button("Clear")) { // TODO: is "Reset" more suitable?
+            if (ImGui::Button("Clear")) {
                 for_each_term([&](termT& t) { t.disabled = t.selected = false; });
                 update_current();
             }

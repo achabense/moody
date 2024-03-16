@@ -1,7 +1,5 @@
 #include "common.hpp"
 
-// TODO: (Must) add help-mode coverage.
-
 // TODO: improve recorder logic (especially `update`...)
 // Never empty.
 class recorderT {
