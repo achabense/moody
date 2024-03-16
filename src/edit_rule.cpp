@@ -142,14 +142,13 @@ class subset_selector {
 public:
     subset_selector() : current(legacy::subsetT::universal()) {
         using namespace legacy::_subsets;
-        // TODO: add descriptions...
+        // TODO: finish descriptions...
 
-        terms_ignore.emplace_back("q", &ignore_q);
+        terms_ignore.emplace_back("q", &ignore_q, "Rules that are \"independent of\" 'q'. That is ...");
         terms_ignore.emplace_back("w", &ignore_w);
         terms_ignore.emplace_back("e", &ignore_e);
         terms_ignore.emplace_back("a", &ignore_a);
-        terms_ignore.emplace_back("s", &ignore_s_z,
-                                  "0->1, 1->1 or 0->0, 1->0"); // TODO: whether to put in terms_ignore?
+        terms_ignore.emplace_back("s", &ignore_s_z, "0->1, 1->1 or 0->0, 1->0");
         terms_ignore.emplace_back("d", &ignore_d);
         terms_ignore.emplace_back("z", &ignore_z);
         terms_ignore.emplace_back("x", &ignore_x);
@@ -158,20 +157,28 @@ public:
         // TODO: better name...
         terms_misc.emplace_back("S(i)", &ignore_s_i, "0->0, 1->1 or 0->1, 1->0");
         terms_misc.emplace_back("Dual", &self_complementary, "Self-complementary rules.");
-        terms_misc.emplace_back("Hex", &ignore_hex);
-        terms_misc.emplace_back("Von", &ignore_von);
+        terms_misc.emplace_back("Hex", &ignore_hex, "Rules that emulate the hexagonal rules. ... TODO...");
+        terms_misc.emplace_back("Von", &ignore_von,
+                                "Rules in the Von-Neumann neighborhood. (The rules that are independent of q,e,z,c.)");
 
-        terms_native.emplace_back("All", &native_isotropic);
-        terms_native.emplace_back("|", &native_refl_wsx);
-        terms_native.emplace_back("-", &native_refl_asd);
-        terms_native.emplace_back("\\", &native_refl_qsc);
-        terms_native.emplace_back("/", &native_refl_esz);
-        terms_native.emplace_back("C2", &native_C2);
-        terms_native.emplace_back("C4", &native_C4);
+        // TODO: about isotropic von rules.
+        terms_native.emplace_back("All", &native_isotropic,
+                                  "Isotropic rules. (The rules that preserve all symmetries.)\n"
+                                  "This is actually the intersection of the following subsets in this line.",
+                                  true /* Selected */);
+        terms_native.emplace_back("|", &native_refl_wsx,
+                                  "Rules that preserve reflection symmetry (taking '|' as the axis).");
+        terms_native.emplace_back("-", &native_refl_asd, "Ditto, except that the reflection axis is `-`");
+        terms_native.emplace_back("\\", &native_refl_qsc, "Ditto, except that the reflection axis is `\\`");
+        terms_native.emplace_back("/", &native_refl_esz, "Ditto, except that the reflection axis is `/`");
+        terms_native.emplace_back("C2", &native_C2, "C2 symmetry.");
+        terms_native.emplace_back("C4", &native_C4, "C4 symmetry. Notice this is a strict subset of C2.");
 
-        terms_totalistic.emplace_back("Nat", &native_tot_exc_s);
+        terms_totalistic.emplace_back(
+            "Nat", &native_tot_exc_s,
+            "(outer-) Totalistic rules (where the B/S notation applies and where the Game-of-Life rule is defined.)");
         terms_totalistic.emplace_back("Nat(+s)", &native_tot_inc_s);
-        terms_totalistic.emplace_back("Hex", &hex_tot_exc_s);
+        terms_totalistic.emplace_back("Hex", &hex_tot_exc_s, "Totalistic hexagonal rules.");
         terms_totalistic.emplace_back("Hex(+s)", &hex_tot_inc_s);
         terms_totalistic.emplace_back("Von", &von_tot_exc_s);
         terms_totalistic.emplace_back("Von(+s)", &von_tot_inc_s);
@@ -179,16 +186,19 @@ public:
         // q w -    q w
         // a s d ~ a s d
         // - x c    x c"
-        terms_hex.emplace_back("All", &hex_isotropic);
-        terms_hex.emplace_back("a-d", &hex_refl_asd);
+        terms_hex.emplace_back("All", &hex_isotropic,
+                               "Isotropic hexagonal rules. (The intersection of the following subsets in this line.)");
+        terms_hex.emplace_back("a-d", &hex_refl_asd,
+                               "Hexagonal rules that preserve reflection symmetry (taking the axis from 'a' to 'd') "
+                               "... TODO, explain the labels..."); // ...
         terms_hex.emplace_back("q-c", &hex_refl_qsc);
         terms_hex.emplace_back("w-x", &hex_refl_wsx);
         terms_hex.emplace_back("a|q", &hex_refl_aq);
         terms_hex.emplace_back("q|w", &hex_refl_qw);
         terms_hex.emplace_back("w|d", &hex_refl_wd);
-        terms_hex.emplace_back("C2", &hex_C2);
-        terms_hex.emplace_back("C3", &hex_C3);
-        terms_hex.emplace_back("C6", &hex_C6);
+        terms_hex.emplace_back("C2", &hex_C2, "... Notice this is a subset of native C2.");
+        terms_hex.emplace_back("C3", &hex_C3, "C3 symmetry.");
+        terms_hex.emplace_back("C6", &hex_C6, "C6 symmetry. Notice this is a subset of both C2 and C3.");
 
         update_current();
     }
@@ -224,8 +234,16 @@ public:
             }
             ImGui::PopID();
 
+            // TODO: or IsItemHovered() && IsMouseDown(ImGuiMouseButton_Right)?
             if (ImGui::BeginItemTooltip()) {
+                ImGui::PushTextWrapPos(wrap_len());
+                // TODO: add a "verbose-message mode"?
+                if (term.disabled) {
+                    imgui_Str("(This is not selectable as the result will be an empty set)");
+                    ImGui::Separator();
+                }
                 imgui_Str(term.description);
+                ImGui::PopTextWrapPos();
                 ImGui::EndTooltip();
             }
 
@@ -499,23 +517,23 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
             }
         });
         ImGui::SameLine();
-        // TODO: this is hiding "clear lock" so it's less obvious what to do when !compatible...
-        ImGui::Button("Locks");
+        guarded_block(true /* Unconditional */, [&] {
+            if (ImGui::Button("Clear lock")) {
+                return_lock({});
+            }
+        });
+        ImGui::SameLine();
+        ImGui::Button("...");
         if (ImGui::BeginPopupContextItem(nullptr, ImGuiPopupFlags_MouseButtonLeft)) {
-            // TODO: say something...
-            imgui_Str("...");
-
             guarded_block(contained, [&] {
-                if (ImGui::Button("Enhance")) {
+                if (ImGui::Button("Enhance lock")) {
                     return_lock(legacy::enhance_lock(subset, mold));
                 }
             });
-            ImGui::SameLine();
-            guarded_block(true /* Unconditional */, [&] {
-                if (ImGui::Button("Clear")) {
-                    return_lock({});
-                }
-            });
+            if (!contained) {
+                ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                imgui_StrTooltip("(?)", "This requires the current rule to belong to the selected subsets.");
+            }
             ImGui::SameLine();
             ImGui::Checkbox("Hide locked groups", &hide_locked);
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());

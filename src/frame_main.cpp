@@ -126,7 +126,7 @@ void frame_main(const code_icons& icons, screenT& screen) {
         }
 #ifndef NDEBUG
         ImGui::SameLine();
-        ImGui::Text("  (%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
+        ImGui::Text("  (Debug mode) (%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
 #endif // !NDEBUG
 
         {

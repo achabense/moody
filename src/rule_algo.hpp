@@ -371,15 +371,9 @@ namespace legacy {
         return res;
     }
 
-    using lock_pred = bool (*)(const moldT::lockT&, const groupT&);
-
     inline bool any_locked(const moldT::lockT& lock, const groupT& group) {
         return std::ranges::any_of(group, [&lock](codeT code) { return lock[code]; });
     }
-
-    // inline bool all_locked(const moldT::lockT& lock, const groupT& group) {
-    //     return std::ranges::all_of(group, [&lock](codeT code) { return lock[code]; });
-    // }
 
     inline bool none_locked(const moldT::lockT& lock, const groupT& group) {
         return std::ranges::none_of(group, [&lock](codeT code) { return lock[code]; });
@@ -399,97 +393,63 @@ namespace legacy {
         return lock;
     }
 
-    namespace _misc {
-        // Firstly get rule = approximate(subset, mold), then transform the rule to another one:
-        // 1. The out-of-channel groups are not affected.
-        // 2. The in-channel groups are listed as a sequence of values (relative to `mask`) and re-assigned by `fn`.
-        inline ruleT transform(const subsetT& subset, const maskT& mask, const moldT& mold, lock_pred channel,
-                               const std::invocable<bool*, bool*> auto& fn) {
-            assert(subset.contains(mask));
-            assert(compatible(subset, mold));
-
-            const partitionT& par = subset.get_par();
-
-            ruleT_masked r = mask ^ approximate(subset, mold);
-
-            // `seq` is not a codeT::map_to<bool>.
-            assert(par.k() <= 512);
-            std::array<bool, 512> seq{};
-            int z = 0;
-            par.for_each_group([&](const groupT& group) {
-                if (channel(mold.lock, group)) {
-                    seq[z] = r[group[0]];
-                    ++z;
-                }
-            });
-
-            fn(seq.data(), seq.data() + z);
-
-            z = 0;
-            par.for_each_group([&](const groupT& group) {
-                if (channel(mold.lock, group)) {
-                    for (codeT code : group) {
-                        r[code] = seq[z];
-                    }
-                    ++z;
-                }
-            });
-
-            const ruleT res = mask ^ r;
-            assert(subset.contains(res) && mold.compatible(res));
-            return res;
-        }
-
-        inline ruleT randomize_c(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand,
-                                 int count, lock_pred channel) {
-            return transform(subset, mask, mold, channel, [&rand, count](bool* begin, bool* end) {
-                int c = std::clamp(count, 0, int(end - begin));
-                std::fill(begin, end, 0);
-                std::fill_n(begin, c, 1);
-                std::shuffle(begin, end, rand);
-            });
-        }
-
-        inline ruleT randomize_p(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand,
-                                 double p, lock_pred channel) {
-            return transform(subset, mask, mold, channel, [&rand, p](bool* begin, bool* end) {
-                std::bernoulli_distribution dist(std::clamp(p, 0.0, 1.0));
-                std::generate(begin, end, [&] { return dist(rand); });
-            });
-        }
-    } // namespace _misc
-
-    // Do transformation among the free groups.
+    // Firstly get rule = approximate(subset, mold), then transform the rule to another one:
+    // 1. The locked groups are not affected.
+    // 2. The free groups are listed as a sequence of values (relative to `mask`) and re-assigned by `fn`.
     inline ruleT transform(const subsetT& subset, const maskT& mask, const moldT& mold,
                            const std::invocable<bool*, bool*> auto& fn) {
-        return _misc::transform(subset, mask, mold, none_locked, fn);
+        assert(subset.contains(mask));
+        assert(compatible(subset, mold));
+
+        const partitionT& par = subset.get_par();
+
+        ruleT_masked r = mask ^ approximate(subset, mold);
+
+        // `seq` is not a codeT::map_to<bool>.
+        assert(par.k() <= 512);
+        std::array<bool, 512> seq{};
+        int z = 0;
+        par.for_each_group([&](const groupT& group) {
+            if (none_locked(mold.lock, group)) {
+                seq[z] = r[group[0]];
+                ++z;
+            }
+        });
+
+        fn(seq.data(), seq.data() + z);
+
+        z = 0;
+        par.for_each_group([&](const groupT& group) {
+            if (none_locked(mold.lock, group)) {
+                for (codeT code : group) {
+                    r[code] = seq[z];
+                }
+                ++z;
+            }
+        });
+
+        const ruleT res = mask ^ r;
+        assert(subset.contains(res) && mold.compatible(res));
+        return res;
     }
 
     inline ruleT randomize_c(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand,
                              int count) {
-        return _misc::randomize_c(subset, mask, mold, rand, count, none_locked);
+        return transform(subset, mask, mold, [&rand, count](bool* begin, bool* end) {
+            int c = std::clamp(count, 0, int(end - begin));
+            std::fill(begin, end, 0);
+            std::fill_n(begin, c, 1);
+            std::shuffle(begin, end, rand);
+        });
     }
 
     inline ruleT randomize_p(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand,
                              double p) {
-        return _misc::randomize_p(subset, mask, mold, rand, p, none_locked);
+        return transform(subset, mask, mold, [&rand, p](bool* begin, bool* end) {
+            std::bernoulli_distribution dist(std::clamp(p, 0.0, 1.0));
+            std::generate(begin, end, [&] { return dist(rand); });
+        });
     }
-
-#if 0
-    // Sometimes it will be useful to randomize both sides.
-    // (For example, to work with `static_constraints` to get "partially stable" structures.)
-    inline ruleT randomize_c2(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand,
-                              int count_free, int count_locked = 0) {
-        const ruleT rule = _misc::randomize_c(subset, mask, mold, rand, count_free, none_locked);
-        return _misc::randomize_c(subset, mask, {rule, mold.lock}, rand, count_locked, any_locked);
-    }
-
-    inline ruleT randomize_p2(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand,
-                              double p_free, double p_locked = 0.0) {
-        const ruleT rule = _misc::randomize_p(subset, mask, mold, rand, p_free, none_locked);
-        return _misc::randomize_p(subset, mask, {rule, mold.lock}, rand, p_locked, any_locked);
-    }
-#endif
 
     // Integral.
     struct seq_int {
