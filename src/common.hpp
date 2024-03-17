@@ -88,7 +88,9 @@ bool file_nav_add_special_path(const char* u8path, const char* title);
 void frame_main(const code_icons& icons, screenT& screen);
 
 // Managed by `frame_main`.
-std::optional<legacy::extrT::valT> load_rule();
+std::optional<legacy::extrT::valT> load_file();
+std::optional<legacy::extrT::valT> load_clipboard();
+std::optional<legacy::extrT::valT> load_doc();
 std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_icons& icons);
 std::optional<legacy::moldT> static_constraints();
 std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, screenT& screen);

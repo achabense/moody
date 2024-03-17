@@ -468,24 +468,21 @@ static void load_rule_from_memory(std::optional<legacy::extrT::valT>& out) {
     }
 }
 
-std::optional<legacy::extrT::valT> load_rule() {
+// The `load_rule_from_xx` functions are static to allow for integration.
+std::optional<legacy::extrT::valT> load_file() {
     std::optional<legacy::extrT::valT> out = std::nullopt;
+    load_rule_from_file(out);
+    return out;
+}
 
-    if (ImGui::BeginTabBar("Tabs")) {
-        if (ImGui::BeginTabItem("Open file")) {
-            load_rule_from_file(out);
-            ImGui::EndTabItem();
-        }
-        if (ImGui::BeginTabItem("Clipboard")) {
-            load_rule_from_clipboard(out);
-            ImGui::EndTabItem();
-        }
-        if (ImGui::BeginTabItem("Documents")) {
-            load_rule_from_memory(out);
-            ImGui::EndTabItem();
-        }
-        ImGui::EndTabBar();
-    }
+std::optional<legacy::extrT::valT> load_clipboard() {
+    std::optional<legacy::extrT::valT> out = std::nullopt;
+    load_rule_from_clipboard(out);
+    return out;
+}
 
+std::optional<legacy::extrT::valT> load_doc() {
+    std::optional<legacy::extrT::valT> out = std::nullopt;
+    load_rule_from_memory(out);
     return out;
 }

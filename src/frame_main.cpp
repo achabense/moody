@@ -77,20 +77,25 @@ void frame_main(const code_icons& icons, screenT& screen) {
     legacy::moldT current = recorder.current();
     bool update = false;
 
-    static bool show_load = true;
+    static bool show_file = false;
+    static bool show_clipboard = false;
+    static bool show_doc = true;
     static bool show_static = false;
 
-    if (show_load) {
-        // TODO: which is responsible for setting Size(Constraints)? frame_main or load_rule?
-        ImGui::SetNextWindowSize({600, 400}, ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSizeConstraints(ImVec2(400, 300), ImVec2(FLT_MAX, FLT_MAX));
-        if (auto window = imgui_Window("Load rule", &show_load, ImGuiWindowFlags_NoCollapse)) {
-            if (auto out = load_rule()) {
-                assign_val(current, *out);
-                update = true;
+    auto load_rule = [&](bool& flag, const char* title, std::optional<legacy::extrT::valT> (*load_fn)()) {
+        ImGui::Checkbox(title, &flag);
+        if (flag) {
+            ImGui::SetNextWindowSize({600, 400}, ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowSizeConstraints(ImVec2(400, 300), ImVec2(FLT_MAX, FLT_MAX));
+            if (auto window = imgui_Window(title, &flag, ImGuiWindowFlags_NoCollapse)) {
+                if (auto out = load_fn()) {
+                    assign_val(current, *out);
+                    update = true;
+                }
             }
         }
-    }
+    };
+
     if (show_static) {
         if (auto window = imgui_Window("Static constraints", &show_static,
                                        ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse)) {
@@ -108,8 +113,13 @@ void frame_main(const code_icons& icons, screenT& screen) {
     ImGui::SetNextWindowPos(viewport->WorkPos);
     ImGui::SetNextWindowSize(viewport->WorkSize);
     if (auto window = imgui_Window("Main", nullptr, flags)) {
-        ImGui::Checkbox("Load", &show_load);
+        load_rule(show_file, "Load file", load_file);
         ImGui::SameLine();
+        load_rule(show_clipboard, "Clipboard", load_clipboard);
+        ImGui::SameLine();
+        load_rule(show_doc, "Documents", load_doc);
+
+        ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
         ImGui::Checkbox("Static", &show_static);
         ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
         sequence::seq(

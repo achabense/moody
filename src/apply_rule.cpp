@@ -71,16 +71,28 @@ static void capture_open(const legacy::tileT& source, legacy::tileT::rangeT rang
 }
 #endif
 
+class densityT {
+    int m_dens; // ∈ [0, 100], /= 100 to serve as density.
+public:
+    densityT(double density) { m_dens = std::clamp(density, 0.0, 1.0) * 100; }
+
+    double get() const { return m_dens / 100.0; }
+    void step_slide(const char* label) {
+        imgui_StepSliderInt(label, &m_dens, 0, 100, std::format("{:.2f}", m_dens / 100.0).c_str());
+    }
+
+    friend bool operator==(const densityT&, const densityT&) = default;
+};
+
 class torusT {
     legacy::tileT m_tile, m_temp;
     int m_gen;
 
 public:
-    // Using float (instead of double) as there is only ImGui::SliderFloat.
     struct initT {
         legacy::tileT::sizeT size;
         uint32_t seed;
-        float density; // ∈ [0.0f, 1.0f]
+        densityT density;
 
         friend bool operator==(const initT&, const initT&) = default;
     };
@@ -96,7 +108,7 @@ public:
         m_temp.resize(init.size);
 
         std::mt19937 rand(init.seed);
-        legacy::random_fill(m_tile, rand, init.density);
+        legacy::random_fill(m_tile, rand, init.density.get());
 
         m_gen = 0;
     }
@@ -169,8 +181,8 @@ class runnerT {
             return pace;
         }
 
-        static constexpr int gap_unit = 50; // ms.
-        static constexpr int gap_min = 0, gap_max = 10;
+        static constexpr int gap_unit = 25; // ms.
+        static constexpr int gap_min = 0, gap_max = 20;
         int gap = 0;
 
         bool pause = false;
@@ -319,12 +331,12 @@ public:
         {
             torusT::initT init = m_init;
             int seed = init.seed;
-            imgui_StepSliderInt("Init seed (0~99)", &seed, 0, 99);
+            imgui_StepSliderInt("Init seed (0~49)", &seed, 0, 49);
             if (ImGui::IsItemActive()) {
                 temp_pause = true;
             }
             init.seed = seed;
-            ImGui::SliderFloat("Init density (0~1)", &init.density, 0.0f, 1.0f, "%.2f", ImGuiSliderFlags_NoInput);
+            init.density.step_slide("Init density (0~1)");
             if (ImGui::IsItemActive()) {
                 temp_pause = true;
             }
@@ -584,7 +596,7 @@ public:
             }
 
             // TODO: better keyboard ctrl...
-            static float fill_den = 0.5;
+            static densityT fill_den = 0.5;
             static bool add_rule = false;
             if (other_op) {
                 if (auto window = imgui_Window("Operations", &other_op,
@@ -622,10 +634,10 @@ public:
                         }
                     };
 
-                    ImGui::SliderFloat("Fill density", &fill_den, 0.0f, 1.0f, "%.2f", ImGuiSliderFlags_NoInput);
+                    fill_den.step_slide("Fill density");
                     term("Random fill", "=", ImGuiKey_Equal, [&] {
                         if (m_sel) {
-                            legacy::random_fill(m_torus.tile(), global_mt19937(), fill_den, m_sel->to_range());
+                            legacy::random_fill(m_torus.tile(), global_mt19937(), fill_den.get(), m_sel->to_range());
                             m_ctrl.mark_written();
                             temp_pause = true;
                         }

@@ -329,6 +329,6 @@ extern const docT docs[]{{"0. About this program", doc_about},          //
                          {"2. Workflow", doc_workflow},                 //
                          {"3. Typical subsets", doc_subsets},           //
                          {"4. Lock and capture", doc_lock_and_capture}, //
-                         {"4. Rules in the wild", doc_atypical}};
+                         {"5. Rules in the wild", doc_atypical}};
 
 extern const int doc_size = sizeof(docs) / sizeof(docT);
