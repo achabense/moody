@@ -248,6 +248,7 @@ public:
     }
 
     // TODO: horribly written...
+    // TODO: simplify control logics if possible...
     std::optional<legacy::moldT::lockT> display(screenT& screen) {
         std::optional<legacy::moldT::lockT> out = std::nullopt;
 
@@ -408,10 +409,6 @@ public:
         ImGui::Separator();
 
         // TODO: set pattern as init state? what if size is already changed?
-        // TODO: specify mouse-dragging behavior (especially, no-op must be an option)
-        // TODO: support drawing as a dragging behavior if easy.
-        // TODO: copy vs copy to clipboard; paste vs paste from clipboard? (don't want to pollute clipboard with small
-        // rle strings...
 
         const legacy::tileT::sizeT tile_size = m_torus.tile().size();
         const ImVec2 screen_size(tile_size.width * screen_zoom, tile_size.height * screen_zoom);
@@ -449,19 +446,25 @@ public:
 
         {
             // (Values of GetContentRegionAvail() can be negative...)
-            ImGui::InvisibleButton("Canvas", ImMax(min_canvas_size, ImGui::GetContentRegionAvail()));
+            ImGui::InvisibleButton("Canvas", ImMax(min_canvas_size, ImGui::GetContentRegionAvail()),
+                                   ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
             const ImVec2 canvas_min = ImGui::GetItemRectMin();
             const ImVec2 canvas_max = ImGui::GetItemRectMax();
             const ImVec2 canvas_size = ImGui::GetItemRectSize();
             last_known_canvas_size = canvas_size;
 
-            if (ImGui::IsItemActive()) {
+            const bool active = ImGui::IsItemActive();
+            const bool hovered = ImGui::IsItemHovered();
+            const bool l_down = ImGui::IsMouseDown(ImGuiMouseButton_Left);
+            const bool r_down = ImGui::IsMouseDown(ImGuiMouseButton_Right);
+
+            if (active) {
                 temp_pause = true;
             }
-            if (ImGui::IsItemHovered() && ImGui::IsItemActive()) {
+            if (active && hovered && l_down || (paste && r_down)) {
                 // Some logics rely on this to be done before rendering.
                 const ImGuiIO& io = ImGui::GetIO();
-                if (io.KeyCtrl && screen_zoom == 1) {
+                if (!r_down && io.KeyCtrl && screen_zoom == 1) {
                     // (This does not need `mark_written`.)
                     m_torus.rotate(io.MouseDelta.x, io.MouseDelta.y);
                 } else {
@@ -515,7 +518,7 @@ public:
             }
             drawlist->PopClipRect();
 
-            if (m_sel && m_sel->active && !ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+            if (m_sel && m_sel->active && !r_down) {
                 m_sel->active = false;
                 // Allow a single right-click to unselect the area.
                 // (Shrinking (`bounding_box`) has no size check like this. This is intentional.)
@@ -524,7 +527,7 @@ public:
                 }
             }
 
-            if (ImGui::IsItemHovered()) {
+            if (hovered) {
                 assert(ImGui::IsMousePosValid());
                 // This will work well even if outside of the image.
                 const ImVec2 mouse_pos = ImGui::GetIO().MousePos;
@@ -532,8 +535,7 @@ public:
                 const int celx = floor(cell_pos_raw.x);
                 const int cely = floor(cell_pos_raw.y);
 
-                if (screen_zoom == 1 && !paste && !ImGui::IsMouseDown(ImGuiMouseButton_Right) &&
-                    !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                if (screen_zoom == 1 && !paste && !active) {
                     if (celx >= -10 && celx < tile_size.width + 10 && cely >= -10 && cely < tile_size.height + 10) {
                         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
                         if (ImGui::BeginItemTooltip()) {
@@ -552,19 +554,19 @@ public:
                     }
                 }
 
-                if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-                    const legacy::tileT::posT pos{.x = std::clamp(celx, 0, tile_size.width - 1),
-                                                  .y = std::clamp(cely, 0, tile_size.height - 1)};
-                    m_sel = {.active = true, .beg = pos, .end = pos};
-                } else if (m_sel && m_sel->active && ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-                    m_sel->end.x = std::clamp(celx, 0, tile_size.width - 1);
-                    m_sel->end.y = std::clamp(cely, 0, tile_size.height - 1);
-                }
-
                 if (paste) {
                     assert(paste->width() <= tile_size.width && paste->height() <= tile_size.height);
                     paste_beg.x = std::clamp(celx - paste->width() / 2, 0, tile_size.width - paste->width());
                     paste_beg.y = std::clamp(cely - paste->height() / 2, 0, tile_size.height - paste->height());
+                } else {
+                    if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+                        const legacy::tileT::posT pos{.x = std::clamp(celx, 0, tile_size.width - 1),
+                                                      .y = std::clamp(cely, 0, tile_size.height - 1)};
+                        m_sel = {.active = true, .beg = pos, .end = pos};
+                    } else if (m_sel && m_sel->active && r_down) {
+                        m_sel->end.x = std::clamp(celx, 0, tile_size.width - 1);
+                        m_sel->end.y = std::clamp(cely, 0, tile_size.height - 1);
+                    }
                 }
 
                 if (imgui_MouseScrolling()) {
@@ -586,6 +588,11 @@ public:
             if (other_op) {
                 if (auto window = imgui_Window("Operations", &other_op,
                                                ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse)) {
+                    // (Shadowing `::imgui_KeyPressed`...)
+                    auto imgui_KeyPressed = [active](ImGuiKey key, bool repeat) {
+                        return (active || !ImGui::GetIO().WantCaptureKeyboard) && ImGui::IsKeyPressed(key, repeat);
+                    };
+
                     if (imgui_KeyPressed(ImGuiKey_1, true)) {
                         m_ctrl.gap = std::max(m_ctrl.gap_min, m_ctrl.gap - 1);
                     } else if (imgui_KeyPressed(ImGuiKey_2, true)) {
@@ -609,8 +616,8 @@ public:
                     imgui_Str("Other shortcuts: 1, 2, 3, 4, Space, M, R");
                     ImGui::Separator();
 
-                    auto term = [any_called = false](const char* label, const char* shortcut, ImGuiKey key,
-                                                     const auto& op) mutable {
+                    auto term = [any_called = false, &imgui_KeyPressed](const char* label, const char* shortcut,
+                                                                        ImGuiKey key, const auto& op) mutable {
                         if (ImGui::MenuItem(label, shortcut) || imgui_KeyPressed(key, false)) {
                             if (!any_called) {
                                 any_called = true;
@@ -699,7 +706,7 @@ public:
             }
         }
 
-        if (paste || (m_sel && m_sel->active)) {
+        if (paste) {
             temp_pause = true;
         }
 
