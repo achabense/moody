@@ -448,10 +448,8 @@ public:
         }
 
         {
-            ImGui::InvisibleButton("Canvas", [] {
-                // Values of GetContentRegionAvail() can be negative...
-                return ImMax(min_canvas_size, ImGui::GetContentRegionAvail());
-            }());
+            // (Values of GetContentRegionAvail() can be negative...)
+            ImGui::InvisibleButton("Canvas", ImMax(min_canvas_size, ImGui::GetContentRegionAvail()));
             const ImVec2 canvas_min = ImGui::GetItemRectMin();
             const ImVec2 canvas_max = ImGui::GetItemRectMax();
             const ImVec2 canvas_size = ImGui::GetItemRectSize();
@@ -541,26 +539,13 @@ public:
                         if (ImGui::BeginItemTooltip()) {
                             const int w = std::min(tile_size.width, 40);
                             const int h = std::min(tile_size.height, 40);
+                            const legacy::tileT::posT min = {.x = std::clamp(celx - w / 2, 0, tile_size.width - w),
+                                                             .y = std::clamp(cely - h / 2, 0, tile_size.height - h)};
+                            const legacy::tileT::posT max = {.x = min.x + w, .y = min.y + h};
 
-                            int minx = celx - w / 2, miny = cely - h / 2;
-                            int maxx = celx + (w - w / 2), maxy = cely + (h - h / 2);
-                            if (minx < 0) {
-                                minx = 0, maxx = w;
-                            }
-                            if (miny < 0) {
-                                miny = 0, maxy = h;
-                            }
-                            if (maxx > tile_size.width) {
-                                minx = tile_size.width - w, maxx = tile_size.width;
-                            }
-                            if (maxy > tile_size.height) {
-                                miny = tile_size.height - h, maxy = tile_size.height;
-                            }
-
-                            assert(w == maxx - minx && h == maxy - miny);
                             ImGui::Image(screen.texture(), ImVec2(w * 4, h * 4),
-                                         {(float)minx / tile_size.width, (float)miny / tile_size.height},
-                                         {(float)maxx / tile_size.width, (float)maxy / tile_size.height});
+                                         {(float)min.x / tile_size.width, (float)min.y / tile_size.height},
+                                         {(float)max.x / tile_size.width, (float)max.y / tile_size.height});
                             ImGui::EndTooltip();
                         }
                         ImGui::PopStyleVar();
@@ -578,8 +563,8 @@ public:
 
                 if (paste) {
                     assert(paste->width() <= tile_size.width && paste->height() <= tile_size.height);
-                    paste_beg.x = std::clamp(celx, 0, tile_size.width - paste->width());
-                    paste_beg.y = std::clamp(cely, 0, tile_size.height - paste->height());
+                    paste_beg.x = std::clamp(celx - paste->width() / 2, 0, tile_size.width - paste->width());
+                    paste_beg.y = std::clamp(cely - paste->height() / 2, 0, tile_size.height - paste->height());
                 }
 
                 if (imgui_MouseScrolling()) {
