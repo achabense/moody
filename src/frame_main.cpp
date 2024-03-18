@@ -122,6 +122,8 @@ void frame_main(const code_icons& icons, screenT& screen) {
         ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
         ImGui::Checkbox("Static", &show_static);
         ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
+        const ImGuiID id_prev =
+            ImGui::GetID("prev"); // For `sequence::bind_to` (when the rule is gotten by randomization.)
         sequence::seq(
             "<|", "prev", "next", "|>", //
             [&] { recorder.set_first(); }, [&] { recorder.set_prev(); }, [&] { recorder.set_next(); },
@@ -161,9 +163,13 @@ void frame_main(const code_icons& icons, screenT& screen) {
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             if (auto child = imgui_ChildWindow("Edit", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
-                if (auto out = edit_rule(current, icons)) {
+                bool randomized = false;
+                if (auto out = edit_rule(current, icons, randomized)) {
                     current = *out;
                     update = true;
+                }
+                if (randomized) {
+                    sequence::bind_to(id_prev);
                 }
             }
             ImGui::TableNextColumn();

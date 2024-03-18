@@ -91,7 +91,8 @@ void frame_main(const code_icons& icons, screenT& screen);
 std::optional<legacy::extrT::valT> load_file();
 std::optional<legacy::extrT::valT> load_clipboard();
 std::optional<legacy::extrT::valT> load_doc();
-std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_icons& icons);
+// (`randomized` is a workaround to allow for binding to undo/redo when the rule is gotten by randomization.)
+std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_icons& icons, bool& randomized);
 std::optional<legacy::moldT> static_constraints();
 std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, screenT& screen);
 

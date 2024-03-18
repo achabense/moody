@@ -424,7 +424,7 @@ public:
         }
         ImGui::SameLine();
         static bool other_op = true;
-        ImGui::Checkbox("Other operations", &other_op);
+        ImGui::Checkbox("Range operations", &other_op);
         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
         imgui_StrTooltip("(!)", "The keyboard shortcuts are available only when the window is open.");
 
@@ -585,7 +585,7 @@ public:
             static densityT fill_den = 0.5;
             static bool add_rule = false;
             if (other_op) {
-                if (auto window = imgui_Window("Operations", &other_op,
+                if (auto window = imgui_Window("Range operations", &other_op,
                                                ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse)) {
                     // (Shadowing `::imgui_KeyPressed`...)
                     auto imgui_KeyPressed = [active](ImGuiKey key, bool repeat) {
@@ -602,6 +602,8 @@ public:
                         m_ctrl.pace = std::min(m_ctrl.pace_max, m_ctrl.pace + 1);
                     } else if (imgui_KeyPressed(ImGuiKey_Space, false)) {
                         m_ctrl.pause = !m_ctrl.pause;
+                    } else if (imgui_KeyPressed(ImGuiKey_N, true)) {
+                        extra_step = 1;
                     } else if (imgui_KeyPressed(ImGuiKey_M, true)) {
                         if (m_ctrl.pause) {
                             extra_step = m_ctrl.actual_pace();
@@ -612,43 +614,46 @@ public:
                     }
 
                     // TODO: whether to explain the effects?
-                    imgui_Str("Other shortcuts: 1, 2, 3, 4, Space, M, R");
+                    imgui_Str("Other shortcuts: 1, 2, 3, 4, Space, N, M, R");
                     ImGui::Separator();
 
-                    auto term = [any_called = false, &imgui_KeyPressed](const char* label, const char* shortcut,
-                                                                        ImGuiKey key, const auto& op) mutable {
-                        if (ImGui::MenuItem(label, shortcut) || imgui_KeyPressed(key, false)) {
+                    auto term = [&, any_called = false](const char* label, const char* shortcut, ImGuiKey key,
+                                                        bool use_sel, const auto& op) mutable {
+                        const bool enabled = !use_sel || m_sel.has_value();
+                        if (ImGui::MenuItem(label, shortcut, nullptr, enabled) ||
+                            (enabled && imgui_KeyPressed(key, false))) {
                             if (!any_called) {
                                 any_called = true;
                                 op();
                             }
                         }
+                        if (!enabled && ImGui::BeginItemTooltip()) {
+                            imgui_Str("This operation is meaningful only when there are selected areas.");
+                            ImGui::EndTooltip();
+                        }
                     };
 
                     fill_den.step_slide("Fill density");
-                    term("Random fill", "=", ImGuiKey_Equal, [&] {
-                        if (m_sel) {
-                            legacy::random_fill(m_torus.tile(), global_mt19937(), fill_den.get(), m_sel->to_range());
-                            m_ctrl.mark_written();
-                            temp_pause = true;
-                        }
+                    term("Random fill", "+/=", ImGuiKey_Equal, true, [&] {
+                        assert(m_sel);
+                        legacy::random_fill(m_torus.tile(), global_mt19937(), fill_den.get(), m_sel->to_range());
+                        m_ctrl.mark_written();
+                        temp_pause = true;
                     });
-                    term("Clear inside", "backspace", ImGuiKey_Backspace, [&] {
-                        if (m_sel) {
-                            legacy::clear_inside(m_torus.tile(), m_sel->to_range());
-                            m_ctrl.mark_written();
-                            temp_pause = true;
-                        }
+                    term("Clear inside", "Backspace", ImGuiKey_Backspace, true, [&] {
+                        assert(m_sel);
+                        legacy::clear_inside(m_torus.tile(), m_sel->to_range());
+                        m_ctrl.mark_written();
+                        temp_pause = true;
                     });
-                    term("Clear outside", "0 (zero)", ImGuiKey_0, [&] {
-                        if (m_sel) {
-                            legacy::clear_outside(m_torus.tile(), m_sel->to_range());
-                            m_ctrl.mark_written();
-                            temp_pause = true;
-                        }
+                    term("Clear outside", "0 (zero)", ImGuiKey_0, true, [&] {
+                        assert(m_sel);
+                        legacy::clear_outside(m_torus.tile(), m_sel->to_range());
+                        m_ctrl.mark_written();
+                        temp_pause = true;
                     });
                     ImGui::Separator();
-                    term("Select all", "A", ImGuiKey_A, [&] {
+                    term("Select all", "A", ImGuiKey_A, false, [&] {
                         if (!m_sel || m_sel->width() != tile_size.width || m_sel->height() != tile_size.height) {
                             m_sel = {.active = false,
                                      .beg = {0, 0},
@@ -657,36 +662,33 @@ public:
                             m_sel.reset();
                         }
                     });
-                    term("Shrink", "S", ImGuiKey_S, [&] {
-                        if (m_sel) {
-                            const auto [begin, end] = legacy::bounding_box(m_torus.tile(), m_sel->to_range());
-                            if (begin != end) {
-                                m_sel = {.active = false, .beg = begin, .end = {.x = end.x - 1, .y = end.y - 1}};
-                            } else {
-                                m_sel.reset();
-                            }
+                    term("Shrink", "S", ImGuiKey_S, true, [&] {
+                        assert(m_sel);
+                        const auto [begin, end] = legacy::bounding_box(m_torus.tile(), m_sel->to_range());
+                        if (begin != end) {
+                            m_sel = {.active = false, .beg = begin, .end = {.x = end.x - 1, .y = end.y - 1}};
+                        } else {
+                            m_sel.reset();
                         }
                     });
                     ImGui::Separator();
                     ImGui::Checkbox("Add rule", &add_rule);
                     ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                    imgui_StrTooltip("(?)", "Affects whether to append the current rule when copying patterns.");
-                    term("Copy", "C", ImGuiKey_C, [&] {
-                        if (m_sel) {
-                            messenger::add_msg(legacy::to_RLE_str(add_rule ? &m_ctrl.rule : nullptr, m_torus.tile(),
-                                                                  m_sel->to_range()));
-                        }
+                    imgui_StrTooltip("(?)", "Whether to append the current rule when copying patterns.");
+                    term("Copy", "C", ImGuiKey_C, true, [&] {
+                        assert(m_sel);
+                        messenger::add_msg(
+                            legacy::to_RLE_str(add_rule ? &m_ctrl.rule : nullptr, m_torus.tile(), m_sel->to_range()));
                     });
-                    term("Cut", "X", ImGuiKey_X, [&] {
-                        if (m_sel) {
-                            messenger::add_msg(legacy::to_RLE_str(add_rule ? &m_ctrl.rule : nullptr, m_torus.tile(),
-                                                                  m_sel->to_range()));
-                            legacy::clear_inside(m_torus.tile(), m_sel->to_range());
-                            m_ctrl.mark_written();
-                            temp_pause = true;
-                        }
+                    term("Cut", "X", ImGuiKey_X, true, [&] {
+                        assert(m_sel);
+                        messenger::add_msg(
+                            legacy::to_RLE_str(add_rule ? &m_ctrl.rule : nullptr, m_torus.tile(), m_sel->to_range()));
+                        legacy::clear_inside(m_torus.tile(), m_sel->to_range());
+                        m_ctrl.mark_written();
+                        temp_pause = true;
                     });
-                    term("Paste", "V", ImGuiKey_V, [&] {
+                    term("Paste", "V", ImGuiKey_V, false, [&] {
                         if (const char* text = ImGui::GetClipboardText()) {
                             try {
                                 // TODO: or ask whether to resize m_torus.tile?
@@ -697,24 +699,21 @@ public:
                         }
                     });
                     ImGui::Separator();
-                    term("Capture (closed)", "P", ImGuiKey_P, [&] {
-                        if (m_sel) {
-                            out = capture_closed(m_torus.tile(), m_sel->to_range(), m_ctrl.rule);
-                        }
+                    term("Capture (closed)", "P", ImGuiKey_P, true, [&] {
+                        assert(m_sel);
+                        out = capture_closed(m_torus.tile(), m_sel->to_range(), m_ctrl.rule);
                     });
                     ImGui::Separator();
                     // TODO: better layout...
                     int count = 0;
                     legacy::for_each_code([&](legacy::codeT code) { count += m_lock[code]; });
-                    term(std::format("Capture (open) {}/512", count).c_str(), "L (repeatable)", ImGuiKey_None, [&] {
-                        if (m_sel) {
-                            capture_open(m_torus.tile(), m_sel->to_range(), m_lock);
-                        }
-                    });
-                    if (imgui_KeyPressed(ImGuiKey_L, true)) {
-                        if (m_sel) {
-                            capture_open(m_torus.tile(), m_sel->to_range(), m_lock);
-                        }
+                    term(std::format("Capture (open) {}/512", count).c_str(), "L (repeatable)", ImGuiKey_None, true,
+                         [&] {
+                             assert(m_sel);
+                             capture_open(m_torus.tile(), m_sel->to_range(), m_lock);
+                         });
+                    if (m_sel && imgui_KeyPressed(ImGuiKey_L, true)) {
+                        capture_open(m_torus.tile(), m_sel->to_range(), m_lock);
                     }
                     if (ImGui::Button("Clear")) {
                         m_lock = {};
