@@ -187,9 +187,10 @@ namespace legacy {
             }
         }
 
-#if 0
         // (For `capture_open`.)
-        void record(moldT::lockT& lock, const rangeT& range) const {
+        void collect(const rangeT& range, moldT::lockT& lock) const {
+            // There is supposed to be a call to `gather` before calling `record`
+            // if `range` is allowed to be adjacent to the boundary.
             assert(has_range(range));
 
             for (int _y = range.begin.y + 1; _y <= range.end.y; ++_y) {
@@ -206,7 +207,6 @@ namespace legacy {
                 }
             }
         }
-#endif
 
         friend bool operator==(const tileT& l, const tileT& r) {
             if (l.m_size != r.m_size) {

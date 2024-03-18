@@ -655,6 +655,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
     return out;
 }
 
+// TODO: move to apply_rule (as this is a special type of capture...)?
 std::optional<legacy::moldT> static_constraints() {
     enum stateE { Any_background, O, I, O_background, I_background };
     const int r = 9;
@@ -667,8 +668,6 @@ std::optional<legacy::moldT> static_constraints() {
                                IM_COL32(80, 0, 80, 255),     //
                                IM_COL32(200, 0, 200, 255)};
 
-    const bool ret = ImGui::Button("Done");
-    ImGui::SameLine();
     if (ImGui::Button("Clear")) {
         for (auto& l : board) {
             for (auto& s : l) {
@@ -676,6 +675,8 @@ std::optional<legacy::moldT> static_constraints() {
             }
         }
     }
+    ImGui::SameLine();
+    const bool ret = ImGui::Button("Adopt");
 
     // Display-only; the value of `state_lbutton` is controlled by mouse-scrolling.
     ImGui::BeginDisabled();

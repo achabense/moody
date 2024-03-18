@@ -24,6 +24,8 @@ static void run_torus(legacy::tileT& tile, legacy::tileT& temp, const legacy::ru
     tile.swap(temp);
 }
 
+// TODO: add documentations for the two kinds of capture, explain with examples.
+
 // Copy the subrange and run as a torus space, recording all invoked mappings.
 // This is good at capturing "self-contained" patterns (oscillators/spaceships).
 static legacy::moldT::lockT capture_closed(const legacy::tileT& source, const legacy::tileT::rangeT& range,
@@ -51,14 +53,9 @@ static legacy::moldT::lockT capture_closed(const legacy::tileT& source, const le
     return lock;
 }
 
-// TODO: how to support open-capture in the gui?
-#if 0
-// However, if the patterns is not self-contained, what happens in the copied subrange (treated as torus space)
-// is not exactly what we see in the source space.
-// Especially, for the rules with interesting "texture"s (but no typical oscillators etc), `capture_closed` tends to
-// make a full lock, which is not useful.
-// ~ We may want to record what actually happened in the range (instead of the the captured pattern) during the run of
-// the source space:
+// `capture_closed` is not suitable for capturing patterns that are not self-contained (what happens in the
+// copied subrange (treated as torus space) is not exactly what we see in the source space)
+// In these cases we need a way to record what actually happened in the range.
 static void capture_open(const legacy::tileT& source, legacy::tileT::rangeT range, legacy::moldT::lockT& lock) {
     if (range.width() <= 2 || range.height() <= 2) {
         return;
@@ -67,9 +64,8 @@ static void capture_open(const legacy::tileT& source, legacy::tileT::rangeT rang
     range.begin.y += 1;
     range.end.x -= 1;
     range.end.y -= 1;
-    source.record(lock, range);
+    source.collect(range, lock);
 }
-#endif
 
 class densityT {
     int m_dens; // ∈ [0, 100], /= 100 to serve as density.
@@ -235,6 +231,8 @@ class runnerT {
     };
     std::optional<selectT> m_sel = std::nullopt;
 
+    legacy::moldT::lockT m_lock{}; // For open-capture.
+
 public:
     void apply_rule(const legacy::ruleT& rule) {
         // TODO: whether to pause for one frame?
@@ -244,6 +242,7 @@ public:
             m_ctrl.pause = false;
             m_torus.restart(m_init);
             m_ctrl.mark_written();
+            m_lock = {};
         }
     }
 
@@ -697,11 +696,33 @@ public:
                             }
                         }
                     });
-                    term("Capture", "P", ImGuiKey_P, [&] {
+                    ImGui::Separator();
+                    term("Capture (closed)", "P", ImGuiKey_P, [&] {
                         if (m_sel) {
                             out = capture_closed(m_torus.tile(), m_sel->to_range(), m_ctrl.rule);
                         }
                     });
+                    ImGui::Separator();
+                    // TODO: better layout...
+                    int count = 0;
+                    legacy::for_each_code([&](legacy::codeT code) { count += m_lock[code]; });
+                    term(std::format("Capture (open) {}/512", count).c_str(), "L (repeatable)", ImGuiKey_None, [&] {
+                        if (m_sel) {
+                            capture_open(m_torus.tile(), m_sel->to_range(), m_lock);
+                        }
+                    });
+                    if (imgui_KeyPressed(ImGuiKey_L, true)) {
+                        if (m_sel) {
+                            capture_open(m_torus.tile(), m_sel->to_range(), m_lock);
+                        }
+                    }
+                    if (ImGui::Button("Clear")) {
+                        m_lock = {};
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Adopt")) {
+                        out = m_lock;
+                    }
                 }
             }
         }
