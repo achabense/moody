@@ -18,7 +18,7 @@ namespace legacy {
         static const subsetT ignore_hex = make_subset({mp_hex_ignore});
         static const subsetT ignore_von = make_subset({mp_von_ignore});
 
-        static const subsetT self_complementary = make_subset({mp_dual}, mask_identity);
+        static const subsetT self_complementary = make_subset({mp_reverse}, mask_identity);
 
         static const subsetT native_isotropic = make_subset({mp_refl_wsx, mp_refl_qsc});
         static const subsetT native_refl_wsx = make_subset({mp_refl_wsx});
@@ -94,6 +94,8 @@ namespace legacy {
 
 } // namespace legacy
 
+// `subsetT` (and `mapperT` pair) are highly customizable. However, for sanity there is no plan to
+// support user-defined subsets in the gui part.
 class subset_selector {
     legacy::subsetT current;
 
@@ -112,7 +114,6 @@ class subset_selector {
     termT_list terms_native;
     termT_list terms_totalistic;
     termT_list terms_hex;
-    // TODO: about the plan to support user-defined subsets...
 
     void for_each_term(const auto& fn) {
         for (termT_list* terms : {&terms_ignore, &terms_misc, &terms_native, &terms_totalistic, &terms_hex}) {
@@ -154,12 +155,12 @@ public:
         terms_ignore.emplace_back("x", &ignore_x);
         terms_ignore.emplace_back("c", &ignore_c);
 
-        // TODO: better name...
-        terms_misc.emplace_back("S(i)", &ignore_s_i, "0->0, 1->1 or 0->1, 1->0");
-        terms_misc.emplace_back("Dual", &self_complementary, "Self-complementary rules.");
         terms_misc.emplace_back("Hex", &ignore_hex, "Rules that emulate the hexagonal rules. ... TODO...");
         terms_misc.emplace_back("Von", &ignore_von,
                                 "Rules in the Von-Neumann neighborhood. (The rules that are independent of q,e,z,c.)");
+        // TODO: better name...
+        terms_misc.emplace_back("S(i)", &ignore_s_i, "0->0, 1->1 or 0->1, 1->0");
+        terms_misc.emplace_back("Dual", &self_complementary, "Self-complementary rules.");
 
         // TODO: about isotropic von rules.
         terms_native.emplace_back("All", &native_isotropic,
@@ -225,7 +226,7 @@ public:
             }
         }
 
-        auto check = [&, id = 0, size = square_size()](termT& term) mutable {
+        auto check = [&, id = 0, size = square_size()](termT& term, bool show_title = false) mutable {
             ImGui::PushID(id++);
             if (ImGui::InvisibleButton("Check", size) && !term.disabled) {
                 term.selected = !term.selected;
@@ -246,16 +247,22 @@ public:
                 ImGui::EndTooltip();
             }
 
-            // TODO: better coloring scheme...
+            const ImU32 cent_col_disabled = !show_title ? IM_COL32(120, 30, 0, 255) : IM_COL32(0, 0, 0, 90);
             const ImU32 cent_col = term.selected                 ? IM_COL32(65, 150, 255, 255) // Roughly _ButtonHovered
                                    : term.set->includes(current) ? IM_COL32(25, 60, 100, 255)  // Roughly _Button
-                                   : term.disabled               ? IM_COL32(120, 30, 0, 255)   // Red
+                                   : term.disabled               ? cent_col_disabled
                                                                  : IM_COL32_BLACK_TRANS;
             const ImU32 ring_col = term.set->contains(mold.rule) ? IM_COL32(0, 255, 0, 255)   // Light green
                                    : compatible(*term.set, mold) ? IM_COL32(0, 100, 0, 255)   // Dull green
                                                                  : IM_COL32(200, 45, 0, 255); // Red
 
             imgui_ItemRectFilled(IM_COL32_BLACK);
+            if (show_title) {
+                const ImVec2 min = ImGui::GetItemRectMin();
+                const ImVec2 sz = ImGui::CalcTextSize(term.title, term.title + 1);
+                const ImVec2 pos(min.x + floor((size.x - sz.x) / 2), min.y + floor((size.y - sz.y) / 2));
+                ImGui::GetWindowDrawList()->AddText(pos, IM_COL32_WHITE, term.title, term.title + 1);
+            }
             imgui_ItemRectFilled(cent_col, term.disabled ? ImVec2(5, 5) : ImVec2(4, 4));
             imgui_ItemRect(ring_col);
             if (!term.disabled && ImGui::IsItemHovered()) {
@@ -285,15 +292,15 @@ public:
                 }
             };
 
-            put_row("Ignore & Misc", [&] {
+            put_row("Neighborhood\n/ Misc", [&] {
                 ImGui::BeginGroup();
                 ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2, 2));
                 for (int l = 0; l < 3; ++l) {
-                    check(terms_ignore[l * 3 + 0]);
+                    check(terms_ignore[l * 3 + 0], true);
                     ImGui::SameLine();
-                    check(terms_ignore[l * 3 + 1]);
+                    check(terms_ignore[l * 3 + 1], true);
                     ImGui::SameLine();
-                    check(terms_ignore[l * 3 + 2]);
+                    check(terms_ignore[l * 3 + 2], true);
                 }
                 ImGui::PopStyleVar();
                 ImGui::EndGroup();

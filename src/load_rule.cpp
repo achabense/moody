@@ -47,9 +47,8 @@ class file_nav {
     char buf_path[200]{};
     char buf_filter[20]{};
 
-    bool m_valid = false; // The last call to `collect(current, ...)` is successful.
-    pathT m_current;      // Canonical path.
-    std::vector<entryT> m_dirs, m_files;
+    pathT m_current{}; // Canonical path; empty() <-> invalid.
+    std::vector<entryT> m_dirs{}, m_files{};
 
     static void collect(const pathT& path, std::vector<entryT>& dirs, std::vector<entryT>& files) {
         dirs.clear();
@@ -73,7 +72,6 @@ class file_nav {
             std::vector<entryT> p_dirs, p_files;
             collect(p, p_dirs, p_files);
 
-            m_valid = true;
             m_current.swap(p);
             m_dirs.swap(p_dirs);
             m_files.swap(p_files);
@@ -84,31 +82,28 @@ class file_nav {
 
 public:
     void refresh_if_valid() {
-        if (m_valid) {
+        if (!m_current.empty()) {
             try {
                 collect(m_current, m_dirs, m_files);
             } catch (const std::exception& /* not used; the encoding is a mystery */) {
                 messenger::add_msg("Cannot refresh folder:\n{}", cpp17_u8string(m_current));
-                m_valid = false;
+                m_current.clear();
                 m_dirs.clear();
                 m_files.clear();
             }
         }
     }
 
-    file_nav(const pathT& path = std::filesystem::current_path()) {
-        m_valid = false;
-        set_current(path);
-    }
+    file_nav(const pathT& path = std::filesystem::current_path()) { set_current(path); }
 
     std::optional<pathT> display() {
         std::optional<pathT> target = std::nullopt;
 
-        if (m_valid) {
+        if (!m_current.empty()) {
             imgui_StrCopyable(cpp17_u8string(m_current), imgui_Str);
         } else {
             assert(m_dirs.empty() && m_files.empty());
-            imgui_StrDisabled("(Invalid) " + cpp17_u8string(m_current));
+            imgui_StrDisabled("N/A");
         }
 
         ImGui::Separator();
@@ -120,11 +115,10 @@ public:
                 ImGui::InputTextWithHint("##Path", "Path", buf_path, std::size(buf_path));
                 ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                 if (ImGui::Button("Open") && buf_path[0] != '\0') {
-                    // TODO: is this still ok when !valid?
                     const pathT p = m_current / cpp17_u8path(buf_path);
                     std::error_code ec{};
                     if (std::filesystem::is_regular_file(p, ec)) {
-                        target = p; // TODO: whether to call canonical?
+                        target = p;
                     } else if (std::filesystem::is_directory(p, ec)) {
                         set_current(p);
                     } else {

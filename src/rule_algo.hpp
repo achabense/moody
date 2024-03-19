@@ -556,16 +556,10 @@ namespace legacy {
         }
     };
 
-    // TODO: better name ("make_mask" is too-general name)...
-    inline maskT make_mask(codeT::bposE bpos) {
-        return {make_rule([bpos](codeT code) { return code.get(bpos); })};
-    }
-
     // rule ^ mask_zero -> the masked values are identical to rule's.
     inline const maskT mask_zero{{}};
     // rule ^ mask_identity -> the masked values can mean whether the cell will "flip" in each situation.
-    inline const maskT mask_identity{make_mask(codeT::bpos_s)};
-    // make_mask(codeT::bpos_q/w/...) are not defined as they are only useful in several rare cases.
+    inline const maskT mask_identity{make_rule([](codeT c) { return c.get(codeT::bpos_s); })};
 
     // A mapperT maps each codeT to another codeT.
     // Especially, mapperT{"qweasdzxc"} maps any codeT to the same value.
@@ -595,7 +589,6 @@ namespace legacy {
                            z(code), x(code), c(code)});
         }
 
-        // TODO: about consteval and the (obsolete) plan to support user-defined mappers / subsets...
         consteval mapperT(const char* str) {
             // [01], or [qweasdzxc], or ![qweasdzxc].
             auto parse = [&]() -> takeT {
@@ -691,12 +684,11 @@ namespace legacy {
                                           "awd"
                                           "zxc"); // swap(w,s); *C8 -> totalistic, including s
 
-    // TODO: better name...
     // * mask_identity -> the self-complementary rules.
-    // (Where every pair of [code] and [mp_dual(code)] have the same "flip-ness")
-    inline constexpr mapperT mp_dual("!q!w!e"
-                                     "!a!s!d"
-                                     "!z!x!c");
+    // (Where every pair of [code] and [mp_reverse(code)] have the same "flip-ness")
+    inline constexpr mapperT mp_reverse("!q!w!e"
+                                        "!a!s!d"
+                                        "!z!x!c");
 
     // Hexagonal emulation and emulated symmetry.
     // q w -     q w
@@ -790,7 +782,7 @@ namespace legacy {
                 }
                 assert(mp_C4(mp_C4(code)) == mp_C2(code));
 
-                assert(mp_dual(mp_dual(code)) == code);
+                assert(mp_reverse(mp_reverse(code)) == code);
 
                 const codeT hex = mp_hex_ignore(code);
 
@@ -808,7 +800,7 @@ namespace legacy {
         };
 
         inline const testT test_subset_intersection = [] {
-            subsetT sc = make_subset({mp_ignore_s}, mask_zero) & make_subset({mp_dual}, mask_identity);
+            subsetT sc = make_subset({mp_ignore_s}, mask_zero) & make_subset({mp_reverse}, mask_identity);
 
             // 2024/1/20 2AM
             // There is NO problem in the algorithm.
@@ -816,15 +808,15 @@ namespace legacy {
             // rules in a certain direction...
             using enum codeT::bposE;
             assert(!sc.empty());
-            assert(sc.contains(make_mask(bpos_q)));
-            assert(sc.contains(make_mask(bpos_w)));
-            assert(sc.contains(make_mask(bpos_e)));
-            assert(sc.contains(make_mask(bpos_a)));
-            assert(!sc.contains(mask_identity)); // Doesn't contain make_mask(bpos_s).
-            assert(sc.contains(make_mask(bpos_d)));
-            assert(sc.contains(make_mask(bpos_z)));
-            assert(sc.contains(make_mask(bpos_x)));
-            assert(sc.contains(make_mask(bpos_c)));
+            assert(sc.contains(make_rule([](codeT c) { return c.get(bpos_q); })));
+            assert(sc.contains(make_rule([](codeT c) { return c.get(bpos_w); })));
+            assert(sc.contains(make_rule([](codeT c) { return c.get(bpos_e); })));
+            assert(sc.contains(make_rule([](codeT c) { return c.get(bpos_a); })));
+            assert(!sc.contains(mask_identity));
+            assert(sc.contains(make_rule([](codeT c) { return c.get(bpos_d); })));
+            assert(sc.contains(make_rule([](codeT c) { return c.get(bpos_z); })));
+            assert(sc.contains(make_rule([](codeT c) { return c.get(bpos_x); })));
+            assert(sc.contains(make_rule([](codeT c) { return c.get(bpos_c); })));
         };
     }  // namespace _tests
 #endif // ENABLE_TESTS
@@ -843,8 +835,6 @@ namespace legacy {
         });
         return mir;
     }
-
-    // TODO: add test that mirror->mirror->original...
 
 #if 0
     // The results are are easy to go out of control...
@@ -870,5 +860,18 @@ namespace legacy {
         return ro;
     }
 #endif
+
+#ifdef ENABLE_TESTS
+    namespace _tests {
+        inline const testT test_trans_mir = [] {
+            moldT mold{};
+            for_each_code([&](codeT code) {
+                mold.rule[code] = testT::rand() & 1;
+                mold.lock[code] = testT::rand() & 1;
+            });
+            assert(mold == trans_mirror(trans_mirror(mold)));
+        };
+    }  // namespace _tests
+#endif // ENABLE_TESTS
 
 } //  namespace legacy
