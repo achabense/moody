@@ -102,14 +102,14 @@ class subset_selector {
     struct termT {
         const char* const title;
         const legacy::subsetT* const set;
-        const char* const description = "TODO";
+        const char* const description;
         bool selected = false;
         bool disabled = false; // current & set -> empty.
     };
 
     using termT_list = std::vector<termT>;
 
-    termT_list terms_ignore; // TODO: rename...
+    termT_list terms_ignore;
     termT_list terms_misc;
     termT_list terms_native;
     termT_list terms_totalistic;
@@ -143,46 +143,62 @@ class subset_selector {
 public:
     subset_selector() : current(legacy::subsetT::universal()) {
         using namespace legacy::_subsets;
-        // TODO: finish descriptions...
 
-        terms_ignore.emplace_back("q", &ignore_q, "Rules that are \"independent of\" 'q'. That is ...");
-        terms_ignore.emplace_back("w", &ignore_w);
-        terms_ignore.emplace_back("e", &ignore_e);
-        terms_ignore.emplace_back("a", &ignore_a);
-        terms_ignore.emplace_back("s", &ignore_s_z, "0->1, 1->1 or 0->0, 1->0");
-        terms_ignore.emplace_back("d", &ignore_d);
-        terms_ignore.emplace_back("z", &ignore_z);
-        terms_ignore.emplace_back("x", &ignore_x);
-        terms_ignore.emplace_back("c", &ignore_c);
+        // TODO: recheck and refine descriptions...
+        terms_ignore.emplace_back(
+            "q", &ignore_q,
+            "Independent of 'q'. That is, for any two cases where only 'q' is different, the mapped "
+            "values are the same. So the rules will work as if the neighborhood does not include"
+            "'q'. w/e/a/d/z/x/c are all similar.");
+        terms_ignore.emplace_back("w", &ignore_w, "See 'q' for details.");
+        terms_ignore.emplace_back("e", &ignore_e, "See 'q' for details.");
+        terms_ignore.emplace_back("a", &ignore_a, "See 'q' for details.");
+        terms_ignore.emplace_back(
+            "s", &ignore_s_z,
+            "For any two cases where only 's' is different, the mapped values are the same. So there "
+            "must be: either s:0->1, s:1->1 or s:0->0, s:1->0. This cannot directly be interpreted as "
+            "\"independent of\" 's'.");
+        terms_ignore.emplace_back("d", &ignore_d, "See 'q' for details.");
+        terms_ignore.emplace_back("z", &ignore_z, "See 'q' for details.");
+        terms_ignore.emplace_back("x", &ignore_x, "See 'q' for details.");
+        terms_ignore.emplace_back("c", &ignore_c, "See 'q' for details.");
 
-        terms_misc.emplace_back("Hex", &ignore_hex, "Rules that emulate the hexagonal rules. ... TODO...");
-        terms_misc.emplace_back("Von", &ignore_von,
-                                "Rules in the Von-Neumann neighborhood. (The rules that are independent of q,e,z,c.)");
-        // TODO: better name...
-        terms_misc.emplace_back("S(i)", &ignore_s_i, "0->0, 1->1 or 0->1, 1->0");
-        terms_misc.emplace_back("Dual", &self_complementary, "Self-complementary rules.");
+        terms_misc.emplace_back(
+            "Hex", &ignore_hex,
+            "Rules that emulate the hexagonal rules (by ignoring e/z). For symmetric hexagonal rules... TODO");
+        terms_misc.emplace_back(
+            "Von", &ignore_von,
+            "Rules in the Von-Neumann neighborhood. (The rules that are independent of q/e/z/c.)\n"
+            "You can combine this with native symmetry subsets to explore symmetric Von-Neumann rules.");
+        terms_misc.emplace_back("s(*)", &ignore_s_i,
+                                "Similar to 's' - for any two cases where only 's' is different, the \"flip-ness\" of "
+                                "values are the same. So there must be: either s:0->0, s:1->1 or s:0->1, s:1->0.");
+        terms_misc.emplace_back("s.c.", &self_complementary, "Self-complementary rules.");
 
-        // TODO: about isotropic von rules.
         terms_native.emplace_back("All", &native_isotropic,
-                                  "Isotropic rules. (The rules that preserve all symmetries.)\n"
+                                  "Isotropic rules. (The rules that preserve all symmetries.) "
                                   "This is actually the intersection of the following subsets in this line.",
                                   true /* Selected */);
         terms_native.emplace_back("|", &native_refl_wsx,
-                                  "Rules that preserve reflection symmetry (taking '|' as the axis).");
-        terms_native.emplace_back("-", &native_refl_asd, "Ditto, except that the reflection axis is `-`");
-        terms_native.emplace_back("\\", &native_refl_qsc, "Ditto, except that the reflection axis is `\\`");
-        terms_native.emplace_back("/", &native_refl_esz, "Ditto, except that the reflection axis is `/`");
-        terms_native.emplace_back("C2", &native_C2, "C2 symmetry.");
-        terms_native.emplace_back("C4", &native_C4, "C4 symmetry. Notice this is a strict subset of C2.");
+                                  "Rules that preserve reflection symmetry, taking '|' as the axis.");
+        terms_native.emplace_back("-", &native_refl_asd, "Ditto, the reflection axis is `-`");
+        terms_native.emplace_back("\\", &native_refl_qsc, "Ditto, the reflection axis is `\\`");
+        terms_native.emplace_back("/", &native_refl_esz, "Ditto, the reflection axis is `/`");
+        terms_native.emplace_back("C2", &native_C2, "C2 symmetry. (2-fold rotational symmetry.)");
+        terms_native.emplace_back("C4", &native_C4,
+                                  "C4 symmetry. (4-fold rotational symmetry.) This is a strict subset of C2.");
 
-        terms_totalistic.emplace_back(
-            "Nat", &native_tot_exc_s,
-            "(outer-) Totalistic rules (where the B/S notation applies and where the Game-of-Life rule is defined.)");
-        terms_totalistic.emplace_back("Nat(+s)", &native_tot_inc_s);
-        terms_totalistic.emplace_back("Hex", &hex_tot_exc_s, "Totalistic hexagonal rules.");
-        terms_totalistic.emplace_back("Hex(+s)", &hex_tot_inc_s);
-        terms_totalistic.emplace_back("Von", &von_tot_exc_s);
-        terms_totalistic.emplace_back("Von(+s)", &von_tot_inc_s);
+        terms_totalistic.emplace_back("Tot", &native_tot_exc_s,
+                                      "(outer-) Totalistic MAP rules (where the B/S notation applies and where the "
+                                      "Game-of-Life rule was defined.)");
+        terms_totalistic.emplace_back("Tot(+s)", &native_tot_inc_s,
+                                      "(inner-) Totalistic MAP rules. That is, the values are only dependent on "
+                                      "q+w+e+a+s+d+z+x+c (including s). This is a strict subset of outer-totalistic "
+                                      "rules.");
+        terms_totalistic.emplace_back("Hex", &hex_tot_exc_s, "(outer-) Totalistic hexagonal rules.");
+        terms_totalistic.emplace_back("Hex(+s)", &hex_tot_inc_s, "(inner-) Totalistic hexagonal rules.");
+        terms_totalistic.emplace_back("Von", &von_tot_exc_s, "(outer-) Totalistic Von-Neumann rules.");
+        terms_totalistic.emplace_back("Von(+s)", &von_tot_inc_s, "(inner-) Totalistic Von-Neumann rules.");
 
         // q w -    q w
         // a s d ~ a s d
@@ -190,17 +206,18 @@ public:
         terms_hex.emplace_back("All", &hex_isotropic,
                                "Isotropic hexagonal rules. (The intersection of the following subsets in this line.)");
         terms_hex.emplace_back("a-d", &hex_refl_asd,
-                               "Hexagonal rules that preserve reflection symmetry (taking the axis from 'a' to 'd') "
-                               "... TODO, explain the labels..."); // ...
-        terms_hex.emplace_back("q-c", &hex_refl_qsc);
-        terms_hex.emplace_back("w-x", &hex_refl_wsx);
-        terms_hex.emplace_back("a|q", &hex_refl_aq);
-        terms_hex.emplace_back("q|w", &hex_refl_qw);
-        terms_hex.emplace_back("w|d", &hex_refl_wd);
-        terms_hex.emplace_back("C2", &hex_C2, "... Notice this is a subset of native C2.");
+                               "Hexagonal rules that preserve reflection symmetry (taking the axis from 'a' to 'd'). "
+                               "Notice this is emulated symmetry...");
+        terms_hex.emplace_back("q-c", &hex_refl_qsc, "Ditto, the reflection axis is q to c.");
+        terms_hex.emplace_back("w-x", &hex_refl_wsx, "Ditto, the reflection axis is w to x.");
+        terms_hex.emplace_back("a|q", &hex_refl_aq, "Ditto, the reflection axis is vertical to 'a to q'");
+        terms_hex.emplace_back("q|w", &hex_refl_qw, "Ditto, the reflection axis is vertical to 'q to w'");
+        terms_hex.emplace_back("w|d", &hex_refl_wd, "Ditto, the reflection axis is vertical to 'w to d'");
+        terms_hex.emplace_back("C2", &hex_C2, "C2 symmetry.");
         terms_hex.emplace_back("C3", &hex_C3, "C3 symmetry.");
-        terms_hex.emplace_back("C6", &hex_C6, "C6 symmetry. Notice this is a subset of both C2 and C3.");
+        terms_hex.emplace_back("C6", &hex_C6, "C6 symmetry. This is a strict subset of C2/C3.");
 
+        for_each_term([](const termT& t) { assert(t.title && t.set && t.description); });
         update_current();
     }
 
@@ -309,7 +326,7 @@ public:
                 checklist(terms_misc);
             });
 
-            put_row("Native", [&] { checklist(terms_native); });
+            put_row("Native\nSymmetry", [&] { checklist(terms_native); });
             put_row("Totalistic", [&] { checklist(terms_totalistic); });
             put_row("q w -    q w\n"
                     "a s d ~ a s d\n"
@@ -375,7 +392,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
             "Custom rule; you can click \"Take current\" button to set this to the current rule.\n"
             "Important tip: ..."};
 
-        // TODO: whether to support mask_mask(bpos_q) etc?
         static maskE mask_tag = Zero;
         const legacy::maskT* const mask_ptrs[]{&legacy::mask_zero, &legacy::mask_identity, &subset.get_mask(),
                                                &mask_custom};

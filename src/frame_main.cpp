@@ -69,10 +69,6 @@ static void assign_val(legacy::moldT& mold, legacy::extrT::valT& val) {
 void frame_main(const code_icons& icons, screenT& screen) {
     messenger::display();
 
-#ifndef NDEBUG
-    ImGui::ShowDemoWindow();
-#endif
-
     static recorderT recorder;
     legacy::moldT current = recorder.current();
     bool update = false;
@@ -136,12 +132,18 @@ void frame_main(const code_icons& icons, screenT& screen) {
         }
 #ifndef NDEBUG
         ImGui::SameLine();
-        ImGui::Text("  (Debug mode) (%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
+        imgui_Str("  (Debug mode)");
+        ImGui::SameLine();
+        static bool show_demo = true;
+        ImGui::Checkbox("Demo window", &show_demo);
+        if (show_demo) {
+            ImGui::ShowDemoWindow(&show_demo);
+        }
+        ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
+        ImGui::Text("(%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
 #endif // !NDEBUG
 
         {
-            // TODO: add a shortcut for quick rule-saving...
-            // (As the rule may be gotten from enter-bound buttons)
             static bool with_lock = false;
             if (with_lock) {
                 imgui_StrCopyable(legacy::to_MAP_str(current), imgui_Str);
