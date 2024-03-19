@@ -1,5 +1,5 @@
 const char* const doc_about =
-    R"(In these documents, you can left-click the rules (which will be highlighted if you hover on them) to see their effects, or try the buttons above to do quick navigation. Right-click to copy the text (on per-line basis; drag to select multiple lines).
+    R"(In these documents (as well as the ones opened via "Load file" or "Clipboard"), you can left-click the rules to see their effects and right-click the lines to copy the text (drag to select multiple lines). For more details see "Program I/O".
 
 --- The sentiment
 ...
@@ -237,6 +237,37 @@ MAP7ohmmYgAmWbuiGaZiACZZogAmWYAEWaIiACZZgARZoiIAJlmABFmiIgAmWYAEWaIABFmiBFmiAAAE
 
 )";
 
+const char* const doc_program_IO =
+    R"(Some strings will be marked with grey borders when you hover on them. You can right-click on them to copy the text to the clipboard. For example, the current rule (with or without the lock) can be copied this way. The path in the "Load file" is also copyable.
+
+In these documents, you can right-click the lines to copy them (drag to select multiple lines). The line(s) will be displayed as a single piece of copyable string in the popup, then you can right-click that string to copy to the clipboard. As you will see, this document ends with an RLE-pattern blob. ......
+
+There are two recognizable formats that you can left-click directly to set as the current rule:
+A MAP rule will be highlighted in green when hovered:
+MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA
+A rule-lock pair will be highlighted in yellow when hovered:
+MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA [AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA]
+
+The rules are read on a per-line basis (mainly because it's hard to render the text/locate with cursors cross physical lines etc). If there are more than one rules in a line only the first rule will be recognized. (This might be improved in the future.)
+
+(About the "current rule"... TODO, missing...)
+
+If you left-click a rule-lock pair, both the rule and lock part will be overwritten.
+Otherwise (if it's a plain rule), the program will firstly test whether the rule "fits" into the locked part, and will clear the lock if the rule does not fit in. The rule part is assigned normally. This will be useful when you read a list of rules (the first of which is a pair, and the following are plain rules generated from it).
+When you click on a rule-lock pair, the working state will be set to it. This makes it easy to know that the following several rules are of the same origin, and you don't have to go back to the original lock if you want to generate new rules based on the lock. If you don't need the lock you can always clear it by the "Clear lock" button.
+
+For example, here is a list of ... TODO...
+
+(TODO: navigation and binding)
+
+Here is an RLE blob (which is a "rocket" in the Day & Night rule). You can firstly click the rule to set the current rule to it, and then copy the following lines (to the '!' mark, with or without the header line (x = ...))
+
+x = 7, y = 14, rule = MAPARYBFxZoF34WaBd+aIF+6RZoF35ogX7paIF+6YEX6ZcWaBd+aIF+6WiBfumBF+mXaIF+6YEX6ZeBF+mXF3+Xfw
+3bo3b$2b3o2b$b5ob$ob3obo$2b3o2b$2b3o2b$ob3obo$ob3obo$b5ob$b
+5ob$3bo3b$7b$2b3o2b$2bobo2b!
+
+... more details about pasting...)";
+
 const char* const doc_lock_and_capture = R"(...
 
 About how the lock is set for plain rules when reading from these documents...
@@ -324,11 +355,13 @@ struct docT {
     const char* text;
 };
 
+// TODO: the documents are currently unordered.
 extern const docT docs[]{{"0. About this program", doc_about},          //
                          {"1. Concepts", doc_concepts},                 //
                          {"2. Workflow", doc_workflow},                 //
                          {"3. Typical subsets", doc_subsets},           //
                          {"4. Lock and capture", doc_lock_and_capture}, //
-                         {"5. Rules in the wild", doc_atypical}};
+                         {"5. Rules in the wild", doc_atypical},        //
+                         {"6. Program I/O", doc_program_IO}};
 
 extern const int doc_size = sizeof(docs) / sizeof(docT);

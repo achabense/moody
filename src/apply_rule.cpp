@@ -675,6 +675,7 @@ public:
                     ImGui::Checkbox("Add rule", &add_rule);
                     ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                     imgui_StrTooltip("(?)", "Whether to append the current rule when copying patterns.");
+                    // TODO: reconsider whether to silently call ImGui::SetClipboardText...
                     term("Copy", "C", ImGuiKey_C, true, [&] {
                         assert(m_sel);
                         messenger::add_msg(

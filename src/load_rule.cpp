@@ -254,6 +254,7 @@ public:
                 }
                 str += m_lines[i].text;
             }
+            // TODO: reconsider whether to silently call ImGui::SetClipboardText...
             messenger::add_msg(str);
             m_sel.reset();
         }
