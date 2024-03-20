@@ -144,7 +144,7 @@ public:
     subset_selector() : current(legacy::subsetT::universal()) {
         using namespace legacy::_subsets;
 
-        // TODO: recheck and refine descriptions...
+        // !!TODO: recheck and refine descriptions...
         terms_ignore.emplace_back(
             "q", &ignore_q,
             "Independent of 'q'. That is, for any two cases where only 'q' is different, the mapped "
@@ -165,7 +165,7 @@ public:
 
         terms_misc.emplace_back(
             "Hex", &ignore_hex,
-            "Rules that emulate the hexagonal rules (by ignoring e/z). For symmetric hexagonal rules... TODO");
+            "Rules that emulate the hexagonal rules (by ignoring e/z). For symmetric hexagonal rules... !!TODO");
         terms_misc.emplace_back(
             "Von", &ignore_von,
             "Rules in the Von-Neumann neighborhood. (The rules that are independent of q/e/z/c.)\n"
@@ -251,10 +251,8 @@ public:
             }
             ImGui::PopID();
 
-            // TODO: or IsItemHovered() && IsMouseDown(ImGuiMouseButton_Right)?
             if (ImGui::BeginItemTooltip()) {
                 ImGui::PushTextWrapPos(wrap_len());
-                // TODO: add a "verbose-message mode"?
                 if (term.disabled) {
                     imgui_Str("(This is not selectable as the result will be an empty set)");
                     ImGui::Separator();
@@ -365,16 +363,16 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
     // Select mask.
     char chr_0 = '0', chr_1 = '1';
     const legacy::maskT& mask = [&] {
-        // TODO: finish...
+        // !!TODO: finish...
         const char* const about_mask =
             "About mask:\n"
             "A mask is an arbitrary rule used to do XOR masking for other rules...\n"
             "The editions are available only when the mask belongs to the selected subsets .";
 
-        // TODO: support rollbacking custom masks?
+        // TODO: add record for custom masks?
         static legacy::maskT mask_custom{{}};
 
-        // TODO: finish descriptions (use cases etc)
+        // !!TODO: finish descriptions (use cases etc)
         enum maskE { Zero, Identity, Native, Custom };
         static const char* const mask_labels[]{"Zero", "Identity", "Native", "Custom"};
         static const char* const mask_descriptions[]{
@@ -435,7 +433,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
     // Disable all edit operations if !subset.contains(mask), including those that do not really need
     // the mask to be valid (for example, `trans_mirror`, which does not actually rely on subsets).
     if (!subset.contains(mask)) {
-        // TODO: refine message...
+        // !!TODO: refine message...
         imgui_StrWrapped("This mask does not belong to the selected subsets. Consider trying other masks. "
                          "(The \"Native\" mask is known to belong to the selected subsets and will always work.) "
                          "For more details see the \"Workflow\" part in \"Documents\"");
@@ -559,11 +557,11 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
             ImGui::SameLine();
             ImGui::Checkbox("Hide locked groups", &hide_locked);
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-            imgui_StrTooltip("(!)", "The \"?TODO?\" groups will not be hidden even when there are locks.");
+            imgui_StrTooltip("(!)", "Only \"pure\" groups can be hidden when there are locks.");
             ImGui::EndPopup();
         }
 
-        // TODO: refine...
+        // !!TODO: refine... (whether to show free groups/ interop with hide_locked...)
         std::string summary = std::format("Groups:{} ({}:{} {}:{} x:{})", c_group, chr_0, c_0, chr_1, c_1, c_x);
         if (c_free != c_group) {
             summary += std::format(" [Locked:{} ({}:{} {}:{} x:{})]", c_group - c_free, chr_0, c_locked_0, chr_1,
@@ -678,7 +676,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
     return out;
 }
 
-// TODO: move to apply_rule (as this is a special type of capture...)?
+// TODO: move to "apply_rule.cpp"? (as this is a special type of capture...)
+// !!TODO: add tips and documentation...
 std::optional<legacy::moldT> static_constraints() {
     enum stateE { Any_background, O, I, O_background, I_background };
     const int r = 9;

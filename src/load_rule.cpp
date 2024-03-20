@@ -4,9 +4,8 @@
 
 #include "common.hpp"
 
-// TODO: whether to consider write access (file-editing etc)?
-// TODO: support saving into file? (without relying on the clipboard)
-// TODO: show recently opened files/folders?
+// TODO: whether to support write access (file-editing)?
+// Or at least support saving rules into file (without relying on the clipboard)?
 
 using pathT = std::filesystem::path;
 
@@ -248,7 +247,7 @@ public:
                 }
                 str += m_lines[i].text;
             }
-            // TODO: reconsider whether to silently call ImGui::SetClipboardText...
+            // !!TODO: reconsider whether to silently call ImGui::SetClipboardText...
             messenger::add_msg(str);
             m_sel.reset();
         }
@@ -359,6 +358,7 @@ static std::string load_binary(const pathT& path, int max_size) {
 static const int max_length = 100'000;
 
 // TODO: support opening multiple files?
+// TODO: show recently opened files/folders?
 static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
     static file_nav nav;
 

@@ -1,3 +1,5 @@
+// TODO: simplest way to use this program... (randomize, and saving the rules...)
+
 const char* const doc_about =
     R"(In these documents (as well as the ones opened via "Load file" or "Clipboard"), you can left-click the rules to see their effects and right-click the lines to copy the text (drag to select multiple lines). For more details see "Program I/O".
 
@@ -47,7 +49,7 @@ MAPARYTZxZsPVoQYRH2UMoGoxdkEtIst5p7coLka9c/r78CCgMUKdi+sSGmEsu0t9kXOp+s9ZB3efelQ
 You will learn about how to find rules like this in the "Lock and capture" section.)";
 
 const char* const doc_workflow =
-    R"(---- The current rule
+    R"(---- Overview
 The current rule is shown in the right plane. At the top ... (about "sequence"/undo/redo/lock/...)
 
 ---- Subset recognition and selection
@@ -300,6 +302,8 @@ MAPARcSZhehPEwRdxeuNABMzyBsF8BsoYg3RND/A80Xmz8DJhdMPwD03RPuesn8F8n7DM3/04oXEXfNw
 
 It will be much easier to find similar rules based on this rule - you can set the rule as the mask ("Take current"), and set a low distance ... For example, ...
 MAPARcTZhegPEwRdxPuFCBIzyBmF8A8+4g3RMD7A+03nz8DBhNIPyD83RPuIMP8F5n7DO3714g3EXfNw/oXmTcXfw
+
+---- Open capture vs closed capture... TODO with examples...
 
 ---- Lock-enhancement
 Let's go back to this lock.

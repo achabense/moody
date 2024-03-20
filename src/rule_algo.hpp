@@ -2,7 +2,7 @@
 
 #include "rule.hpp"
 
-// TODO: add summary about this header, especially subsetT.
+// !!TODO: add summary about this header, especially subsetT.
 
 #define assert_implies(a, b) assert(!(a) || (b))
 
@@ -304,14 +304,12 @@ namespace legacy {
         return subsetT{};
     }
 
-    // TODO: enhance...
     inline auto scan(const partitionT& par, const maskT& mask, const moldT& mold) {
         struct counterT {
             int free_0 = 0, free_1 = 0;
             int locked_0 = 0, locked_1 = 0; // 0/1 means masked value.
 
             bool any_locked() const { return locked_0 || locked_1; }
-            bool none_locked() const { return !any_locked(); }
             bool all_locked() const { return !free_0 && !free_1; }
 
             bool all_0() const { return !free_1 && !locked_1; }
@@ -821,7 +819,7 @@ namespace legacy {
     }  // namespace _tests
 #endif // ENABLE_TESTS
 
-    // TODO: proper name...
+    // !!TODO: proper name...
     inline moldT trans_mirror(const moldT& mold) {
         moldT mir{};
         for_each_code([&](codeT code) {

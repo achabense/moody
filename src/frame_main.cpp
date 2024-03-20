@@ -1,6 +1,6 @@
 #include "common.hpp"
 
-// TODO: improve recorder logic (especially `update`...)
+// TODO: improve recorder logic if possible...
 // Never empty.
 class recorderT {
     std::vector<legacy::moldT> m_record;
@@ -66,6 +66,7 @@ static void assign_val(legacy::moldT& mold, legacy::extrT::valT& val) {
     }
 }
 
+// TODO: make some tooltips interactive?
 void frame_main(const code_icons& icons, screenT& screen) {
     messenger::display();
 

@@ -24,8 +24,6 @@ static void run_torus(legacy::tileT& tile, legacy::tileT& temp, const legacy::ru
     tile.swap(temp);
 }
 
-// TODO: add documentations for the two kinds of capture, explain with examples.
-
 // Copy the subrange and run as a torus space, recording all invoked mappings.
 // This is good at capturing "self-contained" patterns (oscillators/spaceships).
 static legacy::moldT::lockT capture_closed(const legacy::tileT& source, const legacy::tileT::rangeT& range,
@@ -201,6 +199,7 @@ class runnerT {
         }
     };
 
+    // TODO: support setting patterns as init state?
     torusT::initT m_init{.size{.width = 500, .height = 400}, .seed = 0, .density = 0.5};
     torusT m_torus{m_init};
     ctrlT m_ctrl{.rule{}, .pace = 1, .anti_strobing = true, .gap = 0, .pause = false};
@@ -234,8 +233,14 @@ class runnerT {
     legacy::moldT::lockT m_lock{}; // For open-capture.
 
 public:
-    void apply_rule(const legacy::ruleT& rule) {
-        // TODO: whether to pause for one frame?
+    // TODO: redesign pause logics...
+    // TODO: better control logics... (`display` is horribly written due to unorganized control logics...)
+    // TODO: more sensible keyboard controls...
+    // TODO: (wontfix?) there cannot actually be multiple instances in the program.
+    // For example, there are a lot of static variables in `display`, and the keyboard controls are not designed
+    // for per-object use.
+
+    void apply_rule(const legacy::ruleT& rule, bool& temp_pause /* Workaround */) {
         if (m_ctrl.rule != rule) {
             m_ctrl.rule = rule;
             m_ctrl.anti_strobing = true;
@@ -243,20 +248,18 @@ public:
             m_torus.restart(m_init);
             m_ctrl.mark_written();
             m_lock = {};
+
+            temp_pause = true;
         }
     }
 
-    // TODO: horribly written...
-    // TODO: simplify control logics if possible...
-    std::optional<legacy::moldT::lockT> display(screenT& screen) {
+    std::optional<legacy::moldT::lockT> display(screenT& screen, bool& temp_pause /* Workaround */) {
         std::optional<legacy::moldT::lockT> out = std::nullopt;
 
         assert(m_init.size == m_torus.tile().size());
         assert(m_init.size == size_clamped(m_init.size));
         assert(screen_off.x == int(screen_off.x) && screen_off.y == int(screen_off.y));
 
-        // TODO: recheck and refine temp_pause logic...
-        bool temp_pause = false;
         int extra_step = 0;
         auto restart = [&] {
             m_torus.restart(m_init);
@@ -307,6 +310,7 @@ public:
 
             imgui_StepSliderInt("Pace (1~20)", &m_ctrl.pace, m_ctrl.pace_min, m_ctrl.pace_max);
 
+            // !!TODO: redesign this part.
             // TODO: should be interactive.
             // the rule has only all_0 and all_1 NOT flipped, and has interesting effect in extremely low/high
             // densities. (e.g. 0.01, 0.99)
@@ -342,7 +346,6 @@ public:
             }
 
             {
-                // TODO: make object-local? what about fill_den? and especially, other_op...
                 static char input_width[20]{}, input_height[20]{};
                 const auto filter = [](ImGuiInputTextCallbackData* data) -> int {
                     return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
@@ -406,8 +409,6 @@ public:
         ImGui::PopItemWidth();
 
         ImGui::Separator();
-
-        // TODO: set pattern as init state? what if size is already changed?
 
         const legacy::tileT::sizeT tile_size = m_torus.tile().size();
         const ImVec2 screen_size(tile_size.width * screen_zoom, tile_size.height * screen_zoom);
@@ -483,8 +484,6 @@ public:
 
                 drawlist->AddImage(screen.texture(), screen_min, screen_max);
             } else {
-                // TODO: displays poorly with miniwindow...
-
                 assert(paste->width() <= tile_size.width && paste->height() <= tile_size.height);
                 paste_beg.x = std::clamp(paste_beg.x, 0, tile_size.width - paste->width());
                 paste_beg.y = std::clamp(paste_beg.y, 0, tile_size.height - paste->height());
@@ -581,7 +580,6 @@ public:
                 }
             }
 
-            // TODO: better keyboard ctrl...
             static densityT fill_den = 0.5;
             static bool add_rule = false;
             if (other_op) {
@@ -613,7 +611,7 @@ public:
                         restart();
                     }
 
-                    // TODO: whether to explain the effects?
+                    // !!TODO: whether to explain the effects?
                     imgui_Str("Other shortcuts: 1, 2, 3, 4, Space, N, M, R");
                     ImGui::Separator();
 
@@ -675,7 +673,7 @@ public:
                     ImGui::Checkbox("Add rule", &add_rule);
                     ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                     imgui_StrTooltip("(?)", "Whether to append the current rule when copying patterns.");
-                    // TODO: reconsider whether to silently call ImGui::SetClipboardText...
+                    // !!TODO: reconsider whether to silently call ImGui::SetClipboardText...
                     term("Copy", "C", ImGuiKey_C, true, [&] {
                         assert(m_sel);
                         messenger::add_msg(
@@ -692,9 +690,9 @@ public:
                     term("Paste", "V", ImGuiKey_V, false, [&] {
                         if (const char* text = ImGui::GetClipboardText()) {
                             try {
-                                // TODO: or ask whether to resize m_torus.tile?
                                 paste.emplace(legacy::from_RLE_str(text, tile_size));
                             } catch (const std::exception& err) {
+                                // !!TODO: better message...
                                 messenger::add_msg(err.what());
                             }
                         }
@@ -705,7 +703,7 @@ public:
                         out = capture_closed(m_torus.tile(), m_sel->to_range(), m_ctrl.rule);
                     });
                     ImGui::Separator();
-                    // TODO: better layout...
+                    // !!TODO: better layout...
                     int count = 0;
                     legacy::for_each_code([&](legacy::codeT code) { count += m_lock[code]; });
                     term(std::format("Capture (open) {}/512", count).c_str(), "L (repeatable)", ImGuiKey_None, true,
@@ -739,6 +737,7 @@ public:
 
 std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, screenT& screen) {
     static runnerT runner;
-    runner.apply_rule(rule);
-    return runner.display(screen);
+    bool temp_pause = false;
+    runner.apply_rule(rule, temp_pause);
+    return runner.display(screen, temp_pause);
 }
