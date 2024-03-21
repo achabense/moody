@@ -50,7 +50,13 @@ You will learn about how to find rules like this in the "Lock and capture" secti
 
 const char* const doc_workflow =
     R"(---- Overview
-The current rule is shown in the right plane. At the top ... (about "sequence"/undo/redo/lock/...)
+The current rule is shown in the right plane. At the top ...
+
+---- Rule sequence
+There are a series of widgets that manage a sequence of rules. They are organized as a group of buttons for "first prev/next last". When you click on any of them the left/right keys are bound to prev/next (so you can press the keys to trigger the button).
+The first sequence you should be familiar with is the history of working state. With this you can perform undo/redo.
+
+...
 
 ---- Subset recognition and selection
 

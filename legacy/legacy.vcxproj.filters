@@ -96,5 +96,6 @@
   <ItemGroup>
     <None Include="..\src\.clang-format" />
     <None Include="..\README.md" />
+    <None Include="..\rules\README.md" />
   </ItemGroup>
 </Project>

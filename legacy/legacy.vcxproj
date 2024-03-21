@@ -195,6 +195,7 @@
     <ClCompile Include="..\src\frame_main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\rules\README.md" />
     <None Include="..\src\.clang-format" />
     <None Include="..\README.md" />
   </ItemGroup>

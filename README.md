@@ -8,11 +8,12 @@ The supported subsets include self-complementary rules, isotropic/totalistic rul
 #### What can be saved & how to save
 The program uses normal MAP-strings (Link) to store rules. This means you can try these rules in other programs like Golly.
 The program also has an extension called "lock" to help generate specific rules. A lock is encoded the same way as MAP rule and is always associated with a MAP rule.
+The format is defined as: `MAP-string + ' ' + '[' + base64-string-of-the-lock + ']'`.
 
 For now the program cannot save the rule to the file directly. However, it's easy to copy the rule to the clipboard: right-click the rule-string and that's done.
 The program is able to load all MAP rules from a file or from the clipboard. Rules are loaded on a per-line basis. There are no specific requirements for the file format.
 
-(TODO: forgot to mention RLE...)
+If you find some interesting patterns you can also select and save as RLE string.
 
 #### Examples found by this program
 (Rule with pics)
@@ -23,4 +24,7 @@ See the "Documents" part in the program to get familiar with the concepts and op
 
 #### How to build & Dependency
 The program is written in C++20, and developed with the help of ImGui (Link) (which is carried by this project) and SDL2 (there is a zip in ...).
-The project is currently organized as a VS project. ...
+The project is currently organized as a VS project. For now, to build this project, you'd have to:
+(This is a bit awkward; will improve in the future...)
+1. In `sdl` subfolder, un-zip `SDL2-devel-2.30.1-VC.zip` with the same name in the same place, so that there is `sdl\sdl-SDL2-devel-2.30.1-VC\SDL2-2.30.1\...`
+2. Then you can open the `.sln` file to build the project.

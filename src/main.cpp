@@ -157,9 +157,12 @@ int main(int, char**) {
     ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
     ImGui_ImplSDLRenderer2_Init(renderer);
 
+#if 0
     // Test-only.
-    // ImGui::GetIO().Fonts->AddFontFromFileTTF(R"(C:\Windows\Fonts\Deng.ttf)", 13, nullptr,
-    //                                          ImGui::GetIO().Fonts->GetGlyphRangesChineseFull());
+    ImGui::GetIO().Fonts->AddFontDefault();
+    static const ImWchar full_range[]{0x0001, 0xFFFD, 0};
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(R"(C:\Windows\Fonts\Deng.ttf)", 13, nullptr, full_range);
+#endif
 
     auto begin_frame = [] {
         SDL_Event event;
