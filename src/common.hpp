@@ -108,6 +108,17 @@ inline float wrap_len() {
     return ImGui::GetFontSize() * 35.0f;
 }
 
+// TODO: whether to support shortcut in `imgui_StepSliderInt`?
+inline bool button_with_shortcut(const char* label, ImGuiKey shortcut = ImGuiKey_None, const ImVec2& size = {}) {
+    bool ret = ImGui::Button(label, size);
+    if (shortcut != ImGuiKey_None && !imgui_TestItemFlag(ImGuiItemFlags_Disabled)) {
+        const bool pressed = imgui_KeyPressed(shortcut, imgui_TestItemFlag(ImGuiItemFlags_ButtonRepeat));
+        imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_ButtonActive, pressed ? 0.3 : 1.0));
+        ret = ret || pressed;
+    }
+    return ret;
+}
+
 class sequence {
     enum tagE { None, First, Prev, Next, Last };
 
@@ -116,9 +127,6 @@ class sequence {
     // (`disable` is a workaround for dec/inc pair in `edit_rule`...)
     static tagE seq(const char* label_first, const char* label_prev, const char* label_next, const char* label_last,
                     bool disable) {
-        const ImGuiKey key_prev = ImGuiKey_LeftArrow;
-        const ImGuiKey key_next = ImGuiKey_RightArrow;
-
         tagE tag = None;
 
         if (ImGui::Button(label_first)) {
@@ -131,22 +139,18 @@ class sequence {
         const ImGuiID id_prev = ImGui::GetID(label_prev);
         const ImGuiID id_next = ImGui::GetID(label_next);
         assert(id_prev != 0 && id_next != 0 && id_prev != id_next);
-        const bool disabled = imgui_Disabled();
+        const bool disabled = imgui_TestItemFlag(ImGuiItemFlags_Disabled);
         const bool bound = !disabled && (bound_id == id_prev || bound_id == id_next);
+        const ImGuiKey shortcut_prev = bound ? ImGuiKey_LeftArrow : ImGuiKey_None;
+        const ImGuiKey shortcut_next = bound ? ImGuiKey_RightArrow : ImGuiKey_None;
 
         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-        if (ImGui::Button(label_prev) || (bound && imgui_KeyPressed(key_prev, false))) {
+        if (button_with_shortcut(label_prev, shortcut_prev)) {
             tag = Prev;
         }
-        if (bound) {
-            imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_ButtonActive, tag == Prev ? 0.3 : 1.0));
-        }
         ImGui::SameLine(0, 0), imgui_Str("/"), ImGui::SameLine(0, 0);
-        if (ImGui::Button(label_next) || (bound && imgui_KeyPressed(key_next, false))) {
+        if (button_with_shortcut(label_next, shortcut_next)) {
             tag = Next;
-        }
-        if (bound) {
-            imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_ButtonActive, tag == Next ? 0.3 : 1.0));
         }
         if (disable) {
             ImGui::EndDisabled();
@@ -179,17 +183,6 @@ public:
         }
     }
 };
-
-inline bool button_with_shortcut(const char* label, ImGuiKey key) {
-    bool ret = ImGui::Button(label);
-
-    if (!imgui_Disabled()) {
-        const bool pressed = imgui_KeyPressed(key, false);
-        imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_ButtonActive, pressed ? 0.3 : 1.0));
-        ret = ret || pressed;
-    }
-    return ret;
-}
 
 class messenger {
     inline static std::vector<std::string> m_strs{};

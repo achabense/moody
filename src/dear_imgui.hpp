@@ -96,7 +96,9 @@ struct [[nodiscard]] imgui_ChildWindow {
 };
 
 // TODO: are there public ways to do this?
-inline bool imgui_Disabled() { return (GImGui->CurrentItemFlags & ImGuiItemFlags_Disabled) != 0; }
+inline bool imgui_TestItemFlag(ImGuiItemFlags_ flag) { //
+    return (GImGui->CurrentItemFlags & flag) != 0;
+}
 
 inline float imgui_ItemInnerSpacingX() { return ImGui::GetStyle().ItemInnerSpacing.x; }
 
