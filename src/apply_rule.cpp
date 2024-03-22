@@ -489,6 +489,7 @@ public:
                 paste_beg.y = std::clamp(paste_beg.y, 0, tile_size.height - paste->height());
                 const legacy::tileT::posT paste_end = paste_beg + paste->size();
 
+                // !!TODO: the Or-mode cannot paste patterns into white background...
                 // (wontfix) Wasteful, but after all this works...
                 legacy::tileT temp = legacy::copy(m_torus.tile(), {{paste_beg, paste_end}});
                 legacy::blit<legacy::blitE::Or>(m_torus.tile(), paste_beg, *paste);
@@ -580,8 +581,6 @@ public:
                 }
             }
 
-            static densityT fill_den = 0.5;
-            static bool add_rule = false;
             if (other_op) {
                 if (auto window = imgui_Window("Range operations", &other_op,
                                                ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse)) {
@@ -631,6 +630,15 @@ public:
                         }
                     };
 
+                    auto set_tag = [](bool& tag, const char* label, const char* message) {
+                        ImGui::Checkbox(label, &tag);
+                        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                        imgui_StrTooltip("(?)", message);
+                    };
+
+                    // Filling.
+                    // TODO: for "Clear inside/outside" & "Shrink", add a tag for `bool v`?
+                    static densityT fill_den = 0.5;
                     fill_den.step_slide("Fill density");
                     term("Random fill", "+/=", ImGuiKey_Equal, true, [&] {
                         assert(m_sel);
@@ -650,6 +658,7 @@ public:
                         m_ctrl.mark_written();
                         temp_pause = true;
                     });
+
                     ImGui::Separator();
                     term("Select all", "A", ImGuiKey_A, false, [&] {
                         if (!m_sel || m_sel->width() != tile_size.width || m_sel->height() != tile_size.height) {
@@ -669,20 +678,28 @@ public:
                             m_sel.reset();
                         }
                     });
+
+                    // Copy/Cut/Paste.
+                    static bool add_rule = false;
+                    static bool copy_silently = false;
+                    auto copy_sel = [&] {
+                        assert(m_sel);
+                        std::string rle_str =
+                            legacy::to_RLE_str(add_rule ? &m_ctrl.rule : nullptr, m_torus.tile(), m_sel->to_range());
+                        if (copy_silently) {
+                            ImGui::SetClipboardText(rle_str.c_str());
+                        } else {
+                            messenger::add_msg(std::move(rle_str));
+                        }
+                    };
+
                     ImGui::Separator();
-                    ImGui::Checkbox("Add rule", &add_rule);
-                    ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                    imgui_StrTooltip("(?)", "Whether to append the current rule when copying patterns.");
-                    // !!TODO: reconsider whether to silently call ImGui::SetClipboardText...
-                    term("Copy", "C", ImGuiKey_C, true, [&] {
-                        assert(m_sel);
-                        messenger::add_msg(
-                            legacy::to_RLE_str(add_rule ? &m_ctrl.rule : nullptr, m_torus.tile(), m_sel->to_range()));
-                    });
+                    set_tag(add_rule, "Add rule", "Whether to append the current rule when copying patterns.");
+                    ImGui::SameLine();
+                    set_tag(copy_silently, "Copy silently", "Whether to directly copy to the clipboard.");
+                    term("Copy", "C", ImGuiKey_C, true, [&] { copy_sel(); });
                     term("Cut", "X", ImGuiKey_X, true, [&] {
-                        assert(m_sel);
-                        messenger::add_msg(
-                            legacy::to_RLE_str(add_rule ? &m_ctrl.rule : nullptr, m_torus.tile(), m_sel->to_range()));
+                        copy_sel();
                         legacy::clear_inside(m_torus.tile(), m_sel->to_range());
                         m_ctrl.mark_written();
                         temp_pause = true;
@@ -697,20 +714,26 @@ public:
                             }
                         }
                     });
+
+                    // Pattern capturing.
+                    // TODO: enable getting current.lock?
+                    static bool adopt_eagerly = true;
                     ImGui::Separator();
+                    set_tag(adopt_eagerly, "Adopt eagerly",
+                            "Whether to automatically adopt the lock after doing closed-capture. (This does not affect "
+                            "open-capture.)");
                     term("Capture (closed)", "P", ImGuiKey_P, true, [&] {
                         assert(m_sel);
-                        out = capture_closed(m_torus.tile(), m_sel->to_range(), m_ctrl.rule);
+                        const auto lock = capture_closed(m_torus.tile(), m_sel->to_range(), m_ctrl.rule);
+                        legacy::for_each_code([&](legacy::codeT c) { m_lock[c] = m_lock[c] || lock[c]; });
+                        if (adopt_eagerly) {
+                            out = m_lock;
+                        }
                     });
-                    ImGui::Separator();
-                    // !!TODO: better layout...
-                    int count = 0;
-                    legacy::for_each_code([&](legacy::codeT code) { count += m_lock[code]; });
-                    term(std::format("Capture (open) {}/512", count).c_str(), "L (repeatable)", ImGuiKey_None, true,
-                         [&] {
-                             assert(m_sel);
-                             capture_open(m_torus.tile(), m_sel->to_range(), m_lock);
-                         });
+                    term("Capture (open)", "L (repeatable)", ImGuiKey_None, true, [&] {
+                        assert(m_sel);
+                        capture_open(m_torus.tile(), m_sel->to_range(), m_lock);
+                    });
                     if (m_sel && imgui_KeyPressed(ImGuiKey_L, true)) {
                         capture_open(m_torus.tile(), m_sel->to_range(), m_lock);
                     }
@@ -721,6 +744,10 @@ public:
                     if (ImGui::Button("Adopt")) {
                         out = m_lock;
                     }
+                    ImGui::SameLine();
+                    int count = 0;
+                    legacy::for_each_code([&](legacy::codeT code) { count += m_lock[code]; });
+                    ImGui::Text("Count:%d/512", count);
                 }
             }
         }
