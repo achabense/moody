@@ -25,8 +25,8 @@ inline void imgui_Str(std::string_view str) { //
     ImGui::TextUnformatted(str.data(), str.data() + str.size());
 }
 
-inline void imgui_StrWrapped(std::string_view str) {
-    ImGui::PushTextWrapPos(0.0f);
+inline void imgui_StrWrapped(std::string_view str, float min_len) {
+    ImGui::PushTextWrapPos(std::max(min_len, ImGui::GetContentRegionAvail().x));
     imgui_Str(str);
     ImGui::PopTextWrapPos();
 }
@@ -50,6 +50,11 @@ inline void imgui_StrCopyable(const std::string& str, void (*str_func)(std::stri
         imgui_ItemRect(IM_COL32_WHITE);
     } else if (ImGui::IsItemHovered()) {
         imgui_ItemRect(IM_COL32(128, 128, 128, 255));
+    }
+    // TODO: is this too noisy?
+    if (ImGui::BeginItemTooltip()) {
+        imgui_Str("Right-click to copy to the clipboard.");
+        ImGui::EndTooltip();
     }
 }
 

@@ -173,7 +173,7 @@ public:
         terms_misc.emplace_back("s(*)", &ignore_s_i,
                                 "Similar to 's' - for any two cases where only 's' is different, the \"flip-ness\" of "
                                 "values are the same. So there must be: either s:0->0, s:1->1 or s:0->1, s:1->0.");
-        terms_misc.emplace_back("s.c.", &self_complementary, "Self-complementary rules.");
+        terms_misc.emplace_back("S.c.", &self_complementary, "Self-complementary rules.");
 
         terms_native.emplace_back("All", &native_isotropic,
                                   "Isotropic rules. (The rules that preserve all symmetries.) "
@@ -436,7 +436,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
         // !!TODO: refine message...
         imgui_StrWrapped("This mask does not belong to the selected subsets. Consider trying other masks. "
                          "(The \"Native\" mask is known to belong to the selected subsets and will always work.) "
-                         "For more details see the \"Workflow\" part in \"Documents\"");
+                         "For more details see the \"Workflow\" part in \"Documents\"",
+                         item_width);
         return std::nullopt;
     }
 

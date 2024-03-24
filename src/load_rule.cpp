@@ -294,7 +294,7 @@ public:
             for (int l = 1; const auto& [text, id] : m_lines) {
                 ImGui::TextDisabled("%2d ", l++);
                 ImGui::SameLine();
-                imgui_StrWrapped(text);
+                imgui_StrWrapped(text, item_width);
 
                 const int this_l = l - 2;
                 if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
@@ -438,22 +438,32 @@ static void load_rule_from_memory(std::optional<legacy::extrT::valT>& out) {
     static textT text;
     static std::optional<int> doc_id = std::nullopt;
     static bool rewind = false;
-
-    if (!doc_id) {
+    static auto select = []() {
         for (int i = 0; i < doc_size; ++i) {
-            if (ImGui::Selectable(docs[i].title)) {
+            if (ImGui::Selectable(docs[i].title, doc_id == i) && doc_id != i) {
                 text.clear();
                 text.append(docs[i].text);
                 rewind = true;
                 doc_id = i;
             }
         }
+    };
+
+    if (!doc_id) {
+        select();
     } else {
         // assert(text.has_rule());
 
         const bool close = ImGui::SmallButton("Close");
         ImGui::SameLine();
+        ImGui::SmallButton("...");
+        if (ImGui::BeginPopupContextItem(nullptr, ImGuiPopupFlags_MouseButtonLeft)) {
+            select();
+            ImGui::EndPopup();
+        }
+        ImGui::SameLine();
         imgui_Str(docs[*doc_id].title);
+
         ImGui::Separator();
         text.display(out, std::exchange(rewind, false));
         if (close) {
