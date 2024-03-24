@@ -138,6 +138,7 @@ void frame_main(const code_icons& icons, screenT& screen) {
         static bool show_demo = true;
         ImGui::Checkbox("Demo window", &show_demo);
         if (show_demo) {
+            ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
             ImGui::ShowDemoWindow(&show_demo);
         }
         ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();

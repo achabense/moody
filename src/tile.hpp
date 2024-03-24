@@ -260,7 +260,7 @@ namespace legacy {
         return c;
     }
 
-    enum class blitE { Copy, Or, Xor };
+    enum class blitE { Copy, Or, And, Xor };
     template <blitE mode>
     inline void blit(tileT& dest, tileT::posT d_begin, const tileT& source, const rangeT_opt& s_range_ = {}) {
         assert(&source != &dest);
@@ -275,6 +275,8 @@ namespace legacy {
                     *d++ = v;
                 } else if constexpr (mode == blitE::Or) {
                     *d++ |= v;
+                } else if constexpr (mode == blitE::And) {
+                    *d++ &= v;
                 } else {
                     static_assert(mode == blitE::Xor);
                     *d++ ^= v;
