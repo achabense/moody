@@ -674,7 +674,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
 }
 
 // TODO: move to "apply_rule.cpp"? (as this is a special type of capture...)
-// !!TODO: add tips and documentation...
 std::optional<legacy::moldT> static_constraints() {
     enum stateE { Any_background, O, I, O_background, I_background };
     const int r = 9;
@@ -686,6 +685,26 @@ std::optional<legacy::moldT> static_constraints() {
                                IM_COL32(255, 255, 255, 255), //
                                IM_COL32(80, 0, 80, 255),     //
                                IM_COL32(200, 0, 200, 255)};
+    // TODO: finish the description... (how does the board represent still-lives...)
+    static const auto description = [] {
+        auto term = [](stateE s, const char* desc) {
+            ImGui::Dummy(square_size());
+            imgui_ItemRectFilled(cols[s]);
+            imgui_ItemRect(IM_COL32(200, 200, 200, 255));
+            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+            ImGui::AlignTextToFramePadding(); // Needed.
+            imgui_Str(desc);
+        };
+        imgui_Str("Operations:\n"
+                  "Left-click the cell to set the value.\n"
+                  "Right-click to set back to any-background.\n"
+                  "Scroll in the board to change the value for left-click.\n");
+        term(O, ": Supposed to remain 0.");
+        term(I, ": Supposed to remain 1.");
+        term(O_background, ": Background 0.");
+        term(I_background, ": Background 1.");
+        term(Any_background, ": Any background.");
+    };
 
     if (ImGui::Button("Clear")) {
         for (auto& l : board) {
@@ -696,6 +715,9 @@ std::optional<legacy::moldT> static_constraints() {
     }
     ImGui::SameLine();
     const bool ret = ImGui::Button("Adopt");
+    ImGui::SameLine();
+    imgui_StrTooltip("(?)", description);
+    // TODO: add some examples?
 
     // Display-only; the value of `state_lbutton` is controlled by mouse-scrolling.
     ImGui::BeginDisabled();
@@ -722,7 +744,7 @@ std::optional<legacy::moldT> static_constraints() {
                 ImGui::SameLine();
             }
 
-            // No need for unique ID here (as IsItemHovered + IsMouseDown doesn't reply on ID).
+            // No need for unique ID here (as IsItemHovered + IsMouseDown doesn't rely on ID).
             ImGui::InvisibleButton("##Invisible", square_size());
 
             const bool editable = y >= 1 && y < r - 1 && x >= 1 && x < r - 1;
