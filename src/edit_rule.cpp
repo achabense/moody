@@ -163,6 +163,9 @@ public:
         terms_ignore.emplace_back("x", &ignore_x, "See 'q' for details.");
         terms_ignore.emplace_back("c", &ignore_c, "See 'q' for details.");
 
+        terms_misc.emplace_back("s(*)", &ignore_s_i,
+                                "Similar to 's' - for any two cases where only 's' is different, the \"flip-ness\" of "
+                                "values are the same. So there must be: either s:0->0, s:1->1 or s:0->1, s:1->0.");
         terms_misc.emplace_back(
             "Hex", &ignore_hex,
             "Rules that emulate the hexagonal rules (by ignoring e/z). For symmetric hexagonal rules... !!TODO");
@@ -170,9 +173,6 @@ public:
             "Von", &ignore_von,
             "Rules in the Von-Neumann neighborhood. (The rules that are independent of q/e/z/c.)\n"
             "You can combine this with native symmetry subsets to explore symmetric Von-Neumann rules.");
-        terms_misc.emplace_back("s(*)", &ignore_s_i,
-                                "Similar to 's' - for any two cases where only 's' is different, the \"flip-ness\" of "
-                                "values are the same. So there must be: either s:0->0, s:1->1 or s:0->1, s:1->0.");
         terms_misc.emplace_back("S.c.", &self_complementary, "Self-complementary rules.");
 
         terms_native.emplace_back("All", &native_isotropic,
@@ -251,16 +251,13 @@ public:
             }
             ImGui::PopID();
 
-            if (ImGui::BeginItemTooltip()) {
-                ImGui::PushTextWrapPos(wrap_len());
+            imgui_ItemTooltip([&] {
                 if (term.disabled) {
                     imgui_Str("(This is not selectable as the result will be an empty set)");
                     ImGui::Separator();
                 }
                 imgui_Str(term.description);
-                ImGui::PopTextWrapPos();
-                ImGui::EndTooltip();
-            }
+            });
 
             const ImU32 cent_col_disabled = !show_title ? IM_COL32(120, 30, 0, 255) : IM_COL32(0, 0, 0, 90);
             const ImU32 cent_col = term.selected                 ? IM_COL32(65, 150, 255, 255) // Roughly _ButtonHovered
@@ -396,8 +393,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
 
         ImGui::AlignTextToFramePadding();
         imgui_Str("Mask");
-        ImGui::SameLine(0, 0);
-        imgui_StrTooltip("?", about_mask);
+        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+        imgui_StrTooltip("(?)", about_mask);
 
         for (const maskE m : {Zero, Identity, Native, Custom}) {
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
@@ -406,8 +403,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
                 mask_tag = m;
             }
 
-            ImGui::SameLine(0, 0);
-            imgui_StrTooltip("?", [&] {
+            imgui_ItemTooltip([&] {
                 imgui_Str(mask_descriptions[m]);
                 imgui_Str(legacy::to_MAP_str(*mask_ptrs[m]));
             });

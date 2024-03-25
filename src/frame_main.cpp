@@ -84,7 +84,8 @@ void frame_main(const code_icons& icons, screenT& screen) {
         if (flag) {
             ImGui::SetNextWindowSize({600, 400}, ImGuiCond_FirstUseEver);
             ImGui::SetNextWindowSizeConstraints(ImVec2(400, 300), ImVec2(FLT_MAX, FLT_MAX));
-            if (auto window = imgui_Window(title, &flag, ImGuiWindowFlags_NoCollapse)) {
+            ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
+            if (auto window = imgui_Window(title, &flag)) {
                 if (auto out = load_fn()) {
                     assign_val(current, *out);
                     update = true;
@@ -94,8 +95,8 @@ void frame_main(const code_icons& icons, screenT& screen) {
     };
 
     if (show_static) {
-        if (auto window = imgui_Window("Static constraints", &show_static,
-                                       ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse)) {
+        ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
+        if (auto window = imgui_Window("Static constraints", &show_static, ImGuiWindowFlags_AlwaysAutoResize)) {
             if (auto out = static_constraints()) {
                 current = *out;
                 update = true;
@@ -117,7 +118,7 @@ void frame_main(const code_icons& icons, screenT& screen) {
         load_rule(show_doc, "Documents", load_doc);
 
         ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
-        ImGui::Checkbox("Static", &show_static);
+        ImGui::Checkbox("Static", &show_static); // TODO: move elsewhere?
         ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
         const ImGuiID id_prev =
             ImGui::GetID("prev"); // For `sequence::bind_to` (when the rule is gotten by randomization.)
@@ -128,7 +129,7 @@ void frame_main(const code_icons& icons, screenT& screen) {
         ImGui::SameLine();
         ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1 /* [1, size()] */);
         ImGui::SameLine();
-        if (ImGui::Button("Clear")) {
+        if (ImGui::Button("Clear")) { // TODO: the effect is not obvious.
             recorder.clear();
         }
 #ifndef NDEBUG

@@ -20,6 +20,20 @@ inline void imgui_ItemRectFilled(ImU32 col, ImVec2 off_min = {0, 0}) {
                                               ImVec2(pos_max.x - off_min.x, pos_max.y - off_min.y), col);
 }
 
+inline void imgui_ItemTooltip(const std::invocable<> auto& desc) {
+    if (ImGui::BeginItemTooltip()) {
+        // The same as the one in `HelpMarker` in "imgui_demo.cpp".
+        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+        desc();
+        ImGui::PopTextWrapPos();
+        ImGui::EndTooltip();
+    }
+}
+
+inline void imgui_ItemTooltip(std::string_view desc) {
+    imgui_ItemTooltip([desc] { ImGui::TextUnformatted(desc.data(), desc.data() + desc.size()); });
+}
+
 // Unlike ImGui::Text(Wrapped/...), these functions take unformatted string as the argument.
 inline void imgui_Str(std::string_view str) { //
     ImGui::TextUnformatted(str.data(), str.data() + str.size());
@@ -52,21 +66,14 @@ inline void imgui_StrCopyable(const std::string& str, void (*str_func)(std::stri
         imgui_ItemRect(IM_COL32(128, 128, 128, 255));
     }
     // TODO: is this too noisy?
-    if (ImGui::BeginItemTooltip()) {
-        imgui_Str("Right-click to copy to the clipboard.");
-        ImGui::EndTooltip();
-    }
+    // TODO: the message should be dependent on `mouse_button`...
+    // imgui_ItemTooltip("Right-click to copy to the clipboard.");
 }
 
 // Similar to `HelpMarker` in "imgui_demo.cpp".
 inline void imgui_StrTooltip(std::string_view str, const std::invocable<> auto& desc) {
     imgui_StrDisabled(str);
-    if (ImGui::BeginItemTooltip()) {
-        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
-        desc();
-        ImGui::PopTextWrapPos();
-        ImGui::EndTooltip();
-    }
+    ::imgui_ItemTooltip(desc);
 }
 
 inline void imgui_StrTooltip(std::string_view str, std::string_view desc) { //

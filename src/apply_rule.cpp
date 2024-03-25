@@ -627,9 +627,8 @@ public:
                         }
                     }
                     // (Requiring `visible` to avoid the tooltip when the window is collapsed.)
-                    if (visible && !enabled && ImGui::BeginItemTooltip()) {
-                        imgui_Str("This operation is meaningful only when there are selected areas.");
-                        ImGui::EndTooltip();
+                    if (visible && !enabled) {
+                        imgui_ItemTooltip("This operation is meaningful only when there are selected areas.");
                     }
                 };
 
