@@ -554,17 +554,32 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
             ImGui::SameLine();
             ImGui::Checkbox("Hide locked groups", &hide_locked);
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-            imgui_StrTooltip("(!)", "Only \"pure\" groups can be hidden when there are locks.");
+            imgui_StrTooltip("(!)", "Only \"pure\" (light-blue) groups can be hidden when there are locks.");
             ImGui::EndPopup();
         }
 
-        // !!TODO: refine... (whether to show free groups/ interop with hide_locked...)
-        std::string summary = std::format("Groups:{} ({}:{} {}:{} x:{})", c_group, chr_0, c_0, chr_1, c_1, c_x);
-        if (c_free != c_group) {
-            summary += std::format(" [Locked:{} ({}:{} {}:{} x:{})]", c_group - c_free, chr_0, c_locked_0, chr_1,
-                                   c_locked_1, c_locked_x);
+        // TODO: refine message...
+        if (contained) {
+            ImGui::Text("Groups:%d (%c:%d %c:%d)", c_group, chr_1, c_1, chr_0, c_0);
+            if (c_free != c_group) {
+                int count = 0;
+                legacy::for_each_code([&](legacy::codeT c) { count += mold.lock[c]; });
+                const int c_free_1 = c_1 - c_locked_1, c_free_0 = c_0 - c_locked_0;
+                ImGui::Text("Free:%d (%c:%d %c:%d) Locked:%d (%c:%d %c:%d) Locked-abs:%d/512", c_free, chr_1, c_free_1,
+                            chr_0, c_free_0, c_locked_1 + c_locked_0, chr_1, c_locked_1, chr_0, c_locked_0, count);
+            }
+        } else if (compatible) {
+            ImGui::Text("Groups:%d !contained", c_group);
+            ImGui::SameLine();
+            imgui_StrTooltip("(?)", "(Check the dull-blue groups for details.)\n"
+                                    "The current rule does not belong to all the selected subsets.");
+        } else {
+            ImGui::Text("Groups:%d !compatible", c_group);
+            ImGui::SameLine();
+            imgui_StrTooltip("(?)", "(Check the red groups for details.)\n"
+                                    "There cannot be rules that belong to the selected subsets and also have the "
+                                    "same locked values as the current rule.");
         }
-        imgui_Str(summary);
     }
 
     ImGui::Separator();
