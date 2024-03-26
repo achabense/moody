@@ -819,19 +819,19 @@ namespace legacy {
     }  // namespace _tests
 #endif // ENABLE_TESTS
 
-    // !!TODO: proper name...
-    inline moldT trans_mirror(const moldT& mold) {
-        moldT mir{};
+    // 0/1-reversal dual.
+    inline moldT trans_reverse(const moldT& mold) {
+        moldT rev{};
         for_each_code([&](codeT code) {
             const auto [q, w, e, a, s, d, z, x, c] = decode(code);
-            const codeT code_mir = encode({!q, !w, !e, //
+            const codeT code_rev = encode({!q, !w, !e, //
                                            !a, !s, !d, //
                                            !z, !x, !c});
-            mir.lock[code_mir] = mold.lock[code];
-            mir.rule[code_mir] = (mold.rule[code] == s) ? !s : !(!s); // So that ->
-            assert((mir.rule[code_mir] == !s) == (mold.rule[code] == s));
+            rev.lock[code_rev] = mold.lock[code];
+            rev.rule[code_rev] = (mold.rule[code] == s) ? !s : !(!s); // So that ->
+            assert((rev.rule[code_rev] == !s) == (mold.rule[code] == s));
         });
-        return mir;
+        return rev;
     }
 
 #if 0
@@ -861,13 +861,13 @@ namespace legacy {
 
 #ifdef ENABLE_TESTS
     namespace _tests {
-        inline const testT test_trans_mir = [] {
+        inline const testT test_trans_reverse = [] {
             moldT mold{};
             for_each_code([&](codeT code) {
                 mold.rule[code] = testT::rand() & 1;
                 mold.lock[code] = testT::rand() & 1;
             });
-            assert(mold == trans_mirror(trans_mirror(mold)));
+            assert(mold == trans_reverse(trans_reverse(mold)));
         };
     }  // namespace _tests
 #endif // ENABLE_TESTS

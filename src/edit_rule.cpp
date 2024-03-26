@@ -206,10 +206,10 @@ public:
         terms_hex.emplace_back("All", &hex_isotropic,
                                "Isotropic hexagonal rules. (The intersection of the following subsets in this line.)");
         terms_hex.emplace_back("a-d", &hex_refl_asd,
-                               "Hexagonal rules that preserve reflection symmetry (taking the axis from 'a' to 'd'). "
+                               "Hexagonal rules that preserve reflection symmetry (taking the axis from 'a to d'). "
                                "Notice this is emulated symmetry...");
-        terms_hex.emplace_back("q-c", &hex_refl_qsc, "Ditto, the reflection axis is q to c.");
-        terms_hex.emplace_back("w-x", &hex_refl_wsx, "Ditto, the reflection axis is w to x.");
+        terms_hex.emplace_back("q-c", &hex_refl_qsc, "Ditto, the reflection axis is 'q to c'.");
+        terms_hex.emplace_back("w-x", &hex_refl_wsx, "Ditto, the reflection axis is 'w to x'.");
         terms_hex.emplace_back("a|q", &hex_refl_aq, "Ditto, the reflection axis is vertical to 'a to q'");
         terms_hex.emplace_back("q|w", &hex_refl_qw, "Ditto, the reflection axis is vertical to 'q to w'");
         terms_hex.emplace_back("w|d", &hex_refl_wd, "Ditto, the reflection axis is vertical to 'w to d'");
@@ -361,10 +361,9 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
     char chr_0 = '0', chr_1 = '1';
     const legacy::maskT& mask = [&] {
         // !!TODO: finish...
-        const char* const about_mask =
-            "About mask:\n"
+        const char* const about_mask = "About mask:\n"
             "A mask is an arbitrary rule used to do XOR masking for other rules...\n"
-            "The editions are available only when the mask belongs to the selected subsets .";
+                                       "For more details see the \"Workflow\" part in \"Documents\".";
 
         // TODO: add record for custom masks?
         static legacy::maskT mask_custom{{}};
@@ -427,12 +426,15 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
     ImGui::Separator();
 
     // Disable all edit operations if !subset.contains(mask), including those that do not really need
-    // the mask to be valid (for example, `trans_mirror`, which does not actually rely on subsets).
+    // the mask to be valid (for example, `trans_reverse`, which does not actually rely on subsets).
     if (!subset.contains(mask)) {
-        // !!TODO: refine message...
-        imgui_StrWrapped("This mask does not belong to the selected subsets. Consider trying other masks. "
-                         "(The \"Native\" mask is known to belong to the selected subsets and will always work.) "
-                         "For more details see the \"Workflow\" part in \"Documents\"",
+        imgui_StrWrapped(
+            "This mask does not belong to the selected subsets. Consider trying other masks.\n\n"
+            "1. At least one of \"Zero\", \"Identity\" and \"Native\" will work. Especially, \"Native\" will "
+            "always work.\n"
+            "2. If the current rule belongs to the selected subsets, it can also serve as a valid \"Custom\" "
+            "mask (\"Take current\").\n\n"
+            "For more details see the \"Workflow\" part in \"Documents\".",
                          item_width);
         return std::nullopt;
     }
@@ -523,8 +525,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
         });
 
         guarded_block(true /* Unconditional */, [&] {
-            if (ImGui::Button("Mir")) {
-                return_mold(legacy::trans_mirror(mold));
+            if (ImGui::Button("Rev")) {
+                return_mold(legacy::trans_reverse(mold));
             }
         });
         ImGui::SameLine();
