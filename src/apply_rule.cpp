@@ -298,47 +298,49 @@ public:
             ImGui::AlignTextToFramePadding();
             imgui_StrTooltip("(...)",
                              "Keyboard shortcuts:\nR: Restart\n1/2 (repeatable): -/+ Gap\n3/4 (repeatable): -/+ Pace\n"
-                             "N/M (repeatable): +1/+p\nSpace: Pause");
+                             "Space: Pause\nN/M (repeatable): +p/+1");
             ImGui::SameLine();
             ImGui::Checkbox("Pause", &m_ctrl.pause);
-            ImGui::SameLine();
             ImGui::PushButtonRepeat(true);
-            if (ImGui::Button("+1")) {
-                extra_step = 1;
-            }
-            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-            imgui_StrTooltip("(?)", "Advance generation by 1 (instead of pace). This is useful for changing the parity "
-                                    "of generation when pace != 1.");
             ImGui::SameLine();
             if (ImGui::Button(std::format("+p({})###+p", m_ctrl.actual_pace()).c_str())) {
                 extra_step = m_ctrl.actual_pace();
                 m_ctrl.pause = true;
             }
+            ImGui::SameLine();
+            if (ImGui::Button("+1")) {
+                extra_step = 1;
+            }
             ImGui::PopButtonRepeat();
+            ImGui::SameLine();
+            imgui_StrTooltip("(?)", [] {
+                imgui_Str("+p:");
+                ImGui::SameLine();
+                imgui_Str("Run manually (advance generation by actual-pace, controlled by the button/keypress).");
+                imgui_Str("+1:");
+                ImGui::SameLine();
+                imgui_Str("Advance generation by 1 instead of actual-pace. This is useful for changing the parity "
+                          "of generation when actual-pace != 1.");
+            });
 
             imgui_StepSliderInt("Gap time (0~500ms)", &m_ctrl.gap, m_ctrl.gap_min, m_ctrl.gap_max,
                                 std::format("{} ms", m_ctrl.gap * m_ctrl.gap_unit).c_str());
 
             imgui_StepSliderInt("Pace (1~20)", &m_ctrl.pace, m_ctrl.pace_min, m_ctrl.pace_max);
 
-            // !!TODO: redesign this part.
-            // TODO: should be interactive.
-            // the rule has only all_0 and all_1 NOT flipped, and has interesting effect in extremely low/high
-            // densities. (e.g. 0.01, 0.99)
+            // TODO: this would better be explained with examples.
+            // How to make interactive tooltips?
+            assert(m_ctrl.anti_strobing);
             ImGui::BeginDisabled();
             ImGui::Checkbox("Anti-strobing", &m_ctrl.anti_strobing);
-            if (m_ctrl.anti_strobing) {
-                ImGui::SameLine();
-                ImGui::Text("(Actual pace: %d)", m_ctrl.actual_pace());
-            }
+            ImGui::SameLine();
+            ImGui::Text("(Actual pace: %d)", m_ctrl.actual_pace());
             ImGui::EndDisabled();
             ImGui::SameLine();
-            imgui_StrTooltip(
-                "(?)",
-                "Actually this is not enough to guarantee smooth visual effect. For example, the following "
-                "\"non-strobing\" rule has really terrible visual effect:\n\n"
-                "MAPf/8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAQ\n\n"
-                "In cases like this, it generally helps to set the pace to 2*n manually to remove bad visual effects.");
+            imgui_StrTooltip("(?)",
+                             "When there are '000...->1' and '111...->0', the pace will be adjusted to 2*n to avoid "
+                             "bad visual effect.\n"
+                             "In these cases, you can try the \"+1\" button to change the parity of generation.");
 
             if (imgui_KeyPressed(ImGuiKey_R, false)) {
                 restart();
@@ -353,10 +355,10 @@ public:
             } else if (imgui_KeyPressed(ImGuiKey_Space, false)) {
                 m_ctrl.pause = !m_ctrl.pause;
             } else if (imgui_KeyPressed(ImGuiKey_N, true)) {
-                extra_step = 1;
-            } else if (imgui_KeyPressed(ImGuiKey_M, true)) {
                 extra_step = m_ctrl.actual_pace();
                 m_ctrl.pause = true;
+            } else if (imgui_KeyPressed(ImGuiKey_M, true)) {
+                extra_step = 1;
             }
         }
         ImGui::EndGroup();
@@ -457,8 +459,8 @@ public:
         static bool other_op = true;
         ImGui::Checkbox("Range operations", &other_op);
         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-        imgui_StrTooltip("(...)", "The related keyboard shortcuts are available only when this tag is set on. (The "
-                                  "window can be collapsed.)");
+        imgui_StrTooltip("(!)", "The related keyboard shortcuts are available only when this tag is set on. (The "
+                                "window can be collapsed.)");
 
         if (m_sel) {
             ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
@@ -641,9 +643,13 @@ public:
                 ImGui::AlignTextToFramePadding();
                 imgui_Str("Background:");
                 ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                ImGui::RadioButton("0", background == 0) && (background = 0);
+                if (ImGui::RadioButton("0", background == 0)) {
+                    background = 0;
+                }
                 ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                ImGui::RadioButton("1", background == 1) && (background = 1);
+                if (ImGui::RadioButton("1", background == 1)) {
+                    background = 1;
+                }
                 ImGui::SameLine();
                 imgui_StrTooltip("(?)", "This affects the behavior of clearing, shrinking and pasting mode.\n"
                                         "\"Clear inside/outside\" will fill the range with (background).\n"
@@ -720,29 +726,29 @@ public:
                 });
                 term("Paste", "V", ImGuiKey_V, false, [&] {
                     if (const char* text = ImGui::GetClipboardText()) {
+                        // TODO: better handling/message...
                         try {
                             paste.emplace(legacy::from_RLE_str(text, tile_size));
                         } catch (const std::exception& err) {
-                            // !!TODO: better message...
                             messenger::add_msg(err.what());
                         }
                     }
                 });
 
                 // Pattern capturing.
-                // !!TODO: or instead decide whether to return directly or append to m_lock?
                 // TODO: enable getting current.lock?
                 static bool adopt_eagerly = true;
                 ImGui::Separator();
                 set_tag(adopt_eagerly, "Adopt eagerly",
-                        "Whether to automatically adopt the lock after doing closed-capture. (This does not affect "
-                        "open-capture.)");
+                        "For closed-capture, whether to adopt the result directly, or append to the buffer lock "
+                        "just like open-capture.");
                 term("Capture (closed)", "P", ImGuiKey_P, true, [&] {
                     assert(m_sel);
                     const auto lock = capture_closed(m_torus.tile(), m_sel->to_range(), m_ctrl.rule);
-                    legacy::for_each_code([&](legacy::codeT c) { m_lock[c] = m_lock[c] || lock[c]; });
                     if (adopt_eagerly) {
-                        out = m_lock;
+                        out = lock;
+                    } else {
+                        legacy::for_each_code([&](legacy::codeT c) { m_lock[c] = m_lock[c] || lock[c]; });
                     }
                 });
                 term("Capture (open)", "L (repeatable)", ImGuiKey_None, true, [&] {

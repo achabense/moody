@@ -65,9 +65,6 @@ inline void imgui_StrCopyable(const std::string& str, void (*str_func)(std::stri
     } else if (ImGui::IsItemHovered()) {
         imgui_ItemRect(IM_COL32(128, 128, 128, 255));
     }
-    // TODO: is this too noisy?
-    // TODO: the message should be dependent on `mouse_button`...
-    // imgui_ItemTooltip("Right-click to copy to the clipboard.");
 }
 
 // Similar to `HelpMarker` in "imgui_demo.cpp".
