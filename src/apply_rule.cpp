@@ -494,7 +494,7 @@ public:
             if (active) {
                 temp_pause = true;
             }
-            if (active && hovered && l_down || (paste && r_down)) {
+            if (active && hovered && (l_down || (paste && r_down))) {
                 // Some logics rely on this to be done before rendering.
                 const ImGuiIO& io = ImGui::GetIO();
                 if (!r_down && io.KeyCtrl && screen_zoom == 1) {

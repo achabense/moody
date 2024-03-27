@@ -116,10 +116,24 @@ void frame_main(const code_icons& icons, screenT& screen) {
         load_rule(show_clipboard, "Clipboard", load_clipboard);
         ImGui::SameLine();
         load_rule(show_doc, "Documents", load_doc);
-
-        ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
+        ImGui::SameLine();
         ImGui::Checkbox("Static", &show_static); // TODO: move elsewhere?
-        ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
+#ifndef NDEBUG
+        ImGui::SameLine();
+        imgui_Str("  (Debug mode)");
+        ImGui::SameLine();
+        static bool show_demo = true;
+        ImGui::Checkbox("Demo window", &show_demo);
+        if (show_demo) {
+            ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
+            ImGui::ShowDemoWindow(&show_demo);
+        }
+        ImGui::SameLine();
+        ImGui::Text("| (%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
+#endif // !NDEBUG
+
+        ImGui::Separator();
+
         const ImGuiID id_prev =
             ImGui::GetID("prev"); // For `sequence::bind_to` (when the rule is gotten by randomization.)
         sequence::seq(
@@ -132,19 +146,6 @@ void frame_main(const code_icons& icons, screenT& screen) {
         if (ImGui::Button("Clear")) { // TODO: the effect is not obvious.
             recorder.clear();
         }
-#ifndef NDEBUG
-        ImGui::SameLine();
-        imgui_Str("  (Debug mode)");
-        ImGui::SameLine();
-        static bool show_demo = true;
-        ImGui::Checkbox("Demo window", &show_demo);
-        if (show_demo) {
-            ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
-            ImGui::ShowDemoWindow(&show_demo);
-        }
-        ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
-        ImGui::Text("(%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
-#endif // !NDEBUG
 
         {
             static bool with_lock = false;

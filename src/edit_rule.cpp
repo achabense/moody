@@ -170,7 +170,7 @@ public:
             "Hex", &ignore_hex,
             "Rules that emulate the hexagonal rules (by ignoring 'e/z'). In this program the emulation support for "
             "hexagonal rules are all based on ignoring 'e/z' instead of 'q/c'.\n"
-            "For details and symmetric hexagonal rules you can refer to the last line.");
+            "Try the last line for symmetric hexagonal rules (remember to unselect native-symmetry terms).");
         terms_misc.emplace_back(
             "Von", &ignore_von,
             "Rules in the Von-Neumann neighborhood. (The rules that are independent of 'q/e/z/c'.)\n"
@@ -209,8 +209,7 @@ public:
         // - x c    x c"
         terms_hex.emplace_back(
             "All", &hex_isotropic,
-            "(Emulated) isotropic hexagonal rules. (The intersection of the following subsets in this line.)\n"
-            "Notice these are emulated symmetry; remember to unselect native-symmetry terms when trying these terms.");
+            "Rules that emulate isotropic hexagonal rules. (The intersection of the following subsets in this line.)");
         terms_hex.emplace_back(
             "a-d", &hex_refl_asd,
             "Rules that emulate reflection symmetry in the hexagonal tiling, taking the axis from 'a to d'.");
@@ -267,6 +266,7 @@ public:
                 imgui_Str(term.description);
             });
 
+            // TODO: add color for "equals" relation?
             const ImU32 cent_col_disabled = !show_title ? IM_COL32(120, 30, 0, 255) : IM_COL32(0, 0, 0, 90);
             const ImU32 cent_col = term.selected                 ? IM_COL32(65, 150, 255, 255) // Roughly _ButtonHovered
                                    : term.set->includes(current) ? IM_COL32(25, 60, 100, 255)  // Roughly _Button
@@ -329,7 +329,7 @@ public:
                 checklist(terms_misc);
             });
 
-            put_row("Native\nSymmetry", [&] { checklist(terms_native); });
+            put_row("Native\nsymmetry", [&] { checklist(terms_native); });
             put_row("Totalistic", [&] { checklist(terms_totalistic); });
             put_row("q w -    q w\n"
                     "a s d ~ a s d\n"
@@ -530,6 +530,13 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
                     return_rule(legacy::randomize_p(subset, mask, mold, global_mt19937(), rate));
                 }
             }
+            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+            imgui_StrTooltip("(?)", "The value means the intended \"distance\" to the mask. That is, the number of "
+                                    "groups that are different from the masking rule.\n\n"
+                                    "For example, if you are using the \"Zero\" mask and distance = 51, \"Randomize\" "
+                                    "will generate rules with 51 groups having \"1\".\n\n"
+                                    "This is always bound to the 'Enter' key. Also, after you do 'Randomize' "
+                                    "the 'Left/Right' key will be automatically bound to undo/redo.");
         });
 
         guarded_block(true /* Unconditional */, [&] {
