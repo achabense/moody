@@ -445,6 +445,17 @@ public:
         const legacy::tileT::sizeT tile_size = m_torus.tile().size();
         const ImVec2 screen_size(tile_size.width * screen_zoom, tile_size.height * screen_zoom);
 
+        ImGui::AlignTextToFramePadding();
+        imgui_StrTooltip(
+            "(...)",
+            "Mouse operations:\n"
+            "1. Scroll to change the zoom.\n"
+            "2. When there is nothing to paste, you can drag with left button to move the window; drag with right "
+            "button to select area (for range "
+            "operations). When zoom = 1, you can also 'Ctrl + left-drag' to \"rotate\" the space.\n"
+            "3. Otherwise, left-click to decide where to paste. In this case, to move the window you can drag with "
+            "right button. (Range-selection and rotation is disabled when there are patterns to paste.)");
+        ImGui::SameLine();
         if (ImGui::Button("Corner")) {
             screen_off = {0, 0};
         }
@@ -739,6 +750,9 @@ public:
                 // TODO: enable getting current.lock?
                 static bool adopt_eagerly = true;
                 ImGui::Separator();
+                ImGui::AlignTextToFramePadding();
+                imgui_StrTooltip("(...)", "..."); // !!TODO: finish...
+                ImGui::SameLine();
                 set_tag(adopt_eagerly, "Adopt eagerly",
                         "For closed-capture, whether to adopt the result directly, or append to the buffer lock "
                         "just like open-capture.");

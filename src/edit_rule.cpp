@@ -231,9 +231,9 @@ public:
     const legacy::subsetT& select_subset(const legacy::moldT& mold) {
         {
             // https://github.com/ocornut/imgui/issues/6902
-            const float extra_w_sameline = ImGui::GetStyle().ItemSpacing.x * 2; // Two SameLine...
+            const float extra_w_sameline = ImGui::GetStyle().ItemSpacing.x * 3; // Three SameLine...
             const float extra_w_padding = ImGui::GetStyle().FramePadding.x * 4; // Two Button * two sides...
-            const float extra_w = ImGui::CalcTextSize("ClearRecognize").x + extra_w_sameline + extra_w_padding;
+            const float extra_w = ImGui::CalcTextSize("ClearRecognize(?)").x + extra_w_sameline + extra_w_padding;
             ImGui::SeparatorTextEx(0, "Select subsets", nullptr, extra_w);
             ImGui::SameLine();
             if (ImGui::Button("Clear")) {
@@ -248,6 +248,42 @@ public:
                 });
                 update_current();
             }
+            ImGui::SameLine();
+            imgui_StrTooltip("(?)", [] {
+                auto term = [](ImColor ring_col, ImColor cent_col, ImVec2 cent_off, const char* desc) {
+                    ImGui::Dummy(square_size());
+                    imgui_ItemRectFilled(IM_COL32_BLACK);
+                    imgui_ItemRectFilled(cent_col, cent_off);
+                    imgui_ItemRect(ring_col);
+                    ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                    ImGui::AlignTextToFramePadding();
+                    imgui_Str(": ");
+                    ImGui::SameLine(0, 0);
+                    imgui_Str(desc);
+                };
+
+                // !!TODO: unfinished...
+                // (The colors are the same as the ones used in `check` below.)
+                imgui_Str("Ring color:");
+                term(IM_COL32(0, 255, 0, 255), IM_COL32_BLACK_TRANS, ImVec2(4, 4), "The rule belongs to this subset.");
+                term(IM_COL32(0, 100, 0, 255), IM_COL32_BLACK_TRANS, ImVec2(4, 4),
+                     "The rule does not belong to this subset, but there exist rules in the subset that meet the "
+                     "constraints (locked values) posed by rule-lock pair.");
+                term(IM_COL32(200, 45, 0, 255), IM_COL32_BLACK_TRANS, ImVec2(4, 4),
+                     "The rule does not belong to this subset, and the constraints cannot be met in any rule "
+                     "in this subset.");
+                imgui_Str("As to the second case, notice that the [intersection] of such subsets may still contain no "
+                          "rules that satisfy the constraint.");
+                ImGui::Separator();
+                imgui_Str("Center color:");
+                term(IM_COL32(0, 100, 0, 255), IM_COL32(65, 150, 255, 255), ImVec2(4, 4),
+                     "Selected. You are going to explore rules in the intersection of selected subsets.");
+                term(IM_COL32(0, 100, 0, 255), IM_COL32(25, 60, 100, 255), ImVec2(4, 4),
+                     "Not directly selected, but the intersection of the selected subsets already belongs to this "
+                     "subset, so it will behave as if this is selected too.");
+                term(IM_COL32(0, 100, 0, 255), IM_COL32(120, 30, 0, 255), ImVec2(5, 5),
+                     "Not selectable, as the intersection with this subset will be empty.");
+            });
         }
 
         auto check = [&, id = 0, size = square_size()](termT& term, bool show_title = false) mutable {
@@ -260,7 +296,7 @@ public:
 
             imgui_ItemTooltip([&] {
                 if (term.disabled) {
-                    imgui_Str("(This is not selectable as the result will be an empty set)");
+                    imgui_Str("(This is not selectable as the result will be an empty set.)");
                     ImGui::Separator();
                 }
                 imgui_Str(term.description);
@@ -459,7 +495,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
             [&] { return_rule(legacy::seq_int::inc(subset, mask, mold)); },
             [&] { return_rule(legacy::seq_int::max(subset, mask, mold)); }, !contained);
     });
-
     ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
     guarded_block(contained, [&] {
         sequence::seq(
@@ -534,7 +569,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
             imgui_StrTooltip("(?)", "The value means the intended \"distance\" to the mask. That is, the number of "
                                     "groups that are different from the masking rule.\n\n"
                                     "For example, if you are using the \"Zero\" mask and distance = 51, \"Randomize\" "
-                                    "will generate rules with 51 groups having \"1\".\n\n"
+                                    "will generate rules with 51 groups having '1' (different from '0').\n\n"
                                     "This is always bound to the 'Enter' key. Also, after you do 'Randomize' "
                                     "the 'Left/Right' key will be automatically bound to undo/redo.");
         });
@@ -601,6 +636,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
 
     ImGui::Separator();
 
+    // !!TODO: add tooltip for random-access edition...
     if (auto child = imgui_ChildWindow("Details")) {
         const char labels[2][3]{{'-', chr_0, '\0'}, {'-', chr_1, '\0'}};
         const legacy::ruleT_masked masked = mask ^ mold.rule;
@@ -717,7 +753,6 @@ std::optional<legacy::moldT> static_constraints() {
                                IM_COL32(255, 255, 255, 255), //
                                IM_COL32(80, 0, 80, 255),     //
                                IM_COL32(200, 0, 200, 255)};
-    // TODO: finish the description... (how does the board represent still-lives...)
     static const auto description = [] {
         auto term = [](stateE s, const char* desc) {
             ImGui::Dummy(square_size());
@@ -727,6 +762,7 @@ std::optional<legacy::moldT> static_constraints() {
             ImGui::AlignTextToFramePadding(); // Needed.
             imgui_Str(desc);
         };
+
         imgui_Str("Operations:\n"
                   "Left-click the cell to set the value.\n"
                   "Right-click to set back to any-background.\n"
@@ -736,8 +772,14 @@ std::optional<legacy::moldT> static_constraints() {
         term(O_background, ": Background 0.");
         term(I_background, ": Background 1.");
         term(Any_background, ": Any background.");
+        imgui_Str("By 'Adopt', you will get a rule-lock pair that will satisfy the constraints represented by the "
+                  "arrangements. For example, a pattern of white cells surrounded by any-background cells will mean "
+                  "the pattern will keep stable whatever its surroundings are.");
     };
 
+    ImGui::AlignTextToFramePadding();
+    imgui_StrTooltip("(...)", description);
+    ImGui::SameLine();
     if (ImGui::Button("Clear")) {
         for (auto& l : board) {
             for (auto& s : l) {
@@ -746,9 +788,7 @@ std::optional<legacy::moldT> static_constraints() {
         }
     }
     ImGui::SameLine();
-    const bool ret = ImGui::Button("Adopt");
-    ImGui::SameLine();
-    imgui_StrTooltip("(?)", description);
+    const bool ret = ImGui::Button("Adopt"); // TODO: whether to return nothing if the board is empty?
     // TODO: add some examples?
 
     // Display-only; the value of `state_lbutton` is controlled by mouse-scrolling.

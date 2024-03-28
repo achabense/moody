@@ -134,6 +134,21 @@ void frame_main(const code_icons& icons, screenT& screen) {
 
         ImGui::Separator();
 
+        ImGui::AlignTextToFramePadding();
+        imgui_StrTooltip(
+            "(...)",
+            "Below is the MAP-string for the current rule (as shown in the right plane). You can right-click the rule "
+            "to copy to the clipboard.\n"
+            "The string after the rule (enclosed in '[]') is the 'lock' for it, which is also copyable. "
+            "For more details about lock see the \"Lock and capture\" part in \"Documents\".\n\n"
+            "There are a series of widgets that manage sequences of rule(-lock)s. They are all in the form of "
+            "'first prev/next last'. When you click on them the 'Left/Right' key will be bound to 'prev/next'.\n"
+            "Here '<| prev/next |>' represents the record for the current rule. You can undo/redo the editions "
+            "with it.\n"
+            "(For convenience, when you get randomized rules ('Enter' key / \"Randomize\" button), the 'Left/Right' "
+            "key will also be automatically bound to undo/redo.)");
+        ImGui::SameLine();
+
         const ImGuiID id_prev =
             ImGui::GetID("prev"); // For `sequence::bind_to` (when the rule is gotten by randomization.)
         sequence::seq(
