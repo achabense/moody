@@ -250,39 +250,50 @@ public:
             }
             ImGui::SameLine();
             imgui_StrTooltip("(?)", [] {
-                auto term = [](ImColor ring_col, ImColor cent_col, ImVec2 cent_off, const char* desc) {
-                    ImGui::Dummy(square_size());
+                auto term = [size = square_size()](ImColor ring_col, ImColor cent_col, ImVec2 cent_off,
+                                                   const char* desc) {
+                    ImGui::Dummy(size);
                     imgui_ItemRectFilled(IM_COL32_BLACK);
                     imgui_ItemRectFilled(cent_col, cent_off);
                     imgui_ItemRect(ring_col);
                     ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                    ImGui::AlignTextToFramePadding();
+                    ImGui::AlignTextToFramePadding(); // `Dummy` does not align automatically.
                     imgui_Str(": ");
                     ImGui::SameLine(0, 0);
                     imgui_Str(desc);
                 };
 
-                // !!TODO: unfinished...
+                imgui_Str(
+                    "The following terms represent subsets of the MAP rules. You can select these terms freely - "
+                    "the program will calculate the intersection of the selected subsets (and the whole MAP set), and "
+                    "help you explore the rules in it.\n"
+                    "(This set is later called \"working set\"; for example, \"the rule belongs to the working set\" "
+                    "has the same meaning as \"the rule belongs to all of the selected subsets\".)\n"
+                    "(If nothing is selected, the working set will be the whole MAP set.)");
+                ImGui::Separator();
+                imgui_Str("The center color reflects the selection details:");
+                term(IM_COL32(0, 100, 0, 255), IM_COL32_BLACK_TRANS, ImVec2(5, 5), "Not selected.");
+                term(IM_COL32(0, 100, 0, 255), IM_COL32(65, 150, 255, 255), ImVec2(4, 4), "Selected.");
+                term(IM_COL32(0, 100, 0, 255), IM_COL32(25, 60, 100, 255), ImVec2(4, 4),
+                     "Not selected, but the working set already belongs to this subset, so it will behave "
+                     "as if this is selected too.");
+                term(IM_COL32(0, 100, 0, 255), IM_COL32(120, 30, 0, 255), ImVec2(5, 5),
+                     "Not selectable, otherwise the working set will be empty.");
+                ImGui::Separator();
                 // (The colors are the same as the ones used in `check` below.)
-                imgui_Str("Ring color:");
+                imgui_Str("The ring color reflects the relation between the subset and the current rule-lock pair:");
                 term(IM_COL32(0, 255, 0, 255), IM_COL32_BLACK_TRANS, ImVec2(4, 4), "The rule belongs to this subset.");
                 term(IM_COL32(0, 100, 0, 255), IM_COL32_BLACK_TRANS, ImVec2(4, 4),
                      "The rule does not belong to this subset, but there exist rules in the subset that meet the "
-                     "constraints (locked values) posed by rule-lock pair.");
+                     "constraints (locked values) posed by rule-lock pair.\n"
+                     "(Notice that the [intersection] of such subsets may still contain no rules that satisfy the "
+                     "constraints. )");
                 term(IM_COL32(200, 45, 0, 255), IM_COL32_BLACK_TRANS, ImVec2(4, 4),
                      "The rule does not belong to this subset, and the constraints cannot be met in any rule "
                      "in this subset.");
-                imgui_Str("As to the second case, notice that the [intersection] of such subsets may still contain no "
-                          "rules that satisfy the constraint.");
                 ImGui::Separator();
-                imgui_Str("Center color:");
-                term(IM_COL32(0, 100, 0, 255), IM_COL32(65, 150, 255, 255), ImVec2(4, 4),
-                     "Selected. You are going to explore rules in the intersection of selected subsets.");
-                term(IM_COL32(0, 100, 0, 255), IM_COL32(25, 60, 100, 255), ImVec2(4, 4),
-                     "Not directly selected, but the intersection of the selected subsets already belongs to this "
-                     "subset, so it will behave as if this is selected too.");
-                term(IM_COL32(0, 100, 0, 255), IM_COL32(120, 30, 0, 255), ImVec2(5, 5),
-                     "Not selectable, as the intersection with this subset will be empty.");
+                imgui_Str("For a list of example rules in different subsets, see the \"Typical subsets\" part in "
+                          "\"Documents\".");
             });
         }
 
@@ -472,14 +483,14 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
     // Disable all edit operations if !subset.contains(mask), including those that do not really need
     // the mask to be valid (for example, `trans_reverse`, which does not actually rely on subsets).
     if (!subset.contains(mask)) {
-        imgui_StrWrapped(
-            "This mask does not belong to the selected subsets. Consider trying other masks.\n\n"
-            "1. At least one of \"Zero\", \"Identity\" and \"Native\" will work. Especially, \"Native\" will "
-            "always work.\n"
-            "2. If the current rule belongs to the selected subsets, it can also serve as a valid \"Custom\" "
-            "mask (\"Take current\").\n\n"
-            "For more details see the \"Workflow\" part in \"Documents\".",
-            item_width);
+        imgui_StrWrapped("This mask does not belong to the working set (in other words, the rule does not belong to "
+                         "all the selected subsets). Consider trying other masks.\n\n"
+                         "1. At least one of 'Zero', 'Identity' and 'Native' will work. Especially, 'Native' will "
+                         "always work.\n"
+                         "2. If the current rule belongs to the working set, it can also serve as a valid 'Custom' "
+                         "mask ('Take current').\n\n"
+                         "For more details see the \"Workflow\" part in \"Documents\".",
+                         item_width);
         return std::nullopt;
     }
 
@@ -489,7 +500,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
 
     guarded_block(compatible, [&] {
         sequence::seq(
-            "<00..", "dec", "inc", "11..>", //
+            "<00..", "Dec", "Inc", "11..>", //
             [&] { return_rule(legacy::seq_int::min(subset, mask, mold)); },
             [&] { return_rule(legacy::seq_int::dec(subset, mask, mold)); },
             [&] { return_rule(legacy::seq_int::inc(subset, mask, mold)); },
@@ -498,7 +509,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
     ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
     guarded_block(contained, [&] {
         sequence::seq(
-            "<1.0.", "prev", "next", "0.1.>", //
+            "<1.0.", "Prev", "Next", "0.1.>", //
             [&] { return_rule(legacy::seq_perm::first(subset, mask, mold)); },
             [&] { return_rule(legacy::seq_perm::prev(subset, mask, mold)); },
             [&] { return_rule(legacy::seq_perm::next(subset, mask, mold)); },
@@ -552,7 +563,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
 
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
             ImGui::SetNextItemWidth(item_width);
-            if (imgui_StepSliderInt("##Quantity", &dist, c_locked_1, c_locked_1 + c_free) && c_free != 0) {
+            if (imgui_StepSliderInt("##Quantity", &dist, c_locked_1, c_locked_1 + c_free, compatible ? "%d" : "N/A") &&
+                c_free != 0) {
                 rate = double(dist - c_locked_1) / c_free;
                 assert(c_locked_1 + round(rate * c_free) == dist);
             }
@@ -565,13 +577,13 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
                     return_rule(legacy::randomize_p(subset, mask, mold, global_mt19937(), rate));
                 }
             }
-            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+            ImGui::SameLine();
             imgui_StrTooltip("(?)", "The value means the intended \"distance\" to the mask. That is, the number of "
                                     "groups that are different from the masking rule.\n\n"
-                                    "For example, if you are using the \"Zero\" mask and distance = 51, \"Randomize\" "
+                                    "For example, if you are using the 'Zero' mask and distance = 51, 'Randomize' "
                                     "will generate rules with 51 groups having '1' (different from '0').\n\n"
-                                    "This is always bound to the 'Enter' key. Also, after you do 'Randomize' "
-                                    "the 'Left/Right' key will be automatically bound to undo/redo.");
+                                    "This is always bound to the 'Enter' key. For convenience, if you do 'Randomize' "
+                                    "the left/right arrow key will be automatically bound to undo/redo.");
         });
 
         guarded_block(true /* Unconditional */, [&] {
@@ -601,7 +613,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
             });
             if (!contained) {
                 ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                imgui_StrTooltip("(?)", "This requires the current rule to belong to the selected subsets.");
+                imgui_StrTooltip("(?)", "This is available only when the current rule belongs to the working set.");
             }
             ImGui::SameLine();
             ImGui::Checkbox("Hide locked groups", &hide_locked);
@@ -624,12 +636,12 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
             ImGui::Text("Groups:%d !contained", c_group);
             ImGui::SameLine();
             imgui_StrTooltip("(?)", "(Check the dull-blue groups for details.)\n"
-                                    "The current rule does not belong to all the selected subsets.");
+                                    "The current rule does not belong to the working set.");
         } else {
             ImGui::Text("Groups:%d !compatible", c_group);
             ImGui::SameLine();
             imgui_StrTooltip("(?)", "(Check the red groups for details.)\n"
-                                    "There cannot be rules that belong to the selected subsets and also have the "
+                                    "There don't exist rules that belong to the working set and also have the "
                                     "same locked values as the current rule.");
         }
     }
@@ -759,7 +771,7 @@ std::optional<legacy::moldT> static_constraints() {
             imgui_ItemRectFilled(cols[s]);
             imgui_ItemRect(IM_COL32(200, 200, 200, 255));
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-            ImGui::AlignTextToFramePadding(); // Needed.
+            ImGui::AlignTextToFramePadding(); // `Dummy` does not align automatically.
             imgui_Str(desc);
         };
 

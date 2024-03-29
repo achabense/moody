@@ -250,6 +250,9 @@ public:
             // TODO: whether to silently call `ImGui::SetClipboardText`?
             messenger::add_msg(str);
             m_sel.reset();
+            // (wontfix) The message popup will appear at next frame, so it's still possible that an extra click
+            // is made (and begin selection) at this frame. As a result, when entering the popup the right-button
+            // may still be held down, and if released it will bring anther string to the popup.
         }
 
         bool ret = false;
@@ -262,7 +265,7 @@ public:
             }
             ImGui::SameLine();
             sequence::seq(
-                "<|", "prev", "next", "|>",                                   //
+                "<|", "Prev", "Next", "|>",                                   //
                 [&] { n_pos = 0; },                                           //
                 [&] { n_pos = std::max(0, m_pos.value_or(-1) - 1); },         //
                 [&] { n_pos = std::min(total - 1, m_pos.value_or(-1) + 1); }, //
@@ -330,7 +333,7 @@ public:
         if (ret) {
             assert(m_pos && *m_pos >= 0 && *m_pos < total);
             // (Relying on `sequence::seq` to be in the same level in the id-stack.)
-            sequence::bind_to(ImGui::GetID("next"));
+            sequence::bind_to(ImGui::GetID("Next"));
             out = m_rules[*m_pos];
         }
     }

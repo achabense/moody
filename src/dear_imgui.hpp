@@ -111,6 +111,17 @@ inline bool imgui_TestItemFlag(ImGuiItemFlags_ flag) { //
 
 inline float imgui_ItemInnerSpacingX() { return ImGui::GetStyle().ItemInnerSpacing.x; }
 
+// TODO: many controls in the program are relying on these functions (which are not well-designed)...
+inline bool imgui_KeyPressed(ImGuiKey key, bool repeat) {
+    return !ImGui::GetIO().WantCaptureKeyboard && ImGui::IsKeyPressed(key, repeat);
+};
+
+inline bool imgui_MouseScrolling() { return ImGui::GetIO().MouseWheel != 0; }
+
+inline bool imgui_MouseScrollingDown() { return ImGui::GetIO().MouseWheel < 0; }
+
+inline bool imgui_MouseScrollingUp() { return ImGui::GetIO().MouseWheel > 0; }
+
 // (Referring to ImGui::InputScalar.)
 inline bool imgui_StepSliderInt(const char* label, int* v, int v_min, int v_max, const char* format = "%d") {
     if (ImGui::GetCurrentWindow()->SkipItems) {
@@ -149,14 +160,3 @@ inline bool imgui_StepSliderInt(const char* label, int* v, int v_min, int v_max,
     *v = v2;
     return changed;
 }
-
-// TODO: many controls in the program are relying on these functions (which are not well-designed)...
-inline bool imgui_KeyPressed(ImGuiKey key, bool repeat) {
-    return !ImGui::GetIO().WantCaptureKeyboard && ImGui::IsKeyPressed(key, repeat);
-};
-
-inline bool imgui_MouseScrolling() { return ImGui::GetIO().MouseWheel != 0; }
-
-inline bool imgui_MouseScrollingDown() { return ImGui::GetIO().MouseWheel < 0; }
-
-inline bool imgui_MouseScrollingUp() { return ImGui::GetIO().MouseWheel > 0; }

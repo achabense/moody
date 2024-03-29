@@ -141,18 +141,14 @@ void frame_main(const code_icons& icons, screenT& screen) {
             "to copy to the clipboard.\n"
             "The string after the rule (enclosed in '[]') is the 'lock' for it, which is also copyable. "
             "For more details about lock see the \"Lock and capture\" part in \"Documents\".\n\n"
-            "There are a series of widgets that manage sequences of rule(-lock)s. They are all in the form of "
-            "'first prev/next last'. When you click on them the 'Left/Right' key will be bound to 'prev/next'.\n"
-            "Here '<| prev/next |>' represents the record for the current rule. You can undo/redo the editions "
-            "with it.\n"
-            "(For convenience, when you get randomized rules ('Enter' key / \"Randomize\" button), the 'Left/Right' "
-            "key will also be automatically bound to undo/redo.)");
+            "Here '<| Prev/Next |>' represents the record for the current rule. You can undo/redo the editions "
+            "with it. When you click the button the left/right arrow key will be bound to 'Prev/Next'.");
         ImGui::SameLine();
 
         const ImGuiID id_prev =
-            ImGui::GetID("prev"); // For `sequence::bind_to` (when the rule is gotten by randomization.)
+            ImGui::GetID("Prev"); // For `sequence::bind_to` (when the rule is gotten by randomization.)
         sequence::seq(
-            "<|", "prev", "next", "|>", //
+            "<|", "Prev", "Next", "|>", //
             [&] { recorder.set_first(); }, [&] { recorder.set_prev(); }, [&] { recorder.set_next(); },
             [&] { recorder.set_last(); });
         ImGui::SameLine();

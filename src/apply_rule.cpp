@@ -296,9 +296,9 @@ public:
         ImGui::BeginGroup();
         {
             ImGui::AlignTextToFramePadding();
-            imgui_StrTooltip("(...)",
-                             "Keyboard shortcuts:\nR: Restart\n1/2 (repeatable): -/+ Gap\n3/4 (repeatable): -/+ Pace\n"
-                             "Space: Pause\nN/M (repeatable): +p/+1");
+            imgui_StrTooltip("(...)", "Keyboard shortcuts:\nR: Restart\n"
+                                      "Space: Pause\nN/M (repeatable): +p/+1\n"
+                                      "1/2 (repeatable): -/+ Gap\n3/4 (repeatable): -/+ Pace\n");
             ImGui::SameLine();
             ImGui::Checkbox("Pause", &m_ctrl.pause);
             ImGui::PushButtonRepeat(true);
@@ -340,7 +340,7 @@ public:
             imgui_StrTooltip("(?)",
                              "When there are '000...->1' and '111...->0', the pace will be adjusted to 2*n to avoid "
                              "bad visual effect.\n"
-                             "In these cases, you can try the \"+1\" button to change the parity of generation.");
+                             "In these cases, you can try the '+1' button to change the parity of generation.");
 
             if (imgui_KeyPressed(ImGuiKey_R, false)) {
                 restart();
@@ -449,7 +449,7 @@ public:
         imgui_StrTooltip(
             "(...)",
             "Mouse operations:\n"
-            "1. Scroll to change the zoom.\n"
+            "1. Scroll in the window to change the zoom.\n"
             "2. When there is nothing to paste, you can drag with left button to move the window; drag with right "
             "button to select area (for range "
             "operations). When zoom = 1, you can also 'Ctrl + left-drag' to \"rotate\" the space.\n"
@@ -663,8 +663,8 @@ public:
                 }
                 ImGui::SameLine();
                 imgui_StrTooltip("(?)", "This affects the behavior of clearing, shrinking and pasting mode.\n"
-                                        "\"Clear inside/outside\" will fill the range with (background).\n"
-                                        "\"Shrink\" will get the bounding-box for !(background).\n"
+                                        "'Clear inside/outside' will fill the range with (background).\n"
+                                        "'Shrink' will get the bounding-box for !(background).\n"
                                         "When pasting patterns into the white background you need to set this to 1.");
 
                 // Filling.
@@ -711,7 +711,7 @@ public:
                 });
 
                 // Copy/Cut/Paste.
-                static bool add_rule = false;
+                static bool add_rule = true;
                 static bool copy_silently = false;
                 auto copy_sel = [&] {
                     assert(m_sel);
@@ -748,11 +748,23 @@ public:
 
                 // Pattern capturing.
                 // TODO: enable getting current.lock?
+                {
+                    ImGui::SeparatorTextEx(0, "Pattern capturing", nullptr,
+                                           ImGui::GetStyle().ItemSpacing.x + ImGui::CalcTextSize("(?)").x);
+                    ImGui::SameLine();
+                    imgui_StrTooltip(
+                        "(?)", "For use cases see the \"Lock and capture\" part in \"Documents\".\n\n"
+                               "Closed-capture: Run the selected area as torus space (with the current rule), to "
+                               "record all mappings. Depending on 'Adopt eagerly', the result will be integrated to "
+                               "the buffer lock (as shown by 'Count:.../512'), or will replace the lock for the "
+                               "current rule directly.)\n\n"
+                               "Open-capture: Record what there exists in the selected area for the current frame. "
+                               "The capturing area does not include the border. The result will be integrated to "
+                               "the buffer lock.\n\n"
+                               "'Clear' clears the buffer lock.\n"
+                               "'Adopt' sets the lock for the current rule to the buffer lock.");
+                }
                 static bool adopt_eagerly = true;
-                ImGui::Separator();
-                ImGui::AlignTextToFramePadding();
-                imgui_StrTooltip("(...)", "..."); // !!TODO: finish...
-                ImGui::SameLine();
                 set_tag(adopt_eagerly, "Adopt eagerly",
                         "For closed-capture, whether to adopt the result directly, or append to the buffer lock "
                         "just like open-capture.");
