@@ -1,0 +1,34 @@
+MAPBCLpjzDa1bNAIb57IMX+ezPY7X/KIX/eISFOe4CQ++8IIPb+IY17e4QBe6wBSOQzIYBc+yGCe/0yVKTzDmi73w
+
+MAP/vP/3q+73n3fl/bvcd7+9bX9327nk3/+j/b8v8v+/yTNb7//9175uev1/65vXv66uVnv777+w+x/7vRy/KFayA [//379+9bu1/034P3nJ8X79qRk9eHBZ5f5Pf8/x/b//+/hYNXm5P/u9qrE3/bPf+7/V63/7vf//fR9/zf7////w]
+MAP/vP/3q+b3v3fl/bvcN7+9bXd/27HE3/+j/b8v8v+/yTNb7//9175uevl/65vXv66uVnv77r+w+x/5vRy/KFayA
+MAP/vP/3q+72v3fl+bncd7W9bX//2bn0z/+jfb8v+v6/yTNb6/f9z75uev1/y5vXP66uVin777+w+x/7vRy7KFayA
+MAP/vP/3q+73v3fl/bvcd7+9bX5/27nk3/+j/b8v4v+/yTNbb//9175uev1+65PXv66uVnv777+w+x/7vRy/KFayA
+MAP/vP/1r8f3l3Xt/Lvcd4e9ZXdm0bPEx9en/b+v8v6/ySNb5vX9175+ev1l65v3P66u9jv777+w+x/7vRy7KFayA
+MAP/vP/3r8f2l3ct+LvMt7e9ZHd30bPEx9+l/78v8v6/yTNN7vfs175uculty5v3P66u9jn7/r+w+x35vRy7KFayA
+
+!!!
+MAP/vP/3r8f3l3ct/bvcd7+9ZXd307PE19+l/b8v8v6/yTNL7//s175ueqx/65r3P66u9jv777+w+xz7vRy7KFayA
+
+(Monstrous oscillator; amazingly, its isotropic distance to the introductory rule (sym a.txt) is 1)
+MAP+sASUIjICkiAgAiAEKBAhrIGFgAUbAAAoAChgnAAAw6AAkAIgKCAlAQgIAAgIQBboCqhEQAAkFQAARIDAQQRBA
+
+MAP+sISUJjICkiAoAiAEKBAhrJGFgAcbAAAoAChgvAAAw6AAkAIoKCAlAQgIAAgIQBboKqhEQAAkFQAARIDAQQRBA
+
+low-distance randomization; under low density (0.1)
+MAPf/8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAP//AAD//wAA//8AAQ
+MAPElDtvwoA9/8AgPd/AAj//wAA//8AAP//goB//wAA//4AAL//gEB//wAA//8AAP//kAB//4AA//4AAP//AAD/7Q
+MAPgAD/+wAA+7cAAO//AAD/fwAA7f8AAP//AACf/wAA//4AAP3/AAD/fwAA/38AAH//AADX/wAA//4AAP//AAD/7A
+MAPyADtvwAA982AAP9/AAj//wAA/88AAd1/AgB/3wAQ/3+AAP//AEB//wAA//8AAP//EAB//wAC338AAP//ACD//g
+MAPIID/34AB3/8BBP//AAD//4AA/38AAH//ABD//wAB//4BAP//BAD//wBA//8IAP//AAD//wIB//5IAP//AJL/7Q
+
+
+MAPBCkXfmFofuhmGH7o6IDogF6ofujggOiAKEDogAAAhAA86H7oQoDogOgA6IIAAJAAYADohAgAgAAAgIAAgAAAAA
+MAPBCkXfmFofuhmGH7o6oDogF6ofujggOiAKEjogAAAhAE8+H7oQoDogOgA6IIAAJAAYADohEgAgAEAgIAAgAAAEg
+MAPBCkXfmFofuxmGH7o6oDogF6ofujggOiAKEj4gAAAhAA8+H7oQoDogOgA6IIAAJCAYADqhEgAgAAAgIAAgAAAAA
+MAPBCkFPmFodvpmGH5o6oDogF6ofvjggOqAKEhooAAAhIE8+H7oQoBogOgA6IIAAJAAYABohEgAoIEAgIAAgAAAEg
+MAPBCkXfmHofuhmGH7o6oDogH6ofujggOiAKEjogAAAhAE8+H7oQoDogOgA6IIAAJAAYADohEgAgAEAgIAAgAAAEw (special spaceships...)
+(capture & enhanced in iso)
+MAPBCkXfmHofuhmGHrq6IDogH6ofujggOiAKEDogAAAjAA86HroQoD4gOgAoIIAAJAAYADoxAgAgAAAgIAAgAAAAA [///////////3//P8/f/um////vn//uug//f++//shsi/77v8///u0/v/ssr/+9iA///+lL/s+8j+/8iw/8yiyA]
+MAPBCkXfmHofuhmGHLo6oDogH6ofujggOiAKEjogAAAhAE8+DroQoDogOgAoIIAAJAAYADohEgAgAEAgIAAgAAAEg
+MAPBCkXfmHofuhmGHLp6IDogH6ofujggOiAKEDogAAAhAA86DroQoDpgOwAoIIAAJABYADohAgAgAAAgIBBgAAJBA

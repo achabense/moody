@@ -111,7 +111,7 @@ public:
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             {
-                ImGui::InputTextWithHint("##Path", "Path", buf_path, std::size(buf_path));
+                ImGui::InputTextWithHint("##Path", "Path for file/folder", buf_path, std::size(buf_path));
                 ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                 if (ImGui::Button("Open") && buf_path[0] != '\0') {
                     const pathT p = m_current / cpp17_u8path(buf_path);

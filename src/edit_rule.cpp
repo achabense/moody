@@ -415,31 +415,50 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
     // Select mask.
     char chr_0 = '0', chr_1 = '1';
     const legacy::maskT& mask = [&] {
-        // !!TODO: finish...
-        const char* const about_mask = "About mask:\n"
-            "A mask is an arbitrary rule used to do XOR masking for other rules...\n"
-                                       "For more details see the \"Workflow\" part in \"Documents\".";
+        const char* const about_mask =
+            "A mask is an arbitrary rule to perform XOR masking for other rules.\n"
+            "Some rules are special enough, so that the values masked by them have natural interpretations. "
+            "See 'Zero/Identity' for examples.\n"
+            "When the masking rule belongs to the working set, the distance (of the current rule) to the mask can "
+            "be defined as the number of groups that are different from the masking rule.\n\n"
+            "(The exact workings are more complex than explained here. For details see the \"Concept\" part "
+            "in \"Documents\".)";
 
         // TODO: add record for custom masks?
         static legacy::maskT mask_custom{{}};
 
-        // !!TODO: finish descriptions (use cases etc)
         enum maskE { Zero, Identity, Native, Custom };
-        static const char* const mask_labels[]{"Zero", "Identity", "Native", "Custom"};
-        static const char* const mask_descriptions[]{
-            "The all-zero rule.\n"
-            "Masked by this you see the actual values, and ...",
+        struct termT {
+            const char* label;
+            const char* desc;
+            char chr_0, chr_1;
+        };
+        static const termT mask_terms[]{
+            {"Zero",
+             "The all-zero rule.\n"
+             "The masked values show actual values (different:'1' ~ 1, same:'0' ~ 0), and the distance "
+             "to this rule shows how many groups returns 1.",
+             '0', '1'},
 
-            "The rule that maps each situation to the center cell itself, so any pattern will keep unchanged under "
-            "this rule. (Click \"<00..\" button to set to it for test.)\n"
-            "As the masking rule it shows how \"volatile\" a rule is ...",
+            {"Identity",
+             "The rule that preserves the value of the center cell in all situations.\n"
+             "The masked values show whether the cell will \"flip\" (different:'f' ~ flip, same:'.' ~ won't flip), "
+             "and the distance to this rule shows how \"volatile\" a rule is.",
+             '.', 'f'},
 
-            "A specific rule known to belong to the selected subsets, so that it is guaranteed to be able to support "
-            "editions...", // (may or may not be the all-zero rule/identity rule depending on the subsets you have
-                           // selected...)
+            {"Native",
+             "A rule calculated by the program that belongs to the working set. Depending on what subsets "
+             "are selected, it may be the same as zero-rule, identity-rule, or just an ordinary rule in the set.\n"
+             "It's recommended you try this only when there is no other existing rules in the working "
+             "set (neither 'Zero' nor 'Identity' works, and there is no existing rules to serve as custom mask).",
+             'o', 'i'},
 
-            "Custom rule; you can click \"Take current\" button to set this to the current rule.\n"
-            "Important tip: ..."};
+            {"Custom",
+             "Custom rule; you can click 'Take current' button to set this to the current rule.\n"
+             "Different:'i', same:'o'. The smaller the distance is, the more likely that the rule behaves "
+             "similar to the masking rule.\n"
+             "As you will see later, this is a powerful tool to help find interesting rules based on existing ones.",
+             'o', 'i'}};
 
         static maskE mask_tag = Zero;
         const legacy::maskT* const mask_ptrs[]{&legacy::mask_zero, &legacy::mask_identity, &subset.get_mask(),
@@ -452,14 +471,14 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
 
         for (const maskE m : {Zero, Identity, Native, Custom}) {
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-
-            if (ImGui::RadioButton(mask_labels[m], mask_tag == m)) {
+            if (ImGui::RadioButton(mask_terms[m].label, mask_tag == m)) {
                 mask_tag = m;
             }
 
             imgui_ItemTooltip([&] {
-                imgui_Str(mask_descriptions[m]);
                 imgui_Str(legacy::to_MAP_str(*mask_ptrs[m]));
+                ImGui::Separator();
+                imgui_Str(mask_terms[m].desc);
             });
         }
 
@@ -469,12 +488,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
             mask_tag = Custom;
         }
 
-        switch (mask_tag) {
-            case Zero: chr_0 = '0', chr_1 = '1'; break;
-            case Identity: chr_0 = '.', chr_1 = 'f'; break;
-            default: chr_0 = 'o', chr_1 = 'i'; break;
-        }
-
+        chr_0 = mask_terms[mask_tag].chr_0;
+        chr_1 = mask_terms[mask_tag].chr_1;
         return *mask_ptrs[mask_tag];
     }();
 
@@ -515,6 +530,17 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
             [&] { return_rule(legacy::seq_perm::next(subset, mask, mold)); },
             [&] { return_rule(legacy::seq_perm::last(subset, mask, mold)); });
     });
+    ImGui::SameLine();
+    // TODO: about the interaction with locks...
+    imgui_StrTooltip("(?)", "Left : Iterate through the whole working set.\n"
+                            "Right: Iterate through all the rules in the working set that have the same distance to "
+                            "the masking rule (as that of the current rule).\n\n"
+                            "For example, suppose the current rule belongs to the working set. "
+                            "To iterate through all the rules that have distance = 1 to the current rule, you can:\n"
+                            "1. 'Take current' to set the current rule as the custom mask.\n"
+                            "2. 'Inc'. After this, the distance to the mask will be 1.\n"
+                            "3. 'Next' to iterate. The left/right arrow key will be bound to 'Prev/Next' after you "
+                            "click the button.");
 
     const legacy::partitionT& par = subset.get_par();
     const auto scanlist = legacy::scan(par, mask, mold);
@@ -578,25 +604,32 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
                 }
             }
             ImGui::SameLine();
-            imgui_StrTooltip("(?)", "The value means the intended \"distance\" to the mask. That is, the number of "
-                                    "groups that are different from the masking rule.\n\n"
+            imgui_StrTooltip("(?)", "Generate randomized rules with intended distance to the mask.\n\n"
                                     "For example, if you are using the 'Zero' mask and distance = 51, 'Randomize' "
-                                    "will generate rules with 51 groups having '1' (different from '0').\n\n"
+                                    "will generate rules with 51 groups having '1' (different from '0').\n"
+                                    "Also, suppose the current rule belongs to the working set, you can set it to "
+                                    "the custom mask, and 'Randomize' with low distance to generate rules that "
+                                    "are \"close\" to it.\n\n"
                                     "This is always bound to the 'Enter' key. For convenience, if you do 'Randomize' "
                                     "the left/right arrow key will be automatically bound to undo/redo.");
         });
 
+        // TODO: find a better place for this...
         guarded_block(true /* Unconditional */, [&] {
-            if (ImGui::Button("Rev")) {
+            if (ImGui::Button("R.d.")) {
                 return_mold(legacy::trans_reverse(mold));
             }
         });
+        imgui_ItemTooltip("Get the 0/1 reversal dual of the current rule.\n"
+                          "This is actually independent of the working set and mask.");
         ImGui::SameLine();
         guarded_block(compatible, [&] {
             if (ImGui::Button("Approximate")) {
                 return_rule(legacy::approximate(subset, mold));
             }
         });
+        imgui_ItemTooltip("When the current rule does not belong to the working set (but the "
+                          "constraints can be met), you can try this to get the closest rule in the set.");
         ImGui::SameLine();
         guarded_block(true /* Unconditional */, [&] {
             if (ImGui::Button("Clear lock")) {
@@ -611,10 +644,10 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
                     return_lock(legacy::enhance_lock(subset, mold));
                 }
             });
-            if (!contained) {
-                ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                imgui_StrTooltip("(?)", "This is available only when the current rule belongs to the working set.");
-            }
+            imgui_ItemTooltip(
+                "\"Saturate\" the locked groups to keep the full effect of the locks when switching to a"
+                "\"wider\" working set. For use cases see the \"Lock and capture\" part in \"Documents\".\n"
+                "(This is available only when the current rule belongs to the working set.)");
             ImGui::SameLine();
             ImGui::Checkbox("Hide locked groups", &hide_locked);
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
@@ -622,33 +655,33 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
             ImGui::EndPopup();
         }
 
-        // TODO: refine message...
         if (contained) {
-            ImGui::Text("Groups:%d (%c:%d %c:%d)", c_group, chr_1, c_1, chr_0, c_0);
+            std::string str = std::format("Groups:{} ({}:{} {}:{})", c_group, chr_1, c_1, chr_0, c_0);
             if (c_free != c_group) {
-                int count = 0;
-                legacy::for_each_code([&](legacy::codeT c) { count += mold.lock[c]; });
                 const int c_free_1 = c_1 - c_locked_1, c_free_0 = c_0 - c_locked_0;
-                ImGui::Text("Free:%d (%c:%d %c:%d) Locked:%d (%c:%d %c:%d) Locked-abs:%d/512", c_free, chr_1, c_free_1,
-                            chr_0, c_free_0, c_locked_1 + c_locked_0, chr_1, c_locked_1, chr_0, c_locked_0, count);
+                str += std::format(" Free:{} ({}:{} {}:{}) Locked:{} ({}:{} {}:{})", c_free, chr_1, c_free_1, chr_0,
+                                   c_free_0, c_locked_1 + c_locked_0, chr_1, c_locked_1, chr_0, c_locked_0);
             }
+            imgui_Str(str);
         } else if (compatible) {
             ImGui::Text("Groups:%d !contained", c_group);
             ImGui::SameLine();
-            imgui_StrTooltip("(?)", "(Check the dull-blue groups for details.)\n"
-                                    "The current rule does not belong to the working set.");
+            imgui_StrTooltip("(?)", "The current rule does not belong to the working set.\n"
+                                    "(Check the dull-blue groups for details.)\n"
+                                    "(To enter the working set you can try any of '<00..', '11..>', 'Randomize' "
+                                    "and 'Approximate'.)");
         } else {
             ImGui::Text("Groups:%d !compatible", c_group);
             ImGui::SameLine();
-            imgui_StrTooltip("(?)", "(Check the red groups for details.)\n"
-                                    "There don't exist rules that belong to the working set and also have the "
-                                    "same locked values as the current rule.");
+            imgui_StrTooltip("(?)", "There don't exist rules that belong to the working set and also have the "
+                                    "same locked values as the current rule.\n"
+                                    "(Check the red groups for details.)");
+            // TODO: add tips for what to do in this case...
         }
     }
 
     ImGui::Separator();
 
-    // !!TODO: add tooltip for random-access edition...
     if (auto child = imgui_ChildWindow("Details")) {
         const char labels[2][3]{{'-', chr_0, '\0'}, {'-', chr_1, '\0'}};
         const legacy::ruleT_masked masked = mask ^ mold.rule;
@@ -721,6 +754,9 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
             }
 
             if (show_group && ImGui::BeginTooltip()) {
+                // TODO: move elsewhere...
+                imgui_Str("Left-click to flip the values.\nRight-click to toggle the lock.");
+                ImGui::Separator();
                 ImGui::Text("Group size: %d", (int)group.size());
                 const int max_to_show = 48;
                 for (int x = 0; const legacy::codeT code : group) {
