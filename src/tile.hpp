@@ -208,6 +208,39 @@ namespace legacy {
             }
         }
 
+        // This is relying on codeT::bpos_q = 0, bpos_w = 1, ... bpos_c = 8.
+        void apply_v2(const rule_like auto& rule, tileT& dest) {
+            assert(this != &dest);
+            dest.resize(m_size);
+
+            const int width = m_size.width, height = m_size.height;
+            std::vector<char> _vec_a(width + 1), _vec_b(width + 1); // [0, width]
+
+            char *_vec_up = _vec_a.data(), *_vec_cn = _vec_b.data();
+            {
+                const bool *_up = _line(0), *_cn = _line(1);
+                int p3_up = (_up[0] << 1) | (_up[1] << 2);
+                int p3_cn = (_cn[0] << 1) | (_cn[1] << 2);
+                for (int _x = 1; _x <= width; ++_x) {
+                    p3_up = (p3_up >> 1) | (_up[_x + 1] << 2);
+                    p3_cn = (p3_cn >> 1) | (_cn[_x + 1] << 2);
+                    _vec_up[_x] = p3_up; // _up[_x - 1] | (_up[_x] << 1) | (_up[_x + 1] << 2)
+                    _vec_cn[_x] = p3_cn; // _cn[_x - 1] | (_cn[_x] << 1) | (_cn[_x + 1] << 2)
+                }
+            }
+            for (int _y = 1; _y <= height; ++_y) {
+                const bool* _dw = _line(_y + 1);
+                bool* _dest = dest._line(_y);
+                int p3_dw = (_dw[0] << 1) | (_dw[1] << 2);
+                for (int _x = 1; _x <= width; ++_x) {
+                    p3_dw = (p3_dw >> 1) | (_dw[_x + 1] << 2);
+                    _dest[_x] = rule(codeT{_vec_up[_x] | (_vec_cn[_x] << 3) | (p3_dw << 6)});
+                    _vec_up[_x] = p3_dw; // _dw[_x - 1] | (_dw[_x] << 1) | (_dw[_x + 1] << 2)
+                }
+                std::swap(_vec_up, _vec_cn);
+            }
+        }
+
         friend bool operator==(const tileT& l, const tileT& r) {
             if (l.m_size != r.m_size) {
                 return false;
@@ -225,7 +258,7 @@ namespace legacy {
 
 #ifdef ENABLE_TESTS
     namespace _tests {
-        inline const testT test_tileT = [] {
+        inline const testT test_tileT_apply = [] {
             const tileT::sizeT size{1, 1};
 
             tileT t_q(size), t_w(size), t_e(size);
@@ -244,6 +277,20 @@ namespace legacy {
                 t_s.apply(rule, dest);
                 assert(dest.line(0)[0] == rule(code));
             });
+        };
+
+        inline const testT test_tileT_apply_v2 = [] {
+            const tileT::sizeT size{32, 32};
+            tileT source(size), dest(size), dest_v2(size);
+            source.for_each_line(source.entire_range(), [&](std::span<bool> line) { //
+                std::ranges::generate(line, [&] { return testT::rand() & 1; });
+            });
+
+            const ruleT rule = make_rule([](codeT) { return testT::rand() & 1; });
+            source.gather(source, source, source, source, source, source, source, source);
+            source.apply(rule, dest);
+            source.apply(rule, dest_v2);
+            assert(dest == dest_v2);
         };
     }  // namespace _tests
 #endif // ENABLE_TESTS

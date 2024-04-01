@@ -20,7 +20,7 @@ static void run_torus(legacy::tileT& tile, legacy::tileT& temp, const legacy::ru
     assert(&tile != &temp);
 
     tile.gather(tile, tile, tile, tile, tile, tile, tile, tile);
-    tile.apply(rule, temp);
+    tile.apply_v2(rule, temp);
     tile.swap(temp);
 }
 
@@ -163,7 +163,7 @@ class runnerT {
     struct ctrlT {
         legacy::ruleT rule{};
 
-        static constexpr int pace_min = 1, pace_max = 20;
+        static constexpr int pace_min = 1, pace_max = 80;
         int pace = 1;
         bool anti_strobing = true;
         int actual_pace() const {
@@ -326,7 +326,7 @@ public:
             imgui_StepSliderInt("Gap time (0~500ms)", &m_ctrl.gap, m_ctrl.gap_min, m_ctrl.gap_max,
                                 std::format("{} ms", m_ctrl.gap * m_ctrl.gap_unit).c_str());
 
-            imgui_StepSliderInt("Pace (1~20)", &m_ctrl.pace, m_ctrl.pace_min, m_ctrl.pace_max);
+            imgui_StepSliderInt("Pace (1~80)", &m_ctrl.pace, m_ctrl.pace_min, m_ctrl.pace_max);
 
             // TODO: this would better be explained with examples.
             // How to make interactive tooltips?
