@@ -8,8 +8,8 @@
 
 using clockT = std::chrono::steady_clock;
 
-static void refresh(screenT& screen, const legacy::tileT& tile) {
-    screen.refresh(tile.width(), tile.height(), [&tile](int y) { return tile.line(y); });
+[[nodiscard]] static ImTextureID make_screen(const legacy::tileT& tile) {
+    return make_screen(tile.width(), tile.height(), [&tile](int y) { return tile.line(y); });
 }
 
 // TODO: whether to support boundless space?
@@ -253,7 +253,7 @@ public:
         }
     }
 
-    std::optional<legacy::moldT::lockT> display(screenT& screen, bool& temp_pause /* Workaround */) {
+    std::optional<legacy::moldT::lockT> display(bool& temp_pause /* Workaround */) {
         // (Shadowing `::imgui_KeyPressed`)
         // TODO: or use ImGui::SetNextFrameWantCaptureKeyboard when the Canvas button is active?
         auto imgui_KeyPressed = [active = GImGui->ActiveId == ImGui::GetID("Canvas")](ImGuiKey key, bool repeat) {
@@ -523,10 +523,11 @@ public:
             drawlist->PushClipRect(canvas_min, canvas_max);
             drawlist->AddRectFilled(canvas_min, canvas_max, IM_COL32(20, 20, 20, 255));
 
+            ImTextureID texture = nullptr;
             if (!paste) {
-                refresh(screen, m_torus.tile());
+                texture = make_screen(m_torus.tile());
 
-                drawlist->AddImage(screen.texture(), screen_min, screen_max);
+                drawlist->AddImage(texture, screen_min, screen_max);
             } else {
                 assert(paste->width() <= tile_size.width && paste->height() <= tile_size.height);
                 paste_beg.x = std::clamp(paste_beg.x, 0, tile_size.width - paste->width());
@@ -537,7 +538,7 @@ public:
                 legacy::tileT temp = legacy::copy(m_torus.tile(), {{paste_beg, paste_end}});
                 (background == 0 ? legacy::blit<legacy::blitE::Or>
                                  : legacy::blit<legacy::blitE::And>)(m_torus.tile(), paste_beg, *paste, std::nullopt);
-                refresh(screen, m_torus.tile());
+                texture = make_screen(m_torus.tile());
                 if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
                     m_ctrl.mark_written();
                     temp_pause = true;
@@ -546,7 +547,7 @@ public:
                     legacy::blit<legacy::blitE::Copy>(m_torus.tile(), paste_beg, temp);
                 }
 
-                drawlist->AddImage(screen.texture(), screen_min, screen_max);
+                drawlist->AddImage(texture, screen_min, screen_max);
                 const ImVec2 paste_min = screen_min + ImVec2(paste_beg.x, paste_beg.y) * screen_zoom;
                 const ImVec2 paste_max = screen_min + ImVec2(paste_end.x, paste_end.y) * screen_zoom;
                 drawlist->AddRectFilled(paste_min, paste_max, IM_COL32(255, 0, 0, 60));
@@ -588,7 +589,7 @@ public:
                                                              .y = std::clamp(cely - h / 2, 0, tile_size.height - h)};
                             const legacy::tileT::posT max = {.x = min.x + w, .y = min.y + h};
 
-                            ImGui::Image(screen.texture(), ImVec2(w * 4, h * 4),
+                            ImGui::Image(texture, ImVec2(w * 4, h * 4),
                                          {(float)min.x / tile_size.width, (float)min.y / tile_size.height},
                                          {(float)max.x / tile_size.width, (float)max.y / tile_size.height});
                             ImGui::EndTooltip();
@@ -810,9 +811,9 @@ public:
     }
 };
 
-std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, screenT& screen) {
+std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule) {
     static runnerT runner;
     bool temp_pause = false;
     runner.apply_rule(rule, temp_pause);
-    return runner.display(screen, temp_pause);
+    return runner.display(temp_pause);
 }

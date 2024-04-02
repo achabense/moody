@@ -67,7 +67,7 @@ static void assign_val(legacy::moldT& mold, legacy::extrT::valT& val) {
 }
 
 // TODO: make some tooltips interactive?
-void frame_main(const code_icons& icons, screenT& screen) {
+void frame_main() {
     messenger::display();
 
     static recorderT recorder;
@@ -181,7 +181,7 @@ void frame_main(const code_icons& icons, screenT& screen) {
             ImGui::TableNextColumn();
             if (auto child = imgui_ChildWindow("Edit", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
                 bool randomized = false;
-                if (auto out = edit_rule(current, icons, randomized)) {
+                if (auto out = edit_rule(current, randomized)) {
                     current = *out;
                     update = true;
                 }
@@ -191,7 +191,7 @@ void frame_main(const code_icons& icons, screenT& screen) {
             }
             ImGui::TableNextColumn();
             if (auto child = imgui_ChildWindow("Apply", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
-                if (auto out = apply_rule(current.rule, screen)) {
+                if (auto out = apply_rule(current.rule)) {
                     current.lock = *out;
                     update = true;
                 }

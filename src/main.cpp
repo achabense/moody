@@ -14,82 +14,139 @@
 // #define DISABLE_FRAMETATE_CAPPING
 
 [[noreturn]] static void resource_failure() {
-    printf("Error: %s", SDL_GetError());
+    SDL_Log("Error: %s", SDL_GetError());
     exit(EXIT_FAILURE);
 }
 
 static SDL_Window* window = nullptr;
 static SDL_Renderer* renderer = nullptr;
 
-static SDL_Texture* create_texture(SDL_TextureAccess access, int w, int h) {
-    assert(window && renderer);
+// Manage textures for `make_screen`, `code_image` and `code_button`.
+namespace textures {
+    static SDL_Texture* create_texture(SDL_TextureAccess access, int w, int h) {
+        assert(window && renderer);
 
-    // Using the same pixel format as the one in "imgui_impl_sdlrenderer2.cpp".
-    SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888, access, w, h);
-    if (!texture) {
-        resource_failure();
-    }
-    return texture;
-}
-
-static Uint32 color_for(bool b) {
-    // Guaranteed to work under SDL_PIXELFORMAT_XXXX8888.
-    return b ? -1 /* White */ : 0 /* Black*/;
-}
-
-void screenT::refresh(const int w, const int h, std::function<const bool*(int)> getline) {
-    if (!m_texture || m_w != w || m_h != h) {
-        if (m_texture) {
-            SDL_DestroyTexture(static_cast<SDL_Texture*>(m_texture));
+        // Using the same pixel format as the one in "imgui_impl_sdlrenderer2.cpp".
+        SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888, access, w, h);
+        if (!texture) {
+            resource_failure();
         }
-
-        m_w = w;
-        m_h = h;
-        m_texture = create_texture(SDL_TEXTUREACCESS_STREAMING, m_w, m_h);
+        return texture;
     }
 
-    assert(m_texture && m_w == w && m_h == h);
+    static Uint32 color_for(bool b) {
+        // Guaranteed to work under SDL_PIXELFORMAT_XXXX8888.
+        return b ? -1 /* White */ : 0 /* Black*/;
+    }
+
+    static SDL_Texture* code_atlas = nullptr;
+
+    struct blobT {
+        int c; // 0: lent out at this frame.
+        int w, h;
+        SDL_Texture* texture;
+    };
+
+    static std::vector<blobT> blobs = {};
+
+    static void begin() {
+        assert(window && renderer);
+        assert(!code_atlas && blobs.empty());
+
+        const int width = 3, height = 3 * 512;
+        code_atlas = create_texture(SDL_TEXTUREACCESS_STATIC, width, height);
+        // Using heap allocation to avoid "Function uses XXX bytes of stack" warning.
+        std::unique_ptr<Uint32[][3][3]> pixels(new Uint32[512][3][3]);
+        legacy::for_each_code([&](legacy::codeT code) {
+            const legacy::situT situ = legacy::decode(code);
+            const bool fill[3][3] = {{situ.q, situ.w, situ.e}, {situ.a, situ.s, situ.d}, {situ.z, situ.x, situ.c}};
+            for (int y = 0; y < 3; ++y) {
+                for (int x = 0; x < 3; ++x) {
+                    pixels[code][y][x] = color_for(fill[y][x]);
+                }
+            }
+        });
+
+        SDL_UpdateTexture(code_atlas, nullptr, pixels.get(), width * sizeof(Uint32));
+    }
+
+    static void end() {
+        assert(window && renderer);
+
+        SDL_DestroyTexture(code_atlas);
+        code_atlas = nullptr;
+        for (blobT& blob : blobs) {
+            SDL_DestroyTexture(blob.texture);
+        }
+        blobs.clear();
+    }
+
+    // There are not going to be too many textures, so for-loop is efficient enough.
+    static SDL_Texture* get(int w, int h) {
+        assert(window && renderer);
+
+        for (blobT& blob : blobs) {
+            if (blob.c != 0 && blob.w == w && blob.h == h) {
+                blob.c = 0;
+                return blob.texture;
+            }
+        }
+        SDL_Texture* texture = create_texture(SDL_TEXTUREACCESS_STREAMING, w, h);
+        blobs.push_back({.c = 0, .w = w, .h = h, .texture = texture});
+        return texture;
+    }
+
+    static void begin_frame() {
+        assert(window && renderer);
+
+        auto pos = blobs.begin();
+        for (blobT& blob : blobs) {
+            if (++blob.c > 100) { // Expired.
+                SDL_DestroyTexture(blob.texture);
+            } else {
+                *pos++ = blob;
+            }
+        }
+        blobs.erase(pos, blobs.end());
+    }
+} // namespace textures
+
+[[nodiscard]] ImTextureID make_screen(int w, int h, std::function<const bool*(int)> getline) {
+    SDL_Texture* texture = textures::get(w, h);
+
     void* pixels = nullptr;
     int pitch = 0;
-    if (SDL_LockTexture(static_cast<SDL_Texture*>(m_texture), nullptr, &pixels, &pitch) != 0) {
+    if (SDL_LockTexture(texture, nullptr, &pixels, &pitch) != 0) {
         resource_failure();
     }
 
     for (int y = 0; y < h; ++y) {
         Uint32* p = (Uint32*)((char*)pixels + pitch * y);
         for (bool v : std::span(getline(y), w)) {
-            *p++ = color_for(v);
+            *p++ = textures::color_for(v);
         }
     }
 
-    SDL_UnlockTexture(static_cast<SDL_Texture*>(m_texture));
+    SDL_UnlockTexture(texture);
+    return texture;
 }
 
-screenT::~screenT() {
-    if (m_texture) {
-        SDL_DestroyTexture(static_cast<SDL_Texture*>(m_texture));
-    }
+void code_image(legacy::codeT code, int zoom, const ImVec4& tint_col, const ImVec4& border_col) {
+    const ImVec2 size(3 * zoom, 3 * zoom);
+    const ImVec2 uv0(0, code * (1.0f / 512));
+    const ImVec2 uv1(1, (code + 1) * (1.0f / 512));
+    ImGui::Image(textures::code_atlas, size, uv0, uv1, tint_col, border_col);
 }
 
-code_icons::code_icons() {
-    const int width = 3, height = 3 * 512;
-    m_texture = create_texture(SDL_TEXTUREACCESS_STATIC, width, height);
-    // Using heap allocation to avoid "Function uses XXX bytes of stack" warning.
-    std::unique_ptr<Uint32[][3][3]> pixels(new Uint32[512][3][3]);
-    legacy::for_each_code([&](legacy::codeT code) {
-        const legacy::situT situ = legacy::decode(code);
-        const bool fill[3][3] = {{situ.q, situ.w, situ.e}, {situ.a, situ.s, situ.d}, {situ.z, situ.x, situ.c}};
-        for (int y = 0; y < 3; ++y) {
-            for (int x = 0; x < 3; ++x) {
-                pixels[code][y][x] = color_for(fill[y][x]);
-            }
-        }
-    });
-
-    SDL_UpdateTexture(static_cast<SDL_Texture*>(m_texture), nullptr, pixels.get(), width * sizeof(Uint32));
+bool code_button(legacy::codeT code, int zoom, const ImVec4& bg_col, const ImVec4& tint_col) {
+    const ImVec2 size(3 * zoom, 3 * zoom);
+    const ImVec2 uv0(0, code * (1.0f / 512));
+    const ImVec2 uv1(1, (code + 1) * (1.0f / 512));
+    ImGui::PushID(code);
+    const bool hit = ImGui::ImageButton("Code", textures::code_atlas, size, uv0, uv1, bg_col, tint_col);
+    ImGui::PopID();
+    return hit;
 }
-
-code_icons::~code_icons() { SDL_DestroyTexture(static_cast<SDL_Texture*>(m_texture)); }
 
 // The encoding of `argv` cannot be relied upon, see:
 // https://stackoverflow.com/questions/5408730/what-is-the-encoding-of-argv
@@ -198,26 +255,24 @@ int main(int, char**) {
         SDL_RenderPresent(renderer);
     };
 
-    {
-        code_icons icons;
-        screenT screen;
-
-        while (begin_frame()) {
-            frame_main(icons, screen);
-            end_frame();
+    textures::begin();
+    while (begin_frame()) {
+        textures::begin_frame();
+        frame_main();
+        end_frame();
 
 #ifndef DISABLE_FRAMETATE_CAPPING
-            // Added as an extra assurance for the framerate.
-            // (Normally `SDL_RENDERER_PRESENTVSYNC` should be enough to guarantee a moderate framerate.)
-            static Uint64 next = 0;
-            const Uint64 now = SDL_GetTicks64();
-            if (now < next) {
-                SDL_Delay(next - now);
-            }
-            next = SDL_GetTicks64() + 10;
-#endif // !DISABLE_FRAMETATE_CAPPING
+        // Added as an extra assurance for the framerate.
+        // (Normally `SDL_RENDERER_PRESENTVSYNC` should be enough to guarantee a moderate framerate.)
+        static Uint64 next = 0;
+        const Uint64 now = SDL_GetTicks64();
+        if (now < next) {
+            SDL_Delay(next - now);
         }
+        next = SDL_GetTicks64() + 10;
+#endif // !DISABLE_FRAMETATE_CAPPING
     }
+    textures::end();
 
     ImGui_ImplSDLRenderer2_Shutdown();
     ImGui_ImplSDL2_Shutdown();

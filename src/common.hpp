@@ -35,66 +35,29 @@ inline void assert_utf8_encoding() {
 // To make things easy the program does not try to deal with these strings.
 #endif
 
-// Provide texture for cells.
-class screenT {
-    int m_w, m_h;
-    ImTextureID m_texture;
-
-public:
-    screenT(const screenT&) = delete;
-    screenT& operator=(const screenT&) = delete;
-
-    screenT() : m_w{}, m_h{}, m_texture{nullptr} {}
-
-    ~screenT();
-    void refresh(int w, int h, std::function<const bool*(int)> getline);
-
-    ImTextureID texture() const { return m_texture; }
-};
-
-// Provide texture for codes.
-class code_icons {
-    ImTextureID m_texture;
-
-public:
-    code_icons(const code_icons&) = delete;
-    code_icons& operator=(const code_icons&) = delete;
-
-    code_icons();
-    ~code_icons();
-
-    void image(legacy::codeT code, int zoom, const ImVec4& tint_col = ImVec4(1, 1, 1, 1),
-               const ImVec4& border_col = ImVec4(0, 0, 0, 0)) const {
-        const ImVec2 size(3 * zoom, 3 * zoom);
-        const ImVec2 uv0(0, code * (1.0f / 512));
-        const ImVec2 uv1(1, (code + 1) * (1.0f / 512));
-        ImGui::Image(m_texture, size, uv0, uv1, tint_col, border_col);
-    }
-
-    bool button(legacy::codeT code, int zoom, const ImVec4& bg_col = ImVec4(0, 0, 0, 0),
-                const ImVec4& tint_col = ImVec4(1, 1, 1, 1)) const {
-        const ImVec2 size(3 * zoom, 3 * zoom);
-        const ImVec2 uv0(0, code * (1.0f / 512));
-        const ImVec2 uv1(1, (code + 1) * (1.0f / 512));
-        ImGui::PushID(code);
-        const bool hit = ImGui::ImageButton("Code", m_texture, size, uv0, uv1, bg_col, tint_col);
-        ImGui::PopID();
-        return hit;
-    }
-};
-
 // Managed by `main`.
 bool file_nav_add_special_path(const char* u8path, const char* title);
-void frame_main(const code_icons& icons, screenT& screen);
+void frame_main();
 
 // Managed by `frame_main`.
 std::optional<legacy::extrT::valT> load_file();
 std::optional<legacy::extrT::valT> load_clipboard();
 std::optional<legacy::extrT::valT> load_doc();
 // (`randomized` is a workaround to allow for binding to undo/redo when the rule is gotten by randomization.)
-std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_icons& icons, bool& randomized);
+std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& randomized);
 std::optional<legacy::moldT> static_constraints();
-std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule, screenT& screen);
+std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule);
+
+// Returns a texture with width/height exactly = w/h, for the (cell) data represented by `getline`.
+// There must be: getline(0...h-1) -> bool[w].
+// The texture is only valid for the current frame.
+[[nodiscard]] ImTextureID make_screen(int w, int h, std::function<const bool*(int)> getline);
+
+// ImGui::Image and ImGui::ImageButton for `codeT`.
+void code_image(legacy::codeT code, int zoom, const ImVec4& tint_col = ImVec4(1, 1, 1, 1),
+                const ImVec4& border_col = ImVec4(0, 0, 0, 0));
+bool code_button(legacy::codeT code, int zoom, const ImVec4& bg_col = ImVec4(0, 0, 0, 0),
+                 const ImVec4& tint_col = ImVec4(1, 1, 1, 1));
 
 inline const int item_width = 220;
 

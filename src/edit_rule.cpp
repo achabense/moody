@@ -391,7 +391,7 @@ public:
     }
 };
 
-std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_icons& icons, bool& randomized) {
+std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& randomized) {
     std::optional<legacy::moldT> out = std::nullopt;
     auto return_rule = [&out, &mold](const legacy::ruleT& rule) { out.emplace(rule, mold.lock); };
     auto return_lock = [&out, &mold](const legacy::moldT::lockT& lock) { out.emplace(mold.rule, lock); };
@@ -728,7 +728,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
             ImGui::PushStyleColor(ImGuiCol_Button, button_color[0]);
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, button_color[1]);
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, button_color[2]);
-            if (icons.button(head, zoom)) {
+            if (code_button(head, zoom)) {
                 legacy::ruleT rule = mold.rule;
                 for (legacy::codeT code : group) {
                     rule[code] = !rule[code];
@@ -763,7 +763,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, const code_ico
                     if (x++ % 8 != 0) {
                         ImGui::SameLine();
                     }
-                    icons.image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
+                    code_image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
                     ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                     align_text(ImGui::GetItemRectSize().y);
                     imgui_Str(labels[masked[code]]);
