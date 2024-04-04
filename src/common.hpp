@@ -48,6 +48,27 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
 std::optional<legacy::moldT> static_constraints();
 std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule);
 
+// TODO: redesign...
+// TODO: apply in more places...
+struct preview_rule {
+    static void _preview(int id, int width, int height, const legacy::ruleT& rule, bool tooltip);
+
+public:
+    static void preview(int id, int width, int height, const legacy::ruleT& rule, bool tooltip = true) {
+        ImGui::Dummy(ImVec2(width, height));
+        if (ImGui::IsItemVisible()) {
+            _preview(id, width, height, rule, tooltip);
+        }
+    }
+
+    static void preview(int id, int width, int height, const std::invocable<> auto& get_rule, bool tooltip = true) {
+        ImGui::Dummy(ImVec2(width, height));
+        if (ImGui::IsItemVisible()) {
+            _preview(id, width, height, get_rule(), tooltip);
+        }
+    }
+};
+
 // Returns a texture with width/height exactly = w/h, for the (cell) data represented by `getline`.
 // There must be: getline(0...h-1) -> bool[w].
 // The texture is only valid for the current frame.

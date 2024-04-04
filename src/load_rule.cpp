@@ -178,6 +178,8 @@ public:
     }
 };
 
+// TODO: add support for preview mode.
+
 // It is easy to locate all rules in the text via `extract_MAP_str`.
 // However there are no easy ways to locate or highlight (only) the rule across the lines.
 // See: https://github.com/ocornut/imgui/issues/2313

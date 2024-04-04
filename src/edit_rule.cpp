@@ -548,6 +548,9 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
     // TODO: more filtering modes?
     // Will not hide "impure" groups even when there are locks.
     static bool hide_locked = false;
+
+    static bool preview_mode = false;
+    static int preview_size = 160;
     {
         const int c_group = par.k();
         int c_0 = 0, c_1 = 0, c_x = 0;
@@ -655,6 +658,20 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
             ImGui::EndPopup();
         }
 
+        // TODO: redesign layout; add tooltip...
+        ImGui::SameLine();
+        ImGui::Checkbox("Preview mode", &preview_mode);
+        if (preview_mode) {
+            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+            if (ImGui::RadioButton("160", preview_size == 160)) {
+                preview_size = 160;
+            }
+            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+            if (ImGui::RadioButton("240", preview_size == 240)) {
+                preview_size = 240;
+            }
+        }
+
         if (contained) {
             std::string str = std::format("Groups:{} ({}:{} {}:{})", c_group, chr_1, c_1, chr_0, c_0);
             if (c_free != c_group) {
@@ -680,10 +697,13 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
         }
     }
 
-    ImGui::Separator();
-
+    if (preview_mode) {
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(48, 48, 48, 255));
+    }
     if (auto child = imgui_ChildWindow("Details")) {
-        const char labels[2][3]{{'-', chr_0, '\0'}, {'-', chr_1, '\0'}};
+        const char labels_normal[2][3]{{'-', chr_0, '\0'}, {'-', chr_1, '\0'}};
+        const char labels_preview[2][9]{{'-', chr_0, ' ', '-', '>', ' ', chr_1, ':', '\0'},
+                                        {'-', chr_1, ' ', '-', '>', ' ', chr_0, ':', '\0'}};
         const legacy::ruleT_masked masked = mask ^ mold.rule;
 
         // Precise vertical alignment:
@@ -693,8 +713,20 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
             ImGui::SetCursorPosY(floor(ImGui::GetCursorPos().y + off));
         };
 
-        const int zoom = 7;
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
+        const int zoom = 7;
+        const int spacing = preview_mode ? 16 : 12;
+        const int perline = [&] {
+            // button-size + inner-spacing + label-size
+            int group_size = (2 * 2 + 3 * zoom) + imgui_ItemInnerSpacingX() +
+                             ImGui::CalcTextSize(preview_mode ? labels_preview[0] : labels_normal[0]).x;
+            if (preview_mode) {
+                group_size = std::max(group_size, preview_size);
+            }
+            int perline = floor((ImGui::GetContentRegionAvail().x + spacing) / (group_size + spacing));
+            return std::max(perline, 1);
+        }();
+
         int n = 0;
         par.for_each_group([&](int j, const legacy::groupT& group) {
             const bool has_lock = scanlist[j].any_locked();
@@ -702,10 +734,9 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
             if (hide_locked && has_lock && pure) {
                 return;
             }
-            if (n % 8 != 0) {
-                ImGui::SameLine(0, 12);
-            }
-            if (n != 0 && n % 64 == 0) {
+            if (n % perline != 0) {
+                ImGui::SameLine(0, spacing);
+            } else {
                 ImGui::Separator();
             }
             ++n;
@@ -725,6 +756,9 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
                                                : !incomptible ? button_col_impure
                                                               : button_col_incomptible;
 
+            if (preview_mode) {
+                ImGui::BeginGroup();
+            }
             ImGui::PushStyleColor(ImGuiCol_Button, button_color[0]);
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, button_color[1]);
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, button_color[2]);
@@ -749,10 +783,21 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
 
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
             align_text(ImGui::GetItemRectSize().y);
-            imgui_Str(labels[masked[head]]);
+            imgui_Str(preview_mode ? labels_preview[masked[head]] : labels_normal[masked[head]]);
             if (has_lock) {
                 const ImU32 col = scanlist[j].all_locked() ? IM_COL32_WHITE : IM_COL32(128, 128, 128, 255);
                 imgui_ItemRect(col, ImVec2(-2, -2));
+            }
+
+            if (preview_mode) {
+                preview_rule::preview(j, preview_size, preview_size, [&] {
+                    legacy::ruleT rule = mold.rule;
+                    for (legacy::codeT code : group) {
+                        rule[code] = !rule[code];
+                    }
+                    return rule;
+                });
+                ImGui::EndGroup();
             }
 
             if (show_group && ImGui::BeginTooltip()) {
@@ -768,7 +813,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
                     code_image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
                     ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                     align_text(ImGui::GetItemRectSize().y);
-                    imgui_Str(labels[masked[code]]);
+                    imgui_Str(labels_normal[masked[code]]);
                     if (mold.lock[code]) {
                         imgui_ItemRect(IM_COL32_WHITE, ImVec2(-2, -2));
                     }
@@ -786,6 +831,9 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
         if (n == 0) {
             imgui_Str("No free groups");
         }
+    }
+    if (preview_mode) {
+        ImGui::PopStyleColor();
     }
 
     return out;

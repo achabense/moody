@@ -2,6 +2,8 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #endif
 
+#include <unordered_map>
+
 #include "tile.hpp"
 
 #include "common.hpp"
@@ -820,4 +822,52 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule) {
     bool temp_pause = false;
     runner.apply_rule(rule, temp_pause);
     return runner.display(temp_pause);
+}
+
+// TODO: redesign...
+// Remembering rules by `id` across the whole program is a horrible design...
+// Should be able to clean/reuse unused terms...
+// The size/seed/pace... should be configurable in the gui...
+// Should support batch-restart...
+// The efficiency of shared `temp` is relying on width, height to be stable...
+void preview_rule::_preview(int id, const int width, const int height, const legacy::ruleT& rule, bool tooltip) {
+    struct termT {
+        unsigned frame = 0;
+        legacy::ruleT rule = {};
+        legacy::tileT tile = {};
+    };
+
+    static std::unordered_map<int, termT> terms;
+    static legacy::tileT temp;
+
+    assert(ImGui::GetItemRectSize() == ImVec2(width, height));
+    assert(ImGui::IsItemVisible());
+
+    const unsigned frame = ImGui::GetFrameCount();
+    auto& term = terms[id];
+
+    if (term.frame + 1 != frame || ImGui::IsItemClicked() || term.tile.width() != width ||
+        term.tile.height() != height || term.rule != rule) {
+        term.tile.resize({.width = width, .height = height});
+        term.rule = rule;
+        std::mt19937 rand{0};
+        legacy::random_fill(term.tile, rand, 0.5);
+    }
+
+    ImTextureID texture = make_screen(term.tile);
+    ImGui::GetWindowDrawList()->AddImage(texture, ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+    if (tooltip && ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
+        assert(ImGui::IsMousePosValid());
+        const ImVec2 pos = ImGui::GetIO().MousePos - ImGui::GetItemRectMin();
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
+        if (ImGui::BeginTooltip()) {
+            zoom_image(texture, ImVec2(width, height), pos, ImVec2(60, 60), 3);
+            ImGui::EndTooltip();
+        }
+        ImGui::PopStyleVar();
+    }
+    for (int i = 0; i < (strobing(rule) ? 2 : 1); ++i) {
+        run_torus(term.tile, temp, rule);
+    }
+    term.frame = frame;
 }
