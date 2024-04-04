@@ -391,7 +391,7 @@ public:
     }
 };
 
-std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& randomized) {
+std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_undo) {
     std::optional<legacy::moldT> out = std::nullopt;
     auto return_rule = [&out, &mold](const legacy::ruleT& rule) { out.emplace(rule, mold.lock); };
     auto return_lock = [&out, &mold](const legacy::moldT::lockT& lock) { out.emplace(mold.rule, lock); };
@@ -596,7 +596,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& randomiz
             }
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
             if (button_with_shortcut("Randomize", ImGuiKey_Enter)) {
-                randomized = true;
+                bind_undo = true;
                 if (exact_mode) {
                     return_rule(legacy::randomize_c(subset, mask, mold, global_mt19937(), dist - c_locked_1));
                 } else {
@@ -733,12 +733,14 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& randomiz
                 for (legacy::codeT code : group) {
                     rule[code] = !rule[code];
                 }
+                bind_undo = true;
                 return_rule(rule);
             } else if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
                 legacy::moldT::lockT lock = mold.lock;
                 for (legacy::codeT code : group) {
                     lock[code] = !has_lock;
                 }
+                bind_undo = true; // TODO: whether to bind-undo for locks?
                 return_lock(lock);
             }
             ImGui::PopStyleColor(3);

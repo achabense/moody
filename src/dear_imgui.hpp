@@ -40,7 +40,7 @@ inline void imgui_Str(std::string_view str) { //
 }
 
 inline void imgui_StrWrapped(std::string_view str, float min_len) {
-    ImGui::PushTextWrapPos(std::max(min_len, ImGui::GetContentRegionAvail().x));
+    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + std::max(min_len, ImGui::GetContentRegionAvail().x));
     imgui_Str(str);
     ImGui::PopTextWrapPos();
 }

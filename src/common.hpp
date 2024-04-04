@@ -43,8 +43,8 @@ void frame_main();
 std::optional<legacy::extrT::valT> load_file();
 std::optional<legacy::extrT::valT> load_clipboard();
 std::optional<legacy::extrT::valT> load_doc();
-// (`randomized` is a workaround to allow for binding to undo/redo when the rule is gotten by randomization.)
-std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& randomized);
+// (`bind_undo` is a workaround to allow for binding to undo/redo for certain operations.)
+std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_undo);
 std::optional<legacy::moldT> static_constraints();
 std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule);
 

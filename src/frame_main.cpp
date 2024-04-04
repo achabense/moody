@@ -76,7 +76,7 @@ void frame_main() {
 
     static bool show_file = false;
     static bool show_clipboard = false;
-    static bool show_doc = true;
+    static bool show_doc = false;
     static bool show_static = false;
 
     auto load_rule = [&](bool& flag, const char* title, std::optional<legacy::extrT::valT> (*load_fn)()) {
@@ -122,7 +122,7 @@ void frame_main() {
         ImGui::SameLine();
         imgui_Str("  (Debug mode)");
         ImGui::SameLine();
-        static bool show_demo = true;
+        static bool show_demo = false;
         ImGui::Checkbox("Demo window", &show_demo);
         if (show_demo) {
             ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
@@ -180,12 +180,12 @@ void frame_main() {
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             if (auto child = imgui_ChildWindow("Edit", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
-                bool randomized = false;
-                if (auto out = edit_rule(current, randomized)) {
+                bool bind_undo = false;
+                if (auto out = edit_rule(current, bind_undo)) {
                     current = *out;
                     update = true;
                 }
-                if (randomized) {
+                if (bind_undo) {
                     sequence::bind_to(id_prev);
                 }
             }

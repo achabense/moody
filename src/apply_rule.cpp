@@ -12,6 +12,19 @@ using clockT = std::chrono::steady_clock;
     return make_screen(tile.width(), tile.height(), [&tile](int y) { return tile.line(y); });
 }
 
+static void zoom_image(ImTextureID texture, ImVec2 texture_size, ImVec2 region_center, ImVec2 region_size, int zoom) {
+    region_size = ImMin(texture_size, region_size);
+    const ImVec2 min_pos = ImClamp(region_center - ImFloor(region_size / 2), ImVec2(0, 0), texture_size - region_size);
+    const ImVec2 max_pos = min_pos + region_size;
+
+    ImGui::Image(texture, region_size * zoom, min_pos / texture_size, max_pos / texture_size);
+}
+
+static bool strobing(const legacy::ruleT& rule) {
+    constexpr legacy::codeT all_0{0}, all_1{511};
+    return rule[all_0] == 1 && rule[all_1] == 0;
+}
+
 // TODO: whether to support boundless space?
 // `tileT` is able to serve as the building block for boundless space (`tileT::gather` was
 // initially designed to enable this extension) but that's complicated, and torus space is enough to
@@ -167,9 +180,7 @@ class runnerT {
         int pace = 1;
         bool anti_strobing = true;
         int actual_pace() const {
-            constexpr legacy::codeT all_0{0}, all_1{511};
-            const bool strobing = rule[all_0] == 1 && rule[all_1] == 0;
-            if (anti_strobing && strobing && pace % 2) {
+            if (anti_strobing && strobing(rule) && pace % 2) {
                 return pace + 1;
             }
             return pace;
@@ -521,7 +532,7 @@ public:
 
             ImDrawList* const drawlist = ImGui::GetWindowDrawList();
             drawlist->PushClipRect(canvas_min, canvas_max);
-            drawlist->AddRectFilled(canvas_min, canvas_max, IM_COL32(20, 20, 20, 255));
+            drawlist->AddRectFilled(canvas_min, canvas_max, IM_COL32(32, 32, 32, 255));
 
             ImTextureID texture = nullptr;
             if (!paste) {
@@ -583,15 +594,8 @@ public:
                     if (celx >= -10 && celx < tile_size.width + 10 && cely >= -10 && cely < tile_size.height + 10) {
                         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
                         if (ImGui::BeginItemTooltip()) {
-                            const int w = std::min(tile_size.width, 40);
-                            const int h = std::min(tile_size.height, 40);
-                            const legacy::tileT::posT min = {.x = std::clamp(celx - w / 2, 0, tile_size.width - w),
-                                                             .y = std::clamp(cely - h / 2, 0, tile_size.height - h)};
-                            const legacy::tileT::posT max = {.x = min.x + w, .y = min.y + h};
-
-                            ImGui::Image(texture, ImVec2(w * 4, h * 4),
-                                         {(float)min.x / tile_size.width, (float)min.y / tile_size.height},
-                                         {(float)max.x / tile_size.width, (float)max.y / tile_size.height});
+                            zoom_image(texture, ImVec2(tile_size.width, tile_size.height), ImVec2(celx, cely),
+                                       ImVec2(60, 60), 3);
                             ImGui::EndTooltip();
                         }
                         ImGui::PopStyleVar();
