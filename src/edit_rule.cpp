@@ -229,6 +229,55 @@ public:
     }
 
     const legacy::subsetT& select_subset(const legacy::moldT& mold) {
+        enum ringE { Contained, Compatible, Incompatible };
+        enum centerE { Selected, Including, Disabled, None }; // TODO: add "equals" relation?
+        auto put_term = [size = square_size()](ringE ring, centerE center, const char* title /* Optional */,
+                                               bool in_tooltip) -> bool {
+            ImGui::Dummy(size);
+            const bool hit = !in_tooltip && center != Disabled && ImGui::IsItemClicked(ImGuiMouseButton_Left);
+
+            const ImU32 cent_col_disabled = !title ? IM_COL32(120, 30, 0, 255) : IM_COL32(0, 0, 0, 90);
+            const ImU32 cent_col = center == Selected    ? IM_COL32(65, 150, 255, 255) // Roughly _ButtonHovered
+                                   : center == Including ? IM_COL32(25, 60, 100, 255)  // Roughly _Button
+                                   : center == Disabled  ? cent_col_disabled
+                                                         : IM_COL32_BLACK_TRANS;
+            const ImU32 ring_col = ring == Contained    ? IM_COL32(0, 255, 0, 255)   // Light green
+                                   : ring == Compatible ? IM_COL32(0, 100, 0, 255)   // Dull green
+                                                        : IM_COL32(200, 45, 0, 255); // Red
+
+            imgui_ItemRectFilled(IM_COL32_BLACK);
+            if (title && (center == None || center == Disabled)) {
+                const ImVec2 min = ImGui::GetItemRectMin();
+                const ImVec2 sz = ImGui::CalcTextSize(title, title + 1);
+                const ImVec2 pos(min.x + floor((size.x - sz.x) / 2),
+                                 min.y + floor((size.y - sz.y) / 2) - 1 /* -1 for better visual effect */);
+                ImGui::GetWindowDrawList()->AddText(pos, IM_COL32_WHITE, title, title + 1);
+            }
+            imgui_ItemRectFilled(cent_col, center == Disabled ? ImVec2(5, 5) : ImVec2(4, 4));
+            imgui_ItemRect(ring_col);
+            if (!in_tooltip && center != Disabled && ImGui::IsItemHovered()) {
+                imgui_ItemRectFilled(IM_COL32(255, 255, 255, 45));
+            }
+
+            return hit;
+        };
+        auto check = [&](termT& term, bool show_title = false) -> void {
+            if (put_term(term.set->contains(mold.rule) ? Contained
+                         : compatible(*term.set, mold) ? Compatible
+                                                       : Incompatible,
+                         term.selected                 ? Selected
+                         : term.set->includes(current) ? Including
+                         : term.disabled               ? Disabled
+                                                       : None,
+                         show_title ? term.title : nullptr, false)) {
+                assert(!term.disabled);
+                term.selected = !term.selected;
+                update_current();
+            }
+
+            imgui_ItemTooltip(term.description);
+        };
+
         {
             // https://github.com/ocornut/imgui/issues/6902
             const float extra_w_sameline = ImGui::GetStyle().ItemSpacing.x * 3; // Three SameLine...
@@ -249,13 +298,9 @@ public:
                 update_current();
             }
             ImGui::SameLine();
-            imgui_StrTooltip("(?)", [] {
-                auto term = [size = square_size()](ImColor ring_col, ImColor cent_col, ImVec2 cent_off,
-                                                   const char* desc) {
-                    ImGui::Dummy(size);
-                    imgui_ItemRectFilled(IM_COL32_BLACK);
-                    imgui_ItemRectFilled(cent_col, cent_off);
-                    imgui_ItemRect(ring_col);
+            imgui_StrTooltip("(?)", [&] {
+                auto explain = [&](ringE ring, centerE center, const char* title /* Optional */, const char* desc) {
+                    put_term(ring, center, title, true);
                     ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                     ImGui::AlignTextToFramePadding(); // `Dummy` does not align automatically.
                     imgui_Str(": ");
@@ -272,70 +317,32 @@ public:
                     "(If nothing is selected, the working set will be the whole MAP set.)");
                 ImGui::Separator();
                 imgui_Str("The center color reflects the selection details:");
-                term(IM_COL32(0, 100, 0, 255), IM_COL32_BLACK_TRANS, ImVec2(5, 5), "Not selected.");
-                term(IM_COL32(0, 100, 0, 255), IM_COL32(65, 150, 255, 255), ImVec2(4, 4), "Selected.");
-                term(IM_COL32(0, 100, 0, 255), IM_COL32(25, 60, 100, 255), ImVec2(4, 4),
-                     "Not selected, but the working set already belongs to this subset, so it will behave "
-                     "as if this is selected too.");
-                term(IM_COL32(0, 100, 0, 255), IM_COL32(120, 30, 0, 255), ImVec2(5, 5),
-                     "Not selectable, otherwise the working set will be empty.");
+                put_term(Compatible, None, nullptr, true);
+                ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                explain(Compatible, None, "x", "Not selected.");
+                explain(Compatible, Selected, nullptr, "Selected.");
+                explain(Compatible, Including, nullptr,
+                        "Not selected, but the working set already belongs to this subset, so it will behave "
+                        "as if this is selected too.");
+                put_term(Compatible, Disabled, nullptr, true);
+                ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                explain(Compatible, Disabled, "x", "Not selectable, otherwise the working set will be empty.");
                 ImGui::Separator();
-                // (The colors are the same as the ones used in `check` below.)
                 imgui_Str("The ring color reflects the relation between the subset and the current rule-lock pair:");
-                term(IM_COL32(0, 255, 0, 255), IM_COL32_BLACK_TRANS, ImVec2(4, 4), "The rule belongs to this subset.");
-                term(IM_COL32(0, 100, 0, 255), IM_COL32_BLACK_TRANS, ImVec2(4, 4),
-                     "The rule does not belong to this subset, but there exist rules in the subset that meet the "
-                     "constraints (locked values) posed by rule-lock pair.\n"
-                     "(Notice that the [intersection] of such subsets may still contain no rules that satisfy the "
-                     "constraints. )");
-                term(IM_COL32(200, 45, 0, 255), IM_COL32_BLACK_TRANS, ImVec2(4, 4),
-                     "The rule does not belong to this subset, and the constraints cannot be met in any rule "
-                     "in this subset.");
+                explain(Contained, None, nullptr, "The rule belongs to this subset.");
+                explain(Compatible, None, nullptr,
+                        "The rule does not belong to this subset, but there exist rules in the subset that meet the "
+                        "constraints (locked values) posed by rule-lock pair.\n"
+                        "(Notice that the [intersection] of such subsets may still contain no rules that satisfy the "
+                        "constraints. )");
+                explain(Incompatible, None, nullptr,
+                        "The rule does not belong to this subset, and the constraints cannot be met in any rule "
+                        "in this subset.");
                 ImGui::Separator();
                 imgui_Str("For a list of example rules in different subsets, see the \"Typical subsets\" part in "
                           "\"Documents\".");
             });
         }
-
-        auto check = [&, id = 0, size = square_size()](termT& term, bool show_title = false) mutable {
-            ImGui::PushID(id++);
-            if (ImGui::InvisibleButton("Check", size) && !term.disabled) {
-                term.selected = !term.selected;
-                update_current();
-            }
-            ImGui::PopID();
-
-            imgui_ItemTooltip([&] {
-                if (term.disabled) {
-                    imgui_Str("(This is not selectable as the result will be an empty set.)");
-                    ImGui::Separator();
-                }
-                imgui_Str(term.description);
-            });
-
-            // TODO: add color for "equals" relation?
-            const ImU32 cent_col_disabled = !show_title ? IM_COL32(120, 30, 0, 255) : IM_COL32(0, 0, 0, 90);
-            const ImU32 cent_col = term.selected                 ? IM_COL32(65, 150, 255, 255) // Roughly _ButtonHovered
-                                   : term.set->includes(current) ? IM_COL32(25, 60, 100, 255)  // Roughly _Button
-                                   : term.disabled               ? cent_col_disabled
-                                                                 : IM_COL32_BLACK_TRANS;
-            const ImU32 ring_col = term.set->contains(mold.rule) ? IM_COL32(0, 255, 0, 255)   // Light green
-                                   : compatible(*term.set, mold) ? IM_COL32(0, 100, 0, 255)   // Dull green
-                                                                 : IM_COL32(200, 45, 0, 255); // Red
-
-            imgui_ItemRectFilled(IM_COL32_BLACK);
-            if (show_title) {
-                const ImVec2 min = ImGui::GetItemRectMin();
-                const ImVec2 sz = ImGui::CalcTextSize(term.title, term.title + 1);
-                const ImVec2 pos(min.x + floor((size.x - sz.x) / 2), min.y + floor((size.y - sz.y) / 2));
-                ImGui::GetWindowDrawList()->AddText(pos, IM_COL32_WHITE, term.title, term.title + 1);
-            }
-            imgui_ItemRectFilled(cent_col, term.disabled ? ImVec2(5, 5) : ImVec2(4, 4));
-            imgui_ItemRect(ring_col);
-            if (!term.disabled && ImGui::IsItemHovered()) {
-                imgui_ItemRectFilled(IM_COL32(255, 255, 255, 45));
-            }
-        };
 
         if (ImGui::BeginTable("Checklists", 2, ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit)) {
             auto put_row = [](const char* l_str, const auto& r_logic) {
@@ -534,7 +541,9 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
     // TODO: about the interaction with locks...
     imgui_StrTooltip("(?)", "Left : Iterate through the whole working set.\n\n"
                             "Right: Iterate through all the rules in the working set that have the same distance to "
-                            "the masking rule (as that of the current rule).\n\n"
+                            "the masking rule (as that of the current rule).\n"
+                            "(In other words, if the distance between the current rule and the mask is k, this will "
+                            "iterate through all the rules that have distance = k to the mask.)\n\n"
                             "For example, suppose the current rule belongs to the working set. "
                             "To iterate through all the rules that have distance = 1 to the current rule, you can:\n"
                             "1. 'Take current' to set the current rule as the custom mask.\n"
