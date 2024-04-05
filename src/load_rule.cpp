@@ -457,8 +457,6 @@ static void load_rule_from_memory(std::optional<legacy::extrT::valT>& out) {
     if (!doc_id) {
         select();
     } else {
-        // assert(text.has_rule());
-
         const bool close = ImGui::SmallButton("Close");
         ImGui::SameLine();
         ImGui::SmallButton("...");

@@ -21,60 +21,36 @@
 static SDL_Window* window = nullptr;
 static SDL_Renderer* renderer = nullptr;
 
-// Manage textures for `make_screen`, `code_image` and `code_button`.
-namespace textures {
-    static SDL_Texture* create_texture(SDL_TextureAccess access, int w, int h) {
-        assert(window && renderer);
+static SDL_Texture* create_texture(SDL_TextureAccess access, int w, int h) {
+    assert(window && renderer);
 
-        // Using the same pixel format as the one in "imgui_impl_sdlrenderer2.cpp".
-        SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888, access, w, h);
-        if (!texture) {
-            resource_failure();
-        }
-        return texture;
+    // Using the same pixel format as the one in "imgui_impl_sdlrenderer2.cpp".
+    SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888, access, w, h);
+    if (!texture) {
+        resource_failure();
     }
+    return texture;
+}
 
-    static Uint32 color_for(bool b) {
-        // Guaranteed to work under SDL_PIXELFORMAT_XXXX8888.
-        return b ? -1 /* White */ : 0 /* Black*/;
-    }
+static Uint32 color_for(bool b) {
+    // Guaranteed to work under SDL_PIXELFORMAT_XXXX8888.
+    return b ? -1 /* White */ : 0 /* Black*/;
+}
 
-    static SDL_Texture* code_atlas = nullptr;
-
+// Manage textures for `make_screen`.
+class screen_textures {
     struct blobT {
         int c; // 0: lent out at this frame.
         int w, h;
         SDL_Texture* texture;
     };
+    inline static std::vector<blobT> blobs;
 
-    static std::vector<blobT> blobs = {};
-
-    static void begin() {
-        assert(window && renderer);
-        assert(!code_atlas && blobs.empty());
-
-        const int width = 3, height = 3 * 512;
-        code_atlas = create_texture(SDL_TEXTUREACCESS_STATIC, width, height);
-        // Using heap allocation to avoid "Function uses XXX bytes of stack" warning.
-        std::unique_ptr<Uint32[][3][3]> pixels(new Uint32[512][3][3]);
-        legacy::for_each_code([&](legacy::codeT code) {
-            const legacy::situT situ = legacy::decode(code);
-            const bool fill[3][3] = {{situ.q, situ.w, situ.e}, {situ.a, situ.s, situ.d}, {situ.z, situ.x, situ.c}};
-            for (int y = 0; y < 3; ++y) {
-                for (int x = 0; x < 3; ++x) {
-                    pixels[code][y][x] = color_for(fill[y][x]);
-                }
-            }
-        });
-
-        SDL_UpdateTexture(code_atlas, nullptr, pixels.get(), width * sizeof(Uint32));
-    }
-
+public:
+    static void begin() { assert(window && renderer && blobs.empty()); }
     static void end() {
         assert(window && renderer);
 
-        SDL_DestroyTexture(code_atlas);
-        code_atlas = nullptr;
         for (blobT& blob : blobs) {
             SDL_DestroyTexture(blob.texture);
         }
@@ -109,10 +85,10 @@ namespace textures {
         }
         blobs.erase(pos, blobs.end());
     }
-} // namespace textures
+};
 
 [[nodiscard]] ImTextureID make_screen(int w, int h, std::function<const bool*(int)> getline) {
-    SDL_Texture* texture = textures::get(w, h);
+    SDL_Texture* texture = screen_textures::get(w, h);
 
     void* pixels = nullptr;
     int pitch = 0;
@@ -123,7 +99,7 @@ namespace textures {
     for (int y = 0; y < h; ++y) {
         Uint32* p = (Uint32*)((char*)pixels + pitch * y);
         for (bool v : std::span(getline(y), w)) {
-            *p++ = textures::color_for(v);
+            *p++ = color_for(v);
         }
     }
 
@@ -131,11 +107,45 @@ namespace textures {
     return texture;
 }
 
+// Manage the texture for `code_image` and `code_button`.
+class code_atlas {
+    inline static SDL_Texture* texture = nullptr;
+
+public:
+    static void begin() {
+        assert(window && renderer && !texture);
+
+        const int width = 3, height = 3 * 512;
+        texture = create_texture(SDL_TEXTUREACCESS_STATIC, width, height);
+        // Using heap allocation to avoid "Function uses XXX bytes of stack" warning.
+        std::unique_ptr<Uint32[][3][3]> pixels(new Uint32[512][3][3]);
+        legacy::for_each_code([&](legacy::codeT code) {
+            const legacy::situT situ = legacy::decode(code);
+            const bool fill[3][3] = {{situ.q, situ.w, situ.e}, {situ.a, situ.s, situ.d}, {situ.z, situ.x, situ.c}};
+            for (int y = 0; y < 3; ++y) {
+                for (int x = 0; x < 3; ++x) {
+                    pixels[code][y][x] = color_for(fill[y][x]);
+                }
+            }
+        });
+
+        SDL_UpdateTexture(texture, nullptr, pixels.get(), width * sizeof(Uint32));
+    }
+
+    static void end() {
+        assert(window && renderer && texture);
+        SDL_DestroyTexture(texture);
+        texture = nullptr;
+    }
+
+    static SDL_Texture* get() { return texture; }
+};
+
 void code_image(legacy::codeT code, int zoom, const ImVec4& tint_col, const ImVec4& border_col) {
     const ImVec2 size(3 * zoom, 3 * zoom);
     const ImVec2 uv0(0, code * (1.0f / 512));
     const ImVec2 uv1(1, (code + 1) * (1.0f / 512));
-    ImGui::Image(textures::code_atlas, size, uv0, uv1, tint_col, border_col);
+    ImGui::Image(code_atlas::get(), size, uv0, uv1, tint_col, border_col);
 }
 
 bool code_button(legacy::codeT code, int zoom, const ImVec4& bg_col, const ImVec4& tint_col) {
@@ -143,7 +153,7 @@ bool code_button(legacy::codeT code, int zoom, const ImVec4& bg_col, const ImVec
     const ImVec2 uv0(0, code * (1.0f / 512));
     const ImVec2 uv1(1, (code + 1) * (1.0f / 512));
     ImGui::PushID(code);
-    const bool hit = ImGui::ImageButton("Code", textures::code_atlas, size, uv0, uv1, bg_col, tint_col);
+    const bool hit = ImGui::ImageButton("Code", code_atlas::get(), size, uv0, uv1, bg_col, tint_col);
     ImGui::PopID();
     return hit;
 }
@@ -255,9 +265,10 @@ int main(int, char**) {
         SDL_RenderPresent(renderer);
     };
 
-    textures::begin();
+    screen_textures::begin();
+    code_atlas::begin();
     while (begin_frame()) {
-        textures::begin_frame();
+        screen_textures::begin_frame();
         frame_main();
         end_frame();
 
@@ -272,7 +283,8 @@ int main(int, char**) {
         next = SDL_GetTicks64() + 10;
 #endif // !DISABLE_FRAMETATE_CAPPING
     }
-    textures::end();
+    code_atlas::end();
+    screen_textures::end();
 
     ImGui_ImplSDLRenderer2_Shutdown();
     ImGui_ImplSDL2_Shutdown();

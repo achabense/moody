@@ -532,7 +532,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
     });
     ImGui::SameLine();
     // TODO: about the interaction with locks...
-    imgui_StrTooltip("(?)", "Left : Iterate through the whole working set.\n"
+    imgui_StrTooltip("(?)", "Left : Iterate through the whole working set.\n\n"
                             "Right: Iterate through all the rules in the working set that have the same distance to "
                             "the masking rule (as that of the current rule).\n\n"
                             "For example, suppose the current rule belongs to the working set. "
@@ -580,7 +580,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
         assert(compatible == (c_locked_x == 0));
 
         guarded_block(compatible, [&] {
-            // dist: The "distance" to the masking rule the randomization want to achieve.
+            // `dist`: The "distance" to the masking rule the randomization want to achieve.
             // (which does not make sense when !compatible)
             static double rate = 0.5;
             int dist = c_locked_1 + round(rate * c_free);

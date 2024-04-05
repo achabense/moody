@@ -463,8 +463,8 @@ public:
             "(...)",
             "Mouse operations:\n"
             "1. Scroll in the window to change the zoom.\n"
-            "2. When there is nothing to paste, you can drag with left button to move the window; drag with right "
-            "button to select area (for range "
+            "2. When there is nothing to paste, you can drag with left button to move the window, or drag with "
+            "right button to select area (for range "
             "operations). When zoom = 1, you can also 'Ctrl + left-drag' to \"rotate\" the space.\n"
             "3. Otherwise, left-click to decide where to paste. In this case, to move the window you can drag with "
             "right button. (Range-selection and rotation is disabled when there are patterns to paste.)");
@@ -766,8 +766,8 @@ public:
                                "the buffer lock (as shown by 'Count:.../512'), or will replace the lock for the "
                                "current rule directly.)\n\n"
                                "Open-capture: Record what there exists in the selected area for the current frame. "
-                               "The capturing area does not include the border. The result will be integrated to "
-                               "the buffer lock.\n\n"
+                               "The capturing area does not include the border. The result will always be integrated "
+                               "to the buffer lock.\n\n"
                                "'Clear' clears the buffer lock.\n"
                                "'Adopt' sets the lock for the current rule to the buffer lock.");
                 }

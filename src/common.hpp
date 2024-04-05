@@ -50,7 +50,7 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule);
 
 // TODO: redesign...
 // TODO: apply in more places...
-struct preview_rule {
+class preview_rule {
     static void _preview(int id, int width, int height, const legacy::ruleT& rule, bool tooltip);
 
 public:
