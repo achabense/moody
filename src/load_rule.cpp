@@ -177,8 +177,6 @@ public:
     }
 };
 
-// TODO: add support for preview mode.
-
 // It is easy to locate all rules in the text via `extract_MAP_str`.
 // However there are no easy ways to locate or highlight (only) the rule across the lines.
 // See: https://github.com/ocornut/imgui/issues/2313
@@ -263,10 +261,18 @@ public:
 #endif
         }
 
+        // TODO: whether to share the same config across the windows?
+        static bool preview_mode = true;
+        static preview_rule::configT config(preview_rule::configT::_220_160);
+
         bool ret = false;
         const int total = m_rules.size();
 
         if (total != 0) {
+            ImGui::Checkbox("Preview_mode", &preview_mode);
+            ImGui::SameLine();
+            config.set("Settings");
+
             std::optional<int> n_pos = std::nullopt;
             if (ImGui::Button("Focus")) {
                 n_pos = m_pos.value_or(0);
@@ -300,11 +306,16 @@ public:
         if (rewind) {
             ImGui::SetNextWindowScroll({0, 0});
         }
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(24, 24, 24, 255));
         if (auto child = imgui_ChildWindow("Child")) {
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
-            for (int l = 1; const auto& [text, id] : m_lines) {
-                ImGui::TextDisabled("%2d ", l++);
+            for (int l = 0; const auto& [text, id] : m_lines) {
+                const int this_l = l++;
+                ImGui::TextDisabled("%2d ", this_l + 1);
                 ImGui::SameLine();
+                if (preview_mode && id.has_value()) {
+                    ImGui::BeginGroup();
+                }
                 {
                     // (Workaround: `ImGui::TextWrapped` cannot smartly render long single-lines.)
                     // (Related: https://github.com/ocornut/imgui/issues/5720)
@@ -333,7 +344,6 @@ public:
                     }
                 }
 
-                const int this_l = l - 2;
                 if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
                     m_sel = {this_l, this_l};
                 } else if (m_sel && ImGui::IsItemHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
@@ -359,10 +369,22 @@ public:
                             ret = true;
                         }
                     }
+
+                    if (preview_mode) {
+                        imgui_StrDisabled("-: ");
+                        ImGui::SameLine();
+                        if (*id != 0 && m_rules[*id].rule == m_rules[*id - 1].rule) {
+                            imgui_StrDisabled("The same as the last rule.");
+                        } else {
+                            preview_rule::preview(*id, config, m_rules[*id].rule, true);
+                        }
+                        ImGui::EndGroup();
+                    }
                 }
             }
             ImGui::PopStyleVar();
         }
+        ImGui::PopStyleColor();
 
         if (ret) {
             assert(m_pos && *m_pos >= 0 && *m_pos < total);
@@ -429,6 +451,7 @@ static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
         }
         imgui_StrCopyable(cpp17_u8string(file->path), imgui_Str);
 
+        ImGui::Separator();
         file->text.display(out, std::exchange(rewind, false));
         if (close) {
             file.reset();
@@ -467,6 +490,7 @@ static void load_rule_from_clipboard(std::optional<legacy::extrT::valT>& out) {
         text.clear();
     }
 
+    ImGui::Separator();
     text.display(out, std::exchange(rewind, false));
 }
 

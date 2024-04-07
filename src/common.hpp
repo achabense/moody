@@ -48,25 +48,64 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
 std::optional<legacy::moldT> static_constraints();
 std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule);
 
-// TODO: redesign...
-// TODO: apply in more places...
 class preview_rule {
-    static void _preview(int id, int width, int height, const legacy::ruleT& rule, bool tooltip);
-
 public:
-    static void preview(int id, int width, int height, const legacy::ruleT& rule, bool tooltip = true) {
-        ImGui::Dummy(ImVec2(width, height));
+    struct configT {
+        enum sizeE { _160_160 = 0, _220_160, _220_220, _280_220, Count };
+
+        sizeE size; // Cannot be `Count`.
+        int seed;
+
+        int width() const {
+            static const int w[]{160, 220, 220, 280};
+            return w[size];
+        }
+
+        int height() const {
+            static const int h[]{160, 160, 220, 220};
+            return h[size];
+        }
+
+        void set(const char* label) {
+            ImGui::Button(label);
+            if (ImGui::BeginPopupContextItem(nullptr, ImGuiPopupFlags_MouseButtonLeft)) {
+                imgui_Str("Gap time = 0ms, pace = 1, anti-strobing = true");
+                ImGui::Separator();
+
+                imgui_StepSliderInt("Init seed", &seed, 0, 10);
+                imgui_Str("Init density = 0.5");
+
+                ImGui::AlignTextToFramePadding();
+                imgui_Str("Size =");
+                for (sizeE s : {_160_160, _220_160, _220_220, _280_220}) {
+                    static const char* const labels[]{"160*160", "220*160", "220*220", "280*220"};
+                    ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                    if (ImGui::RadioButton(labels[s], size == s)) {
+                        size = s;
+                    }
+                }
+                ImGui::EndPopup();
+            }
+        }
+    };
+
+    static void preview(uint32_t id, const configT& config, const legacy::ruleT& rule, bool tooltip = true) {
+        ImGui::Dummy(ImVec2(config.width(), config.height()));
         if (ImGui::IsItemVisible()) {
-            _preview(id, width, height, rule, tooltip);
+            _preview((uint64_t(ImGui::GetID("")) << 32) | id, config, rule, tooltip);
         }
     }
 
-    static void preview(int id, int width, int height, const std::invocable<> auto& get_rule, bool tooltip = true) {
-        ImGui::Dummy(ImVec2(width, height));
+    static void preview(uint32_t id, const configT& config, const std::invocable<> auto& get_rule,
+                        bool tooltip = true) {
+        ImGui::Dummy(ImVec2(config.width(), config.height()));
         if (ImGui::IsItemVisible()) {
-            _preview(id, width, height, get_rule(), tooltip);
+            _preview((uint64_t(ImGui::GetID("")) << 32) | id, config, get_rule(), tooltip);
         }
     }
+
+private:
+    static void _preview(uint64_t id, const configT& config, const legacy::ruleT& rule, bool tooltip);
 };
 
 // Returns a texture with width/height exactly = w/h, for the (cell) data represented by `getline`.

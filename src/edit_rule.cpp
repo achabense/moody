@@ -421,7 +421,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
 
     // Select mask.
     char chr_0 = '0', chr_1 = '1';
-    const legacy::maskT& mask = [&] {
+    const legacy::maskT& mask = [&]() -> const legacy::maskT& {
         const char* const about_mask =
             "A mask is an arbitrary rule to perform XOR masking for other rules.\n"
             "Some rules are special enough, so that the values masked by them have natural interpretations. "
@@ -559,7 +559,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
     static bool hide_locked = false;
 
     static bool preview_mode = false;
-    static int preview_size = 160;
+    static preview_rule::configT config{preview_rule::configT::_160_160};
     {
         const int c_group = par.k();
         int c_0 = 0, c_1 = 0, c_x = 0;
@@ -667,19 +667,10 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
             ImGui::EndPopup();
         }
 
-        // TODO: redesign layout; add tooltip...
         ImGui::SameLine();
         ImGui::Checkbox("Preview mode", &preview_mode);
-        if (preview_mode) {
-            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-            if (ImGui::RadioButton("160", preview_size == 160)) {
-                preview_size = 160;
-            }
-            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-            if (ImGui::RadioButton("240", preview_size == 240)) {
-                preview_size = 240;
-            }
-        }
+        ImGui::SameLine();
+        config.set("Settings");
 
         if (contained) {
             std::string str = std::format("Groups:{} ({}:{} {}:{})", c_group, chr_1, c_1, chr_0, c_0);
@@ -730,7 +721,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
             int group_size = (2 * 2 + 3 * zoom) + imgui_ItemInnerSpacingX() +
                              ImGui::CalcTextSize(preview_mode ? labels_preview[0] : labels_normal[0]).x;
             if (preview_mode) {
-                group_size = std::max(group_size, preview_size);
+                group_size = std::max(group_size, config.width());
             }
             int perline = floor((ImGui::GetContentRegionAvail().x + spacing) / (group_size + spacing));
             return std::max(perline, 1);
@@ -799,7 +790,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
             }
 
             if (preview_mode) {
-                preview_rule::preview(j, preview_size, preview_size, [&] {
+                preview_rule::preview(j, config, [&] {
                     legacy::ruleT rule = mold.rule;
                     for (legacy::codeT code : group) {
                         rule[code] = !rule[code];

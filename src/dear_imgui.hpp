@@ -124,7 +124,7 @@ inline bool imgui_MouseScrollingUp() { return ImGui::GetIO().MouseWheel > 0; }
 
 // (Referring to ImGui::InputScalar.)
 inline bool imgui_StepSliderInt(const char* label, int* v, int v_min, int v_max, const char* format = "%d") {
-    if (ImGui::GetCurrentWindow()->SkipItems) {
+    if (GImGui->CurrentWindow->SkipItems) {
         return false;
     }
 

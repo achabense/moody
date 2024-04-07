@@ -336,10 +336,10 @@ public:
                           "of generation when actual-pace != 1.");
             });
 
-            imgui_StepSliderInt("Gap time (0~500ms)", &m_ctrl.gap, m_ctrl.gap_min, m_ctrl.gap_max,
+            imgui_StepSliderInt("Gap time", &m_ctrl.gap, m_ctrl.gap_min, m_ctrl.gap_max,
                                 std::format("{} ms", m_ctrl.gap * m_ctrl.gap_unit).c_str());
 
-            imgui_StepSliderInt("Pace (1~80)", &m_ctrl.pace, m_ctrl.pace_min, m_ctrl.pace_max);
+            imgui_StepSliderInt("Pace", &m_ctrl.pace, m_ctrl.pace_min, m_ctrl.pace_max);
 
             // TODO: this would better be explained with examples.
             // How to make interactive tooltips?
@@ -375,17 +375,17 @@ public:
             }
         }
         ImGui::EndGroup();
-        ImGui::SameLine();
+        ImGui::SameLine(0, ImGui::GetStyle().ItemSpacing.x + ImGui::CalcTextSize("  ").x);
         ImGui::BeginGroup();
         {
             torusT::initT init = m_init;
             int seed = init.seed;
-            imgui_StepSliderInt("Init seed (0~49)", &seed, 0, 49);
+            imgui_StepSliderInt("Init seed", &seed, 0, 49);
             if (ImGui::IsItemActive()) {
                 temp_pause = true;
             }
             init.seed = seed;
-            init.density.step_slide("Init density (0~1)");
+            init.density.step_slide("Init density");
             if (ImGui::IsItemActive()) {
                 temp_pause = true;
             }
@@ -422,7 +422,7 @@ public:
                 }
 
                 ImGui::SameLine(0, s);
-                ImGui::Text("Width:%d, height:%d", m_torus.tile().width(), m_torus.tile().height());
+                ImGui::Text("Size = %d * %d", m_torus.tile().width(), m_torus.tile().height());
             }
 
             ImGui::AlignTextToFramePadding();
@@ -824,33 +824,54 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule) {
     return runner.display(temp_pause);
 }
 
-// TODO: redesign...
-// Remembering rules by `id` across the whole program is a horrible design...
-// Should be able to clean/reuse unused terms...
-// The size/seed/pace... should be configurable in the gui...
-// Should support batch-restart...
-// The efficiency of shared `temp` is relying on width, height to be stable...
-void preview_rule::_preview(int id, const int width, const int height, const legacy::ruleT& rule, bool tooltip) {
+// TODO: should support batch-restart...
+void preview_rule::_preview(uint64_t id, const configT& config, const legacy::ruleT& rule, bool tooltip) {
     struct termT {
-        unsigned frame = 0;
+        bool active = false;
+        int seed = {};
         legacy::ruleT rule = {};
         legacy::tileT tile = {};
     };
+    static std::unordered_map<uint64_t, termT> terms;
+    static legacy::tileT temps[configT::Count];
 
-    static std::unordered_map<int, termT> terms;
-    static legacy::tileT temp;
+    static unsigned latest = ImGui::GetFrameCount();
+    if (const unsigned frame = ImGui::GetFrameCount(); frame != latest) {
+        if (latest + 1 != frame) {
+            terms.clear();
+        } else {
+            auto pos = terms.begin();
+            const auto end = terms.end();
+            while (pos != end) {
+                if (pos->second.active) {
+                    pos->second.active = false;
+                    ++pos;
+                } else {
+                    // ~ won't invalidate `end`.
+                    pos = terms.erase(pos);
+                }
+            }
+        }
+        latest = frame;
+    }
 
+    const int width = config.width(), height = config.height();
     assert(ImGui::GetItemRectSize() == ImVec2(width, height));
     assert(ImGui::IsItemVisible());
 
-    const unsigned frame = ImGui::GetFrameCount();
-    auto& term = terms[id];
+    termT& term = terms[id];
+    if (term.active) [[unlikely]] {
+        imgui_ItemRect(IM_COL32(255, 255, 255, 255));
+        return;
+    }
+    term.active = true;
 
-    if (term.frame + 1 != frame || ImGui::IsItemClicked() || term.tile.width() != width ||
-        term.tile.height() != height || term.rule != rule) {
+    if (ImGui::IsItemClicked() || term.tile.width() != width || term.tile.height() != height ||
+        term.seed != config.seed || term.rule != rule) {
         term.tile.resize({.width = width, .height = height});
+        term.seed = config.seed;
         term.rule = rule;
-        std::mt19937 rand{0};
+        std::mt19937 rand(config.seed);
         legacy::random_fill(term.tile, rand, 0.5);
     }
 
@@ -867,7 +888,6 @@ void preview_rule::_preview(int id, const int width, const int height, const leg
         ImGui::PopStyleVar();
     }
     for (int i = 0; i < (strobing(rule) ? 2 : 1); ++i) {
-        run_torus(term.tile, temp, rule);
+        run_torus(term.tile, temps[config.size], rule);
     }
-    term.frame = frame;
 }
