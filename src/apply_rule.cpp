@@ -400,11 +400,11 @@ public:
                                  ImGui::GetStyle().FramePadding.x * 2) /
                                 2;
                 ImGui::SetNextItemWidth(floor(w));
-                ImGui::InputTextWithHint("##Width", "width", input_width, std::size(input_width),
+                ImGui::InputTextWithHint("##Width", "Width", input_width, std::size(input_width),
                                          ImGuiInputTextFlags_CallbackCharFilter, filter);
                 ImGui::SameLine(0, s);
                 ImGui::SetNextItemWidth(ceil(w));
-                ImGui::InputTextWithHint("##Height", "height", input_height, std::size(input_height),
+                ImGui::InputTextWithHint("##Height", "Height", input_height, std::size(input_height),
                                          ImGuiInputTextFlags_CallbackCharFilter, filter);
                 ImGui::SameLine(0, s);
                 if (ImGui::Button("Resize")) {

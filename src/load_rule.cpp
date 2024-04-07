@@ -249,12 +249,19 @@ public:
                 }
                 str += m_lines[i].text;
             }
+
+            // The problem (see the "Workaround" part below) can happen as long as wrap-pos is enabled.
+            // For example, push-wrap-pos -> ImGui::Text will result in the same issue.
+            ImGui::SetClipboardText(str.c_str());
+            m_sel.reset();
+#if 0
             // TODO: whether to silently call `ImGui::SetClipboardText`?
             messenger::add_msg(str);
             m_sel.reset();
             // (wontfix) The message popup will appear at next frame, so it's still possible that an extra click
             // is made (and begin selection) at this frame. As a result, when entering the popup the right-button
             // may still be held down, and if released it will bring anther string to the popup.
+#endif
         }
 
         bool ret = false;
@@ -299,7 +306,33 @@ public:
             for (int l = 1; const auto& [text, id] : m_lines) {
                 ImGui::TextDisabled("%2d ", l++);
                 ImGui::SameLine();
-                imgui_StrWrapped(text, item_width);
+                {
+                    // (Workaround: `ImGui::TextWrapped` cannot smartly render long single-lines.)
+                    // (Related: https://github.com/ocornut/imgui/issues/5720)
+                    if (text.size() < 2000) {
+                        imgui_StrWrapped(text, item_width);
+                    } else {
+                        ImGui::BeginGroup();
+                        const char* begin = text.data();
+                        const char* const end = text.data() + text.size();
+                        while (end - begin > 1000) {
+                            const char* seg_end = begin + 1000; // seg_end < end
+                            // Find a meaningful (utf8) code-point end nearby.
+                            for (int i = 0; i < 4; ++i) {
+                                if ((*seg_end & 0b11'000000) != 0b10'000000) {
+                                    break;
+                                }
+                                --seg_end;
+                            }
+                            imgui_StrWrapped(std::string_view(begin, seg_end), item_width);
+                            begin = seg_end;
+                        }
+                        if (begin != end) {
+                            imgui_StrWrapped(std::string_view(begin, end), item_width);
+                        }
+                        ImGui::EndGroup();
+                    }
+                }
 
                 const int this_l = l - 2;
                 if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
