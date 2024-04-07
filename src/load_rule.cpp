@@ -40,6 +40,7 @@ bool file_nav_add_special_path(const char* u8path, const char* title) {
 }
 
 // TODO: better layout...
+// TODO: record recently-opened folders...
 class file_nav {
     using entryT = std::filesystem::directory_entry;
 
@@ -95,6 +96,30 @@ public:
 
     file_nav(const pathT& path = std::filesystem::current_path()) { set_current(path); }
 
+    void select_file(const pathT* current_file /* Optional */, std::optional<pathT>& target) {
+        ImGui::InputText("Filter", buf_filter, std::size(buf_filter));
+        ImGui::Separator();
+        if (auto child = imgui_ChildWindow("Files")) {
+            bool has = false;
+            for (const entryT& entry : m_files) {
+                const std::string str = cpp17_u8string(entry.path().filename());
+                if (str.find(buf_filter) != str.npos) {
+                    has = true;
+                    const bool selected = current_file && *current_file == entry.path();
+                    if (ImGui::Selectable(str.c_str(), selected)) {
+                        target = entry.path();
+                    }
+                    if (selected && ImGui::IsWindowAppearing()) {
+                        ImGui::SetScrollHereY();
+                    }
+                }
+            }
+            if (!has) {
+                imgui_StrDisabled("None");
+            }
+        }
+    }
+
     std::optional<pathT> display() {
         std::optional<pathT> target = std::nullopt;
 
@@ -111,18 +136,10 @@ public:
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             {
-                ImGui::InputTextWithHint("##Path", "Path for file/folder", buf_path, std::size(buf_path));
+                ImGui::InputTextWithHint("##Path", "Folder path", buf_path, std::size(buf_path));
                 ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                 if (ImGui::Button("Open") && buf_path[0] != '\0') {
-                    const pathT p = m_current / cpp17_u8path(buf_path);
-                    std::error_code ec{};
-                    if (std::filesystem::is_regular_file(p, ec)) {
-                        target = p;
-                    } else if (std::filesystem::is_directory(p, ec)) {
-                        set_current(p);
-                    } else {
-                        messenger::add_msg("Invalid path:\n{}", buf_path);
-                    }
+                    set_current(m_current / cpp17_u8path(buf_path));
                     buf_path[0] = '\0';
                 }
                 for (const auto& [path, title] : special_paths) {
@@ -152,25 +169,7 @@ public:
                 }
             }
             ImGui::TableNextColumn();
-            {
-                ImGui::InputText("Filter", buf_filter, std::size(buf_filter));
-                ImGui::Separator();
-                if (auto child = imgui_ChildWindow("Files")) {
-                    bool has = false;
-                    for (const entryT& entry : m_files) {
-                        const std::string str = cpp17_u8string(entry.path().filename());
-                        if (str.find(buf_filter) != str.npos) {
-                            has = true;
-                            if (ImGui::Selectable(str.c_str())) {
-                                target = entry.path();
-                            }
-                        }
-                    }
-                    if (!has) {
-                        imgui_StrDisabled("None");
-                    }
-                }
-            }
+            select_file(nullptr, target);
             ImGui::EndTable();
         }
 
@@ -393,10 +392,10 @@ static std::string load_binary(const pathT& path, int max_size) {
                         : std::format("Failed to load file:\n{}", cpp17_u8string(path)));
 }
 
-static const int max_length = 100'000;
+static const int max_length = 1024 * 128;
 
 // TODO: support opening multiple files?
-// TODO: show recently opened files/folders?
+// TODO: add a mode to avoid opening files without rules?
 static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
     static file_nav nav;
 
@@ -407,21 +406,27 @@ static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
     static bool rewind = false;
     static std::optional<fileT> file;
 
-    bool load = false;
+    std::optional<pathT> sel = std::nullopt;
     if (!file) {
         if (ImGui::SmallButton("Refresh")) {
             nav.refresh_if_valid();
         }
 
-        if (auto sel = nav.display()) {
-            file.emplace(*sel);
-            rewind = true;
-            load = true;
-        }
+        sel = nav.display();
     } else {
         const bool close = ImGui::SmallButton("Close");
         ImGui::SameLine();
-        load = ImGui::SmallButton("Reload");
+        if (ImGui::SmallButton("Reload")) {
+            sel = file->path;
+        }
+        ImGui::SameLine();
+        ImGui::SmallButton("...");
+        // `SetNextWindowSize` will only affect the `select_file` window, even if it is not opened.
+        ImGui::SetNextWindowSize({0, 200}, ImGuiCond_Always);
+        if (ImGui::BeginPopupContextItem(nullptr, ImGuiPopupFlags_MouseButtonLeft)) {
+            nav.select_file(&file->path, sel);
+            ImGui::EndPopup();
+        }
         imgui_StrCopyable(cpp17_u8string(file->path), imgui_Str);
 
         file->text.display(out, std::exchange(rewind, false));
@@ -430,13 +435,13 @@ static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
         }
     }
 
-    if (load) {
-        assert(file);
+    if (sel) {
         try {
-            file->text.clear();
-            file->text.append(load_binary(file->path, max_length));
+            fileT temp{.path = std::move(*sel)};
+            temp.text.append(load_binary(temp.path, max_length));
+            file = std::move(temp);
+            rewind = true;
         } catch (const std::exception& err) {
-            file.reset();
             messenger::add_msg(err.what());
         }
     }
@@ -444,6 +449,7 @@ static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
 
 static void load_rule_from_clipboard(std::optional<legacy::extrT::valT>& out) {
     static textT text;
+    static bool rewind = false;
     if (ImGui::SmallButton("Read clipboard")) {
         if (const char* str = ImGui::GetClipboardText()) {
             std::string_view str_view(str);
@@ -452,6 +458,7 @@ static void load_rule_from_clipboard(std::optional<legacy::extrT::valT>& out) {
             } else {
                 text.clear();
                 text.append(str_view);
+                rewind = true;
             }
         }
     }
@@ -460,7 +467,7 @@ static void load_rule_from_clipboard(std::optional<legacy::extrT::valT>& out) {
         text.clear();
     }
 
-    text.display(out);
+    text.display(out, std::exchange(rewind, false));
 }
 
 // Must keep in sync with "docs.cpp".
@@ -474,8 +481,8 @@ extern const int doc_size;
 
 static void load_rule_from_memory(std::optional<legacy::extrT::valT>& out) {
     static textT text;
-    static std::optional<int> doc_id = std::nullopt;
     static bool rewind = false;
+    static std::optional<int> doc_id = std::nullopt;
     static auto select = []() {
         for (int i = 0; i < doc_size; ++i) {
             if (ImGui::Selectable(docs[i].title, doc_id == i) && doc_id != i) {
@@ -509,7 +516,7 @@ static void load_rule_from_memory(std::optional<legacy::extrT::valT>& out) {
     }
 }
 
-// The `load_rule_from_xx` functions are static to allow for integration.
+// Preserving the `load_rule_from_xx` functions to allow for integration.
 std::optional<legacy::extrT::valT> load_file() {
     std::optional<legacy::extrT::valT> out = std::nullopt;
     load_rule_from_file(out);
