@@ -824,6 +824,23 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule) {
     return runner.display(temp_pause);
 }
 
+void preview_rule::configT::_set() {
+    imgui_Str("Gap time = 0ms, pace = 1, anti-strobing = true");
+    ImGui::Separator();
+
+    imgui_StepSliderInt("Init seed", &seed, 0, 10);
+    imgui_Str("Init density = 0.5");
+
+    ImGui::AlignTextToFramePadding();
+    imgui_Str("Size =");
+    for (int i = 0; i < Count; ++i) {
+        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+        if (ImGui::RadioButton(size_labels[i], size == i)) {
+            size = sizeE{i};
+        }
+    }
+}
+
 // TODO: should support batch-restart...
 void preview_rule::_preview(uint64_t id, const configT& config, const legacy::ruleT& rule, bool tooltip) {
     struct termT {

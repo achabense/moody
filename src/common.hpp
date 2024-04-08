@@ -50,11 +50,19 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule);
 
 class preview_rule {
 public:
-    struct configT {
-        enum sizeE { _160_160 = 0, _220_160, _220_220, _280_220, Count };
+    class configT {
+    public:
+        enum sizeE : int { _160_160 = 0, _220_160, _220_220, _280_220, Count };
 
+    private:
+        static constexpr const char* size_labels[Count]{"160*160", "220*160", "220*220", "280*220"};
+        friend preview_rule;
         sizeE size; // Cannot be `Count`.
         int seed;
+        void _set();
+
+    public:
+        configT(sizeE size) : size(size), seed(0) { assert(size != Count); }
 
         int width() const {
             static const int w[]{160, 220, 220, 280};
@@ -69,21 +77,7 @@ public:
         void set(const char* label) {
             ImGui::Button(label);
             if (ImGui::BeginPopupContextItem(nullptr, ImGuiPopupFlags_MouseButtonLeft)) {
-                imgui_Str("Gap time = 0ms, pace = 1, anti-strobing = true");
-                ImGui::Separator();
-
-                imgui_StepSliderInt("Init seed", &seed, 0, 10);
-                imgui_Str("Init density = 0.5");
-
-                ImGui::AlignTextToFramePadding();
-                imgui_Str("Size =");
-                for (sizeE s : {_160_160, _220_160, _220_220, _280_220}) {
-                    static const char* const labels[]{"160*160", "220*160", "220*220", "280*220"};
-                    ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                    if (ImGui::RadioButton(labels[s], size == s)) {
-                        size = s;
-                    }
-                }
+                _set();
                 ImGui::EndPopup();
             }
         }

@@ -26,6 +26,16 @@ static pathT cpp17_u8path(const std::string_view path) { //
     return pathT(std::u8string(path.begin(), path.end()));
 }
 
+static void display_path(const pathT& p) {
+    const std::string str = cpp17_u8string(p);
+    imgui_StrCopyable(str, imgui_Str);
+    // (Referring to ImGui::IsRectVisible() and ImGui::GetItemRectMin().)
+    const bool fully_visible = GImGui->CurrentWindow->ClipRect.Contains(GImGui->LastItemData.Rect);
+    if (!fully_visible) {
+        imgui_ItemTooltip(str);
+    }
+}
+
 static std::vector<std::pair<pathT, std::string>> special_paths;
 bool file_nav_add_special_path(const char* u8path, const char* title) {
     std::error_code ec{};
@@ -124,7 +134,7 @@ public:
         std::optional<pathT> target = std::nullopt;
 
         if (!m_current.empty()) {
-            imgui_StrCopyable(cpp17_u8string(m_current), imgui_Str);
+            display_path(m_current);
         } else {
             assert(m_dirs.empty() && m_files.empty());
             imgui_StrDisabled("N/A");
@@ -449,7 +459,7 @@ static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
             nav.select_file(&file->path, sel);
             ImGui::EndPopup();
         }
-        imgui_StrCopyable(cpp17_u8string(file->path), imgui_Str);
+        display_path(file->path);
 
         ImGui::Separator();
         file->text.display(out, std::exchange(rewind, false));
