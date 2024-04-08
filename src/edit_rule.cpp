@@ -279,26 +279,8 @@ public:
         };
 
         {
-            // https://github.com/ocornut/imgui/issues/6902
-            const float extra_w_sameline = ImGui::GetStyle().ItemSpacing.x * 3; // Three SameLine...
-            const float extra_w_padding = ImGui::GetStyle().FramePadding.x * 4; // Two Button * two sides...
-            const float extra_w = ImGui::CalcTextSize("ClearRecognize(?)").x + extra_w_sameline + extra_w_padding;
-            ImGui::SeparatorTextEx(0, "Select subsets", nullptr, extra_w);
-            ImGui::SameLine();
-            if (ImGui::Button("Clear")) {
-                for_each_term([&](termT& t) { t.disabled = t.selected = false; });
-                update_current();
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Recognize")) {
-                for_each_term([&](termT& t) {
-                    t.disabled = false; // Will be updated by `update_current`.
-                    t.selected = t.set->contains(mold.rule);
-                });
-                update_current();
-            }
-            ImGui::SameLine();
-            imgui_StrTooltip("(?)", [&] {
+            ImGui::AlignTextToFramePadding();
+            imgui_StrTooltip("(...)", [&] {
                 auto explain = [&](ringE ring, centerE center, const char* title /* Optional */, const char* desc) {
                     put_term(ring, center, title, true);
                     ImGui::SameLine(0, imgui_ItemInnerSpacingX());
@@ -342,6 +324,22 @@ public:
                 imgui_Str("For a list of example rules in different subsets, see the \"Typical subsets\" part in "
                           "\"Documents\".");
             });
+            ImGui::SameLine();
+            imgui_Str("Select subsets");
+            ImGui::SameLine();
+            if (ImGui::Button("Clear")) {
+                for_each_term([&](termT& t) { t.disabled = t.selected = false; });
+                update_current();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Recognize")) {
+                for_each_term([&](termT& t) {
+                    t.disabled = false; // Will be updated by `update_current`.
+                    t.selected = t.set->contains(mold.rule);
+                });
+                update_current();
+            }
+            ImGui::Separator();
         }
 
         if (ImGui::BeginTable("Checklists", 2, ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit)) {
@@ -398,6 +396,7 @@ public:
     }
 };
 
+// TODO: add batch-preview support for generation modes (int/perm/rand)?
 std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_undo) {
     std::optional<legacy::moldT> out = std::nullopt;
     auto return_rule = [&out, &mold](const legacy::ruleT& rule) { out.emplace(rule, mold.lock); };
@@ -472,10 +471,9 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
                                                &mask_custom};
 
         ImGui::AlignTextToFramePadding();
-        imgui_Str("Mask");
-        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-        imgui_StrTooltip("(?)", about_mask);
-
+        imgui_StrTooltip("(...)", about_mask);
+        ImGui::SameLine();
+        imgui_Str("Mask =");
         for (const maskE m : {Zero, Identity, Native, Custom}) {
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
             if (ImGui::RadioButton(mask_terms[m].label, mask_tag == m)) {

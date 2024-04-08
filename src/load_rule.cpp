@@ -279,7 +279,7 @@ public:
         const int total = m_rules.size();
 
         if (total != 0) {
-            ImGui::Checkbox("Preview_mode", &preview_mode);
+            ImGui::Checkbox("Preview mode", &preview_mode);
             ImGui::SameLine();
             config.set("Settings");
 
@@ -519,7 +519,7 @@ static void load_rule_from_memory(std::optional<legacy::extrT::valT>& out) {
     static std::optional<int> doc_id = std::nullopt;
     static auto select = []() {
         for (int i = 0; i < doc_size; ++i) {
-            if (ImGui::Selectable(docs[i].title, doc_id == i) && doc_id != i) {
+            if (ImGui::Selectable(docs[i].title, doc_id == i, ImGuiSelectableFlags_DontClosePopups) && doc_id != i) {
                 text.clear();
                 text.append(docs[i].text);
                 rewind = true;

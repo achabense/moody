@@ -289,20 +289,13 @@ public:
 
         {
             // (Keeping in line with edit-rule's.)
-            const float extra_w_sameline = ImGui::GetStyle().ItemSpacing.x * 1; // One SameLine...
-            const float extra_w_padding = ImGui::GetStyle().FramePadding.x * 2; // One Button * two sides...
-            const float extra_w = ImGui::CalcTextSize("Restart").x + extra_w_sameline + extra_w_padding;
-            const std::string str = std::format("Generation:{}, density:{:.4f}{}", m_torus.gen(),
-                                                float(legacy::count(m_torus.tile())) / m_torus.tile().area(),
-                                                m_torus.gen() < 10     ? "   "
-                                                : m_torus.gen() < 100  ? "  "
-                                                : m_torus.gen() < 1000 ? " "
-                                                                       : "");
-            ImGui::SeparatorTextEx(0, str.c_str(), nullptr, extra_w);
-            ImGui::SameLine();
             if (ImGui::Button("Restart")) {
                 restart();
             }
+            ImGui::SameLine();
+            ImGui::Text("Generation:%d, density:%.4f", m_torus.gen(),
+                        float(legacy::count(m_torus.tile())) / m_torus.tile().area());
+            ImGui::Separator();
         }
 
         ImGui::PushItemWidth(item_width);
@@ -422,11 +415,11 @@ public:
                 }
 
                 ImGui::SameLine(0, s);
-                ImGui::Text("Size = %d * %d", m_torus.tile().width(), m_torus.tile().height());
+                ImGui::Text("Size = %d*%d", m_torus.tile().width(), m_torus.tile().height());
             }
 
             ImGui::AlignTextToFramePadding();
-            imgui_Str("Fullscreen with zoom =");
+            imgui_Str("Full-screen with zoom =");
             ImGui::SameLine();
             assert(max_zoom == 8);
             for (const ImVec2 size = square_size(); const int z : {1, 2, 4, 8}) {
@@ -659,7 +652,7 @@ public:
                 };
 
                 ImGui::AlignTextToFramePadding();
-                imgui_Str("Background:");
+                imgui_Str("Background =");
                 ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                 if (ImGui::RadioButton("0", background == 0)) {
                     background = 0;

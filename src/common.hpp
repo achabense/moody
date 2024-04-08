@@ -56,6 +56,9 @@ public:
 
     private:
         static constexpr const char* size_labels[Count]{"160*160", "220*160", "220*220", "280*220"};
+        static constexpr int size_w[Count]{160, 220, 220, 280};
+        static constexpr int size_h[Count]{160, 160, 220, 220};
+
         friend preview_rule;
         sizeE size; // Cannot be `Count`.
         int seed;
@@ -64,15 +67,8 @@ public:
     public:
         configT(sizeE size) : size(size), seed(0) { assert(size != Count); }
 
-        int width() const {
-            static const int w[]{160, 220, 220, 280};
-            return w[size];
-        }
-
-        int height() const {
-            static const int h[]{160, 160, 220, 220};
-            return h[size];
-        }
+        int width() const { return size_w[size]; }
+        int height() const { return size_h[size]; }
 
         void set(const char* label) {
             ImGui::Button(label);
