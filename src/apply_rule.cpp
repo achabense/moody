@@ -818,11 +818,18 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule) {
 }
 
 void preview_rule::configT::_set() {
-    imgui_Str("Gap time = 0ms, pace = 1, anti-strobing = true");
-    ImGui::Separator();
+    ImGui::AlignTextToFramePadding();
+    imgui_Str("Pace =");
+    for (int p = 1; p <= 4; ++p) {
+        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+        const char label[]{"01234"[p], '\0'};
+        if (ImGui::RadioButton(label, pace == p)) {
+            pace = p;
+        }
+    }
+    imgui_Str("Gap time = 0ms, anti-strobing = true");
 
-    imgui_StepSliderInt("Init seed", &seed, 0, 10);
-    imgui_Str("Init density = 0.5");
+    ImGui::Separator();
 
     ImGui::AlignTextToFramePadding();
     imgui_Str("Size =");
@@ -832,6 +839,9 @@ void preview_rule::configT::_set() {
             size = sizeE{i};
         }
     }
+    ImGui::SetNextItemWidth(item_width);
+    imgui_StepSliderInt("Init seed", &seed, 0, 10);
+    imgui_Str("Init density = 0.5");
 }
 
 // TODO: should support batch-restart...
@@ -897,7 +907,8 @@ void preview_rule::_preview(uint64_t id, const configT& config, const legacy::ru
         }
         ImGui::PopStyleVar();
     }
-    for (int i = 0; i < (strobing(rule) ? 2 : 1); ++i) {
+    const int p = config.pace + ((config.pace % 2 == 1) && strobing(rule));
+    for (int i = 0; i < p; ++i) {
         run_torus(term.tile, temps[config.size], rule);
     }
 }

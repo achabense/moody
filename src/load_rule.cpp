@@ -107,6 +107,7 @@ public:
     file_nav(const pathT& path = std::filesystem::current_path()) { set_current(path); }
 
     void select_file(const pathT* current_file /* Optional */, std::optional<pathT>& target) {
+        ImGui::SetNextItemWidth(std::min(ImGui::CalcItemWidth(), (float)item_width));
         ImGui::InputText("Filter", buf_filter, std::size(buf_filter));
         ImGui::Separator();
         if (auto child = imgui_ChildWindow("Files")) {
@@ -146,18 +147,22 @@ public:
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             {
+                ImGui::SetNextItemWidth(std::min(ImGui::CalcItemWidth(), (float)item_width));
                 ImGui::InputTextWithHint("##Path", "Folder path", buf_path, std::size(buf_path));
                 ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                 if (ImGui::Button("Open") && buf_path[0] != '\0') {
                     set_current(m_current / cpp17_u8path(buf_path));
                     buf_path[0] = '\0';
                 }
+                ImGui::Separator();
+                // (Using `ImGuiSelectableFlags_NoPadWithHalfSpacing` for the same visual effect as
+                // those in _ChildWindow("Folders").)
                 for (const auto& [path, title] : special_paths) {
-                    if (ImGui::MenuItem(title.c_str())) {
+                    if (ImGui::Selectable(title.c_str(), false, ImGuiSelectableFlags_NoPadWithHalfSpacing)) {
                         set_current(path);
                     }
                 }
-                if (ImGui::MenuItem("..")) {
+                if (ImGui::Selectable("..", false, ImGuiSelectableFlags_NoPadWithHalfSpacing)) {
                     set_current(m_current.parent_path());
                 }
                 ImGui::Separator();
@@ -424,7 +429,7 @@ static std::string load_binary(const pathT& path, int max_size) {
                         : std::format("Failed to load file:\n{}", cpp17_u8string(path)));
 }
 
-static const int max_length = 1024 * 128;
+static const int max_length = 1024 * 256;
 
 // TODO: support opening multiple files?
 // TODO: add a mode to avoid opening files without rules?

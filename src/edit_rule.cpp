@@ -454,7 +454,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
 
             {"Native",
              "A rule calculated by the program that belongs to the working set. Depending on what subsets "
-             "are selected, it may be the same as zero-rule, identity-rule, or just an ordinary rule in the set.\n"
+             "are selected, it may be the same as zero-rule, or identity-rule, or just an ordinary rule in the set.\n"
              "It's recommended you try this only when there is no other existing rules in the working "
              "set (neither 'Zero' nor 'Identity' works, and there is no existing rules to serve as custom mask).",
              'o', 'i'},

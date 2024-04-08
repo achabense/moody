@@ -62,10 +62,11 @@ public:
         friend preview_rule;
         sizeE size; // Cannot be `Count`.
         int seed;
+        int pace;
         void _set();
 
     public:
-        configT(sizeE size) : size(size), seed(0) { assert(size != Count); }
+        configT(sizeE size) : size(size), seed(0), pace(1) { assert(size != Count); }
 
         int width() const { return size_w[size]; }
         int height() const { return size_h[size]; }
