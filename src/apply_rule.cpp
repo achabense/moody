@@ -34,7 +34,7 @@ static bool strobing(const legacy::ruleT& rule) {
 static void run_torus(legacy::tileT& tile, legacy::tileT& temp, const legacy::rule_like auto& rule) {
     assert(&tile != &temp);
 
-    tile.gather(tile, tile, tile, tile, tile, tile, tile, tile);
+    tile.gather_torus();
     tile.apply_v2(rule, temp);
     tile.swap(temp);
 }

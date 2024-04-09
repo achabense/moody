@@ -140,7 +140,7 @@ namespace legacy {
         }
 
     public:
-        // (`q`, `w`, ... may refer to `*this`.)
+        // (`q`, `w`, ... may refer to `*this`, see below.)
         void gather(const tileT& q, const tileT& w, const tileT& e, //
                     const tileT& a, /*   *this   */ const tileT& d, //
                     const tileT& z, const tileT& x, const tileT& c) {
@@ -163,6 +163,8 @@ namespace legacy {
             _set_lr(_line(height + 1), z._line(1)[width], c._line(1)[1]);
             std::copy_n(x._line(1) + 1, width, _line(height + 1) + 1);
         }
+
+        void gather_torus() { gather(*this, *this, *this, *this, *this, *this, *this, *this); }
 
         void apply(const rule_like auto& rule, tileT& dest) const {
             // There is supposed to be a call to `gather` before calling `apply`.
@@ -287,7 +289,7 @@ namespace legacy {
             });
 
             const ruleT rule = make_rule([](codeT) { return testT::rand() & 1; });
-            source.gather(source, source, source, source, source, source, source, source);
+            source.gather_torus();
             source.apply(rule, dest);
             source.apply(rule, dest_v2);
             assert(dest == dest_v2);

@@ -410,26 +410,14 @@ public:
     }
 };
 
-static std::string load_binary(const pathT& path, int max_size) {
-    std::error_code ec{};
-    const auto size = std::filesystem::file_size(path, ec);
-    if (size != -1 && size < max_size) {
-        std::ifstream file(path, std::ios::in | std::ios::binary);
-        if (file) {
-            std::string data(size, '\0');
-            file.read(data.data(), size);
-            if (file && file.gcount() == size) {
-                return data;
-            }
-        }
-    }
+static const int max_size = 1024 * 256;
 
-    throw std::runtime_error(
-        size > max_size ? std::format("File too large: {} > {} (bytes)\n{}", size, max_size, cpp17_u8string(path))
-                        : std::format("Failed to load file:\n{}", cpp17_u8string(path)));
+// For error message.
+static std::string too_long(uintmax_t size, int max_size) {
+    const bool use_mb = size >= 1024 * 1024;
+    return std::format("{:.2f}{} > {:.2f}KB", size / (use_mb ? (1024 * 1024.0) : 1024.0), use_mb ? "MB" : "KB",
+                       max_size / 1024.0);
 }
-
-static const int max_length = 1024 * 256;
 
 // TODO: support opening multiple files?
 // TODO: add a mode to avoid opening files without rules?
@@ -476,11 +464,31 @@ static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
     if (sel) {
         try {
             fileT temp{.path = std::move(*sel)};
-            temp.text.append(load_binary(temp.path, max_length));
+            temp.text.append([](const pathT& path) -> std::string {
+                std::error_code ec{};
+                const auto size = std::filesystem::file_size(path, ec);
+                if (!ec && size <= max_size) {
+                    std::ifstream file(path, std::ios::in | std::ios::binary);
+                    if (file) {
+                        std::string data(size, '\0');
+                        file.read(data.data(), size);
+                        if (file && file.gcount() == size) {
+                            return data;
+                        }
+                    }
+                }
+
+                if (!ec && size > max_size) {
+                    messenger::add_msg("File too large: {}\n{}", too_long(size, max_size), cpp17_u8string(path));
+                } else {
+                    messenger::add_msg("Failed to load file:\n{}", cpp17_u8string(path));
+                }
+                throw 0; // 0 ->
+            }(temp.path));
             file = std::move(temp);
             rewind = true;
-        } catch (const std::exception& err) {
-            messenger::add_msg(err.what());
+        } catch (...) {
+            ; // <- 0
         }
     }
 }
@@ -491,8 +499,8 @@ static void load_rule_from_clipboard(std::optional<legacy::extrT::valT>& out) {
     if (ImGui::SmallButton("Read clipboard")) {
         if (const char* str = ImGui::GetClipboardText()) {
             std::string_view str_view(str);
-            if (str_view.size() > max_length) {
-                messenger::add_msg("Text too long: {} > {} (bytes)", str_view.size(), max_length);
+            if (str_view.size() > max_size) {
+                messenger::add_msg("Text too long: {}", too_long(str_view.size(), max_size));
             } else {
                 text.clear();
                 text.append(str_view);
