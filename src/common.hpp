@@ -220,8 +220,9 @@ public:
                 _set();
                 ImGui::EndPopup();
             }
-            ImGui::SameLine(0, 0), imgui_Str("-"), ImGui::SameLine(0, 0);
+            ImGui::SameLine();
             restart = ImGui::Button(label_restart);
+            imgui_ItemTooltip("Or right-click to restart individual ones.");
         }
     };
 

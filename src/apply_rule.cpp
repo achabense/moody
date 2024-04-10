@@ -663,7 +663,7 @@ public:
                 }
                 ImGui::SameLine();
                 imgui_StrTooltip("(?)", "Treat 0 (black) or 1 (white) as background value. "
-                                        "This affects the behavior of clearing, shrinking and pasting mode.\n"
+                                        "This affects the behavior of clearing, shrinking and pasting mode.\n\n"
                                         "'Clear inside/outside' will fill the range with (background).\n"
                                         "'Shrink' will get the bounding-box for !(background).\n"
                                         "When pasting patterns into the white background you need to set this to 1.");
@@ -885,8 +885,8 @@ void previewer::_preview(uint64_t id, const configT& config, const legacy::ruleT
     }
     term.active = true;
 
-    if (config.restart || term.tile.width() != width || term.tile.height() != height || term.seed != config.seed ||
-        term.rule != rule) {
+    if (config.restart || ImGui::IsItemClicked(ImGuiMouseButton_Right) || term.tile.width() != width ||
+        term.tile.height() != height || term.seed != config.seed || term.rule != rule) {
         term.tile.resize({.width = width, .height = height});
         term.seed = config.seed;
         term.rule = rule;
