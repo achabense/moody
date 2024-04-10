@@ -23,6 +23,7 @@ As a starting point, it will help a lot if you are familiar with Convay's Game-o
 See the "Documents" part in the program to get familiar with the concepts and operations.
 
 #### How to build & Dependency
+TODO: rewrite...
 The program is written in C++20, and developed with the help of ImGui (Link) (which is carried by this project) and SDL2 (there is a zip in ...).
 The project is currently organized as a VS project. For now, to build this project, you'd have to:
 (This is a bit awkward; will improve in the future...)
