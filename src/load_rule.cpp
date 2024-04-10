@@ -76,7 +76,7 @@ class file_nav {
     }
 
     // (`path` may come from `entryT.path()` in `m_dirs`.)
-    void set_current(const pathT& path) {
+    bool set_current(const pathT& path) {
         try {
             pathT p = std::filesystem::canonical(path);
             std::vector<entryT> p_dirs, p_files;
@@ -85,9 +85,11 @@ class file_nav {
             m_current.swap(p);
             m_dirs.swap(p_dirs);
             m_files.swap(p_files);
+            return true;
         } catch (const std::exception& /* not used; the encoding is a mystery */) {
             messenger::add_msg("Cannot open folder:\n{}", cpp17_u8string(path));
         }
+        return false;
     }
 
 public:
@@ -131,6 +133,7 @@ public:
         }
     }
 
+    // Return one of `entryT.path()` in `m_files`.
     std::optional<pathT> display() {
         std::optional<pathT> target = std::nullopt;
 
@@ -148,10 +151,25 @@ public:
             ImGui::TableNextColumn();
             {
                 ImGui::SetNextItemWidth(std::min(ImGui::CalcItemWidth(), (float)item_width));
-                ImGui::InputTextWithHint("##Path", "Folder path", buf_path, std::size(buf_path));
+                ImGui::InputTextWithHint("##Path", "Folder or file path", buf_path, std::size(buf_path));
                 ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                 if (ImGui::Button("Open") && buf_path[0] != '\0') {
-                    set_current(m_current / cpp17_u8path(buf_path));
+                    std::error_code ec{};
+                    const pathT p = m_current / cpp17_u8path(buf_path);
+                    if (std::filesystem::is_directory(p, ec)) {
+                        set_current(p);
+                    } else if (std::filesystem::is_regular_file(p, ec) && set_current(p.parent_path())) {
+                        // (wontfix) Inefficient, but there are a lot of uncertainties about `entryT.path()`.
+                        // (Are there better ways to find such an entry? Is `entryT.path()` canonical?
+                        // Does `target = canonical(p)` or `target = entryT(p).path()` work?)
+                        for (const entryT& entry : m_files) {
+                            if (std::filesystem::equivalent(entry.path(), p, ec)) {
+                                target = entry.path();
+                                break;
+                            }
+                        }
+                    }
+
                     buf_path[0] = '\0';
                 }
                 ImGui::Separator();
