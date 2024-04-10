@@ -557,7 +557,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
     static bool hide_locked = false;
 
     static bool preview_mode = false;
-    static preview_rule::configT config{preview_rule::configT::_160_160};
+    static previewer::configT config{previewer::configT::_160_160};
     {
         const int c_group = par.k();
         int c_0 = 0, c_1 = 0, c_x = 0;
@@ -667,8 +667,10 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
 
         ImGui::SameLine();
         ImGui::Checkbox("Preview mode", &preview_mode);
-        ImGui::SameLine();
-        config.set("Settings");
+        if (preview_mode) {
+            ImGui::SameLine();
+            config.set("Settings", "Restart");
+        }
 
         if (contained) {
             std::string str = std::format("Groups:{} ({}:{} {}:{})", c_group, chr_1, c_1, chr_0, c_0);
@@ -788,7 +790,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
             }
 
             if (preview_mode) {
-                preview_rule::preview(j, config, [&] {
+                previewer::preview(j, config, [&] {
                     legacy::ruleT rule = mold.rule;
                     for (legacy::codeT code : group) {
                         rule[code] = !rule[code];

@@ -48,7 +48,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
 std::optional<legacy::moldT> static_constraints();
 std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule);
 
-class preview_rule {
+// Preview rules.
+class previewer {
 public:
     class configT {
     public:
@@ -59,24 +60,29 @@ public:
         static constexpr int size_w[Count]{160, 220, 220, 280};
         static constexpr int size_h[Count]{160, 160, 220, 220};
 
-        friend preview_rule;
+        friend previewer;
         sizeE size; // Cannot be `Count`.
         int seed;
         int pace;
         void _set();
 
+        // (Workaround: managed by configT for convenience.)
+        bool restart = false;
+
     public:
-        configT(sizeE size) : size(size), seed(0), pace(1) { assert(size != Count); }
+        /*implicit*/ configT(sizeE size) : size(size), seed(0), pace(1) { assert(size != Count); }
 
         int width() const { return size_w[size]; }
         int height() const { return size_h[size]; }
 
-        void set(const char* label) {
+        void set(const char* label, const char* label_restart) {
             ImGui::Button(label);
             if (ImGui::BeginPopupContextItem(nullptr, ImGuiPopupFlags_MouseButtonLeft)) {
                 _set();
                 ImGui::EndPopup();
             }
+            ImGui::SameLine(0, 0), imgui_Str("-"), ImGui::SameLine(0, 0);
+            restart = ImGui::Button(label_restart);
         }
     };
 

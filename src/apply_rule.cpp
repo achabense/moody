@@ -662,7 +662,8 @@ public:
                     background = 1;
                 }
                 ImGui::SameLine();
-                imgui_StrTooltip("(?)", "This affects the behavior of clearing, shrinking and pasting mode.\n"
+                imgui_StrTooltip("(?)", "Treat 0 (black) or 1 (white) as background value. "
+                                        "This affects the behavior of clearing, shrinking and pasting mode.\n"
                                         "'Clear inside/outside' will fill the range with (background).\n"
                                         "'Shrink' will get the bounding-box for !(background).\n"
                                         "When pasting patterns into the white background you need to set this to 1.");
@@ -748,22 +749,21 @@ public:
 
                 // Pattern capturing.
                 // TODO: enable getting current.lock?
-                {
-                    ImGui::SeparatorTextEx(0, "Pattern capturing", nullptr,
-                                           ImGui::GetStyle().ItemSpacing.x + ImGui::CalcTextSize("(?)").x);
-                    ImGui::SameLine();
-                    imgui_StrTooltip(
-                        "(?)", "For use cases see the \"Lock and capture\" part in \"Documents\".\n\n"
-                               "Closed-capture: Run the selected area as torus space (with the current rule), to "
-                               "record all mappings. Depending on 'Adopt eagerly', the result will be integrated to "
-                               "the buffer lock (as shown by 'Count:.../512'), or will replace the lock for the "
-                               "current rule directly.)\n\n"
-                               "Open-capture: Record what there exists in the selected area for the current frame. "
-                               "The capturing area does not include the border. The result will always be integrated "
-                               "to the buffer lock.\n\n"
-                               "'Clear' clears the buffer lock.\n"
-                               "'Adopt' sets the lock for the current rule to the buffer lock.");
-                }
+                ImGui::SeparatorText("Pattern capturing");
+
+                ImGui::AlignTextToFramePadding();
+                imgui_StrTooltip("(...)", // TODO: notify this is program-specific.
+                                 "For use cases see the \"Lock and capture\" part in \"Documents\".\n\n"
+                                 "Closed-capture: Run the selected area as torus space (with the current rule), to "
+                                 "record all mappings. Depending on 'Adopt eagerly', the result will be integrated to "
+                                 "the buffer lock (as shown by 'Count:.../512'), or will replace the lock for the "
+                                 "current rule directly.)\n\n"
+                                 "Open-capture: Record what there exists in the selected area for the current frame. "
+                                 "The capturing area does not include the border. The result will always be integrated "
+                                 "to the buffer lock.\n\n"
+                                 "'Clear' clears the buffer lock.\n"
+                                 "'Adopt' sets the lock for the current rule to the buffer lock.");
+                ImGui::SameLine();
                 static bool adopt_eagerly = true;
                 set_tag(adopt_eagerly, "Adopt eagerly",
                         "For closed-capture, whether to adopt the result directly, or append to the buffer lock "
@@ -817,7 +817,7 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule) {
     return runner.display(temp_pause);
 }
 
-void preview_rule::configT::_set() {
+void previewer::configT::_set() {
     ImGui::AlignTextToFramePadding();
     imgui_Str("Pace =");
     for (int p = 1; p <= 4; ++p) {
@@ -844,8 +844,7 @@ void preview_rule::configT::_set() {
     imgui_Str("Init density = 0.5");
 }
 
-// TODO: should support batch-restart...
-void preview_rule::_preview(uint64_t id, const configT& config, const legacy::ruleT& rule, bool tooltip) {
+void previewer::_preview(uint64_t id, const configT& config, const legacy::ruleT& rule, bool tooltip) {
     struct termT {
         bool active = false;
         int seed = {};
@@ -886,8 +885,8 @@ void preview_rule::_preview(uint64_t id, const configT& config, const legacy::ru
     }
     term.active = true;
 
-    if (ImGui::IsItemClicked() || term.tile.width() != width || term.tile.height() != height ||
-        term.seed != config.seed || term.rule != rule) {
+    if (config.restart || term.tile.width() != width || term.tile.height() != height || term.seed != config.seed ||
+        term.rule != rule) {
         term.tile.resize({.width = width, .height = height});
         term.seed = config.seed;
         term.rule = rule;

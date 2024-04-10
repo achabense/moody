@@ -296,15 +296,17 @@ public:
 
         // TODO: whether to share the same config across the windows?
         static bool preview_mode = true;
-        static preview_rule::configT config(preview_rule::configT::_220_160);
+        static previewer::configT config(previewer::configT::_220_160);
 
         bool ret = false;
         const int total = m_rules.size();
 
         if (total != 0) {
             ImGui::Checkbox("Preview mode", &preview_mode);
-            ImGui::SameLine();
-            config.set("Settings");
+            if (preview_mode) {
+                ImGui::SameLine();
+                config.set("Settings", "Restart");
+            }
 
             std::optional<int> n_pos = std::nullopt;
             if (ImGui::Button("Focus")) {
@@ -409,7 +411,7 @@ public:
                         if (*id != 0 && m_rules[*id].rule == m_rules[*id - 1].rule) {
                             imgui_StrDisabled("The same as the last rule.");
                         } else {
-                            preview_rule::preview(*id, config, m_rules[*id].rule, true);
+                            previewer::preview(*id, config, m_rules[*id].rule, true);
                         }
                         ImGui::EndGroup();
                     }
