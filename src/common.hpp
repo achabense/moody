@@ -48,63 +48,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
 std::optional<legacy::moldT> static_constraints();
 std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule);
 
-// Preview rules.
-class previewer {
-public:
-    class configT {
-    public:
-        enum sizeE : int { _160_160 = 0, _220_160, _220_220, _280_220, Count };
-
-    private:
-        static constexpr const char* size_labels[Count]{"160*160", "220*160", "220*220", "280*220"};
-        static constexpr int size_w[Count]{160, 220, 220, 280};
-        static constexpr int size_h[Count]{160, 160, 220, 220};
-
-        friend previewer;
-        sizeE size; // Cannot be `Count`.
-        int seed;
-        int pace;
-        void _set();
-
-        // (Workaround: managed by configT for convenience.)
-        bool restart = false;
-
-    public:
-        /*implicit*/ configT(sizeE size) : size(size), seed(0), pace(1) { assert(size != Count); }
-
-        int width() const { return size_w[size]; }
-        int height() const { return size_h[size]; }
-
-        void set(const char* label, const char* label_restart) {
-            ImGui::Button(label);
-            if (ImGui::BeginPopupContextItem(nullptr, ImGuiPopupFlags_MouseButtonLeft)) {
-                _set();
-                ImGui::EndPopup();
-            }
-            ImGui::SameLine(0, 0), imgui_Str("-"), ImGui::SameLine(0, 0);
-            restart = ImGui::Button(label_restart);
-        }
-    };
-
-    static void preview(uint32_t id, const configT& config, const legacy::ruleT& rule, bool tooltip = true) {
-        ImGui::Dummy(ImVec2(config.width(), config.height()));
-        if (ImGui::IsItemVisible()) {
-            _preview((uint64_t(ImGui::GetID("")) << 32) | id, config, rule, tooltip);
-        }
-    }
-
-    static void preview(uint32_t id, const configT& config, const std::invocable<> auto& get_rule,
-                        bool tooltip = true) {
-        ImGui::Dummy(ImVec2(config.width(), config.height()));
-        if (ImGui::IsItemVisible()) {
-            _preview((uint64_t(ImGui::GetID("")) << 32) | id, config, get_rule(), tooltip);
-        }
-    }
-
-private:
-    static void _preview(uint64_t id, const configT& config, const legacy::ruleT& rule, bool tooltip);
-};
-
 // Returns a texture with width/height exactly = w/h, for the (cell) data represented by `getline`.
 // There must be: getline(0...h-1) -> bool[w].
 // The texture is only valid for the current frame.
@@ -242,4 +185,61 @@ public:
             opened = false;
         }
     }
+};
+
+// Preview rules.
+class previewer {
+public:
+    class configT {
+    public:
+        enum sizeE : int { _160_160 = 0, _220_160, _220_220, _280_220, Count };
+
+    private:
+        static constexpr const char* size_labels[Count]{"160*160", "220*160", "220*220", "280*220"};
+        static constexpr int size_w[Count]{160, 220, 220, 280};
+        static constexpr int size_h[Count]{160, 160, 220, 220};
+
+        friend previewer;
+        sizeE size; // Cannot be `Count`.
+        int seed;
+        int pace;
+        void _set();
+
+        // (Workaround: managed by configT for convenience.)
+        bool restart = false;
+
+    public:
+        /*implicit*/ configT(sizeE size) : size(size), seed(0), pace(1) { assert(size != Count); }
+
+        int width() const { return size_w[size]; }
+        int height() const { return size_h[size]; }
+
+        void set(const char* label, const char* label_restart) {
+            ImGui::Button(label);
+            if (ImGui::BeginPopupContextItem(nullptr, ImGuiPopupFlags_MouseButtonLeft)) {
+                _set();
+                ImGui::EndPopup();
+            }
+            ImGui::SameLine(0, 0), imgui_Str("-"), ImGui::SameLine(0, 0);
+            restart = ImGui::Button(label_restart);
+        }
+    };
+
+    static void preview(uint32_t id, const configT& config, const legacy::ruleT& rule, bool tooltip = true) {
+        ImGui::Dummy(ImVec2(config.width(), config.height()));
+        if (ImGui::IsItemVisible()) {
+            _preview((uint64_t(ImGui::GetID("")) << 32) | id, config, rule, tooltip);
+        }
+    }
+
+    static void preview(uint32_t id, const configT& config, const std::invocable<> auto& get_rule,
+                        bool tooltip = true) {
+        ImGui::Dummy(ImVec2(config.width(), config.height()));
+        if (ImGui::IsItemVisible()) {
+            _preview((uint64_t(ImGui::GetID("")) << 32) | id, config, get_rule(), tooltip);
+        }
+    }
+
+private:
+    static void _preview(uint64_t id, const configT& config, const legacy::ruleT& rule, bool tooltip);
 };
