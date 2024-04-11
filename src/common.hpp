@@ -36,7 +36,7 @@ inline void assert_utf8_encoding() {
 #endif
 
 // Managed by `main`.
-bool file_nav_add_special_path(const char* u8path, const char* title);
+bool set_home(const char* u8path = nullptr); // nullptr ~ filesystem::current_path.
 void frame_main();
 
 // Managed by `frame_main`.

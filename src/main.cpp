@@ -193,25 +193,15 @@ int main(int, char**) {
 
     // Setup Dear ImGui context
     ImGui::CreateContext();
-
-    const auto [ini_abs, log_abs] = [] {
+    {
         char* base_path = SDL_GetBasePath();
-        if (!base_path) {
+        if (!set_home(base_path)) {
             resource_failure();
         }
-
-        file_nav_add_special_path(base_path, "Exe path");
-        std::string path = base_path;
-        SDL_free(base_path);
-
-        assert(path.ends_with('\\') || path.ends_with('/'));
-        return std::pair{path + "imgui.ini", path + "imgui_log.txt"};
-    }();
-
-    // Freeze to absolute path.
-    // (This is safe as `ini_abs` and `log_abs` will outlive the context.)
-    ImGui::GetIO().IniFilename = ini_abs.c_str();
-    ImGui::GetIO().LogFilename = log_abs.c_str();
+        if (base_path) {
+            SDL_free(base_path);
+        }
+    }
 
     // Currently the controls of the program work poorly with navigation mode.
     assert(!(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_NavEnableKeyboard));

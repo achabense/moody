@@ -36,17 +36,29 @@ static void display_path(const pathT& p) {
     }
 }
 
-static std::vector<std::pair<pathT, std::string>> special_paths;
-bool file_nav_add_special_path(const char* u8path, const char* title) {
-    std::error_code ec{};
-    pathT p = std::filesystem::canonical(cpp17_u8path(u8path), ec);
-    if (!ec) {
-        special_paths.emplace_back(std::move(p), title);
-        return true;
-    } else {
-        messenger::add_msg("Cannot add path:\n{}", u8path);
+static pathT home_path{};
+bool set_home(const char* u8path) {
+    auto try_set = [](const char* u8path) {
+        std::error_code ec{};
+        const pathT p = u8path ? cpp17_u8path(u8path) : std::filesystem::current_path(ec);
+        if (!ec) {
+            pathT cp = std::filesystem::canonical(p, ec);
+            if (!ec) {
+                // These will outlive the imgui context.
+                static std::string ini_path, log_path;
+
+                ini_path = cpp17_u8string(home_path / "imgui.ini");
+                log_path = cpp17_u8string(home_path / "imgui_log.txt");
+                ImGui::GetIO().IniFilename = ini_path.c_str();
+                ImGui::GetIO().LogFilename = log_path.c_str();
+                home_path.swap(cp);
+                return true;
+            }
+        }
         return false;
-    }
+    };
+
+    return (u8path && try_set(u8path)) || try_set(nullptr);
 }
 
 // TODO: better layout...
@@ -106,7 +118,7 @@ public:
         }
     }
 
-    file_nav(const pathT& path = std::filesystem::current_path()) { set_current(path); }
+    file_nav() { set_current(home_path); }
 
     void select_file(const pathT* current_file /* Optional */, std::optional<pathT>& target) {
         ImGui::SetNextItemWidth(std::min(ImGui::CalcItemWidth(), (float)item_width));
@@ -175,9 +187,9 @@ public:
                 ImGui::Separator();
                 // (Using `ImGuiSelectableFlags_NoPadWithHalfSpacing` for the same visual effect as
                 // those in _ChildWindow("Folders").)
-                for (const auto& [path, title] : special_paths) {
-                    if (ImGui::Selectable(title.c_str(), false, ImGuiSelectableFlags_NoPadWithHalfSpacing)) {
-                        set_current(path);
+                if (!home_path.empty()) {
+                    if (ImGui::Selectable("Home", false, ImGuiSelectableFlags_NoPadWithHalfSpacing)) {
+                        set_current(home_path);
                     }
                 }
                 if (ImGui::Selectable("..", false, ImGuiSelectableFlags_NoPadWithHalfSpacing)) {
