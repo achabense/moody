@@ -232,9 +232,9 @@ public:
         enum ringE { Contained, Compatible, Incompatible };
         enum centerE { Selected, Including, Disabled, None }; // TODO: add "equals" relation?
         auto put_term = [size = square_size()](ringE ring, centerE center, const char* title /* Optional */,
-                                               bool in_tooltip) -> bool {
+                                               bool interactive) -> bool {
             ImGui::Dummy(size);
-            const bool hit = !in_tooltip && center != Disabled && ImGui::IsItemClicked(ImGuiMouseButton_Left);
+            const bool hit = interactive && center != Disabled && ImGui::IsItemClicked(ImGuiMouseButton_Left);
 
             const ImU32 cent_col_disabled = !title ? IM_COL32(120, 30, 0, 255) : IM_COL32(0, 0, 0, 90);
             const ImU32 cent_col = center == Selected    ? IM_COL32(65, 150, 255, 255) // Roughly _ButtonHovered
@@ -255,7 +255,7 @@ public:
             }
             imgui_ItemRectFilled(cent_col, center == Disabled ? ImVec2(5, 5) : ImVec2(4, 4));
             imgui_ItemRect(ring_col);
-            if (!in_tooltip && center != Disabled && ImGui::IsItemHovered()) {
+            if (interactive && center != Disabled && ImGui::IsItemHovered()) {
                 imgui_ItemRectFilled(IM_COL32(255, 255, 255, 45));
             }
 
@@ -269,7 +269,7 @@ public:
                          : term.set->includes(current) ? Including
                          : term.disabled               ? Disabled
                                                        : None,
-                         show_title ? term.title : nullptr, false)) {
+                         show_title ? term.title : nullptr, true)) {
                 assert(!term.disabled);
                 term.selected = !term.selected;
                 update_current();
@@ -282,7 +282,7 @@ public:
             ImGui::AlignTextToFramePadding();
             imgui_StrTooltip("(...)", [&] {
                 auto explain = [&](ringE ring, centerE center, const char* title /* Optional */, const char* desc) {
-                    put_term(ring, center, title, true);
+                    put_term(ring, center, title, false);
                     ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                     ImGui::AlignTextToFramePadding(); // `Dummy` does not align automatically.
                     imgui_Str(": ");
@@ -299,14 +299,14 @@ public:
                     "(If nothing is selected, the working set will be the whole MAP set.)");
                 ImGui::Separator();
                 imgui_Str("The center color reflects the selection details:");
-                put_term(Compatible, None, nullptr, true);
+                put_term(Compatible, None, nullptr, false);
                 ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                 explain(Compatible, None, "x", "Not selected.");
                 explain(Compatible, Selected, nullptr, "Selected.");
                 explain(Compatible, Including, nullptr,
                         "Not selected, but the working set already belongs to this subset, so it will behave "
                         "as if this is selected too.");
-                put_term(Compatible, Disabled, nullptr, true);
+                put_term(Compatible, Disabled, nullptr, false);
                 ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                 explain(Compatible, Disabled, "x", "Not selectable, otherwise the working set will be empty.");
                 ImGui::Separator();

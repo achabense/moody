@@ -222,25 +222,26 @@ public:
             }
             ImGui::SameLine();
             restart = ImGui::Button(label_restart);
-            imgui_ItemTooltip("Or right-click to restart individual ones.");
+            imgui_ItemTooltip("For individual preview windows:\n"
+                              "Left-press to pause; right-click to restart.");
         }
     };
 
-    static void preview(uint32_t id, const configT& config, const legacy::ruleT& rule, bool tooltip = true) {
+    static void preview(uint32_t id, const configT& config, const legacy::ruleT& rule, bool interactive = true) {
         ImGui::Dummy(ImVec2(config.width(), config.height()));
         if (ImGui::IsItemVisible()) {
-            _preview((uint64_t(ImGui::GetID("")) << 32) | id, config, rule, tooltip);
+            _preview((uint64_t(ImGui::GetID("")) << 32) | id, config, rule, interactive);
         }
     }
 
     static void preview(uint32_t id, const configT& config, const std::invocable<> auto& get_rule,
-                        bool tooltip = true) {
+                        bool interactive = true) {
         ImGui::Dummy(ImVec2(config.width(), config.height()));
         if (ImGui::IsItemVisible()) {
-            _preview((uint64_t(ImGui::GetID("")) << 32) | id, config, get_rule(), tooltip);
+            _preview((uint64_t(ImGui::GetID("")) << 32) | id, config, get_rule(), interactive);
         }
     }
 
 private:
-    static void _preview(uint64_t id, const configT& config, const legacy::ruleT& rule, bool tooltip);
+    static void _preview(uint64_t id, const configT& config, const legacy::ruleT& rule, bool interactive);
 };

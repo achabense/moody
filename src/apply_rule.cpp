@@ -819,19 +819,6 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule) {
 
 void previewer::configT::_set() {
     ImGui::AlignTextToFramePadding();
-    imgui_Str("Pace =");
-    for (int p = 1; p <= 4; ++p) {
-        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-        const char label[]{"01234"[p], '\0'};
-        if (ImGui::RadioButton(label, pace == p)) {
-            pace = p;
-        }
-    }
-    imgui_Str("Gap time = 0ms, anti-strobing = true");
-
-    ImGui::Separator();
-
-    ImGui::AlignTextToFramePadding();
     imgui_Str("Size =");
     for (int i = 0; i < Count; ++i) {
         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
@@ -842,9 +829,15 @@ void previewer::configT::_set() {
     ImGui::SetNextItemWidth(item_width);
     imgui_StepSliderInt("Init seed", &seed, 0, 10);
     imgui_Str("Init density = 0.5");
+
+    ImGui::Separator();
+
+    imgui_Str("Gap time = 0ms, anti-strobing = true");
+    ImGui::SetNextItemWidth(item_width);
+    imgui_StepSliderInt("Pace (1~6)", &pace, 1, 6);
 }
 
-void previewer::_preview(uint64_t id, const configT& config, const legacy::ruleT& rule, bool tooltip) {
+void previewer::_preview(uint64_t id, const configT& config, const legacy::ruleT& rule, bool interactive) {
     struct termT {
         bool active = false;
         int seed = {};
@@ -885,7 +878,7 @@ void previewer::_preview(uint64_t id, const configT& config, const legacy::ruleT
     }
     term.active = true;
 
-    if (config.restart || ImGui::IsItemClicked(ImGuiMouseButton_Right) || term.tile.width() != width ||
+    if (config.restart || (interactive && ImGui::IsItemClicked(ImGuiMouseButton_Right)) || term.tile.width() != width ||
         term.tile.height() != height || term.seed != config.seed || term.rule != rule) {
         term.tile.resize({.width = width, .height = height});
         term.seed = config.seed;
@@ -896,7 +889,7 @@ void previewer::_preview(uint64_t id, const configT& config, const legacy::ruleT
 
     ImTextureID texture = make_screen(term.tile);
     ImGui::GetWindowDrawList()->AddImage(texture, ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
-    if (tooltip && ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
+    if (interactive && ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
         assert(ImGui::IsMousePosValid());
         const ImVec2 pos = ImGui::GetIO().MousePos - ImGui::GetItemRectMin();
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
@@ -906,8 +899,13 @@ void previewer::_preview(uint64_t id, const configT& config, const legacy::ruleT
         }
         ImGui::PopStyleVar();
     }
-    const int p = config.pace + ((config.pace % 2 == 1) && strobing(rule));
-    for (int i = 0; i < p; ++i) {
-        run_torus(term.tile, temps[config.size], rule);
+
+    // (`IsItemActive` does not work as preview-window is based on `Dummy`.)
+    const bool pause = interactive && ImGui::IsItemHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Left);
+    if (!pause) {
+        const int p = config.pace + ((config.pace % 2 == 1) && strobing(rule));
+        for (int i = 0; i < p; ++i) {
+            run_torus(term.tile, temps[config.size], rule);
+        }
     }
 }
