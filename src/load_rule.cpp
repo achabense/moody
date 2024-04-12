@@ -314,12 +314,6 @@ public:
         const int total = m_rules.size();
 
         if (total != 0) {
-            ImGui::Checkbox("Preview mode", &preview_mode);
-            if (preview_mode) {
-                ImGui::SameLine();
-                config.set("Settings", "Restart");
-            }
-
             std::optional<int> n_pos = std::nullopt;
             if (ImGui::Button("Focus")) {
                 n_pos = m_pos.value_or(0);
@@ -342,6 +336,12 @@ public:
                 assert(*n_pos >= 0 && *n_pos < total);
                 m_pos = *n_pos;
                 ret = true;
+            }
+
+            ImGui::Checkbox("Preview mode", &preview_mode);
+            if (preview_mode) {
+                ImGui::SameLine();
+                config.set("Settings", "Restart");
             }
         } else {
             ImGui::Text("(No rules)");

@@ -259,7 +259,14 @@ int main(int, char**) {
     code_atlas::begin();
     while (begin_frame()) {
         screen_textures::begin_frame();
+
+        // Make collapsed windows obvious to see. Set outside of `frame_main` for convenience.
+        // TODO: the collapse and close buttons always take ImGuiCol_ButtonXXX (bright-blue) and
+        // look strange in the reddish background.
+        ImGui::PushStyleColor(ImGuiCol_TitleBgCollapsed, IM_COL32(180, 0, 90, 128));
         frame_main();
+        ImGui::PopStyleColor();
+
         end_frame();
 
 #ifndef DISABLE_FRAMETATE_CAPPING

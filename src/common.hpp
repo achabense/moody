@@ -169,6 +169,7 @@ public:
             opened = true;
         }
 
+        ImGui::SetNextWindowSizeConstraints({}, ImVec2(FLT_MAX, ImGui::GetTextLineHeight() * 30));
         if (ImGui::BeginPopup("Message")) {
             assert(opened && !m_strs.empty());
             ImGui::PushTextWrapPos(wrap_len());

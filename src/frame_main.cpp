@@ -154,8 +154,12 @@ void frame_main() {
         ImGui::SameLine();
         ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1 /* [1, size()] */);
         ImGui::SameLine();
-        if (ImGui::Button("Clear")) { // TODO: the effect is not obvious.
-            recorder.clear();
+        ImGui::Button("Clear"); // TODO: the effect is not obvious.
+        if (ImGui::BeginPopupContextItem(nullptr, ImGuiPopupFlags_MouseButtonLeft)) {
+            if (ImGui::Selectable("Yes")) {
+                recorder.clear();
+            }
+            ImGui::EndPopup();
         }
 
         {
