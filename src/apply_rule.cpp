@@ -832,9 +832,9 @@ void previewer::configT::_set() {
 
     ImGui::Separator();
 
-    imgui_Str("Gap time = 0ms, anti-strobing = true");
     ImGui::SetNextItemWidth(item_width);
     imgui_StepSliderInt("Pace (1~6)", &pace, 1, 6);
+    imgui_Str("Gap time = 0ms, anti-strobing = true");
 }
 
 void previewer::_preview(uint64_t id, const configT& config, const legacy::ruleT& rule, bool interactive) {

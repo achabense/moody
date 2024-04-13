@@ -292,10 +292,10 @@ public:
 
                 imgui_Str(
                     "The following terms represent subsets of the MAP rules. You can select these terms freely - "
-                    "the program will calculate the intersection of the selected subsets (and the whole MAP set), and "
+                    "the program will calculate the intersection of the selected subsets (with the whole MAP set), and "
                     "help you explore the rules in it.\n"
-                    "(This set is later called \"working set\"; for example, \"the rule belongs to the working set\" "
-                    "has the same meaning as \"the rule belongs to all of the selected subsets\".)\n"
+                    "This set is later called \"working set\". For example, \"the rule belongs to the working set\" "
+                    "has the same meaning as \"the rule belongs to every selected subset\".\n"
                     "(If nothing is selected, the working set will be the whole MAP set.)");
                 ImGui::Separator();
                 imgui_Str("The center color reflects the selection details:");
@@ -318,7 +318,7 @@ public:
                         "(Notice that the [intersection] of such subsets may still contain no rules that satisfy the "
                         "constraints. )");
                 explain(Incompatible, None, nullptr,
-                        "The rule does not belong to this subset, and the constraints cannot be met in any rule "
+                        "The rule does not belong to this subset, and the constraints cannot be satisfied by any rule "
                         "in this subset.");
                 ImGui::Separator();
                 imgui_Str("For a list of example rules in different subsets, see the \"Typical subsets\" part in "
@@ -339,9 +339,9 @@ public:
                 });
                 update_current();
             }
-            ImGui::Separator();
         }
 
+        ImGui::Separator();
         if (ImGui::BeginTable("Checklists", 2, ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit)) {
             auto put_row = [](const char* l_str, const auto& r_logic) {
                 ImGui::TableNextRow();
@@ -425,8 +425,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
             "A mask is an arbitrary rule to perform XOR masking for other rules.\n"
             "Some rules are special enough, so that the values masked by them have natural interpretations. "
             "See 'Zero/Identity' for examples.\n"
-            "When the masking rule belongs to the working set, the distance (of the current rule) to the mask can "
-            "be defined as the number of groups that are different from the masking rule.\n\n"
+            "When both the current rule and the masking rule belong to the working set, the distance between the two "
+            "rules can be defined as the number of groups where they have different values.\n\n"
             "(The exact workings are more complex than explained here. For details see the \"Concept\" part "
             "in \"Documents\".)";
 
@@ -630,8 +630,17 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
                 return_mold(legacy::trans_reverse(mold));
             }
         });
-        imgui_ItemTooltip("Get the 0/1 reversal dual of the current rule.\n"
-                          "This is actually independent of the working set and mask.");
+        imgui_ItemTooltip([&] {
+            imgui_Str("Get the 0/1 reversal dual of the current rule.");
+            ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(64, 64, 64, 128));
+            if (auto child = imgui_ChildWindow("Preview", {}, ImGuiChildFlags_AutoResizeY)) {
+                ImGui::Separator();
+                imgui_Str("Preview:");
+                ImGui::SameLine();
+                previewer::preview(-1, previewer::configT::_220_160, legacy::trans_reverse(mold).rule, false);
+            }
+            ImGui::PopStyleColor();
+        });
         ImGui::SameLine();
         guarded_block(compatible, [&] {
             if (ImGui::Button("Approximate")) {
