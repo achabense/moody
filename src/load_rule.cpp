@@ -280,6 +280,7 @@ public:
         }
     }
 
+    // TODO: refactor... the logics have been a mess...
     // (Workaround: using `rewind` tag to reset the scroll after opening new files.)
     void display(std::optional<legacy::extrT::valT>& out, bool rewind = false) {
         if (m_sel && ImGui::IsMouseReleased(ImGuiMouseButton_Right) /* From anywhere */) {
@@ -405,13 +406,10 @@ public:
 
                     if (*id == m_pos) {
                         imgui_ItemRectFilled(IM_COL32(has_lock ? 196 : 0, 255, 0, 60));
-                        if (locate && !ImGui::IsItemVisible()) {
-                            ImGui::SetScrollHereY();
-                        }
                     }
                     if (!m_sel && ImGui::IsItemHovered()) {
                         imgui_ItemRectFilled(IM_COL32(has_lock ? 196 : 0, 255, 0, 30));
-                        if (ImGui::IsItemClicked()) {
+                        if (!locate && ImGui::IsItemClicked()) {
                             m_pos = *id;
                             ret = true;
                         }
@@ -426,6 +424,11 @@ public:
                             previewer::preview(*id, config, m_rules[*id].rule, true);
                         }
                         ImGui::EndGroup();
+                    }
+
+                    // It's ok to test fully-visible even if the region is not large enough.
+                    if (locate && *id == m_pos && !imgui_ItemFullyVisible()) {
+                        ImGui::SetScrollHereY();
                     }
                 }
             }

@@ -20,6 +20,11 @@ inline void imgui_ItemRectFilled(ImU32 col, ImVec2 off_min = {0, 0}) {
                                               ImVec2(pos_max.x - off_min.x, pos_max.y - off_min.y), col);
 }
 
+// (Referring to ImGui::IsRectVisible() and ImGui::GetItemRectMin().)
+inline bool imgui_ItemFullyVisible() { //
+    return GImGui->CurrentWindow->ClipRect.Contains(GImGui->LastItemData.Rect);
+}
+
 inline void imgui_ItemTooltip(const std::invocable<> auto& desc) {
     if (ImGui::BeginItemTooltip()) {
         // The same as the one in `HelpMarker` in "imgui_demo.cpp".
