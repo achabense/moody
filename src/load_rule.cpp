@@ -1,3 +1,4 @@
+#include <deque>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -26,13 +27,75 @@ static pathT cpp17_u8path(const std::string_view path) { //
     return pathT(std::u8string(path.begin(), path.end()));
 }
 
-static void display_path(const pathT& p) {
-    const std::string str = cpp17_u8string(p);
-    imgui_StrCopyable(str, imgui_Str);
-    // (Referring to ImGui::IsRectVisible() and ImGui::GetItemRectMin().)
-    const bool fully_visible = GImGui->CurrentWindow->ClipRect.Contains(GImGui->LastItemData.Rect);
-    if (!fully_visible) {
-        imgui_ItemTooltip(str);
+// I hate this part so much...
+// (This is horribly inefficient, but there are not going to be too many calls in each frame, so let it go.)
+[[nodiscard]] static std::string clip_path(const pathT& p, const float avail_w, bool* clipped = nullptr) {
+    if (p.empty()) {
+        clipped && (*clipped = false);
+        return "";
+    }
+
+    std::string full_str = cpp17_u8string(p);
+    const float full_w = ImGui::CalcTextSize(full_str.c_str()).x;
+    if (full_w <= avail_w) {
+        clipped && (*clipped = false);
+        return full_str;
+    } else {
+        clipped && (*clipped = true);
+        if (!p.has_relative_path()) {
+            return full_str;
+        }
+
+        // Try to make a shorter string in the form of:
+        // .../longest suffix in the relative_path within `avail_w`, always including the last element.
+        std::vector<pathT> segs;
+        for (pathT seg : p.relative_path()) {
+            segs.push_back(std::move(seg));
+        }
+        assert(!segs.empty());
+
+        // ~ `&sep + 1` is valid, see:
+        // https://stackoverflow.com/questions/14505851/is-the-one-past-the-end-pointer-of-a-non-array-type-a-valid-concept-in-c
+        const char sep = pathT::preferred_separator;
+        const float sep_w = ImGui::CalcTextSize(&sep, &sep + 1).x;
+
+        std::vector<std::string> vec;
+        vec.push_back(cpp17_u8string(segs.back()));
+        float suffix_w = ImGui::CalcTextSize(vec.back().c_str()).x + ImGui::CalcTextSize("...").x + sep_w;
+        for (auto pos = segs.rbegin() + 1; pos != segs.rend(); ++pos) {
+            std::string seg_str = cpp17_u8string(*pos);
+            const float seg_w = ImGui::CalcTextSize(seg_str.c_str()).x;
+            if (suffix_w + (seg_w + sep_w) <= avail_w) {
+                suffix_w += (seg_w + sep_w);
+                vec.push_back(std::move(seg_str));
+            } else {
+                break;
+            }
+        }
+
+        if (suffix_w > full_w) {
+            // This may happen in rare cases like `C:/very-long-name`.
+            return full_str;
+        } else {
+            std::string str = "...";
+            for (auto pos = vec.rbegin(); pos != vec.rend(); ++pos) {
+                str += sep;
+                str += *pos;
+            }
+            return str;
+        }
+    }
+}
+
+// (Sharing the same style as `imgui_StrCopyable`.)
+static void display_path(const pathT& p, float avail_w) {
+    bool clipped = false;
+    imgui_Str(clip_path(p, avail_w, &clipped));
+    if (clipped) {
+        imgui_ItemTooltip([&] { imgui_Str(cpp17_u8string(p)); });
+    }
+    if (imgui_ItemClickable()) {
+        ImGui::SetClipboardText(cpp17_u8string(p).c_str());
     }
 }
 
@@ -61,16 +124,16 @@ bool set_home(const char* u8path) {
     return (u8path && try_set(u8path)) || try_set(nullptr);
 }
 
-// TODO: better layout...
-// TODO: record recently-opened folders...
 class file_nav {
     using entryT = std::filesystem::directory_entry;
 
     char buf_path[200]{};
     char buf_filter[20]{};
 
-    pathT m_current{}; // Canonical path; empty() <-> invalid.
-    std::vector<entryT> m_dirs{}, m_files{};
+    pathT m_current{};                       // Canonical path; empty() <-> invalid.
+    std::vector<entryT> m_dirs{}, m_files{}; // invalid -> empty()
+    std::deque<pathT> m_record{};            // Record for valid m_current; front() ~ most recent one.
+    int max_record = 10;
 
     static void collect(const pathT& path, std::vector<entryT>& dirs, std::vector<entryT>& files) {
         dirs.clear();
@@ -93,6 +156,18 @@ class file_nav {
             pathT p = std::filesystem::canonical(path);
             std::vector<entryT> p_dirs, p_files;
             collect(p, p_dirs, p_files);
+
+            {
+                // (`m_record` is small enough.)
+                const auto find = std::find(m_record.begin(), m_record.end(), p);
+                if (find != m_record.end()) {
+                    m_record.erase(find);
+                }
+                m_record.push_front(p);
+                if (m_record.size() > max_record) {
+                    m_record.resize(max_record);
+                }
+            }
 
             m_current.swap(p);
             m_dirs.swap(p_dirs);
@@ -131,6 +206,7 @@ public:
                 if (str.find(buf_filter) != str.npos) {
                     has = true;
                     const bool selected = current_file && *current_file == entry.path();
+                    // (`Selectable` will not close the popup from child-window.)
                     if (ImGui::Selectable(str.c_str(), selected)) {
                         target = entry.path();
                     }
@@ -145,12 +221,37 @@ public:
         }
     }
 
+    void select_history() {
+        ImGui::SetNextItemWidth(item_width);
+        imgui_StepSliderInt("Limit", &max_record, 5, 15);
+        imgui_Str("Recently opened folders");
+        if (m_record.size() > max_record) {
+            m_record.resize(max_record);
+        }
+        ImGui::Separator();
+        if (auto child = imgui_ChildWindow("Records")) {
+            if (m_record.empty()) {
+                imgui_StrDisabled("None");
+            }
+            const pathT* sel = nullptr;
+            for (bool f = true; pathT & p : m_record) {
+                const bool is_current = std::exchange(f, false) && p == m_current;
+                if (ImGui::Selectable(clip_path(p, ImGui::GetContentRegionAvail().x).c_str(), is_current)) {
+                    sel = &p;
+                }
+            }
+            if (sel) {
+                set_current(*sel);
+            }
+        }
+    }
+
     // Return one of `entryT.path()` in `m_files`.
     std::optional<pathT> display() {
         std::optional<pathT> target = std::nullopt;
 
         if (!m_current.empty()) {
-            display_path(m_current);
+            display_path(m_current, ImGui::GetContentRegionAvail().x);
         } else {
             assert(m_dirs.empty() && m_files.empty());
             imgui_StrDisabled("N/A");
@@ -471,6 +572,14 @@ static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
         if (ImGui::SmallButton("Refresh")) {
             nav.refresh_if_valid();
         }
+        ImGui::SameLine();
+        ImGui::SmallButton("...");
+        // `BeginPopupContextItem` will consume the settings, even if it is not opened.
+        ImGui::SetNextWindowSize({0, 200}, ImGuiCond_Always);
+        if (ImGui::BeginPopupContextItem(nullptr, ImGuiPopupFlags_MouseButtonLeft)) {
+            nav.select_history();
+            ImGui::EndPopup();
+        }
 
         sel = nav.display();
     } else {
@@ -481,13 +590,12 @@ static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
         }
         ImGui::SameLine();
         ImGui::SmallButton("...");
-        // `SetNextWindowSize` will only affect the `select_file` window, even if it is not opened.
         ImGui::SetNextWindowSize({0, 200}, ImGuiCond_Always);
         if (ImGui::BeginPopupContextItem(nullptr, ImGuiPopupFlags_MouseButtonLeft)) {
             nav.select_file(&file->path, sel);
             ImGui::EndPopup();
         }
-        display_path(file->path);
+        display_path(file->path, ImGui::GetContentRegionAvail().x);
 
         ImGui::Separator();
         file->text.display(out, std::exchange(rewind, false));

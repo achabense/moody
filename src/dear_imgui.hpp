@@ -39,6 +39,16 @@ inline void imgui_ItemTooltip(std::string_view desc) {
     imgui_ItemTooltip([desc] { ImGui::TextUnformatted(desc.data(), desc.data() + desc.size()); });
 }
 
+inline bool imgui_ItemClickable(ImGuiMouseButton_ mouse_button = ImGuiMouseButton_Right) {
+    if (ImGui::IsItemClicked(mouse_button)) {
+        imgui_ItemRect(IM_COL32_WHITE);
+        return true;
+    } else if (ImGui::IsItemHovered()) {
+        imgui_ItemRect(IM_COL32(128, 128, 128, 255));
+    }
+    return false;
+}
+
 // Unlike ImGui::Text(Wrapped/...), these functions take unformatted string as the argument.
 inline void imgui_Str(std::string_view str) { //
     ImGui::TextUnformatted(str.data(), str.data() + str.size());
@@ -64,11 +74,8 @@ inline void imgui_StrDisabled(std::string_view str) {
 inline void imgui_StrCopyable(const std::string& str, void (*str_func)(std::string_view),
                               ImGuiMouseButton_ mouse_button = ImGuiMouseButton_Right) {
     str_func(str);
-    if (ImGui::IsItemClicked(mouse_button)) {
+    if (imgui_ItemClickable(mouse_button)) {
         ImGui::SetClipboardText(str.c_str());
-        imgui_ItemRect(IM_COL32_WHITE);
-    } else if (ImGui::IsItemHovered()) {
-        imgui_ItemRect(IM_COL32(128, 128, 128, 255));
     }
 }
 
