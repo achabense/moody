@@ -451,6 +451,7 @@ public:
         const legacy::tileT::sizeT tile_size = m_torus.tile().size();
         const ImVec2 screen_size(tile_size.width * screen_zoom, tile_size.height * screen_zoom);
 
+        // TODO: support locking mouse controls?
         ImGui::AlignTextToFramePadding();
         imgui_StrTooltip(
             "(...)",
@@ -837,6 +838,7 @@ void previewer::configT::_set() {
     imgui_Str("Gap time = 0ms, anti-strobing = true");
 }
 
+// TODO: support ctrl + drag to rotate?
 void previewer::_preview(uint64_t id, const configT& config, const legacy::ruleT& rule, bool interactive) {
     struct termT {
         bool active = false;
@@ -887,7 +889,17 @@ void previewer::_preview(uint64_t id, const configT& config, const legacy::ruleT
         legacy::random_fill(term.tile, rand, 0.5);
     }
 
-    ImTextureID texture = make_screen(term.tile);
+    // (`IsItemActive` does not work as preview-window is based on `Dummy`.)
+    const bool pause = interactive && ImGui::IsItemHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Left);
+    if (!pause) {
+        const int p = config.pace + ((config.pace % 2 == 1) && strobing(rule));
+        for (int i = 0; i < p; ++i) {
+            run_torus(term.tile, temps[config.size], rule);
+        }
+    }
+
+    // Intentionally display after running for better visual effect (the initial state of the tile won't be displayed).
+    const ImTextureID texture = make_screen(term.tile);
     ImGui::GetWindowDrawList()->AddImage(texture, ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
     if (interactive && ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
         assert(ImGui::IsMousePosValid());
@@ -898,14 +910,5 @@ void previewer::_preview(uint64_t id, const configT& config, const legacy::ruleT
             ImGui::EndTooltip();
         }
         ImGui::PopStyleVar();
-    }
-
-    // (`IsItemActive` does not work as preview-window is based on `Dummy`.)
-    const bool pause = interactive && ImGui::IsItemHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Left);
-    if (!pause) {
-        const int p = config.pace + ((config.pace % 2 == 1) && strobing(rule));
-        for (int i = 0; i < p; ++i) {
-            run_torus(term.tile, temps[config.size], rule);
-        }
     }
 }

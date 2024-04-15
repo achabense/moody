@@ -183,9 +183,9 @@ public:
                                   true /* Selected */);
         terms_native.emplace_back("|", &native_refl_wsx,
                                   "Rules that preserve reflection symmetry, taking '|' as the axis.");
-        terms_native.emplace_back("-", &native_refl_asd, "Ditto, the reflection axis is `-`");
-        terms_native.emplace_back("\\", &native_refl_qsc, "Ditto, the reflection axis is `\\`");
-        terms_native.emplace_back("/", &native_refl_esz, "Ditto, the reflection axis is `/`");
+        terms_native.emplace_back("-", &native_refl_asd, "Ditto, the reflection axis is `-`.");
+        terms_native.emplace_back("\\", &native_refl_qsc, "Ditto, the reflection axis is `\\`.");
+        terms_native.emplace_back("/", &native_refl_esz, "Ditto, the reflection axis is `/`.");
         terms_native.emplace_back("C2", &native_C2, "Rules that preserve C2 symmetry (2-fold rotational symmetry).");
         terms_native.emplace_back("C4", &native_C4,
                                   "C4 symmetry (4-fold rotational symmetry). This is a strict subset of C2.");
@@ -215,9 +215,9 @@ public:
             "Rules that emulate reflection symmetry in the hexagonal tiling, taking the axis from 'a to d'.");
         terms_hex.emplace_back("q-c", &hex_refl_qsc, "Ditto, the reflection axis is 'q to c'.");
         terms_hex.emplace_back("w-x", &hex_refl_wsx, "Ditto, the reflection axis is 'w to x'.");
-        terms_hex.emplace_back("a|q", &hex_refl_aq, "Ditto, the reflection axis is vertical to 'a to q'");
-        terms_hex.emplace_back("q|w", &hex_refl_qw, "Ditto, the reflection axis is vertical to 'q to w'");
-        terms_hex.emplace_back("w|d", &hex_refl_wd, "Ditto, the reflection axis is vertical to 'w to d'");
+        terms_hex.emplace_back("a|q", &hex_refl_aq, "Ditto, the reflection axis is vertical to 'a to q'.");
+        terms_hex.emplace_back("q|w", &hex_refl_qw, "Ditto, the reflection axis is vertical to 'q to w'.");
+        terms_hex.emplace_back("w|d", &hex_refl_wd, "Ditto, the reflection axis is vertical to 'w to d'.");
         terms_hex.emplace_back("C2", &hex_C2,
                                "Rules that emulate C2 symmetry in the hexagonal tiling.\n"
                                "Notice this is different from native C2 rules.");
@@ -416,6 +416,11 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
             ImGui::EndDisabled();
         }
     };
+    auto itemtooltip_with_previewer = [](const auto& desc) {
+        ImGui::PushStyleColor(ImGuiCol_PopupBg, IM_COL32(24, 24, 24, 240));
+        imgui_ItemTooltip(desc);
+        ImGui::PopStyleColor();
+    };
 
     static subset_selector selector;
     const legacy::subsetT& subset = selector.select_subset(mold);
@@ -464,8 +469,9 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
              "set (neither 'Zero' nor 'Identity' works, and there is no existing rules to serve as custom mask).",
              'o', 'i'},
 
+            // TODO: is right-click control a good idea?
             {"Custom",
-             "Custom rule; you can click the '<< Cur' button to set this to the current rule.\n"
+             "Custom rule; you can click the '<< Cur' button (or right-click this) to set this to the current rule.\n"
              "Different:'i', same:'o'. The smaller the distance is, the more likely that the rule behaves "
              "similar to the masking rule.\n"
              "As you will see later, this is a powerful tool to help find interesting rules based on existing ones.",
@@ -483,12 +489,17 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
             if (ImGui::RadioButton(mask_terms[m].label, mask_tag == m)) {
                 mask_tag = m;
+            } else if (m == Custom && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+                mask_tag = m;
+                mask_custom = {mold.rule};
             }
 
-            imgui_ItemTooltip([&] {
-                imgui_Str(legacy::to_MAP_str(*mask_ptrs[m]));
-                ImGui::Separator();
+            itemtooltip_with_previewer([&] {
                 imgui_Str(mask_terms[m].desc);
+                ImGui::Separator();
+                previewer::preview(-1, previewer::configT::_220_160, *mask_ptrs[m], false);
+                ImGui::SameLine();
+                imgui_Str(legacy::to_MAP_str(*mask_ptrs[m]));
             });
         }
 
@@ -666,16 +677,17 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
                 return_mold(legacy::trans_reverse(mold));
             }
         });
-        imgui_ItemTooltip([&] {
+        itemtooltip_with_previewer([&] {
             imgui_Str("Get the 0/1 reversal dual of the current rule.");
-            ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(64, 64, 64, 128));
-            if (auto child = imgui_ChildWindow("Preview", {}, ImGuiChildFlags_AutoResizeY)) {
-                ImGui::Separator();
+            ImGui::Separator();
+            const legacy::ruleT rev = legacy::trans_reverse(mold).rule;
+            if (rev != mold.rule) {
                 imgui_Str("Preview:");
                 ImGui::SameLine();
-                previewer::preview(-1, previewer::configT::_220_160, legacy::trans_reverse(mold).rule, false);
+                previewer::preview(-1, previewer::configT::_220_160, rev, false);
+            } else {
+                imgui_Str("(The result will be the same as the current rule, as it is self-complementary.)");
             }
-            ImGui::PopStyleColor();
         });
         ImGui::SameLine();
         guarded_block(compatible, [&] {
@@ -683,8 +695,19 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
                 return_rule(legacy::approximate(subset, mold));
             }
         });
-        imgui_ItemTooltip("When the current rule does not belong to the working set (but the "
-                          "constraints can be met), you can try this to get the closest rule in the set.");
+        itemtooltip_with_previewer([&] {
+            // TODO: refine message; and approximation is not very useful in practice...
+            imgui_Str("When the current rule does not belong to the working set (but the "
+                      "constraints can be met), you can try this to get the closest rule in the set.");
+            ImGui::Separator();
+            if (!contained) {
+                imgui_Str("Preview:");
+                ImGui::SameLine();
+                previewer::preview(-1, previewer::configT::_220_160, legacy::approximate(subset, mold), false);
+            } else {
+                imgui_Str("(The current rule already belongs to the working set.)");
+            }
+        });
         ImGui::SameLine();
         guarded_block(true /* Unconditional */, [&] {
             if (ImGui::Button("Clear lock")) {
