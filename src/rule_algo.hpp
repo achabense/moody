@@ -435,8 +435,8 @@ namespace legacy {
                              int count) {
         return transform(subset, mask, mold, [&rand, count](bool* begin, bool* end) {
             int c = std::clamp(count, 0, int(end - begin));
-            std::fill(begin, end, 0);
             std::fill_n(begin, c, 1);
+            std::fill(begin + c, end, 0);
             std::shuffle(begin, end, rand);
         });
     }
@@ -448,6 +448,9 @@ namespace legacy {
             std::generate(begin, end, [&] { return dist(rand); });
         });
     }
+
+#if 0
+    // Replaced by `seq_mixed`.
 
     // Integral.
     struct seq_int {
@@ -550,6 +553,45 @@ namespace legacy {
                 }
 
                 std::prev_permutation(std::reverse_iterator(end), std::reverse_iterator(begin));
+            });
+        }
+    };
+#endif
+
+    struct seq_mixed {
+        static ruleT first(const subsetT& subset, const maskT& mask, const moldT& mold) {
+            return transform(subset, mask, mold, [](bool* begin, bool* end) { std::fill(begin, end, 0); });
+        }
+
+        static ruleT last(const subsetT& subset, const maskT& mask, const moldT& mold) {
+            return transform(subset, mask, mold, [](bool* begin, bool* end) { std::fill(begin, end, 1); });
+        }
+
+        static ruleT next(const subsetT& subset, const maskT& mask, const moldT& mold) {
+            assert(subset.contains(mold.rule));
+
+            return transform(subset, mask, mold, [](bool* begin, bool* end) {
+                if (!std::next_permutation(begin, end, std::greater<>{})) {
+                    // 1100... -> 1110..., or stop at 000... (first())
+                    bool* first_0 = std::find(begin, end, 0);
+                    if (first_0 != end) {
+                        *first_0 = 1;
+                    }
+                }
+            });
+        }
+
+        static ruleT prev(const subsetT& subset, const maskT& mask, const moldT& mold) {
+            assert(subset.contains(mold.rule));
+
+            return transform(subset, mask, mold, [](bool* begin, bool* end) {
+                if (!std::prev_permutation(begin, end, std::greater<>{})) {
+                    // ...0111 -> ...0011, or stop at 111... (last())
+                    bool* first_1 = std::find(begin, end, 1);
+                    if (first_1 != end) {
+                        *first_1 = 0;
+                    }
+                }
             });
         }
     };

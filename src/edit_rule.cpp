@@ -523,6 +523,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
     const bool contained = subset.contains(mold.rule);
     assert_implies(contained, compatible);
 
+#if 0
+    // (Replaced by mixed-mode.)
     guarded_block(compatible, [&] {
         sequence::seq(
             "<00..", "Dec", "Inc", "11..>", //
@@ -553,6 +555,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
                             "2. 'Inc'. After this, the distance to the mask will be 1.\n"
                             "3. 'Next' to iterate. The left/right arrow key will be bound to 'Prev/Next' after you "
                             "click the button.");
+#endif
 
     const legacy::partitionT& par = subset.get_par();
     const auto scanlist = legacy::scan(par, mask, mold);
@@ -587,15 +590,41 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
                 ++c_locked_x; // Number of groups that make `mold` incompatible.
             }
         }
+        const bool has_lock = c_free != c_group;
 
         assert(contained == (c_x == 0));
         assert(compatible == (c_locked_x == 0));
 
         guarded_block(compatible, [&] {
+            sequence::seq(
+                "<00..", "Prev", "Next", "11..>", //
+                [&] { return_rule(legacy::seq_mixed::first(subset, mask, mold)); },
+                [&] { return_rule(legacy::seq_mixed::prev(subset, mask, mold)); },
+                [&] { return_rule(legacy::seq_mixed::next(subset, mask, mold)); },
+                [&] { return_rule(legacy::seq_mixed::last(subset, mask, mold)); }, !contained);
+        });
+        ImGui::SameLine();
+        if (contained) {
+            ImGui::Text("%s = %d", !has_lock ? "Distance" : "Free dist", c_1 - c_locked_1);
+        } else {
+            ImGui::Text("%s = N/A", !has_lock ? "Distance" : "Free dist");
+        }
+        ImGui::SameLine();
+        imgui_StrTooltip("(?)",
+                         "Iterate through the whole working set, by firstly iterating through all rules that have "
+                         "distance = 1 to the masking rule, then 2, 3, ..., until max distance.\n"
+                         "Here 'Distance = ...' refers to the distance from the current rule to the mask.\n\n"
+                         "For example, suppose the current rule belongs to the working set. To iterate through all "
+                         "rules that have distance = 1 to the current rule, you can:\n"
+                         "1. '<< Cur' to set the current rule as the custom mask.\n"
+                         "2. 'Next' to iterate. The left/right arrow key will be bound to 'Prev/Next' after you "
+                         "click the button.");
+
+        guarded_block(compatible, [&] {
             // `dist`: The "distance" to the masking rule the randomization want to achieve.
             // (which does not make sense when !compatible)
             static double rate = 0.5;
-            int dist = c_locked_1 + round(rate * c_free);
+            int free_dist = round(rate * c_free);
 
             static bool exact_mode = false;
             if (ImGui::Button(exact_mode ? "Exactly###Mode" : "Around ###Mode")) {
@@ -604,30 +633,32 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
 
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
             ImGui::SetNextItemWidth(item_width);
-            if (imgui_StepSliderInt("##Quantity", &dist, c_locked_1, c_locked_1 + c_free, compatible ? "%d" : "N/A") &&
+            if (imgui_StepSliderInt("##Quantity", &free_dist, 0, c_free,
+                                    compatible ? (has_lock ? "(Free) %d" : "%d") : "N/A") &&
                 c_free != 0) {
-                rate = double(dist - c_locked_1) / c_free;
-                assert(c_locked_1 + round(rate * c_free) == dist);
+                rate = double(free_dist) / c_free;
+                assert(round(rate * c_free) == free_dist);
             }
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
             if (button_with_shortcut("Randomize", ImGuiKey_Enter)) {
                 bind_undo = true;
                 if (exact_mode) {
-                    return_rule(legacy::randomize_c(subset, mask, mold, global_mt19937(), dist - c_locked_1));
+                    return_rule(legacy::randomize_c(subset, mask, mold, global_mt19937(), free_dist));
                 } else {
                     return_rule(legacy::randomize_p(subset, mask, mold, global_mt19937(), rate));
                 }
             }
         });
         ImGui::SameLine();
-        imgui_StrTooltip("(?)", "Generate randomized rules with intended distance to the mask.\n\n"
+        imgui_StrTooltip("(?)", "Generate randomized rules with intended distance to the mask.\n"
+                                "(Real distance, both in the locked and free part.)\n\n"
                                 "For example, if you are using the 'Zero' mask and distance = 51, 'Randomize' "
                                 "will generate rules with 51 groups having '1' (different from '0').\n"
                                 "Also, suppose the current rule belongs to the working set, you can set it to "
                                 "the custom mask, and 'Randomize' with low distance to generate rules that "
                                 "are \"close\" to it.\n\n"
-                                "This is always bound to the 'Enter' key. For convenience, if you do 'Randomize' "
-                                "the left/right arrow key will be automatically bound to undo/redo.");
+                                "For convenience, this is always bound to the 'Enter' key; if you do 'Randomize' "
+                                "the left/right arrow key will also be automatically bound to undo/redo.");
 
         // TODO: find a better place for this...
         guarded_block(true /* Unconditional */, [&] {
