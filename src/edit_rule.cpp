@@ -293,22 +293,10 @@ public:
                 imgui_Str(
                     "The following terms represent subsets of the MAP rules. You can select these terms freely - "
                     "the program will calculate the intersection of the selected subsets (with the whole MAP set), and "
-                    "help you explore the rules in it.\n"
+                    "help you explore rules in it.\n"
                     "This set is later called \"working set\". For example, \"the rule belongs to the working set\" "
-                    "has the same meaning as \"the rule belongs to every selected subset\".\n"
-                    "(If nothing is selected, the working set will be the whole MAP set.)");
-                ImGui::Separator();
-                imgui_Str("The center color reflects the selection details:");
-                put_term(Compatible, None, nullptr, false);
-                ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                explain(Compatible, None, "x", "Not selected.");
-                explain(Compatible, Selected, nullptr, "Selected.");
-                explain(Compatible, Including, nullptr,
-                        "Not selected, but the working set already belongs to this subset, so it will behave "
-                        "as if this is selected too.");
-                put_term(Compatible, Disabled, nullptr, false);
-                ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                explain(Compatible, Disabled, "x", "Not selectable, otherwise the working set will be empty.");
+                    "has the same meaning as \"the rule belongs to every selected subset\". If nothing is selected, "
+                    "the working set will be the whole MAP set.");
                 ImGui::Separator();
                 imgui_Str("The ring color reflects the relation between the subset and the current rule-lock pair:");
                 explain(Contained, None, nullptr, "The rule belongs to this subset.");
@@ -321,11 +309,20 @@ public:
                         "The rule does not belong to this subset, and the constraints cannot be satisfied by any rule "
                         "in this subset.");
                 ImGui::Separator();
-                imgui_Str("For a list of example rules in different subsets, see the \"Typical subsets\" part in "
-                          "\"Documents\".");
+                imgui_Str("The center color reflects the selection details:");
+                put_term(Compatible, None, nullptr, false);
+                ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                explain(Compatible, None, "x", "Not selected.");
+                explain(Compatible, Selected, nullptr, "Selected.");
+                explain(Compatible, Including, nullptr,
+                        "Not selected, but the working set already belongs to this subset, so it will behave "
+                        "as if this is selected too.");
+                put_term(Compatible, Disabled, nullptr, false);
+                ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                explain(Compatible, Disabled, "x", "Not selectable, otherwise the working set will be empty.");
             });
             ImGui::SameLine();
-            imgui_Str("Select subsets");
+            imgui_Str("Subsets");
             ImGui::SameLine();
             if (ImGui::Button("Clear")) {
                 for_each_term([&](termT& t) { t.disabled = t.selected = false; });
@@ -339,6 +336,14 @@ public:
                 });
                 update_current();
             }
+            ImGui::SameLine();
+            imgui_Str("~"); // (The layout looks strange without this.)
+            ImGui::SameLine();
+            put_term(current.contains(mold.rule) ? Contained
+                     : compatible(current, mold) ? Compatible
+                                                 : Incompatible,
+                     None, nullptr, false);
+            imgui_ItemTooltip("The working set. See '(...)' for details.");
         }
 
         ImGui::Separator();
@@ -460,7 +465,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
              'o', 'i'},
 
             {"Custom",
-             "Custom rule; you can click 'Take current' button to set this to the current rule.\n"
+             "Custom rule; you can click the '<< Cur' button to set this to the current rule.\n"
              "Different:'i', same:'o'. The smaller the distance is, the more likely that the rule behaves "
              "similar to the masking rule.\n"
              "As you will see later, this is a powerful tool to help find interesting rules based on existing ones.",
@@ -488,7 +493,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
         }
 
         ImGui::SameLine();
-        if (ImGui::Button("Take current")) {
+        if (ImGui::Button("<< Cur")) {
             mask_custom = {mold.rule};
             mask_tag = Custom;
         }
@@ -508,7 +513,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
                          "1. At least one of 'Zero', 'Identity' and 'Native' will work. Especially, 'Native' will "
                          "always work.\n"
                          "2. If the current rule belongs to the working set, it can also serve as a valid 'Custom' "
-                         "mask ('Take current').\n\n"
+                         "mask ('<< Cur').\n\n"
                          "For more details see the \"Workflow\" part in \"Documents\".",
                          item_width);
         return std::nullopt;
@@ -544,7 +549,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
                             "iterate through all the rules that have distance = k to the mask.)\n\n"
                             "For example, suppose the current rule belongs to the working set. "
                             "To iterate through all the rules that have distance = 1 to the current rule, you can:\n"
-                            "1. 'Take current' to set the current rule as the custom mask.\n"
+                            "1. '<< Cur' to set the current rule as the custom mask.\n"
                             "2. 'Inc'. After this, the distance to the mask will be 1.\n"
                             "3. 'Next' to iterate. The left/right arrow key will be bound to 'Prev/Next' after you "
                             "click the button.");
@@ -613,16 +618,16 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
                     return_rule(legacy::randomize_p(subset, mask, mold, global_mt19937(), rate));
                 }
             }
-            ImGui::SameLine();
-            imgui_StrTooltip("(?)", "Generate randomized rules with intended distance to the mask.\n\n"
-                                    "For example, if you are using the 'Zero' mask and distance = 51, 'Randomize' "
-                                    "will generate rules with 51 groups having '1' (different from '0').\n"
-                                    "Also, suppose the current rule belongs to the working set, you can set it to "
-                                    "the custom mask, and 'Randomize' with low distance to generate rules that "
-                                    "are \"close\" to it.\n\n"
-                                    "This is always bound to the 'Enter' key. For convenience, if you do 'Randomize' "
-                                    "the left/right arrow key will be automatically bound to undo/redo.");
         });
+        ImGui::SameLine();
+        imgui_StrTooltip("(?)", "Generate randomized rules with intended distance to the mask.\n\n"
+                                "For example, if you are using the 'Zero' mask and distance = 51, 'Randomize' "
+                                "will generate rules with 51 groups having '1' (different from '0').\n"
+                                "Also, suppose the current rule belongs to the working set, you can set it to "
+                                "the custom mask, and 'Randomize' with low distance to generate rules that "
+                                "are \"close\" to it.\n\n"
+                                "This is always bound to the 'Enter' key. For convenience, if you do 'Randomize' "
+                                "the left/right arrow key will be automatically bound to undo/redo.");
 
         // TODO: find a better place for this...
         guarded_block(true /* Unconditional */, [&] {

@@ -130,6 +130,9 @@ void frame_main() {
         }
         ImGui::SameLine();
         ImGui::Text("| (%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
+#else
+        ImGui::SameLine();
+        ImGui::Text("  (%.1f FPS)", ImGui::GetIO().Framerate);
 #endif // !NDEBUG
 
         ImGui::Separator();
@@ -142,7 +145,9 @@ void frame_main() {
             "The string after the rule (enclosed in '[]') is the 'lock' for it, which is also copyable. "
             "For more details about lock see the \"Lock and capture\" part in \"Documents\".\n\n"
             "Here '<| Prev/Next |>' represents the record for the current rule. You can undo/redo the editions "
-            "with it. When you click the button the left/right arrow key will be bound to 'Prev/Next'.");
+            "with it. When you click the button the left/right arrow key will be bound to 'Prev/Next'.\n"
+            "(If you want to clear the record, you can right-click the 'Total:.. At:..' text, and then click 'Clear' "
+            "in the popup to confirm.)");
         ImGui::SameLine();
 
         const ImGuiID id_prev =
@@ -153,10 +158,8 @@ void frame_main() {
             [&] { recorder.set_last(); });
         ImGui::SameLine();
         ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1 /* [1, size()] */);
-        ImGui::SameLine();
-        ImGui::Button("Clear"); // TODO: the effect is not obvious.
-        if (ImGui::BeginPopupContextItem(nullptr, ImGuiPopupFlags_MouseButtonLeft)) {
-            if (ImGui::Selectable("Yes")) {
+        if (ImGui::BeginPopupContextItem("", ImGuiPopupFlags_MouseButtonRight)) {
+            if (ImGui::Selectable("Clear")) {
                 recorder.clear();
             }
             ImGui::EndPopup();
