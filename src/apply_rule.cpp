@@ -486,7 +486,7 @@ public:
         ImGui::SameLine();
         static bool other_op = true;
         ImGui::Checkbox("Range operations", &other_op);
-        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+        ImGui::SameLine();
         imgui_StrTooltip("(!)", "The related keyboard shortcuts are available only when this tag is set on. (The "
                                 "window can be collapsed.)");
 

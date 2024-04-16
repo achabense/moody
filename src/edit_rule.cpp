@@ -2,6 +2,11 @@
 
 #include "common.hpp"
 
+// TODO: incomplete and unpolished.
+#ifndef NDEBUG
+#define ENABLE_BATCH_PREVIEWER
+#endif // !NDEBUG
+
 namespace legacy {
     namespace _subsets {
         static const subsetT ignore_q = make_subset({mp_ignore_q});
@@ -410,7 +415,11 @@ public:
     }
 };
 
-// TODO: add batch-preview support for generation modes (int/perm/rand)?
+#ifdef ENABLE_BATCH_PREVIEWER
+static bool show_snapshots(std::optional<legacy::moldT>& out);
+static void take_snapshot(const legacy::subsetT& subset, const legacy::maskT& mask, const legacy::moldT& mold);
+#endif // ENABLE_BATCH_PREVIEWER
+
 std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_undo) {
     std::optional<legacy::moldT> out = std::nullopt;
     auto return_rule = [&out, &mold](const legacy::ruleT& rule) { out.emplace(rule, mold.lock); };
@@ -660,6 +669,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
                 assert(round(rate * c_free) == free_dist);
             }
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+            // TODO: Enter-binding is not appropriate when there are many windows.
             if (button_with_shortcut("Randomize", ImGuiKey_Enter)) {
                 bind_undo = true;
                 if (exact_mode) {
@@ -679,6 +689,18 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
                                 "are \"close\" to it.\n\n"
                                 "For convenience, this is always bound to the 'Enter' key; if you do 'Randomize' "
                                 "the left/right arrow key will also be automatically bound to undo/redo.");
+
+#ifdef ENABLE_BATCH_PREVIEWER
+        ImGui::SameLine();
+        guarded_block(compatible, [&] {
+            if (ImGui::Button("Snapshot")) {
+                take_snapshot(subset, mask, mold);
+            }
+        });
+        if (show_snapshots(out)) {
+            // bind_undo = true;
+        }
+#endif // ENABLE_BATCH_PREVIEWER
 
         // TODO: find a better place for this...
         guarded_block(true /* Unconditional */, [&] {
@@ -737,7 +759,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
                 "(This is available only when the current rule belongs to the working set.)");
             ImGui::SameLine();
             ImGui::Checkbox("Hide locked groups", &hide_locked);
-            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+            ImGui::SameLine();
             imgui_StrTooltip("(!)", "Only \"pure\" (light-blue) groups can be hidden when there are locks.");
             ImGui::EndPopup();
         }
@@ -1058,3 +1080,196 @@ std::optional<legacy::moldT> static_constraints() {
     }
     return std::nullopt;
 }
+
+#ifdef ENABLE_BATCH_PREVIEWER
+class snapshot_manager {
+public:
+    class windowT {
+        bool open = true;
+        inline static int id = 0;
+        int index = id++;
+        friend snapshot_manager;
+
+    public:
+        virtual ~windowT() = default;
+
+    private:
+        virtual bool display(std::optional<legacy::moldT>& out) = 0;
+    };
+
+    template <class T>
+    void accept(const legacy::subsetT& subset, const legacy::maskT& mask, const legacy::moldT& mold) {
+        m_snapshots.push_back(std::unique_ptr<windowT>(new T(subset, mask, mold)));
+    }
+
+    // TODO: add closing confirmation...
+    bool display(std::optional<legacy::moldT>& out) {
+        bool assigned = false;
+        for (const auto& ptr : m_snapshots) {
+            const std::string title = "Snapshot " + std::to_string(ptr->index);
+            if (auto window = imgui_Window(title.c_str(), &ptr->open,
+                                           ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
+                assigned = ptr->display(out) || assigned; // Cannot be reversed.
+            }
+        }
+        std::erase_if(m_snapshots, [](const auto& ptr) { return !ptr->open; });
+        return assigned;
+    }
+
+private:
+    std::vector<std::unique_ptr<windowT>> m_snapshots;
+};
+
+// TODO: show information about `m_subset`, `m_mask`, and `m_mold`.
+// TODO: should be able to switch between masks in the same way as `edit_rule`.
+// TODO: enable accepting current rule as mask?
+// TODO: support batch-preview for `seq_mixed` as well.
+class randomizerT : public snapshot_manager::windowT {
+    const legacy::subsetT m_subset;
+    legacy::maskT m_mask;
+    const legacy::moldT m_mold;
+
+public:
+    randomizerT(const legacy::subsetT& subset, const legacy::maskT& mask, const legacy::moldT& mold)
+        : m_subset(subset), m_mask(mask), m_mold{legacy::approximate(subset, mold), mold.lock} {
+        assert(!m_subset.empty());
+        assert(m_subset.contains(m_mask));
+        assert(m_subset.contains(m_mold.rule));
+        c_locked_1 = 0, c_free = 0, has_lock = false;
+        // TODO: share with `edit_rule`.
+        for (const auto& scan : legacy::scan(m_subset.get_par(), m_mask, m_mold)) {
+            if (scan.locked_0 || scan.locked_1) {
+                has_lock = true;
+            } else {
+                ++c_free;
+            }
+
+            if (scan.locked_1) {
+                ++c_locked_1;
+            }
+        }
+    }
+
+private:
+    previewer::configT config{previewer::configT::_220_160};
+    static constexpr const int page_size = 6, perline = 3;
+    using pageT = std::array<legacy::ruleT, page_size>;
+    std::vector<pageT> pages;
+    int page_no = 0;
+
+    double rate = 0.5;
+    bool exact_mode = false;
+    /*const*/ int c_locked_1, c_free;
+    /*const*/ bool has_lock;
+
+    // TODO: share with `edit_rule`.
+    bool set_spec() {
+        int free_dist = round(rate * c_free);
+        if (ImGui::Button(exact_mode ? "Exactly###Mode" : "Around ###Mode")) {
+            exact_mode = !exact_mode;
+        }
+
+        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+        ImGui::SetNextItemWidth(item_width);
+        if (imgui_StepSliderInt("##Quantity", &free_dist, 0, c_free, has_lock ? "(Free) %d" : "%d") && c_free != 0) {
+            rate = double(free_dist) / c_free;
+            assert(round(rate * c_free) == free_dist);
+        }
+        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+        return ImGui::Button("Randomize");
+    }
+
+    void make_page() {
+        for (auto& rule : pages.emplace_back()) {
+            if (exact_mode) {
+                rule = legacy::randomize_c(m_subset, m_mask, m_mold, global_mt19937(), round(rate * c_free));
+            } else {
+                rule = legacy::randomize_p(m_subset, m_mask, m_mold, global_mt19937(), rate);
+            }
+        }
+        page_no = pages.size() - 1;
+    }
+
+    void set_page(int p, bool force = false) {
+        if (p < 0) {
+            return;
+        } else if (p < pages.size()) {
+            page_no = p;
+        } else if (force) {
+            make_page();
+        }
+    };
+
+private:
+    bool display(std::optional<legacy::moldT>& out) override {
+        bool assigned = false;
+
+        if (set_spec()) {
+            make_page();
+            sequence::bind_to(ImGui::GetID("<<"));
+        }
+
+        ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
+        sequence::seq(
+            "<|", "<<", ">>>", "|>", //
+            [&] { set_page(0); }, [&] { set_page(page_no - 1); }, [&] { set_page(page_no + 1, true); },
+            [&] { set_page(pages.size() - 1); });
+        ImGui::SameLine();
+        if (!pages.empty()) {
+            ImGui::Text("Page:%d At:%d", (int)pages.size(), page_no + 1);
+        } else {
+            imgui_Str("Page:N/A");
+        }
+        // (Using the same style as in `frame_main`.)
+        if (!pages.empty() && ImGui::BeginPopupContextItem("", ImGuiPopupFlags_MouseButtonRight)) {
+            if (ImGui::Selectable("Clear")) {
+                pages = std::vector<pageT>{};
+                page_no = 0;
+            }
+            ImGui::EndPopup();
+        }
+
+        if (!pages.empty()) {
+            ImGui::BeginDisabled();
+            bool b = true;
+            ImGui::Checkbox("Preview mode", &b);
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+            config.set("Settings", "Restart");
+            ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(32, 32, 32, 255));
+            if (auto child = imgui_ChildWindow("Page", {}, ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY)) {
+                for (int j = 0; auto& rule : pages[page_no]) {
+                    if (j % perline != 0) {
+                        ImGui::SameLine(0, 16); // (The same value as in `edit_rule`.)
+                    } else {
+                        ImGui::Separator();
+                    }
+                    ++j;
+                    ImGui::BeginGroup();
+                    ImGui::PushID(j);
+                    if (ImGui::Button(">> Cur")) {
+                        out.emplace(rule, m_mold.lock);
+                        assigned = true;
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button(">> Mask")) {
+                        m_mask = {rule};
+                    }
+                    ImGui::PopID();
+                    previewer::preview(j, config, rule);
+                    ImGui::EndGroup();
+                }
+            }
+            ImGui::PopStyleColor();
+        }
+        return assigned;
+    }
+};
+
+static snapshot_manager snapshots;
+static bool show_snapshots(std::optional<legacy::moldT>& out) { return snapshots.display(out); }
+
+static void take_snapshot(const legacy::subsetT& subset, const legacy::maskT& mask, const legacy::moldT& mold) {
+    snapshots.accept<randomizerT>(subset, mask, mold);
+}
+#endif // ENABLE_BATCH_PREVIEWER
