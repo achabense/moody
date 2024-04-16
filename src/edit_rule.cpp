@@ -322,28 +322,37 @@ public:
                 explain(Compatible, Disabled, "x", "Not selectable, otherwise the working set will be empty.");
             });
             ImGui::SameLine();
-            imgui_Str("Subsets");
-            ImGui::SameLine();
-            if (ImGui::Button("Clear")) {
-                for_each_term([&](termT& t) { t.disabled = t.selected = false; });
-                update_current();
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Recognize")) {
-                for_each_term([&](termT& t) {
-                    t.disabled = false; // Will be updated by `update_current`.
-                    t.selected = t.set->contains(mold.rule);
-                });
-                update_current();
-            }
-            ImGui::SameLine();
-            imgui_Str("~"); // (The layout looks strange without this.)
+            imgui_Str("Subsets ~");
             ImGui::SameLine();
             put_term(current.contains(mold.rule) ? Contained
                      : compatible(current, mold) ? Compatible
                                                  : Incompatible,
                      None, nullptr, false);
-            imgui_ItemTooltip("The working set. See '(...)' for details.");
+            imgui_ItemTooltip("The working set. (See '(...)' for explanation.)");
+
+            // TODO: `static` for convenience. This must be refactored when there are to be multiple instances.
+            static bool hide_details = false;
+            if (!hide_details) {
+                ImGui::SameLine();
+                if (ImGui::Button("Clear")) {
+                    for_each_term([&](termT& t) { t.disabled = t.selected = false; });
+                    update_current();
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Recognize")) {
+                    for_each_term([&](termT& t) {
+                        t.disabled = false; // Will be updated by `update_current`.
+                        t.selected = t.set->contains(mold.rule);
+                    });
+                    update_current();
+                }
+                imgui_ItemTooltip("Select every subset that the current rule belongs to.");
+            }
+            ImGui::SameLine();
+            ImGui::Checkbox("Hide details", &hide_details);
+            if (hide_details) {
+                return current;
+            }
         }
 
         ImGui::Separator();

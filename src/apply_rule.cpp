@@ -8,6 +8,8 @@
 
 #include "common.hpp"
 
+// TODO: support boundless space...
+
 using clockT = std::chrono::steady_clock;
 
 [[nodiscard]] static ImTextureID make_screen(const legacy::tileT& tile) {
@@ -27,7 +29,6 @@ static bool strobing(const legacy::ruleT& rule) {
     return rule[all_0] == 1 && rule[all_1] == 0;
 }
 
-// TODO: whether to support boundless space?
 // `tileT` is able to serve as the building block for boundless space (`tileT::gather` was
 // initially designed to enable this extension) but that's complicated, and torus space is enough to
 // show the effect of the rules.
@@ -451,17 +452,26 @@ public:
         const legacy::tileT::sizeT tile_size = m_torus.tile().size();
         const ImVec2 screen_size(tile_size.width * screen_zoom, tile_size.height * screen_zoom);
 
-        // TODO: support locking mouse controls?
+        static bool lock_mouse = false; // Lock scrolling control and window moving.
         ImGui::AlignTextToFramePadding();
-        imgui_StrTooltip(
-            "(...)",
-            "Mouse operations:\n"
-            "1. Scroll in the window to change the zoom.\n"
-            "2. When there is nothing to paste, you can drag with left button to move the window, or drag with "
-            "right button to select area (for range "
-            "operations). When zoom = 1, you can also 'Ctrl + left-drag' to \"rotate\" the space.\n"
-            "3. Otherwise, left-click to decide where to paste. In this case, to move the window you can drag with "
-            "right button. (Range-selection and rotation is disabled when there are patterns to paste.)");
+        imgui_StrTooltip(lock_mouse ? "[...]" : "(...)", [] {
+            imgui_Str(
+                "Mouse operations:\n"
+                "1. Scroll in the window to change the zoom.\n"
+                "2. When there is nothing to paste, you can drag with left button to move the window, or drag with "
+                "right button to select area (for range operations). When zoom = 1, you can also 'Ctrl + left-drag' "
+                "to \"rotate\" the space.\n"
+                "3. Otherwise, left-click to decide where to paste. In this case, to move the window you can drag with "
+                "right button. (Range-selection and rotation is disabled when there are patterns to paste.)");
+            ImGui::Separator();
+            ImGui::Text("(You can right-click this '%s' to enable/disable scrolling control and window moving.)",
+                        lock_mouse ? "[...]" : "(...)");
+            ImGui::Checkbox("Enabling scrolling and window moving", &lock_mouse);
+        });
+        if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+            lock_mouse = !lock_mouse;
+        }
+
         ImGui::SameLine();
         if (ImGui::Button("Corner")) {
             screen_off = {0, 0};
@@ -518,7 +528,7 @@ public:
                 if (!r_down && io.KeyCtrl && screen_zoom == 1) {
                     // (This does not need `mark_written`.)
                     m_torus.rotate(io.MouseDelta.x, io.MouseDelta.y);
-                } else {
+                } else if (!lock_mouse) {
                     screen_off += io.MouseDelta;
                 }
             }
@@ -613,7 +623,7 @@ public:
                     }
                 }
 
-                if (imgui_MouseScrolling()) {
+                if (!lock_mouse && imgui_MouseScrolling()) {
                     if (imgui_MouseScrollingDown() && screen_zoom != 1) {
                         screen_zoom /= 2;
                     }
@@ -648,7 +658,7 @@ public:
 
                 auto set_tag = [](bool& tag, const char* label, const char* message) {
                     ImGui::Checkbox(label, &tag);
-                    ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                    ImGui::SameLine();
                     imgui_StrTooltip("(?)", message);
                 };
 
