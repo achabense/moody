@@ -302,15 +302,15 @@ public:
         ImGui::BeginGroup();
         {
             ImGui::AlignTextToFramePadding();
-            imgui_StrTooltip("(...)", "Keyboard shortcuts:\nR: Restart\n"
-                                      "Space: Pause\nN/M (repeatable): +p/+1\n"
-                                      "1/2 (repeatable): -/+ Gap\n3/4 (repeatable): -/+ Pace\n");
+            imgui_StrTooltip("(...)", "Keyboard shortcuts:\n"
+                                      "R: Restart    Space: Pause\nN/M (repeatable): +p/+1\n"
+                                      "1/2 (repeatable): -/+ Pace\n3/4 (repeatable): -/+ Gap time\n");
             ImGui::SameLine();
             ImGui::Checkbox("Pause", &m_ctrl.pause);
             ImGui::PushButtonRepeat(true);
             ImGui::SameLine();
             if (ImGui::Button(std::format("+p({})###+p", m_ctrl.actual_pace()).c_str())) {
-                extra_step = m_ctrl.actual_pace();
+                extra_step = m_ctrl.pause ? m_ctrl.actual_pace() : 0;
                 m_ctrl.pause = true;
             }
             ImGui::SameLine();
@@ -320,19 +320,19 @@ public:
             ImGui::PopButtonRepeat();
             ImGui::SameLine();
             imgui_StrTooltip("(?)", [] {
-                imgui_Str("+p:");
-                ImGui::SameLine();
+                imgui_Str("+p: ");
+                ImGui::SameLine(0, 0);
                 imgui_Str("Run manually (advance generation by actual-pace, controlled by the button/keypress).");
-                imgui_Str("+1:");
-                ImGui::SameLine();
+                imgui_Str("+1: ");
+                ImGui::SameLine(0, 0);
                 imgui_Str("Advance generation by 1 instead of actual-pace. This is useful for changing the parity "
                           "of generation when actual-pace != 1.");
             });
 
+            imgui_StepSliderInt("Pace", &m_ctrl.pace, m_ctrl.pace_min, m_ctrl.pace_max);
+
             imgui_StepSliderInt("Gap time", &m_ctrl.gap, m_ctrl.gap_min, m_ctrl.gap_max,
                                 std::format("{} ms", m_ctrl.gap * m_ctrl.gap_unit).c_str());
-
-            imgui_StepSliderInt("Pace", &m_ctrl.pace, m_ctrl.pace_min, m_ctrl.pace_max);
 
             // TODO: this would better be explained with examples.
             // How to make interactive tooltips?
@@ -351,17 +351,17 @@ public:
             if (imgui_KeyPressed(ImGuiKey_R, false)) {
                 restart();
             } else if (imgui_KeyPressed(ImGuiKey_1, true)) {
-                m_ctrl.gap = std::max(m_ctrl.gap_min, m_ctrl.gap - 1);
-            } else if (imgui_KeyPressed(ImGuiKey_2, true)) {
-                m_ctrl.gap = std::min(m_ctrl.gap_max, m_ctrl.gap + 1);
-            } else if (imgui_KeyPressed(ImGuiKey_3, true)) {
                 m_ctrl.pace = std::max(m_ctrl.pace_min, m_ctrl.pace - 1);
-            } else if (imgui_KeyPressed(ImGuiKey_4, true)) {
+            } else if (imgui_KeyPressed(ImGuiKey_2, true)) {
                 m_ctrl.pace = std::min(m_ctrl.pace_max, m_ctrl.pace + 1);
+            } else if (imgui_KeyPressed(ImGuiKey_3, true)) {
+                m_ctrl.gap = std::max(m_ctrl.gap_min, m_ctrl.gap - 1);
+            } else if (imgui_KeyPressed(ImGuiKey_4, true)) {
+                m_ctrl.gap = std::min(m_ctrl.gap_max, m_ctrl.gap + 1);
             } else if (imgui_KeyPressed(ImGuiKey_Space, false)) {
                 m_ctrl.pause = !m_ctrl.pause;
             } else if (imgui_KeyPressed(ImGuiKey_N, true)) {
-                extra_step = m_ctrl.actual_pace();
+                extra_step = m_ctrl.pause ? m_ctrl.actual_pace() : 0;
                 m_ctrl.pause = true;
             } else if (imgui_KeyPressed(ImGuiKey_M, true)) {
                 extra_step = 1;
@@ -373,7 +373,7 @@ public:
         {
             torusT::initT init = m_init;
             int seed = init.seed;
-            imgui_StepSliderInt("Init seed", &seed, 0, 49);
+            imgui_StepSliderInt("Init seed", &seed, 0, 29);
             if (ImGui::IsItemActive()) {
                 temp_pause = true;
             }
@@ -667,7 +667,8 @@ public:
                                         "This affects the behavior of clearing, shrinking and pasting mode.\n\n"
                                         "'Clear inside/outside' will fill the range with (background).\n"
                                         "'Shrink' will get the bounding-box for !(background).\n"
-                                        "When pasting patterns into the white background you need to set this to 1.");
+                                        "'Paste' will use different pasting modes based on (background). "
+                                        "(When pasting into the white background you need to set this to 1.)");
 
                 // Filling.
                 ImGui::Separator();
@@ -727,7 +728,7 @@ public:
                 };
 
                 ImGui::Separator();
-                set_tag(add_rule, "Add rule", "Whether to append the current rule when copying patterns.");
+                set_tag(add_rule, "Add rule", "Whether to add the 'rule = ...' part when copying patterns.");
                 ImGui::SameLine();
                 set_tag(copy_silently, "Copy silently", "Whether to directly copy to the clipboard.");
                 term("Copy", "C", ImGuiKey_C, true, [&] { copy_sel(); });
@@ -754,7 +755,7 @@ public:
 
                 ImGui::AlignTextToFramePadding();
                 imgui_StrTooltip("(...)", // TODO: notify this is program-specific.
-                                 "For use cases see the \"Lock and capture\" part in \"Documents\".\n\n"
+                                 "For concepts and use cases see the \"Lock and capture\" part in \"Documents\".\n\n"
                                  "Closed-capture: Run the selected area as torus space (with the current rule), to "
                                  "record all mappings. Depending on 'Adopt eagerly', the result will be integrated to "
                                  "the buffer lock (as shown by 'Count:.../512'), or will replace the lock for the "
@@ -828,7 +829,7 @@ void previewer::configT::_set() {
         }
     }
     ImGui::SetNextItemWidth(item_width);
-    imgui_StepSliderInt("Init seed", &seed, 0, 10);
+    imgui_StepSliderInt("Init seed", &seed, 0, 9);
     imgui_Str("Init density = 0.5");
 
     ImGui::Separator();

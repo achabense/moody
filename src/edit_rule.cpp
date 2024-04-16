@@ -155,8 +155,8 @@ public:
         terms_ignore.emplace_back("a", &ignore_a, "See 'q' for details.");
         terms_ignore.emplace_back(
             "s", &ignore_s_z,
-            "For any two cases where only 's' is different, the mapped values are the same. So (when q/w/e/a/d/z/x/c "
-            "are the same) there must be: either s:0->1, s:1->1 or s:0->0, s:1->0.\n"
+            "For any two cases where only 's' is different, the mapped values are the same. So when 'q/w/e/a/d/z/x/c' "
+            "are the same, there must be: either s:0->1, s:1->1 or s:0->0, s:1->0.\n"
             "(This cannot easily be interpreted as \"independent of\" 's'.)");
         terms_ignore.emplace_back("d", &ignore_d, "See 'q' for details.");
         terms_ignore.emplace_back("z", &ignore_z, "See 'q' for details.");
@@ -165,7 +165,7 @@ public:
 
         terms_misc.emplace_back("s(*)", &ignore_s_i,
                                 "Similar to 's' - for any two cases where only 's' is different, the \"flip-ness\" of "
-                                "values are the same. So there must be: either s:0->0, s:1->1 or s:0->1, s:1->0.");
+                                "the values are the same (either s:0->0, s:1->1 or s:0->1, s:1->0).");
         terms_misc.emplace_back(
             "Hex", &ignore_hex,
             "Rules that emulate the hexagonal rules (by ignoring 'e/z'). In this program the emulation support for "
@@ -465,16 +465,16 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
             {"Native",
              "A rule calculated by the program that belongs to the working set. Depending on what subsets "
              "are selected, it may be the same as zero-rule, or identity-rule, or just an ordinary rule in the set.\n"
-             "It's recommended you try this only when there is no other existing rules in the working "
-             "set (neither 'Zero' nor 'Identity' works, and there is no existing rules to serve as custom mask).",
+             "It's recommended you try this only when there are no other rules known to belong to the working "
+             "set (neither 'Zero' nor 'Identity' works, and there are no existing rules to serve as custom mask).",
              'o', 'i'},
 
             // TODO: is right-click control a good idea?
             {"Custom",
              "Custom rule; you can click the '<< Cur' button (or right-click this) to set this to the current rule.\n"
-             "Different:'i', same:'o'. The smaller the distance is, the more likely that the rule behaves "
-             "similar to the masking rule.\n"
-             "As you will see later, this is a powerful tool to help find interesting rules based on existing ones.",
+             "Different:'i', same:'o'. This is a useful tool to help find interesting rules based on existing ones. "
+             "For example, the smaller the distance is, the more likely that the rule behaves similar to the masking "
+             "rule.",
              'o', 'i'}};
 
         static maskE mask_tag = Zero;

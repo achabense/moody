@@ -46,7 +46,8 @@ public:
     void set_last() { set_pos(size() - 1); }
 
     void clear() {
-        m_record = {m_record[m_pos]};
+        // `m_record = {m_record[m_pos]}` will not free the memory.
+        m_record = std::vector<legacy::moldT>{m_record[m_pos]};
         m_pos = 0;
     }
 
