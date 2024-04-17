@@ -555,20 +555,47 @@ static std::string too_long(uintmax_t size, int max_size) {
                        max_size / 1024.0);
 }
 
+static std::string load_binary(const pathT& path) {
+    std::error_code ec{};
+    const auto size = std::filesystem::file_size(path, ec);
+    if (!ec && size <= max_size) {
+        std::ifstream file(path, std::ios::in | std::ios::binary);
+        if (file) {
+            std::string data(size, '\0');
+            file.read(data.data(), size);
+            if (file && file.gcount() == size) {
+                return data;
+            }
+        }
+    }
+
+    if (!ec && size > max_size) {
+        messenger::add_msg("File too large: {}\n{}", too_long(size, max_size), cpp17_u8string(path));
+    } else {
+        messenger::add_msg("Failed to load file:\n{}", cpp17_u8string(path));
+    }
+    throw 0;
+}
+
 // TODO: support opening multiple files?
 // TODO: add a mode to avoid opening files without rules?
 static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
     static file_nav nav;
 
-    struct fileT {
-        pathT path;
-        textT text;
-    };
+    static textT text;
     static bool rewind = false;
-    static std::optional<fileT> file;
+    static std::optional<pathT> path;
 
-    std::optional<pathT> sel = std::nullopt;
-    if (!file) {
+    auto try_load = [](const pathT& p) -> bool {
+        try {
+            text = textT(load_binary(p));
+            return true;
+        } catch (...) {
+            return false;
+        }
+    };
+
+    if (!path) {
         if (ImGui::SmallButton("Refresh")) {
             nav.refresh_if_valid();
         }
@@ -581,57 +608,38 @@ static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
             ImGui::EndPopup();
         }
 
-        sel = nav.display();
+        if (auto sel = nav.display(); sel && try_load(*sel)) {
+            rewind = true;
+            path = std::move(*sel);
+        }
     } else {
         const bool close = ImGui::SmallButton("Close");
         ImGui::SameLine();
         if (ImGui::SmallButton("Reload")) {
-            sel = file->path;
+            try_load(*path);
+            // Don't rewind.
         }
         ImGui::SameLine();
         ImGui::SmallButton("...");
         ImGui::SetNextWindowSize({0, 200}, ImGuiCond_Always);
         if (ImGui::BeginPopupContextItem(nullptr, ImGuiPopupFlags_MouseButtonLeft)) {
-            nav.select_file(&file->path, sel);
+            // TODO: the popup may be closed unexpectedly by messenger's popup if the load fails.
+            // (I haven't figured out how to make the two popups display together...)
+            std::optional<pathT> sel = std::nullopt;
+            nav.select_file(&*path, sel);
+            if (sel && try_load(*sel)) {
+                rewind = true; // Rewind, even if the new path is the same as the old one.
+                path = std::move(*sel);
+            }
             ImGui::EndPopup();
         }
-        display_path(file->path, ImGui::GetContentRegionAvail().x);
+        display_path(*path, ImGui::GetContentRegionAvail().x);
 
         ImGui::Separator();
-        file->text.display(out, std::exchange(rewind, false));
+        text.display(out, std::exchange(rewind, false));
         if (close) {
-            file.reset();
-        }
-    }
-
-    if (sel) {
-        try {
-            fileT temp{.path = std::move(*sel)};
-            temp.text.append([](const pathT& path) -> std::string {
-                std::error_code ec{};
-                const auto size = std::filesystem::file_size(path, ec);
-                if (!ec && size <= max_size) {
-                    std::ifstream file(path, std::ios::in | std::ios::binary);
-                    if (file) {
-                        std::string data(size, '\0');
-                        file.read(data.data(), size);
-                        if (file && file.gcount() == size) {
-                            return data;
-                        }
-                    }
-                }
-
-                if (!ec && size > max_size) {
-                    messenger::add_msg("File too large: {}\n{}", too_long(size, max_size), cpp17_u8string(path));
-                } else {
-                    messenger::add_msg("Failed to load file:\n{}", cpp17_u8string(path));
-                }
-                throw 0; // 0 ->
-            }(temp.path));
-            file = std::move(temp);
-            rewind = true;
-        } catch (...) {
-            ; // <- 0
+            path.reset();
+            text.clear();
         }
     }
 }

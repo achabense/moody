@@ -634,15 +634,15 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
         });
         ImGui::SameLine();
         if (contained) {
-            ImGui::Text("%s = %d", !has_lock ? "Distance" : "Free dist", c_1 - c_locked_1);
+            ImGui::Text("%s:%d", !has_lock ? "Distance" : "Free dist", c_1 - c_locked_1);
         } else {
-            ImGui::Text("%s = N/A", !has_lock ? "Distance" : "Free dist");
+            ImGui::Text("%s:N/A", !has_lock ? "Distance" : "Free dist");
         }
         ImGui::SameLine();
         imgui_StrTooltip("(?)",
                          "Iterate through the whole working set, by firstly iterating through all rules that have "
                          "distance = 1 to the masking rule, then 2, 3, ..., until max distance.\n"
-                         "Here 'Distance = ...' refers to the distance from the current rule to the mask.\n\n"
+                         "Here 'Distance:...' refers to the distance from the current rule to the mask.\n\n"
                          "For example, suppose the current rule belongs to the working set. To iterate through all "
                          "rules that have distance = 1 to the current rule, you can:\n"
                          "1. '<< Cur' to set the current rule as the custom mask.\n"

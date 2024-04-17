@@ -466,7 +466,8 @@ public:
             ImGui::Separator();
             ImGui::Text("(You can right-click this '%s' to enable/disable scrolling control and window moving.)",
                         lock_mouse ? "[...]" : "(...)");
-            ImGui::Checkbox("Enabling scrolling and window moving", &lock_mouse);
+            bool enabled = !lock_mouse;
+            ImGui::Checkbox("Enabling scrolling and window moving", &enabled);
         });
         if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
             lock_mouse = !lock_mouse;
