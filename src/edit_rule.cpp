@@ -592,6 +592,30 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
     // TODO: more filtering modes?
     // Will not hide "impure" groups even when there are locks.
     static bool hide_locked = false;
+    static bool toggle_lock = false; // Whether to toggle lock by right-click in the random-access plane.
+    // !!TODO: disable instead of hide when the mask does not fit in the working set...
+    manage_lock::display([&] {
+        ImGui::SeparatorText("Lock edition");
+        if (ImGui::Button("Clear lock")) {
+            return_lock({});
+        }
+        ImGui::SameLine();
+        guarded_block(contained, [&] {
+            if (ImGui::Button("Enhance lock")) {
+                return_lock(legacy::enhance_lock(subset, mold));
+            }
+        });
+        imgui_ItemTooltip("\"Saturate\" the locked groups to keep the full effect of the locks when switching to a"
+                          "\"wider\" working set. For use cases see the \"Lock and capture\" part in \"Documents\".\n"
+                          "(This is available only when the current rule belongs to the working set.)");
+        ImGui::SameLine();
+        ImGui::Checkbox("Hide locked groups", &hide_locked);
+        ImGui::SameLine();
+        imgui_StrTooltip("(!)", "Only \"pure\" (light-blue) groups can be hidden when there are locks.");
+        ImGui::Checkbox("Toggle lock with right-click", &toggle_lock);
+        ImGui::SameLine();
+        imgui_StrTooltip("(?)", "..."); // !!TODO
+    });
 
     static bool preview_mode = false;
     static previewer::configT config{previewer::configT::_160_160};
@@ -704,7 +728,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
 
         // TODO: find a better place for this...
         guarded_block(true /* Unconditional */, [&] {
-            if (ImGui::Button("R.d.")) {
+            if (ImGui::Button("Reverse")) {
                 return_mold(legacy::trans_reverse(mold));
             }
         });
@@ -739,31 +763,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
                 imgui_Str("(The current rule already belongs to the working set.)");
             }
         });
-        ImGui::SameLine();
-        guarded_block(true /* Unconditional */, [&] {
-            if (ImGui::Button("Clear lock")) {
-                return_lock({});
-            }
-        });
-        ImGui::SameLine();
-        ImGui::Button("...");
-        if (ImGui::BeginPopupContextItem(nullptr, ImGuiPopupFlags_MouseButtonLeft)) {
-            guarded_block(contained, [&] {
-                if (ImGui::Button("Enhance lock")) {
-                    return_lock(legacy::enhance_lock(subset, mold));
-                }
-            });
-            imgui_ItemTooltip(
-                "\"Saturate\" the locked groups to keep the full effect of the locks when switching to a"
-                "\"wider\" working set. For use cases see the \"Lock and capture\" part in \"Documents\".\n"
-                "(This is available only when the current rule belongs to the working set.)");
-            ImGui::SameLine();
-            ImGui::Checkbox("Hide locked groups", &hide_locked);
-            ImGui::SameLine();
-            imgui_StrTooltip("(!)", "Only \"pure\" (light-blue) groups can be hidden when there are locks.");
-            ImGui::EndPopup();
-        }
-
         ImGui::SameLine();
         ImGui::Checkbox("Preview mode", &preview_mode);
         if (preview_mode) {
@@ -868,7 +867,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
                 }
                 bind_undo = true;
                 return_rule(rule);
-            } else if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+            } else if (toggle_lock && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
                 legacy::moldT::lockT lock = mold.lock;
                 for (legacy::codeT code : group) {
                     lock[code] = !has_lock;
@@ -901,7 +900,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
 
             if (show_group && ImGui::BeginTooltip()) {
                 // TODO: move elsewhere...
-                imgui_Str("Left-click to flip the values.\nRight-click to toggle the lock.");
+                imgui_Str(toggle_lock ? "Left-click to flip the values.\nRight-click to toggle the lock."
+                                      : "Left-click to flip the values.");
                 ImGui::Separator();
                 ImGui::Text("Group size: %d", (int)group.size());
                 const int max_to_show = 48;

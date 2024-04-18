@@ -503,6 +503,7 @@ public:
                 }
 
                 if (id.has_value()) {
+                    // TODO: whether to require `manage_lock::enabled()`?
                     const bool has_lock = m_rules[*id].lock.has_value();
 
                     if (*id == m_pos) {

@@ -78,8 +78,7 @@ void frame_main() {
     static bool show_file = false;
     static bool show_clipboard = false;
     static bool show_doc = false;
-    static bool show_static = false;
-
+    static bool take_lock = false;
     auto load_rule = [&](bool& flag, const char* title, std::optional<legacy::extrT::valT> (*load_fn)()) {
         ImGui::Checkbox(title, &flag);
         if (flag) {
@@ -88,14 +87,21 @@ void frame_main() {
             ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
             if (auto window = imgui_Window(title, &flag)) {
                 if (auto out = load_fn()) {
-                    assign_val(current, *out);
+                    if (take_lock) {
+                        assert(manage_lock::enabled());
+                        assign_val(current, *out);
+                    } else {
+                        current = {out->rule, {}};
+                    }
                     update = true;
                 }
             }
         }
     };
 
+    static bool show_static = false;
     if (show_static) {
+        assert(manage_lock::enabled());
         ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
         if (auto window = imgui_Window("Static constraints", &show_static, ImGuiWindowFlags_AlwaysAutoResize)) {
             if (auto out = static_constraints()) {
@@ -118,7 +124,13 @@ void frame_main() {
         ImGui::SameLine();
         load_rule(show_doc, "Documents", load_doc);
         ImGui::SameLine();
-        ImGui::Checkbox("Static", &show_static); // TODO: move elsewhere?
+        manage_lock::checkbox();
+        manage_lock::display([] {
+            ImGui::Checkbox("Take lock", &take_lock);
+            imgui_ItemTooltip(""); // !!TODO
+            ImGui::SameLine();
+            ImGui::Checkbox("Static constraints", &show_static);
+        });
 #ifndef NDEBUG
         ImGui::SameLine();
         imgui_Str("  (Debug mode)");
@@ -167,6 +179,7 @@ void frame_main() {
         }
 
         {
+            // TODO: whether to display the lock part when it is never enabled?
             static bool with_lock = false;
             if (with_lock) {
                 imgui_StrCopyable(legacy::to_MAP_str(current), imgui_Str);

@@ -246,3 +246,28 @@ public:
 private:
     static void _preview(uint64_t id, const configT& config, const legacy::ruleT& rule, bool interactive);
 };
+
+// Ensure that users won't touch this feature unexpectedly.
+// !!TODO: recheck every tooltip etc that refers to lock but is outside of `display`.
+class manage_lock {
+    inline static bool open = false, ever_opened = false;
+
+public:
+    // Managed by `frame_main`.
+    static void checkbox() {
+        ImGui::Checkbox("Lock & capture", &manage_lock::open);
+        if (open) {
+            ever_opened = true;
+        }
+    }
+
+    static bool enabled() { return ever_opened; }
+    static void display(const std::invocable<> auto& append) {
+        if (open) {
+            ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
+            if (auto window = imgui_Window("Lock & capture", &open, ImGuiWindowFlags_AlwaysAutoResize)) {
+                append();
+            }
+        }
+    }
+};
