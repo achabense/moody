@@ -26,6 +26,9 @@ inline bool imgui_ItemFullyVisible() { //
 }
 
 inline void imgui_ItemTooltip(const std::invocable<> auto& desc) {
+    if (GImGui->CurrentWindow->SkipItems) {
+        return;
+    }
     if (ImGui::BeginItemTooltip()) {
         // The same as the one in `HelpMarker` in "imgui_demo.cpp".
         ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);

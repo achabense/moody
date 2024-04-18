@@ -637,31 +637,81 @@ public:
                 }
             }
 
+            auto term = [&, any_called = false](const char* label, const char* shortcut, ImGuiKey key, bool use_sel,
+                                                const auto& op) mutable {
+                const bool enabled = !use_sel || m_sel.has_value();
+                if (ImGui::MenuItem(label, shortcut, nullptr, enabled) || (enabled && imgui_KeyPressed(key, false))) {
+                    if (!any_called) {
+                        any_called = true;
+                        op();
+                    }
+                }
+                if (!enabled) {
+                    imgui_ItemTooltip("This operation is meaningful only when there are selected areas.");
+                }
+            };
+
+            auto set_tag = [](bool& tag, const char* label, const char* message) {
+                ImGui::Checkbox(label, &tag);
+                ImGui::SameLine();
+                imgui_StrTooltip("(?)", message);
+            };
+
+            // Pattern capturing.
+            // TODO: enable getting current.lock?
+            manage_lock::display([&](bool /* visible */) {
+                ImGui::SeparatorText("Pattern capturing");
+
+                ImGui::AlignTextToFramePadding();
+                imgui_StrTooltip("(...)",
+                                 "Closed-capture: Run the selected area as torus space (with the current rule), to "
+                                 "record all mappings. Depending on 'Adopt eagerly', the result will be integrated to "
+                                 "the buffer lock (as shown by 'Count:.../512'), or will replace the lock for the "
+                                 "current rule directly.)\n\n"
+                                 "Open-capture: Record what there exists in the selected area for the current frame. "
+                                 "The capturing area does not include the border. The result will always be integrated "
+                                 "to the buffer lock.\n\n"
+                                 "'Clear' clears the buffer lock.\n"
+                                 "'Adopt' sets the lock for the current rule to the buffer lock.");
+                ImGui::SameLine();
+                static bool adopt_eagerly = true;
+                set_tag(adopt_eagerly, "Adopt eagerly",
+                        "For closed-capture, whether to adopt the result directly, or append to the buffer lock "
+                        "just like open-capture.");
+                // TODO: like those controlled by `other_op`, the shortcuts are not available when the window
+                // tag is off.
+                term("Capture (closed)", "P", ImGuiKey_P, true, [&] {
+                    assert(m_sel);
+                    const auto lock = capture_closed(m_torus.tile(), m_sel->to_range(), m_ctrl.rule);
+                    if (adopt_eagerly) {
+                        out = lock;
+                    } else {
+                        legacy::for_each_code([&](legacy::codeT c) { m_lock[c] = m_lock[c] || lock[c]; });
+                    }
+                });
+                term("Capture (open)", "L (repeatable)", ImGuiKey_None, true, [&] {
+                    assert(m_sel);
+                    capture_open(m_torus.tile(), m_sel->to_range(), m_lock);
+                });
+                if (m_sel && imgui_KeyPressed(ImGuiKey_L, true)) {
+                    capture_open(m_torus.tile(), m_sel->to_range(), m_lock);
+                }
+                if (ImGui::Button("Clear")) {
+                    m_lock = {};
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Adopt")) {
+                    out = m_lock;
+                }
+                ImGui::SameLine();
+                int count = 0;
+                legacy::for_each_code([&](legacy::codeT code) { count += m_lock[code]; });
+                ImGui::Text("Count:%d/512", count);
+            });
+
             if (other_op) {
                 ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
-                const bool visible = ImGui::Begin("Range operations", &other_op, ImGuiWindowFlags_AlwaysAutoResize);
-
-                auto term = [&, any_called = false](const char* label, const char* shortcut, ImGuiKey key, bool use_sel,
-                                                    const auto& op) mutable {
-                    const bool enabled = !use_sel || m_sel.has_value();
-                    if (ImGui::MenuItem(label, shortcut, nullptr, enabled) ||
-                        (enabled && imgui_KeyPressed(key, false))) {
-                        if (!any_called) {
-                            any_called = true;
-                            op();
-                        }
-                    }
-                    // (Requiring `visible` to avoid the tooltip when the window is collapsed.)
-                    if (visible && !enabled) {
-                        imgui_ItemTooltip("This operation is meaningful only when there are selected areas.");
-                    }
-                };
-
-                auto set_tag = [](bool& tag, const char* label, const char* message) {
-                    ImGui::Checkbox(label, &tag);
-                    ImGui::SameLine();
-                    imgui_StrTooltip("(?)", message);
-                };
+                ImGui::Begin("Range operations", &other_op, ImGuiWindowFlags_AlwaysAutoResize);
 
                 ImGui::AlignTextToFramePadding();
                 imgui_Str("Background =");
@@ -758,57 +808,6 @@ public:
                             messenger::add_msg(err.what());
                         }
                     }
-                });
-
-                // !!TODO: should be independent of `other_op`...
-                // Pattern capturing.
-                // TODO: enable getting current.lock?
-                manage_lock::display([&] {
-                    ImGui::SeparatorText("Pattern capturing");
-
-                    ImGui::AlignTextToFramePadding();
-                    imgui_StrTooltip(
-                        "(...)", "Closed-capture: Run the selected area as torus space (with the current rule), to "
-                                 "record all mappings. Depending on 'Adopt eagerly', the result will be integrated to "
-                                 "the buffer lock (as shown by 'Count:.../512'), or will replace the lock for the "
-                                 "current rule directly.)\n\n"
-                                 "Open-capture: Record what there exists in the selected area for the current frame. "
-                                 "The capturing area does not include the border. The result will always be integrated "
-                                 "to the buffer lock.\n\n"
-                                 "'Clear' clears the buffer lock.\n"
-                                 "'Adopt' sets the lock for the current rule to the buffer lock.");
-                    ImGui::SameLine();
-                    static bool adopt_eagerly = true;
-                    set_tag(adopt_eagerly, "Adopt eagerly",
-                            "For closed-capture, whether to adopt the result directly, or append to the buffer lock "
-                            "just like open-capture.");
-                    term("Capture (closed)", "P", ImGuiKey_P, true, [&] {
-                        assert(m_sel);
-                        const auto lock = capture_closed(m_torus.tile(), m_sel->to_range(), m_ctrl.rule);
-                        if (adopt_eagerly) {
-                            out = lock;
-                        } else {
-                            legacy::for_each_code([&](legacy::codeT c) { m_lock[c] = m_lock[c] || lock[c]; });
-                        }
-                    });
-                    term("Capture (open)", "L (repeatable)", ImGuiKey_None, true, [&] {
-                        assert(m_sel);
-                        capture_open(m_torus.tile(), m_sel->to_range(), m_lock);
-                    });
-                    if (m_sel && imgui_KeyPressed(ImGuiKey_L, true)) {
-                        capture_open(m_torus.tile(), m_sel->to_range(), m_lock);
-                    }
-                    if (ImGui::Button("Clear")) {
-                        m_lock = {};
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::Button("Adopt")) {
-                        out = m_lock;
-                    }
-                    ImGui::SameLine();
-                    int count = 0;
-                    legacy::for_each_code([&](legacy::codeT code) { count += m_lock[code]; });
-                    ImGui::Text("Count:%d/512", count);
                 });
 
                 ImGui::End();

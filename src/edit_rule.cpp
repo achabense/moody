@@ -534,9 +534,45 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
 
     ImGui::Separator();
 
+    const bool mask_avail = subset.contains(mask);
+    const bool compatible = legacy::compatible(subset, mold);
+    const bool contained = subset.contains(mold.rule);
+    assert_implies(contained, compatible);
+
+    // TODO: more filtering modes?
+    // Will not hide "impure" groups even when there are locks.
+    static bool hide_locked = false;
+    manage_lock::display([&](bool visible) {
+        if (!visible) {
+            return;
+        }
+        if (!mask_avail) {
+            // TODO: better message... whether to disable the operations?
+            imgui_StrDisabled("\nConsider selecting a valid mask first.");
+        }
+        ImGui::SeparatorText("Lock edition");
+        if (ImGui::Button("Clear lock")) {
+            return_lock({});
+        }
+        ImGui::SameLine();
+        guarded_block(contained, [&] {
+            if (ImGui::Button("Enhance lock")) {
+                return_lock(legacy::enhance_lock(subset, mold));
+            }
+        });
+        imgui_ItemTooltip("\"Saturate\" the locked groups to keep the full effect of the locks when switching to a"
+                          "\"wider\" working set. For use cases see the \"Lock and capture\" part in \"Documents\".\n"
+                          "(This is available only when the current rule belongs to the working set.)");
+        ImGui::SameLine();
+        ImGui::Checkbox("Hide locked groups", &hide_locked);
+        ImGui::SameLine();
+        imgui_StrTooltip("(?)", "Hide locked groups in the random-access section.\n"
+                                "(Only \"pure\" (light-blue) groups can be hidden.)");
+    });
+
     // Disable all edit operations if !subset.contains(mask), including those that do not really need
     // the mask to be valid (for example, `trans_reverse`, which does not actually rely on subsets).
-    if (!subset.contains(mask)) {
+    if (!mask_avail) {
         imgui_StrWrapped("This mask does not belong to the working set (in other words, the rule does not belong to "
                          "all the selected subsets). Consider trying other masks.\n\n"
                          "1. At least one of 'Zero', 'Identity' and 'Native' will work. Especially, 'Native' will "
@@ -547,10 +583,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
                          item_width);
         return std::nullopt;
     }
-
-    const bool compatible = legacy::compatible(subset, mold);
-    const bool contained = subset.contains(mold.rule);
-    assert_implies(contained, compatible);
 
 #if 0
     // (Replaced by mixed-mode.)
@@ -588,34 +620,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
 
     const legacy::partitionT& par = subset.get_par();
     const auto scanlist = legacy::scan(par, mask, mold);
-
-    // TODO: more filtering modes?
-    // Will not hide "impure" groups even when there are locks.
-    static bool hide_locked = false;
-    static bool toggle_lock = false; // Whether to toggle lock by right-click in the random-access plane.
-    // !!TODO: disable instead of hide when the mask does not fit in the working set...
-    manage_lock::display([&] {
-        ImGui::SeparatorText("Lock edition");
-        if (ImGui::Button("Clear lock")) {
-            return_lock({});
-        }
-        ImGui::SameLine();
-        guarded_block(contained, [&] {
-            if (ImGui::Button("Enhance lock")) {
-                return_lock(legacy::enhance_lock(subset, mold));
-            }
-        });
-        imgui_ItemTooltip("\"Saturate\" the locked groups to keep the full effect of the locks when switching to a"
-                          "\"wider\" working set. For use cases see the \"Lock and capture\" part in \"Documents\".\n"
-                          "(This is available only when the current rule belongs to the working set.)");
-        ImGui::SameLine();
-        ImGui::Checkbox("Hide locked groups", &hide_locked);
-        ImGui::SameLine();
-        imgui_StrTooltip("(!)", "Only \"pure\" (light-blue) groups can be hidden when there are locks.");
-        ImGui::Checkbox("Toggle lock with right-click", &toggle_lock);
-        ImGui::SameLine();
-        imgui_StrTooltip("(?)", "..."); // !!TODO
-    });
 
     static bool preview_mode = false;
     static previewer::configT config{previewer::configT::_160_160};
@@ -867,7 +871,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
                 }
                 bind_undo = true;
                 return_rule(rule);
-            } else if (toggle_lock && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+            } else if (manage_lock::enabled() && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
                 legacy::moldT::lockT lock = mold.lock;
                 for (legacy::codeT code : group) {
                     lock[code] = !has_lock;
@@ -900,8 +904,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
 
             if (show_group && ImGui::BeginTooltip()) {
                 // TODO: move elsewhere...
-                imgui_Str(toggle_lock ? "Left-click to flip the values.\nRight-click to toggle the lock."
-                                      : "Left-click to flip the values.");
+                imgui_Str(manage_lock::enabled() ? "Left-click to flip the values.\nRight-click to toggle the lock."
+                                                 : "Left-click to flip the values.");
                 ImGui::Separator();
                 ImGui::Text("Group size: %d", (int)group.size());
                 const int max_to_show = 48;

@@ -262,15 +262,17 @@ public:
         if (open) {
             ever_opened = true;
         }
+        if (ever_opened) {
+            imgui_ItemTooltip("Enabled");
+        }
     }
 
     static bool enabled() { return ever_opened; }
-    static void display(const std::invocable<> auto& append) {
+    static void display(const std::invocable<bool> auto& append) {
         if (open) {
             ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
-            if (auto window = imgui_Window("Lock & capture", &open, ImGuiWindowFlags_AlwaysAutoResize)) {
-                append();
-            }
+            auto window = imgui_Window("Lock & capture", &open, ImGuiWindowFlags_AlwaysAutoResize);
+            append(window.visible);
         }
     }
 };

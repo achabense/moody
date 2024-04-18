@@ -124,7 +124,11 @@ void frame_main() {
         load_rule(show_doc, "Documents", load_doc);
         ImGui::SameLine();
         manage_lock::checkbox();
-        manage_lock::display([] { ImGui::Checkbox("Static constraints", &show_static); });
+        manage_lock::display([](bool visible) {
+            if (visible) {
+                ImGui::Checkbox("Static constraints", &show_static);
+            }
+        });
 #ifndef NDEBUG
         ImGui::SameLine();
         imgui_Str("  (Debug mode)");
