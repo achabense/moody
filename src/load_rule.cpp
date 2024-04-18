@@ -99,6 +99,14 @@ static void display_path(const pathT& p, float avail_w) {
     }
 }
 
+static void display_filename(const pathT& p) {
+    imgui_Str(std::string("...") + char(pathT::preferred_separator) + cpp17_u8string(p.filename()));
+    imgui_ItemTooltip([&] { imgui_Str(cpp17_u8string(p)); });
+    if (imgui_ItemClickable()) {
+        ImGui::SetClipboardText(cpp17_u8string(p).c_str());
+    }
+}
+
 static pathT home_path{};
 bool set_home(const char* u8path) {
     auto try_set = [](const char* u8path) {
@@ -246,18 +254,18 @@ public:
         }
     }
 
-    // Return one of `entryT.path()` in `m_files`.
-    std::optional<pathT> display() {
-        std::optional<pathT> target = std::nullopt;
-
+    void show_current() {
         if (!m_current.empty()) {
             display_path(m_current, ImGui::GetContentRegionAvail().x);
         } else {
             assert(m_dirs.empty() && m_files.empty());
             imgui_StrDisabled("N/A");
         }
+    }
 
-        ImGui::Separator();
+    // Return one of `entryT.path()` in `m_files`.
+    std::optional<pathT> display() {
+        std::optional<pathT> target = std::nullopt;
 
         if (ImGui::BeginTable("##Table", 2, ImGuiTableFlags_Resizable)) {
             ImGui::TableNextRow();
@@ -608,7 +616,9 @@ static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
             nav.select_history();
             ImGui::EndPopup();
         }
+        nav.show_current();
 
+        ImGui::Separator();
         if (auto sel = nav.display(); sel && try_load(*sel)) {
             rewind = true;
             path = std::move(*sel);
@@ -634,7 +644,8 @@ static void load_rule_from_file(std::optional<legacy::extrT::valT>& out) {
             }
             ImGui::EndPopup();
         }
-        display_path(*path, ImGui::GetContentRegionAvail().x);
+        ImGui::SameLine();
+        display_filename(*path);
 
         ImGui::Separator();
         text.display(out, std::exchange(rewind, false));
