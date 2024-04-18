@@ -503,8 +503,8 @@ public:
                 }
 
                 if (id.has_value()) {
-                    // TODO: whether to require `manage_lock::enabled()`?
-                    const bool has_lock = m_rules[*id].lock.has_value();
+                    // Pretend there is no lock if `!manage_lock::enabled()`.
+                    const bool has_lock = manage_lock::enabled() && m_rules[*id].lock.has_value();
 
                     if (*id == m_pos) {
                         imgui_ItemRectFilled(IM_COL32(has_lock ? 196 : 0, 255, 0, 60));

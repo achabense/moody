@@ -78,7 +78,6 @@ void frame_main() {
     static bool show_file = false;
     static bool show_clipboard = false;
     static bool show_doc = false;
-    static bool take_lock = false;
     auto load_rule = [&](bool& flag, const char* title, std::optional<legacy::extrT::valT> (*load_fn)()) {
         ImGui::Checkbox(title, &flag);
         if (flag) {
@@ -87,7 +86,7 @@ void frame_main() {
             ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
             if (auto window = imgui_Window(title, &flag)) {
                 if (auto out = load_fn()) {
-                    if (take_lock) {
+                    if (manage_lock::enabled()) {
                         assert(manage_lock::enabled());
                         assign_val(current, *out);
                     } else {
@@ -104,7 +103,7 @@ void frame_main() {
         assert(manage_lock::enabled());
         ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
         if (auto window = imgui_Window("Static constraints", &show_static, ImGuiWindowFlags_AlwaysAutoResize)) {
-            if (auto out = static_constraints()) {
+            if (auto out = static_constraints()) { // TODO: bind-undo in this case?
                 current = *out;
                 update = true;
             }
@@ -125,12 +124,7 @@ void frame_main() {
         load_rule(show_doc, "Documents", load_doc);
         ImGui::SameLine();
         manage_lock::checkbox();
-        manage_lock::display([] {
-            ImGui::Checkbox("Take lock", &take_lock);
-            imgui_ItemTooltip(""); // !!TODO
-            ImGui::SameLine();
-            ImGui::Checkbox("Static constraints", &show_static);
-        });
+        manage_lock::display([] { ImGui::Checkbox("Static constraints", &show_static); });
 #ifndef NDEBUG
         ImGui::SameLine();
         imgui_Str("  (Debug mode)");
@@ -154,9 +148,7 @@ void frame_main() {
         imgui_StrTooltip(
             "(...)",
             "Below is the MAP-string for the current rule (as shown in the right plane). You can right-click the rule "
-            "to copy to the clipboard.\n"
-            "The string after the rule (enclosed in '[]') is the 'lock' for it, which is also copyable. "
-            "For more details about lock see the \"Lock and capture\" part in \"Documents\".\n\n"
+            "to copy to the clipboard.\n\n"
             "Here '<| Prev/Next |>' represents the record for the current rule. You can undo/redo the editions "
             "with it. When you click the button the left/right arrow key will be bound to 'Prev/Next'.\n"
             "(If you want to clear the record, you can right-click the 'Total:.. At:..' text, and then click 'Clear' "
@@ -182,16 +174,19 @@ void frame_main() {
             // TODO: whether to display the lock part when it is never enabled?
             static bool with_lock = false;
             if (with_lock) {
+                assert(manage_lock::enabled());
                 imgui_StrCopyable(legacy::to_MAP_str(current), imgui_Str);
                 with_lock = ImGui::IsItemHovered();
             } else {
                 imgui_StrCopyable(legacy::to_MAP_str(current.rule), imgui_Str);
-                ImGui::SameLine(0, ImGui::CalcTextSize(" ").x - 1 /* For correct alignment */);
-                std::string lock_str = "[";
-                legacy::_misc::to_MAP(lock_str, current.lock);
-                lock_str += "]";
-                imgui_StrDisabled(lock_str);
-                with_lock = ImGui::IsItemHovered();
+                if (manage_lock::enabled()) {
+                    ImGui::SameLine(0, ImGui::CalcTextSize(" ").x - 1 /* For correct alignment */);
+                    std::string lock_str = "[";
+                    legacy::_misc::to_MAP(lock_str, current.lock);
+                    lock_str += "]";
+                    imgui_StrDisabled(lock_str);
+                    with_lock = ImGui::IsItemHovered();
+                }
             }
         }
 

@@ -255,7 +255,10 @@ class manage_lock {
 public:
     // Managed by `frame_main`.
     static void checkbox() {
+        const ImVec4 col(1, 1, ever_opened ? 0.5 : 1, 1);
+        ImGui::PushStyleColor(ImGuiCol_Text, col);
         ImGui::Checkbox("Lock & capture", &manage_lock::open);
+        ImGui::PopStyleColor();
         if (open) {
             ever_opened = true;
         }
