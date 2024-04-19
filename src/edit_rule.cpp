@@ -305,14 +305,21 @@ public:
                 ImGui::Separator();
                 imgui_Str("The ring color reflects the relation between the subset and the current rule-lock pair:");
                 explain(Contained, None, nullptr, "The rule belongs to this subset.");
-                explain(Compatible, None, nullptr,
+                if (!manage_lock::enabled()) {
+                    explain(Compatible, None, nullptr, "The rule does not belong to this subset.");
+                } else {
+                    explain(
+                        Compatible, None, nullptr,
                         "The rule does not belong to this subset, but there exist rules in the subset that meet the "
                         "constraints (locked values) posed by rule-lock pair.\n"
                         "(Notice that the [intersection] of such subsets may still contain no rules that satisfy the "
                         "constraints. )");
-                explain(Incompatible, None, nullptr,
+                    explain(
+                        Incompatible, None, nullptr,
                         "The rule does not belong to this subset, and the constraints cannot be satisfied by any rule "
                         "in this subset.");
+                }
+
                 ImGui::Separator();
                 imgui_Str("The center color reflects the selection details:");
                 put_term(Compatible, None, nullptr, false);
@@ -653,31 +660,6 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
         assert(compatible == (c_locked_x == 0));
 
         guarded_block(compatible, [&] {
-            sequence::seq(
-                "<00..", "Prev", "Next", "11..>", //
-                [&] { return_rule(legacy::seq_mixed::first(subset, mask, mold)); },
-                [&] { return_rule(legacy::seq_mixed::prev(subset, mask, mold)); },
-                [&] { return_rule(legacy::seq_mixed::next(subset, mask, mold)); },
-                [&] { return_rule(legacy::seq_mixed::last(subset, mask, mold)); }, !contained);
-        });
-        ImGui::SameLine();
-        if (contained) {
-            ImGui::Text("%s:%d", !has_lock ? "Distance" : "Free dist", c_1 - c_locked_1);
-        } else {
-            ImGui::Text("%s:N/A", !has_lock ? "Distance" : "Free dist");
-        }
-        ImGui::SameLine();
-        imgui_StrTooltip("(?)",
-                         "Iterate through the whole working set, by firstly iterating through all rules that have "
-                         "distance = 1 to the masking rule, then 2, 3, ..., until max distance.\n"
-                         "Here 'Distance:...' refers to the distance from the current rule to the mask.\n\n"
-                         "For example, suppose the current rule belongs to the working set. To iterate through all "
-                         "rules that have distance = 1 to the current rule, you can:\n"
-                         "1. '<< Cur' to set the current rule as the custom mask.\n"
-                         "2. 'Next' to iterate. The left/right arrow key will be bound to 'Prev/Next' after you "
-                         "click the button.");
-
-        guarded_block(compatible, [&] {
             // `dist`: The "distance" to the masking rule the randomization want to achieve.
             // (which does not make sense when !compatible)
             static double rate = 0.5;
@@ -730,9 +712,36 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
         }
 #endif // ENABLE_BATCH_PREVIEWER
 
-        // TODO: find a better place for this...
+        guarded_block(compatible, [&] {
+            sequence::seq(
+                "<00..", "Prev", "Next", "11..>", //
+                [&] { return_rule(legacy::seq_mixed::first(subset, mask, mold)); },
+                [&] { return_rule(legacy::seq_mixed::prev(subset, mask, mold)); },
+                [&] { return_rule(legacy::seq_mixed::next(subset, mask, mold)); },
+                [&] { return_rule(legacy::seq_mixed::last(subset, mask, mold)); }, !contained);
+        });
+#if 0
+        ImGui::SameLine();
+        if (contained) {
+            ImGui::Text("%s:%d", !has_lock ? "Distance" : "Free dist", c_1 - c_locked_1);
+        } else {
+            ImGui::Text("%s:N/A", !has_lock ? "Distance" : "Free dist");
+        }
+#endif
+        ImGui::SameLine();
+        imgui_StrTooltip("(?)",
+                         "Iterate through the whole working set, by firstly iterating through all rules that have "
+                         "distance = 1 to the masking rule, then 2, 3, ..., until max distance.\n\n"
+                         // "Here 'Distance:...' refers to the distance from the current rule to the mask.\n\n"
+                         "For example, suppose the current rule belongs to the working set. To iterate through all "
+                         "rules that have distance = 1 to the current rule, you can:\n"
+                         "1. '<< Cur' to set the current rule as the custom mask.\n"
+                         "2. 'Next' to iterate. The left/right arrow key will be bound to 'Prev/Next' after you "
+                         "click the button.");
+
+        ImGui::SameLine();
         guarded_block(true /* Unconditional */, [&] {
-            if (ImGui::Button("Reverse")) {
+            if (ImGui::Button("Rev")) {
                 return_mold(legacy::trans_reverse(mold));
             }
         });
@@ -748,6 +757,9 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
                 imgui_Str("(The result will be the same as the current rule, as it is self-complementary.)");
             }
         });
+#if 0
+        // TODO: whether to expose this? This is conceptually well-defined, but very hard to explain and
+        // the effect may not be as expected.
         ImGui::SameLine();
         guarded_block(compatible, [&] {
             if (ImGui::Button("Approximate")) {
@@ -767,6 +779,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
                 imgui_Str("(The current rule already belongs to the working set.)");
             }
         });
+#endif
         ImGui::SameLine();
         ImGui::Checkbox("Preview mode", &preview_mode);
         if (preview_mode) {
@@ -785,16 +798,15 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
         } else if (compatible) {
             ImGui::Text("Groups:%d !contained", c_group);
             ImGui::SameLine();
-            imgui_StrTooltip("(?)", "The current rule does not belong to the working set.\n"
-                                    "(Check the dull-blue groups for details.)\n"
-                                    "(To enter the working set you can try any of '<00..', '11..>', 'Randomize' "
-                                    "and 'Approximate'.)");
+            imgui_StrTooltip(
+                "(?)",
+                "The current rule does not belong to the working set. (Check the dull-blue groups for details.)\n"
+                "(To get a rule in the working set you can try any of '<00..', '11..>', or 'Randomize'.)");
         } else {
             ImGui::Text("Groups:%d !compatible", c_group);
             ImGui::SameLine();
-            imgui_StrTooltip("(?)", "There don't exist rules that belong to the working set and also have the "
-                                    "same locked values as the current rule.\n"
-                                    "(Check the red groups for details.)");
+            imgui_StrTooltip("(?)", "There don't exist rules in the working set that also have the same locked "
+                                    "values as the current rule. (Check the red groups for details.)");
             // TODO: add tips for what to do in this case...
         }
     }

@@ -248,30 +248,33 @@ private:
 };
 
 // Ensure that users won't touch this feature unexpectedly.
-// !!TODO: recheck every tooltip etc that refers to lock but is outside of `display`.
+// The program will behave as if the feature doesn't exist.
 class manage_lock {
-    inline static bool open = false, ever_opened = false;
+    inline static bool m_enabled = false, m_opened = false;
 
 public:
     // Managed by `frame_main`.
     static void checkbox() {
-        const ImVec4 col(1, 1, ever_opened ? 0.5 : 1, 1);
-        ImGui::PushStyleColor(ImGuiCol_Text, col);
-        ImGui::Checkbox("Lock & capture", &manage_lock::open);
-        ImGui::PopStyleColor();
-        if (open) {
-            ever_opened = true;
-        }
-        if (ever_opened) {
-            imgui_ItemTooltip("Enabled");
+        if (!m_enabled) {
+            assert(!m_opened);
+            ImGui::BeginDisabled();
+            ImGui::Checkbox("Lock & capture", &m_opened);
+            ImGui::EndDisabled();
+            imgui_ItemTooltip("Not enabled; right-click to enable.");
+            if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) &&
+                ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+                m_enabled = true;
+            }
+        } else {
+            ImGui::Checkbox("Lock & capture", &m_opened);
         }
     }
 
-    static bool enabled() { return ever_opened; }
+    static bool enabled() { return m_enabled; }
     static void display(const std::invocable<bool> auto& append) {
-        if (open) {
+        if (m_opened) {
             ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
-            auto window = imgui_Window("Lock & capture", &open, ImGuiWindowFlags_AlwaysAutoResize);
+            auto window = imgui_Window("Lock & capture", &m_opened, ImGuiWindowFlags_AlwaysAutoResize);
             append(window.visible);
         }
     }
