@@ -690,10 +690,9 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
             }
         });
         ImGui::SameLine();
-        imgui_StrTooltip("(?)", "Generate randomized rules with intended distance to the mask.\n"
-                                "(Real distance, both in the locked and free part.)\n\n"
+        imgui_StrTooltip("(?)", "Generate randomized rules with intended distance to the mask.\n\n"
                                 "For example, if you are using the 'Zero' mask and distance = 51, 'Randomize' "
-                                "will generate rules with 51 groups having '1' (different from '0').\n"
+                                "will generate rules with 51 groups having '1'.\n"
                                 "Also, suppose the current rule belongs to the working set, you can set it to "
                                 "the custom mask, and 'Randomize' with low distance to generate rules that "
                                 "are \"close\" to it.\n\n"

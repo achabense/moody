@@ -1,8 +1,8 @@
 #### About this program
-This program is designed to help explore subsets of 2-state CA rules in range-1 Moore neighborhood (also known as MAP rules).
+This program is designed to help explore 2-state CA rules in range-1 Moore neighborhood (aka "MAP rules").
 (Link...)
 
-With this program, it's easy to test the effect of a MAP rule, tell what subsets the rule belongs to, and generate rules in the specified subsets in non-trivial ways.
+With this program, it's easy to test the effect of a MAP rule, know what subsets it belongs to, and explore rules in the specified subsets systematically.
 The supported subsets include self-complementary rules, isotropic/totalistic rules in Moore/hexagonal/Von-Neumann neighborhood, and so on. You can combine these subsets freely to explore rules in the intersections of these subsets.
 
 #### What can be saved & how to save
@@ -22,10 +22,5 @@ If you find some interesting patterns you can also select and save as RLE string
 As a starting point, it will help a lot if you are familiar with Convay's Game-of-Life rule.
 See the "Documents" part in the program to get familiar with the concepts and operations.
 
-#### How to build & Dependency
-TODO: rewrite...
-The program is written in C++20, and developed with the help of ImGui (Link) (which is carried by this project) and SDL2 (there is a zip in ...).
-The project is currently organized as a VS project. For now, to build this project, you'd have to:
-(This is a bit awkward; will improve in the future...)
-1. In `sdl` subfolder, un-zip `SDL2-devel-2.30.1-VC.zip` with the same name in the same place, so that there is `sdl\sdl-SDL2-devel-2.30.1-VC\SDL2-2.30.1\...`
-2. Then you can open the `.sln` file to build the project.
+#### Dependency & Building
+The project is organized as a CMake-project. The program is written in C++20 with the help of [ImGui](https://github.com/ocornut/imgui) and [SDL2](https://github.com/libsdl-org/SDL) library. (ImGui is carried by this project; SDL2 will be fetched automatically by CMake). From my experience, the project can be opened and built directly by Visual Studio (with CMake tools available).
