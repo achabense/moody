@@ -359,19 +359,12 @@ MAPEUQRVCLdM4gRRBFVItkziiK7IswiABEAIKsoyCIAFBxVAEQAmIiqA1UIQBGZiOoCzEWIryKZxRHJR
 MAPEUQRVCLdM4gRRBFUItkziiK7IswiABEEIasuyCIAFAZVBEQAmIiqAlUIQBGZiKoizEWIryKZxQHJRIKpIhjAEQ [/////v/////////+/////////////f/6+v/4//7v/2T/+//v/////v/++vH/7rvO//3//v//9+v9/v3+/nr/uQ]
 These things are insane, so let's stop here.)";
 
-// Must keep in sync with "load_rule.cpp".
-struct docT {
-    const char* title;
-    const char* text;
-};
-
 // TODO: the documents are currently unordered.
-extern const docT docs[]{{"0. About this program", doc_about},          //
-                         {"1. Concepts", doc_concepts},                 //
-                         {"2. Workflow", doc_workflow},                 //
-                         {"3. Typical subsets", doc_subsets},           //
-                         {"4. Lock and capture", doc_lock_and_capture}, //
-                         {"5. Rules in the wild", doc_atypical},        //
-                         {"6. Program I/O", doc_program_IO}};
-
-extern const int doc_size = sizeof(docs) / sizeof(docT);
+extern const char* const docs[][2]{{"0. About this program", doc_about},          //
+                                   {"1. Concepts", doc_concepts},                 //
+                                   {"2. Workflow", doc_workflow},                 //
+                                   {"3. Typical subsets", doc_subsets},           //
+                                   {"4. Lock and capture", doc_lock_and_capture}, //
+                                   {"5. Rules in the wild", doc_atypical},        //
+                                   {"6. Program I/O", doc_program_IO},            //
+                                   {/* null terminator */}};

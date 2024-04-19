@@ -1,7 +1,7 @@
 #include <deque>
 #include <filesystem>
 #include <fstream>
-#include <sstream>
+#include <ranges>
 
 #include "common.hpp"
 
@@ -375,13 +375,9 @@ public:
     // `str` is assumed to be utf8-encoded.
     // (If not, the rules are still likely extractable.)
     void append(std::string_view str) {
-        // (wontfix) It's not worthwhile to bother removing this copy.
-        std::istringstream is{std::string(str)};
-
-        std::string text;
-        while (std::getline(is, text)) {
-            const auto val = legacy::extract_MAP_str(text).val;
-            lineT& line = m_lines.emplace_back(std::move(text));
+        for (const auto& l : std::views::split(str, '\n')) {
+            lineT& line = m_lines.emplace_back(std::string(l.data(), l.size()));
+            const auto val = legacy::extract_MAP_str(l).val;
             if (val.has_value()) {
                 m_rules.push_back(*val);
                 line.id = m_rules.size() - 1;
@@ -680,24 +676,19 @@ static void load_rule_from_clipboard(std::optional<legacy::extrT::valT>& out) {
     text.display(out, std::exchange(rewind, false));
 }
 
-// Must keep in sync with "docs.cpp".
-struct docT {
-    const char* title;
-    const char* text;
-};
-
-extern const docT docs[];
-extern const int doc_size;
+// Defined in "docs.cpp". [0]:title [1]:contents, null-terminated.
+extern const char* const docs[][2];
 
 static void load_rule_from_memory(std::optional<legacy::extrT::valT>& out) {
     static textT text;
     static bool rewind = false;
     static std::optional<int> doc_id = std::nullopt;
     static auto select = []() {
-        for (int i = 0; i < doc_size; ++i) {
-            if (ImGui::Selectable(docs[i].title, doc_id == i, ImGuiSelectableFlags_DontClosePopups) && doc_id != i) {
+        for (int i = 0; docs[i][0] != nullptr; ++i) {
+            const auto [title, contents] = docs[i];
+            if (ImGui::Selectable(title, doc_id == i, ImGuiSelectableFlags_DontClosePopups) && doc_id != i) {
                 text.clear();
-                text.append(docs[i].text);
+                text.append(contents);
                 rewind = true;
                 doc_id = i;
             }
@@ -715,7 +706,7 @@ static void load_rule_from_memory(std::optional<legacy::extrT::valT>& out) {
             ImGui::EndPopup();
         }
         ImGui::SameLine();
-        imgui_Str(docs[*doc_id].title);
+        imgui_Str(docs[*doc_id][0]);
 
         ImGui::Separator();
         text.display(out, std::exchange(rewind, false));
