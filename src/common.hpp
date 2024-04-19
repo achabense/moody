@@ -260,8 +260,9 @@ public:
             ImGui::BeginDisabled();
             ImGui::Checkbox("Lock & capture", &m_opened);
             ImGui::EndDisabled();
-            imgui_ItemTooltip("Not enabled; right-click to enable.");
-            if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) &&
+            // TODO: more explanations...
+            imgui_ItemTooltip("Not enabled; double-click to enable.");
+            if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
                 ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
                 m_enabled = true;
             }
