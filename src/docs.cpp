@@ -169,47 +169,70 @@ MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAA
 ...)";
 
 const char* const doc_subsets =
-    R"(The following rules are examples from certain subsets. They may or may not be representative of the subsets they belong to. You can click the "Recognize" button to select the subsets they belong to.
-The best way to get familiar with a subset is to generate randomized rules in it. ... (relation between the subsets)
+    R"(The following rules are selected from different subsets. You can click the 'Recognize' button to select the subsets they belong to.
+The best way to get familiar with a subset is to generate randomized rules in it. As to the relation between the subsets, .............
+
 
 --- None
+This is typically what you will get in default density (without any constraints):
 MAPYaxTu9YJm9UZsagD9KrzcclQXH5nLwLTGALPMYhZeR6QeYRX6y7WoAw4DDpCQnTjY7k71qW7iQtvjMBxLGNBBg
-This is typically what you will get in default density (without any constraints).
 
 MAPBRAACkiAAUiATAhmCQkIEYMBgCBDCBFHUqQgJUQAAEAiAAmANgIkRAAISUA0ADgAAZAQAmAMFTCJgAAAYEYEgA
 
 It's possible to get non-trivial rules that do not belong to any well-defined subsets. See "Rules in the wild" part for details.
 
+
 --- Native symmetry
-
-Isotropic:
-MAPEkAFDAgARAAAgXxAAgGAAAAASAAAAAASgAlAAAUEACIAEG6AgQEIAAACzIAQFoAAgAUIAEEEADABUoAAGkgAAQ
-
-\:
-MAPEUQRQDEGwsYQQAlGgBgAFAjB8AEAARBIEmARoA4aKABABHPAkqgQ5BwAAcQAABIQoGAwZQsCgBgggBAIgeYiCQ
+...............
 
 
-| & -:
+Isotropic ('All'):
+MAPgAAFBAAABAAAAVxABgEAAAAAAAAAAAASBAlAAAUEACIAFE4AAQEIABIKzIBQFoAABAUIAEEEADABUoAAGkgAAQ
+MAPBAwgkEQAgsh8AQAAgQcAgEgAsgAAEgAAQQcggAMsBAJugQAAARUAgMiQAAKCXhABCREgBBVkgBATWgABWkgBBA
+
+Notice that even isotropic rules can easily be completely chaotic:
+MAPpYmhj8ES1QVpVzN8kX6+ZskXyU4XX1xeA2ZdWnr59y9pgzP2H35uPIRwF+8qaP36EXpPvzzrWnX66P6G6DOUkg
+
+
+
+'-' ('|' is essentially the same as '-'):
+MAPQCAkAAAAABCJAAgABFACAgCCoAABIQAAAAAGBAJABIFACEADAAIAAgAAlBVDABAAACEQCBQIQEhAAgEMJCAAEQ
+MAPIKAkAIAAABAJAAgABFACAoCCoAABIQAAAAAGBAJABIFACEADAAIAAgAAlBVDABAAACEQCBQIQEhAAgEMJCAAEQ
+
+
+'\' ('/' is essentially the same as '\'):
+MAPEUwRQHEGwsIwQQlGQBgAFETB8AEAARBIEmABoA4aKABgjHPAk6gQ5DwAAcQAABKQoGAyZQsCgBggwBAIieYiCQ
+MAPQAjggAIIgAAgAAAACQAAAAAAgAAggAAAKIQAAAAAAAAAAAIAAiEgAAgACIAICAEgACAAggAARAAKkAAEAABAAA
+
+
+'| & -':
 MAPIAJIChAAUMgAELFhAQCBgIAASWAABCgAAEZCAIIQhAAAAaOBAgApgAAQAAICIRAAAJAYhBwCAAAACWhIQQRIAA
+MAP7AKSABAAABLAAwAAAQBgSKACABgQIEISEhCAIKkEAKCIAQAoEQAASIAAAAAAEgAAEuGAAAIEIKAASgAAWAEAAA
 
-\ & /:
-MAPAhghuAgQgyQsgCBAwliAAA0RiCAAAOCQgggQwAQABABBCEUgFAgeESlGQEIUAACBAEQCUKCIkWBkAMCRIAABRA
 
-Notice that both (| & -) and (\ & /) belong to the C2 subset (which is NOT true reversely - a rule that belongs to C2 may not belong to any of |, -, \ or /)
+'\ & /':
+MAPAhghuAgQgywsgCBAwliAgA0RiiAAAOCQgggwwAQABABBCEUgFAgeESlGQEIUAACBAEQCUKCIkWBkAMCRIAABRA
+MAPAhEkiDkAgEICmmcMDTWcNgDDmAcEHBZKjUUNInwAZqgRQggGZxAAtAJqmisCKGlJQJIlOJh5EFlCyBoFohglFA
 
-C2: (Temp from rul32.txt)
+Both '| & -' and '\ & /' belong to the 'C2' subset (which is NOT true reversely - a rule that belongs to 'C2' may not belong to any of '|, -, \ or /').
+
+
+'C2':
+Notice how "sparse" this rule is:
 MAP2AAAAQAAAQCAAAAQAAAAAAAAAAAAAAAAAAAAQAAAAACAAAAAAAACAAAAAAAAAAAAgAAAAAAACAAAAACAAACAAA
-Notice how "sparse" this rule is...
+MAPAjaoGRYMbAUJCY78PLH9F3RZ5I6GChkQ1aZIFMMgJBp3BiKINUAIUWLoKJrChCqIYsgRKaAJj3pKQhA4KBiQyA
 
-C4:
-C4 is a strict subset of C2 (so every C4 rule will belong to C2). In C4...
-MAPAkMwkQDI20gEBSC4AtgYpzNEmgABABwookggwMACAA0FEhCAo8gCgEwAACAoAAALMADhuUAYmQFgYBCRiACRHg
-It's highly likely that there are "more interesting" rules close to it. This is a very important technique as described in TODO...
-MAPAkMwkQDI20gEBSS4AtAYpzNEmgABABwookggwMACAA0FEhSAo8gCgEwASCAoAAALIADhuUAYmQFgYBCRiACRHg
 
+'C4':
+'C4' is a strict subset of 'C2'. In 'C4', oftentimes (for example, by getting randomized rules) you will find interesting die-patterns:
+MAPAkMwkQDI20gEBSC4F/gYtzNEmgAVCB0ookwgwMEGAA0FExCAo8gCgFw4ACAqEgALNCnhuUQcmQlgahCx2ACRHg
+It's highly likely there are oscillators or spaceships close to it. (The following rule has huge shaceships.)
+MAPAkMwkwDo20gEBSC4F/gItzNkmkA1iBkookwgwMEGgA0FExCAo8gigFw4AAAqEgALNCnhsUQcmQlgahCx2ACRHg
+
+/////////////////////////////////////////////
 (Outer-) Totalistic:
-MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA
 Aah! The Game-of-Life rule.
+MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA
 
 --- The self-complementary rule
 (...)
@@ -222,6 +245,7 @@ Well, that's not many! I'd recommend trying all the rules in this set.
 
 Isotropic:
 MAPzAAzzAAzzMzMADPMADPMzAAz/wAz/wAzADP/ADP/ADPMADPMADPMzMwAM8wAM8zMADP/ADP/ADMAM/8AM/8AMw
+MAPAAD/zAAzzP8AAP/MADPM/wAz/zMz/zP/ADP/MzP/M/8AAP/MADPM/wAA/8wAM8z/ADP/MzP/M/8AM/8zM/8z/w
 
 --- Hexagonal neighborhood
 
@@ -360,11 +384,11 @@ MAPEUQRVCLdM4gRRBFUItkziiK7IswiABEEIasuyCIAFAZVBEQAmIiqAlUIQBGZiKoizEWIryKZxQHJR
 These things are insane, so let's stop here.)";
 
 // TODO: the documents are currently unordered.
-extern const char* const docs[][2]{{"0. About this program", doc_about},          //
-                                   {"1. Concepts", doc_concepts},                 //
-                                   {"2. Workflow", doc_workflow},                 //
-                                   {"3. Typical subsets", doc_subsets},           //
-                                   {"4. Lock and capture", doc_lock_and_capture}, //
-                                   {"5. Rules in the wild", doc_atypical},        //
-                                   {"6. Program I/O", doc_program_IO},            //
+extern const char* const docs[][2]{{"About this program", doc_about},
+                                   {"Concepts", doc_concepts},
+                                   {"Workflow", doc_workflow},
+                                   {"Rules in different subsets", doc_subsets},
+                                   {"Lock and capture", doc_lock_and_capture},
+                                   {"Rules in the wild", doc_atypical},
+                                   {"Program I/O", doc_program_IO},
                                    {/* null terminator */}};
