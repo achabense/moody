@@ -526,9 +526,11 @@ public:
             if (active && hovered && (l_down || (paste && r_down))) {
                 // Some logics rely on this to be done before rendering.
                 const ImGuiIO& io = ImGui::GetIO();
-                if (!r_down && io.KeyCtrl && screen_zoom == 1) {
-                    // (This does not need `mark_written`.)
-                    m_torus.rotate(io.MouseDelta.x, io.MouseDelta.y);
+                if (!r_down && io.KeyCtrl) {
+                    if (screen_zoom == 1) {
+                        // (This does not need `mark_written`.)
+                        m_torus.rotate(io.MouseDelta.x, io.MouseDelta.y);
+                    }
                 } else if (!lock_mouse) {
                     screen_off += io.MouseDelta;
                 }

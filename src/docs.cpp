@@ -23,7 +23,7 @@ As a consequence, there are:
 
 (When there are k groups in P, there are 2^k rules in S.)
 
->> 1. For any two (??any two??) rules that belong to the same subset S = (M, P), in each group in P, the two rules must have either all the same or all the different values, just like them to M. In this sense, it does not matter which rule serves as M in S.
+>> 1. For any two (??any two??) rules that belong to the same subset S = (M, P), in each group in P, the values of two rules must be either all-the-same or all-the-different from each other, just like them to M. In this sense, it does not matter which rule serves as M in S.
 
 >> 2. As a result, it's also natural to define the "distance" between the two rules (in S) as the number of groups where they have different values.
 To ease the air, here are some rules that all have distance = 1 (in the isotropic set) to the Game-of-Life rule:
@@ -46,30 +46,33 @@ The program decide to make M immutable and designate an "active" mask that do th
 (The active mask)
 In most situations at least one of 'Zero' or 'Identity' will work, that's actually because the supported subsets are either defined based on 'Zero' or 'Identity' mask. There do exist situations where neither works, ...
 
-
 With the above background, it will be much clearer to explain what happens in the program:
 0. For the selected subsets, the program calculates their intersection (with the whole MAP set) as the working set W = (M, P).
 1. Then you need to decide a working mask M' to actively measure the rules. To allow for further editions, M' must belong to W.
-M is exposed as 'Native', so that there is at least a viable rule in the set.
+W.M is immutable but is exposed as 'Native', so that there is at least a viable rule in the set.
 2. The current rule C is XOR-masked by the M', into a sequence of 0/1. The rule belongs to the working set (in other words, every selected subset) iff, the masked values has ......
-3. '<00.. Prev/Next 11..>' generates new rules based on the relation of C and M'. The effect is: ...........
+3. '<00.. Prev/Next 11..>' generates new rules based on the relation of C and M'. The effects are:
+'<00..' sets the current rule to......
+By 'Next'......
 4. 'Randomize' generates randomized rules in W with specified distance to M'.
 5. The random-access section displays the masked values...
 By left-clicking the button you get a rule with each value in the group flipped. As a result, if the current rule C already belongs to W, the result will still belong to W. Otherwise, the operation essentially defines (C, W.P).
 ... The design is intentional...
 
-If the working set is small enough (if it has only a few groups), the most direct way to explore the set is simply to check every rule in it.
-For example, try selecting 'S.c.' and 'Tot(+s)' (self-complementary and inner-totalistic rules). In this case, both 'Zero' and 'Identity' do not work. ...
-There are only 5 groups, which means there are only 2^5 = 32 rules in the set, so it's fairly reasonable to check all of them. By clicking '<00..' you start from M', which happens to be..........
+If the working set is small enough (it has only a few groups), the most direct way to explore the set is simply to check every rule in it.
+
+For example, try selecting both 'S.c.' and 'Tot(+s)' (the self-complementary and inner-totalistic rules). In this case, both 'Zero' and 'Identity' do not work, so you may need to select the 'Native' mask.
+There are only 5 groups ~ 2^5=32 rules in the set, so it's fairly reasonable to check all of them. By clicking '<00..' you start from M', which happens to be the "voting" rule (for reference, see: https://conwaylife.com/wiki/OCA:Vote).
 MAPAAAAAQABARcAAQEXARcXfwABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf3//f////w
 
+If the working set is large, then it becomes infeasible to test all rules. Typically, we can:
+1. Try randomized rules. (If the W.P has k groups, then the more close the specified distance is to k/2, the more likely that the result will be unrelated to the masking rule.)
+2. If there are rules (the current rule) in the set known to be special/promising, we can check rules that are close to it.
+2.1. We can set the mask to the current rule ('<< Cur'), then try 'Randomize' with a small distance, or we can also do 'Prev/Next' - the whole-set traversal starts with the rules that are closest to the masking rule, meaning that ...
+2.2. By turning on the 'Preview mode' for the random-access section, we can test rules that...
 
-If the working set is large, then it becomes ...
-Typically, we can:
-1. If there are no existing rules, we select a mask M' to get randomized rules.
-2. If there are rules in the set known to be special/promising, we can check rules that are ..
-2.1. You can do '<< Cur' to set M' as C, then do ......
-2.2. The random-access section has a 'Preview mode' ??? by turning it on, ...
+Sometimes we may also want to jump outside of the predefined subsets. This can be... See the "Rules in the wild" section for more info.
+
 
 )";
 
@@ -363,8 +366,16 @@ x = 7, y = 14, rule = MAPARYBFxZoF34WaBd+aIF+6RZoF35ogX7paIF+6YEX6ZcWaBd+aIF+6Wi
 3bo3b$2b3o2b$b5ob$ob3obo$2b3o2b$2b3o2b$ob3obo$ob3obo$b5ob$b
 5ob$3bo3b$7b$2b3o2b$2bobo2b!
 
-... more details about pasting...)";
+... more details about pasting...
 
+
+......
+About links....
+
+)";
+
+// TODO: finish...
+#if 0
 const char* const doc_lock_and_capture = R"(...
 
 About how the lock is set for plain rules when reading from these documents...
@@ -417,6 +428,7 @@ MAPARcTZhYBPMgVYRCgAAAAyXBAUsEIYIgCQIrwgIQCgQQCIAIUaEDikAmBGICCQJgBSYGugNgDKACJE
 ---- Static constraints
 This is a feature similar to "Capture" to help find still-life based patterns...
 )";
+#endif
 
 const char* const doc_atypical =
     R"(Typically you will explore rules that belong to several of the "well-defined" subsets. These subsets, however, take up just a small part of all MAP rules. With the help of "lock" feature it's possible to generate very strange rules that do not belong to any well-defined subsets.
@@ -454,7 +466,7 @@ extern const char* const docs[][2]{{"About this program", doc_about},
                                    // {"Concepts", doc_concepts},
                                    // {"Workflow", doc_workflow},
                                    {"Rules in different subsets", doc_subsets},
-                                   {"Lock and capture", doc_lock_and_capture},
+                                   {"Lock and capture", /*doc_lock_and_capture*/ "This section is not finished yet :("},
                                    {"Rules in the wild", doc_atypical},
                                    {"Program I/O", doc_program_IO},
                                    {/* null terminator */}};

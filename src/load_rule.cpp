@@ -272,23 +272,30 @@ public:
             ImGui::TableNextColumn();
             {
                 ImGui::SetNextItemWidth(std::min(ImGui::CalcItemWidth(), (float)item_width));
-                ImGui::InputTextWithHint("##Path", "Folder or file path", buf_path, std::size(buf_path));
+                const bool enter = ImGui::InputTextWithHint("##Path", "Folder or file path", buf_path,
+                                                            std::size(buf_path), ImGuiInputTextFlags_EnterReturnsTrue);
                 ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                if (ImGui::Button("Open") && buf_path[0] != '\0') {
-                    std::error_code ec{};
-                    const pathT p = m_current / cpp17_u8path(buf_path);
-                    if (std::filesystem::is_directory(p, ec)) {
-                        set_current(p);
-                    } else if (std::filesystem::is_regular_file(p, ec) && set_current(p.parent_path())) {
-                        // (wontfix) Inefficient, but there are a lot of uncertainties about `entryT.path()`.
-                        // (Are there better ways to find such an entry? Is `entryT.path()` canonical?
-                        // Does `target = canonical(p)` or `target = entryT(p).path()` work?)
-                        for (const entryT& entry : m_files) {
-                            if (std::filesystem::equivalent(entry.path(), p, ec)) {
-                                target = entry.path();
-                                break;
+                if ((ImGui::Button("Open") || enter) && buf_path[0] != '\0') {
+                    const bool succ = [&]() -> bool {
+                        std::error_code ec{};
+                        const pathT p = m_current / cpp17_u8path(buf_path);
+                        if (std::filesystem::is_directory(p, ec)) {
+                            return set_current(p);
+                        } else if (std::filesystem::is_regular_file(p, ec) && set_current(p.parent_path())) {
+                            // (wontfix) Inefficient, but there are a lot of uncertainties about `entryT.path()`.
+                            // (Are there better ways to find such an entry? Is `entryT.path()` canonical?
+                            // Does `target = canonical(p)` or `target = entryT(p).path()` work?)
+                            for (const entryT& entry : m_files) {
+                                if (std::filesystem::equivalent(entry.path(), p, ec)) {
+                                    target = entry.path();
+                                    return true;
+                                }
                             }
                         }
+                        return false;
+                    }();
+                    if (!succ) {
+                        messenger::add_msg("Cannot open path:\n{}", buf_path);
                     }
 
                     buf_path[0] = '\0';

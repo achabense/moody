@@ -154,15 +154,16 @@ public:
             "q", &ignore_q,
             "Independent of 'q'. That is, for any two cases where only 'q' is different, the mapped "
             "values are the same. So the rules will work as if the neighborhood does not include 'q'.\n"
-            "'w/e/a/d/z/x/c' are all similar. ('q/w/e/a/s/d/z/x/c' are named after the keys in 'qwerty' keyboard.)");
+            "The same applies to 'w/e/a/d/z/x/c'.\n\n"
+            "('q/w/e/a/s/d/z/x/c' are named after the keys in 'qwerty' keyboard.)");
         terms_ignore.emplace_back("w", &ignore_w, "See 'q' for details.");
         terms_ignore.emplace_back("e", &ignore_e, "See 'q' for details.");
         terms_ignore.emplace_back("a", &ignore_a, "See 'q' for details.");
         terms_ignore.emplace_back(
             "s", &ignore_s_z,
             "For any two cases where only 's' is different, the mapped values are the same. So when 'q/w/e/a/d/z/x/c' "
-            "are the same, there must be: either s:0->1, s:1->1 or s:0->0, s:1->0.\n"
-            "(This cannot easily be interpreted as \"independent of\" 's'.)");
+            "are the same, there must be: either s:0->1, s:1->1 or s:0->0, s:1->0.\n\n"
+            "(This is defined in the same way as 'q', but it's strange to treat this as \"independent of 's'\".)");
         terms_ignore.emplace_back("d", &ignore_d, "See 'q' for details.");
         terms_ignore.emplace_back("z", &ignore_z, "See 'q' for details.");
         terms_ignore.emplace_back("x", &ignore_x, "See 'q' for details.");
@@ -174,12 +175,12 @@ public:
         terms_misc.emplace_back(
             "Hex", &ignore_hex,
             "Rules that emulate the hexagonal rules (by ignoring 'e/z'). In this program the emulation support for "
-            "hexagonal rules are all based on ignoring 'e/z' instead of 'q/c'.\n"
-            "Try the last line for symmetric hexagonal rules (remember to unselect native-symmetry terms).");
+            "hexagonal rules are all based on ignoring 'e/z' instead of 'q/c'.\n\n"
+            "(Try the last line for symmetric hexagonal rules (remember to unselect native-symmetry terms).)");
         terms_misc.emplace_back(
             "Von", &ignore_von,
-            "Rules in the Von-Neumann neighborhood. (The rules that are independent of 'q/e/z/c'.)\n"
-            "For symmetric Von-Neumann rules you can directly combine this with native-symmetry terms.");
+            "Rules in the Von-Neumann neighborhood. (The rules that are independent of 'q/e/z/c'.)\n\n"
+            "(For symmetric Von-Neumann rules you can directly combine this with native-symmetry terms.)");
         terms_misc.emplace_back("S.c.", &self_complementary, "Self-complementary rules.");
 
         terms_native.emplace_back("All", &native_isotropic,
