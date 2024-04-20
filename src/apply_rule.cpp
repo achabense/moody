@@ -849,7 +849,7 @@ void previewer::configT::_set() {
     ImGui::Separator();
 
     ImGui::SetNextItemWidth(item_width);
-    imgui_StepSliderInt("Pace (1~6)", &pace, 1, 6);
+    imgui_StepSliderInt("Pace (1~10)", &pace, 1, 10);
     imgui_Str("Gap time = 0ms, anti-strobing = true");
 }
 

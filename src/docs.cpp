@@ -16,29 +16,27 @@ const char* const doc_workings =
 In this program, a MAP rule is located by a series of subsets. These subsets are uniformly composable in the form of:
 S = (M, P) (if not empty), where:
 1. M is a MAP rule specified to belong to S, and P is a partition of all cases.
-2. A rule R belongs to S iff in each group in P, the values of the rule are either all the same or all the different than those in M.
+2. A rule R belongs to S iff in each group in P, the values of the rule are either all-the-same or all-the-different from those in M.
 '2.' can also be defined in terms of XOR operations ~ (R ^ M) has either all 0 or all 1 in each group in P.
 
 As a consequence, there are:
 
-(When there are k groups in P, there are 2^k rules in S.)
+>> Suppose there are k groups in P, then there are 2^k rules in S.
 
->> 1. For any two (??any two??) rules that belong to the same subset S = (M, P), in each group in P, the values of two rules must be either all-the-same or all-the-different from each other, just like them to M. In this sense, it does not matter which rule serves as M in S.
+>> For any two rules that belong to the same subset S = (M, P), in each group in P, the values of the two rules must be either all-the-same or all-the-different from each other, just like them to M. In this sense, it does not matter which rule serves as M in S.
 
->> 2. As a result, it's also natural to define the "distance" between the two rules (in S) as the number of groups where they have different values.
-To ease the air, here are some rules that all have distance = 1 (in the isotropic set) to the Game-of-Life rule:
+>> It's natural to define the "distance" between the two rules (in S) as the number of groups where they have different values.
+For example, here are some rules that all have distance = 1 (in the isotropic set) to the Game-of-Life rule:
 MAPARYXbhZofOgWaH7oaIDogBZofuhogOiAaIDoAIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAAACAAIAAAAAAAA
 MAPARYXfhZofugWan7oaIDogBZofuhogOiAaIDogIgAgAAWaH7oeIDogGiA6ICAAIAAaMDogIAAgACAAIAAAAAAAA
 MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6YSAAIQAaIDogIAAgACAAIQAAAAAAA
 In this program it's fairly easy to find such rules.
 
->> 3. If a rule R belongs to S = (M, P), by flipping all values in a group of R, you will always get another rule in S. Conversely, if R does not belong to S, then by flipping the values you essentially get rules in S' = (R, S.P). More generally, from any rule in S, by flipping all values in some groups, you are able to get to any rule in the set.
+>> If a rule R belongs to S = (M, P), by flipping all values in a group of R, you will always get another rule in S. Conversely, if R does not belong to S, then by flipping the values you essentially get rules in S' = (R, S.P). More generally, from any rule in S, by flipping all values in some groups, you are able to get to any rule in the set.
+-->...
 
->> Finally, it can be proven that, the intersection of such subsets are of the same structure. That is, S1 & S2 -> (R', P') (if not empty), where R' is an arbitrary rule that belongs to both S1 and S2, and P' is ...
-Therefore, the above conclusions apply to any combinations of these sets.
-And obviously the whole MAP ruleset can be defined this way ..........
-
-As a result, the program provides the ability to select the subsets freely (as long as the result is not empty) - the program will calculate the intersection of the selected subsets (), and ...
+>> Obviously the whole MAP ruleset can be defined this way. And finally, it can be proven that, the intersection of such subsets are of the same structure. That is, S1 & S2 -> (R', P') (if not empty).
+Therefore, the above conclusions apply to any combinations of these sets. As a result, the program provides the ability to select the subsets freely (as long as the result is not empty) - the program will calculate the intersection of the selected subsets (with the whole MAP set), and ...
 The working set, and the active mask (directly called "mask" in the program...)
 
 The program decide to make M immutable and designate an "active" mask that do the real observation...
@@ -51,7 +49,7 @@ With the above background, it will be much clearer to explain what happens in th
 1. Then you need to decide a working mask M' to actively measure the rules. To allow for further editions, M' must belong to W.
 W.M is immutable but is exposed as 'Native', so that there is at least a viable rule in the set.
 2. The current rule C is XOR-masked by the M', into a sequence of 0/1. The rule belongs to the working set (in other words, every selected subset) iff, the masked values has ......
-3. '<00.. Prev/Next 11..>' generates new rules based on the relation of C and M'. The effects are:
+3. '<00.. Prev/Next 11..>' generates new rules based on the relation of C and M', in such a way that:
 '<00..' sets the current rule to......
 By 'Next'......
 4. 'Randomize' generates randomized rules in W with specified distance to M'.
@@ -250,7 +248,7 @@ MAPBRAACkiAAUiATAhmCQkIEYMBgCBDCBFHUqQgJUQAAEAiAAmANgIkRAAISUA0ADgAAZAQAmAMFTCJg
 It's possible to get non-trivial rules that do not belong to any well-defined subsets. See "Rules in the wild" part for details.
 
 
---- Native symmetry
+--- Rules with native symmetry
 ...............
 
 
@@ -297,17 +295,21 @@ MAPAkMwkQDI20gEBSC4F/gYtzNEmgAVCB0ookwgwMEGAA0FExCAo8gCgFw4ACAqEgALNCnhuUQcmQlga
 It's highly likely there are oscillators or spaceships close to it. (The following rule has huge shaceships.)
 MAPAkMwkwDo20gEBSC4F/gItzNkmkA1iBkookwgwMEGgA0FExCAo8gigFw4AAAqEgALNCnhsUQcmQlgahCx2ACRHg
 
+
+--- Rules with state symmetry (the self-complementary rules)
+('S.c.' ...)
+Spaceships and oscillators do exists ... (found using the 'Lock & Capture' feature in this program)...
+MAPARcTZhegPEwRdxPuFCBIzyBmF8A8+4g3RMD7A+03nz8DBhNIPyD83RPuIMP8F5n7DO3714g3EXfNw/oXmTcXfw
+
+MAPgAAAAQABARcAAQEXARcXfwABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf3//f////g
+
+
 /////////////////////////////////////////////
 (Outer-) Totalistic:
 Aah! The Game-of-Life rule.
 MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA
 
---- The self-complementary rule
-(...)
-MAPgAAAAQABARcAAQEXARcXfwABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf3//f////g
 
-Well, that's not many! I'd recommend trying all the rules in this set.
-(...)
 
 --- Native symmetry, but in Von-Neumann neighborhood
 

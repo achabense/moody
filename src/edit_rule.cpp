@@ -479,13 +479,13 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
             {"Zero",
              "The all-zero rule.\n"
              "The masked values show actual values (different:'1' ~ 1, same:'0' ~ 0), and the distance "
-             "to this rule shows how many groups returns 1.",
+             "to this rule shows how many groups return 1.",
              '0', '1'},
 
             {"Identity",
              "The rule that preserves the value of the center cell in all situations.\n"
              "The masked values show whether the cell will \"flip\" (different:'f' ~ flip, same:'.' ~ won't flip), "
-             "and the distance to this rule shows how \"volatile\" a rule is.",
+             "and the distance to this rule reflects how \"volatile\" a rule is.",
              '.', 'f'},
 
             {"Native",
@@ -680,8 +680,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
                 assert(round(rate * c_free) == free_dist);
             }
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-            // TODO: Enter-binding is not appropriate when there are many windows.
-            if (button_with_shortcut("Randomize", ImGuiKey_Enter)) {
+            if (ImGui::Button("Randomize")) {
                 bind_undo = true;
                 if (exact_mode) {
                     return_rule(legacy::randomize_c(subset, mask, mold, global_mt19937(), free_dist));
@@ -697,8 +696,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
                                 "Also, suppose the current rule belongs to the working set, you can set it to "
                                 "the custom mask, and 'Randomize' with low distance to generate rules that "
                                 "are \"close\" to it.\n\n"
-                                "For convenience, this is always bound to the 'Enter' key; if you do 'Randomize' "
-                                "the left/right arrow key will also be automatically bound to undo/redo.");
+                                "For convenience, if you do 'Randomize', the left/right arrow key will be "
+                                "automatically bound to undo/redo.");
 
 #ifdef ENABLE_BATCH_PREVIEWER
         ImGui::SameLine();
