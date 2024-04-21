@@ -6,7 +6,7 @@
 
 #define assert_implies(a, b) assert(!(a) || (b))
 
-namespace legacy {
+namespace aniso {
     // TODO: defining `maskT` to emphasis which rule serves as the mask; it might be more
     // convenient to use `ruleT` directly.
 
@@ -914,4 +914,4 @@ namespace legacy {
     }  // namespace _tests
 #endif // ENABLE_TESTS
 
-} //  namespace legacy
+} //  namespace aniso

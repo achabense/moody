@@ -40,13 +40,13 @@ bool set_home(const char* u8path = nullptr); // nullptr ~ filesystem::current_pa
 void frame_main();
 
 // Managed by `frame_main`.
-std::optional<legacy::extrT::valT> load_file();
-std::optional<legacy::extrT::valT> load_clipboard();
-std::optional<legacy::extrT::valT> load_doc();
+std::optional<aniso::extrT::valT> load_file();
+std::optional<aniso::extrT::valT> load_clipboard();
+std::optional<aniso::extrT::valT> load_doc();
 // (`bind_undo` is a workaround to allow for binding to undo/redo for certain operations.)
-std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_undo);
-std::optional<legacy::moldT> static_constraints();
-std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule);
+std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo);
+std::optional<aniso::moldT> static_constraints();
+std::optional<aniso::moldT::lockT> apply_rule(const aniso::ruleT& rule);
 
 // Returns a texture with width/height exactly = w/h, for the (cell) data represented by `getline`.
 // There must be: getline(0...h-1) -> bool[w].
@@ -54,9 +54,9 @@ std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule);
 [[nodiscard]] ImTextureID make_screen(int w, int h, std::function<const bool*(int)> getline);
 
 // ImGui::Image and ImGui::ImageButton for `codeT`.
-void code_image(legacy::codeT code, int zoom, const ImVec4& tint_col = ImVec4(1, 1, 1, 1),
+void code_image(aniso::codeT code, int zoom, const ImVec4& tint_col = ImVec4(1, 1, 1, 1),
                 const ImVec4& border_col = ImVec4(0, 0, 0, 0));
-bool code_button(legacy::codeT code, int zoom, const ImVec4& bg_col = ImVec4(0, 0, 0, 0),
+bool code_button(aniso::codeT code, int zoom, const ImVec4& bg_col = ImVec4(0, 0, 0, 0),
                  const ImVec4& tint_col = ImVec4(1, 1, 1, 1));
 
 inline const int item_width = 220;
@@ -228,7 +228,7 @@ public:
         }
     };
 
-    static void preview(uint32_t id, const configT& config, const legacy::ruleT& rule, bool interactive = true) {
+    static void preview(uint32_t id, const configT& config, const aniso::ruleT& rule, bool interactive = true) {
         ImGui::Dummy(ImVec2(config.width(), config.height()));
         if (ImGui::IsItemVisible()) {
             _preview((uint64_t(ImGui::GetID("")) << 32) | id, config, rule, interactive);
@@ -244,7 +244,7 @@ public:
     }
 
 private:
-    static void _preview(uint64_t id, const configT& config, const legacy::ruleT& rule, bool interactive);
+    static void _preview(uint64_t id, const configT& config, const aniso::ruleT& rule, bool interactive);
 };
 
 // Ensure that users won't touch this feature unexpectedly.

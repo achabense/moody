@@ -5,7 +5,7 @@
 
 #include "rule.hpp"
 
-namespace legacy {
+namespace aniso {
     // Building block for torus space etc.
     class tileT {
     public:
@@ -545,4 +545,4 @@ namespace legacy {
     }  // namespace _tests
 #endif // ENABLE_TESTS
 
-} // namespace legacy
+} // namespace aniso

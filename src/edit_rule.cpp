@@ -7,7 +7,7 @@
 #define ENABLE_BATCH_PREVIEWER
 #endif // !NDEBUG
 
-namespace legacy {
+namespace aniso {
     namespace _subsets {
         static const subsetT ignore_q = make_subset({mp_ignore_q});
         static const subsetT ignore_w = make_subset({mp_ignore_w});
@@ -97,16 +97,16 @@ namespace legacy {
     }
 #endif // ENABLE_TESTS
 
-} // namespace legacy
+} // namespace aniso
 
 // `subsetT` (and `mapperT` pair) are highly customizable. However, for sanity there is no plan to
 // support user-defined subsets in the gui part.
 class subset_selector {
-    legacy::subsetT current;
+    aniso::subsetT current;
 
     struct termT {
         const char* const title;
-        const legacy::subsetT* const set;
+        const aniso::subsetT* const set;
         const char* const description;
         bool selected = false;
         bool disabled = false; // current & set -> empty.
@@ -129,7 +129,7 @@ class subset_selector {
     }
 
     void update_current() {
-        current = legacy::subsetT::universal();
+        current = aniso::subsetT::universal();
 
         for_each_term([&](termT& t) {
             assert_implies(t.disabled, !t.selected);
@@ -141,13 +141,13 @@ class subset_selector {
         assert(!current.empty());
 
         for_each_term([&](termT& t) { //
-            t.disabled = !legacy::subsetT::common_rule(*t.set, current);
+            t.disabled = !aniso::subsetT::common_rule(*t.set, current);
         });
     }
 
 public:
-    subset_selector() : current(legacy::subsetT::universal()) {
-        using namespace legacy::_subsets;
+    subset_selector() : current(aniso::subsetT::universal()) {
+        using namespace aniso::_subsets;
 
         // TODO: refine descriptions.
         terms_ignore.emplace_back(
@@ -234,7 +234,7 @@ public:
         update_current();
     }
 
-    const legacy::subsetT& select_subset(const legacy::moldT& mold) {
+    const aniso::subsetT& select_subset(const aniso::moldT& mold) {
         enum ringE { Contained, Compatible, Incompatible };
         enum centerE { Selected, Including, Disabled, None }; // TODO: add "equals" relation?
         auto put_term = [size = square_size()](ringE ring, centerE center, const char* title /* Optional */,
@@ -424,15 +424,15 @@ public:
 };
 
 #ifdef ENABLE_BATCH_PREVIEWER
-static bool show_snapshots(std::optional<legacy::moldT>& out);
-static void take_snapshot(const legacy::subsetT& subset, const legacy::maskT& mask, const legacy::moldT& mold);
+static bool show_snapshots(std::optional<aniso::moldT>& out);
+static void take_snapshot(const aniso::subsetT& subset, const aniso::maskT& mask, const aniso::moldT& mold);
 #endif // ENABLE_BATCH_PREVIEWER
 
-std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_undo) {
-    std::optional<legacy::moldT> out = std::nullopt;
-    auto return_rule = [&out, &mold](const legacy::ruleT& rule) { out.emplace(rule, mold.lock); };
-    auto return_lock = [&out, &mold](const legacy::moldT::lockT& lock) { out.emplace(mold.rule, lock); };
-    auto return_mold = [&out](const legacy::moldT& mold) { out.emplace(mold); };
+std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo) {
+    std::optional<aniso::moldT> out = std::nullopt;
+    auto return_rule = [&out, &mold](const aniso::ruleT& rule) { out.emplace(rule, mold.lock); };
+    auto return_lock = [&out, &mold](const aniso::moldT::lockT& lock) { out.emplace(mold.rule, lock); };
+    auto return_mold = [&out](const aniso::moldT& mold) { out.emplace(mold); };
     auto guarded_block = [](const bool enable, const auto& fn) {
         if (!enable) {
             ImGui::BeginDisabled();
@@ -449,14 +449,14 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
     };
 
     static subset_selector selector;
-    const legacy::subsetT& subset = selector.select_subset(mold);
+    const aniso::subsetT& subset = selector.select_subset(mold);
     assert(!subset.empty());
 
     ImGui::Separator();
 
     // Select mask.
     char chr_0 = '0', chr_1 = '1';
-    const legacy::maskT& mask = [&]() -> const legacy::maskT& {
+    const aniso::maskT& mask = [&]() -> const aniso::maskT& {
         const char* const about_mask =
             "A mask is an arbitrary rule to perform XOR masking for other rules.\n"
             "Some rules are special enough, so that the values masked by them have natural interpretations. "
@@ -467,7 +467,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
             "in \"Documents\".)";
 
         // TODO: add record for custom masks?
-        static legacy::maskT mask_custom{{}};
+        static aniso::maskT mask_custom{{}};
 
         enum maskE { Zero, Identity, Native, Custom };
         struct termT {
@@ -504,8 +504,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
              'o', 'i'}};
 
         static maskE mask_tag = Zero;
-        const legacy::maskT* const mask_ptrs[]{&legacy::mask_zero, &legacy::mask_identity, &subset.get_mask(),
-                                               &mask_custom};
+        const aniso::maskT* const mask_ptrs[]{&aniso::mask_zero, &aniso::mask_identity, &subset.get_mask(),
+                                              &mask_custom};
 
         ImGui::AlignTextToFramePadding();
         imgui_StrTooltip("(...)", about_mask);
@@ -525,7 +525,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
                 ImGui::Separator();
                 previewer::preview(-1, previewer::configT::_220_160, *mask_ptrs[m], false);
                 ImGui::SameLine();
-                imgui_Str(legacy::to_MAP_str(*mask_ptrs[m]));
+                imgui_Str(aniso::to_MAP_str(*mask_ptrs[m]));
             });
         }
 
@@ -543,7 +543,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
     ImGui::Separator();
 
     const bool mask_avail = subset.contains(mask);
-    const bool compatible = legacy::compatible(subset, mold);
+    const bool compatible = aniso::compatible(subset, mold);
     const bool contained = subset.contains(mold.rule);
     assert_implies(contained, compatible);
 
@@ -565,7 +565,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
         ImGui::SameLine();
         guarded_block(contained, [&] {
             if (ImGui::Button("Enhance lock")) {
-                return_lock(legacy::enhance_lock(subset, mold));
+                return_lock(aniso::enhance_lock(subset, mold));
             }
         });
         imgui_ItemTooltip("\"Saturate\" the locked groups to keep the full effect of the locks when switching to a"
@@ -597,19 +597,19 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
     guarded_block(compatible, [&] {
         sequence::seq(
             "<00..", "Dec", "Inc", "11..>", //
-            [&] { return_rule(legacy::seq_int::min(subset, mask, mold)); },
-            [&] { return_rule(legacy::seq_int::dec(subset, mask, mold)); },
-            [&] { return_rule(legacy::seq_int::inc(subset, mask, mold)); },
-            [&] { return_rule(legacy::seq_int::max(subset, mask, mold)); }, !contained);
+            [&] { return_rule(aniso::seq_int::min(subset, mask, mold)); },
+            [&] { return_rule(aniso::seq_int::dec(subset, mask, mold)); },
+            [&] { return_rule(aniso::seq_int::inc(subset, mask, mold)); },
+            [&] { return_rule(aniso::seq_int::max(subset, mask, mold)); }, !contained);
     });
     ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
     guarded_block(contained, [&] {
         sequence::seq(
             "<1.0.", "Prev", "Next", "0.1.>", //
-            [&] { return_rule(legacy::seq_perm::first(subset, mask, mold)); },
-            [&] { return_rule(legacy::seq_perm::prev(subset, mask, mold)); },
-            [&] { return_rule(legacy::seq_perm::next(subset, mask, mold)); },
-            [&] { return_rule(legacy::seq_perm::last(subset, mask, mold)); });
+            [&] { return_rule(aniso::seq_perm::first(subset, mask, mold)); },
+            [&] { return_rule(aniso::seq_perm::prev(subset, mask, mold)); },
+            [&] { return_rule(aniso::seq_perm::next(subset, mask, mold)); },
+            [&] { return_rule(aniso::seq_perm::last(subset, mask, mold)); });
     });
     ImGui::SameLine();
     // TODO: about the interaction with locks...
@@ -626,8 +626,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
                             "click the button.");
 #endif
 
-    const legacy::partitionT& par = subset.get_par();
-    const auto scanlist = legacy::scan(par, mask, mold);
+    const aniso::partitionT& par = subset.get_par();
+    const auto scanlist = aniso::scan(par, mask, mold);
 
     static bool preview_mode = false;
     static previewer::configT config{previewer::configT::_160_160};
@@ -683,9 +683,9 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
             if (ImGui::Button("Randomize")) {
                 bind_undo = true;
                 if (exact_mode) {
-                    return_rule(legacy::randomize_c(subset, mask, mold, global_mt19937(), free_dist));
+                    return_rule(aniso::randomize_c(subset, mask, mold, global_mt19937(), free_dist));
                 } else {
-                    return_rule(legacy::randomize_p(subset, mask, mold, global_mt19937(), rate));
+                    return_rule(aniso::randomize_p(subset, mask, mold, global_mt19937(), rate));
                 }
             }
         });
@@ -714,10 +714,10 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
         guarded_block(compatible, [&] {
             sequence::seq(
                 "<00..", "Prev", "Next", "11..>", //
-                [&] { return_rule(legacy::seq_mixed::first(subset, mask, mold)); },
-                [&] { return_rule(legacy::seq_mixed::prev(subset, mask, mold)); },
-                [&] { return_rule(legacy::seq_mixed::next(subset, mask, mold)); },
-                [&] { return_rule(legacy::seq_mixed::last(subset, mask, mold)); }, !contained);
+                [&] { return_rule(aniso::seq_mixed::first(subset, mask, mold)); },
+                [&] { return_rule(aniso::seq_mixed::prev(subset, mask, mold)); },
+                [&] { return_rule(aniso::seq_mixed::next(subset, mask, mold)); },
+                [&] { return_rule(aniso::seq_mixed::last(subset, mask, mold)); }, !contained);
         });
 #if 0
         ImGui::SameLine();
@@ -741,13 +741,13 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
         ImGui::SameLine();
         guarded_block(true /* Unconditional */, [&] {
             if (ImGui::Button("Rev")) {
-                return_mold(legacy::trans_reverse(mold));
+                return_mold(aniso::trans_reverse(mold));
             }
         });
         itemtooltip_with_previewer([&] {
             imgui_Str("Get the 0/1 reversal dual of the current rule.");
             ImGui::Separator();
-            const legacy::ruleT rev = legacy::trans_reverse(mold).rule;
+            const aniso::ruleT rev = aniso::trans_reverse(mold).rule;
             if (rev != mold.rule) {
                 imgui_Str("Preview:");
                 ImGui::SameLine();
@@ -762,7 +762,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
         ImGui::SameLine();
         guarded_block(compatible, [&] {
             if (ImGui::Button("Approximate")) {
-                return_rule(legacy::approximate(subset, mold));
+                return_rule(aniso::approximate(subset, mold));
             }
         });
         itemtooltip_with_previewer([&] {
@@ -773,7 +773,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
             if (!contained) {
                 imgui_Str("Preview:");
                 ImGui::SameLine();
-                previewer::preview(-1, previewer::configT::_220_160, legacy::approximate(subset, mold), false);
+                previewer::preview(-1, previewer::configT::_220_160, aniso::approximate(subset, mold), false);
             } else {
                 imgui_Str("(The current rule already belongs to the working set.)");
             }
@@ -817,7 +817,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
         const char labels_normal[2][3]{{'-', chr_0, '\0'}, {'-', chr_1, '\0'}};
         const char labels_preview[2][9]{{'-', chr_0, ' ', '-', '>', ' ', chr_1, ':', '\0'},
                                         {'-', chr_1, ' ', '-', '>', ' ', chr_0, ':', '\0'}};
-        const legacy::ruleT_masked masked = mask ^ mold.rule;
+        const aniso::ruleT_masked masked = mask ^ mold.rule;
 
         // Precise vertical alignment:
         // https://github.com/ocornut/imgui/issues/2064
@@ -841,7 +841,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
         }();
 
         int n = 0;
-        par.for_each_group([&](int j, const legacy::groupT& group) {
+        par.for_each_group([&](int j, const aniso::groupT& group) {
             const bool has_lock = scanlist[j].any_locked();
             const bool pure = scanlist[j].all_0() || scanlist[j].all_1();
             if (hide_locked && has_lock && pure) {
@@ -855,7 +855,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
             ++n;
 
             const bool incomptible = scanlist[j].locked_0 != 0 && scanlist[j].locked_1 != 0;
-            const legacy::codeT head = group[0];
+            const aniso::codeT head = group[0];
 
             // TODO: better color... (will be ugly if using green colors...)
             // _ButtonHovered: ImVec4(0.26f, 0.59f, 0.98f, 1.00f)
@@ -876,15 +876,15 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, button_color[1]);
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, button_color[2]);
             if (code_button(head, zoom)) {
-                legacy::ruleT rule = mold.rule;
-                for (legacy::codeT code : group) {
+                aniso::ruleT rule = mold.rule;
+                for (aniso::codeT code : group) {
                     rule[code] = !rule[code];
                 }
                 bind_undo = true;
                 return_rule(rule);
             } else if (manage_lock::enabled() && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
-                legacy::moldT::lockT lock = mold.lock;
-                for (legacy::codeT code : group) {
+                aniso::moldT::lockT lock = mold.lock;
+                for (aniso::codeT code : group) {
                     lock[code] = !has_lock;
                 }
                 bind_undo = true; // TODO: whether to bind-undo for locks?
@@ -904,8 +904,8 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
 
             if (preview_mode) {
                 previewer::preview(j, config, [&] {
-                    legacy::ruleT rule = mold.rule;
-                    for (legacy::codeT code : group) {
+                    aniso::ruleT rule = mold.rule;
+                    for (aniso::codeT code : group) {
                         rule[code] = !rule[code];
                     }
                     return rule;
@@ -920,7 +920,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
                 ImGui::Separator();
                 ImGui::Text("Group size: %d", (int)group.size());
                 const int max_to_show = 48;
-                for (int x = 0; const legacy::codeT code : group) {
+                for (int x = 0; const aniso::codeT code : group) {
                     if (x++ % 8 != 0) {
                         ImGui::SameLine();
                     }
@@ -954,7 +954,7 @@ std::optional<legacy::moldT> edit_rule(const legacy::moldT& mold, bool& bind_und
 }
 
 // TODO: move to "apply_rule.cpp"? (as this is a special type of capture...)
-std::optional<legacy::moldT> static_constraints() {
+std::optional<aniso::moldT> static_constraints() {
     enum stateE { Any_background, O, I, O_background, I_background };
     const int r = 9;
     static stateE board[r][r]{/* Any_background... */};
@@ -1056,7 +1056,7 @@ std::optional<legacy::moldT> static_constraints() {
     }
 
     if (ret) {
-        legacy::moldT mold{};
+        aniso::moldT mold{};
         for (int y = 1; y < r - 1; ++y) {
             for (int x = 1; x < r - 1; ++x) {
                 if (board[y][x] == O || board[y][x] == I) {
@@ -1064,7 +1064,7 @@ std::optional<legacy::moldT> static_constraints() {
                     //  O   O_b  I                  001       001
                     // [Any] O   O  will result in [0]00 and [1]00 being set.
                     //  I_b  I  I_b                 111       111
-                    legacy::for_each_code([&](legacy::codeT code) {
+                    aniso::for_each_code([&](aniso::codeT code) {
                         auto imbue = [](bool& b, stateE state) {
                             if (state == O || state == O_background) {
                                 b = 0;
@@ -1073,7 +1073,7 @@ std::optional<legacy::moldT> static_constraints() {
                             }
                         };
 
-                        legacy::situT situ = legacy::decode(code);
+                        aniso::situT situ = aniso::decode(code);
 
                         imbue(situ.q, board[y - 1][x - 1]);
                         imbue(situ.w, board[y - 1][x]);
@@ -1085,8 +1085,8 @@ std::optional<legacy::moldT> static_constraints() {
                         imbue(situ.x, board[y + 1][x]);
                         imbue(situ.c, board[y + 1][x + 1]);
 
-                        mold.rule[legacy::encode(situ)] = board[y][x] == O ? 0 : 1;
-                        mold.lock[legacy::encode(situ)] = true;
+                        mold.rule[aniso::encode(situ)] = board[y][x] == O ? 0 : 1;
+                        mold.lock[aniso::encode(situ)] = true;
                     });
                 }
             }
@@ -1109,16 +1109,16 @@ public:
         virtual ~windowT() = default;
 
     private:
-        virtual bool display(std::optional<legacy::moldT>& out) = 0;
+        virtual bool display(std::optional<aniso::moldT>& out) = 0;
     };
 
     template <class T>
-    void accept(const legacy::subsetT& subset, const legacy::maskT& mask, const legacy::moldT& mold) {
+    void accept(const aniso::subsetT& subset, const aniso::maskT& mask, const aniso::moldT& mold) {
         m_snapshots.push_back(std::unique_ptr<windowT>(new T(subset, mask, mold)));
     }
 
     // TODO: add closing confirmation...
-    bool display(std::optional<legacy::moldT>& out) {
+    bool display(std::optional<aniso::moldT>& out) {
         bool assigned = false;
         for (const auto& ptr : m_snapshots) {
             const std::string title = "Snapshot " + std::to_string(ptr->index);
@@ -1140,19 +1140,19 @@ private:
 // TODO: enable accepting current rule as mask?
 // TODO: support batch-preview for `seq_mixed` as well.
 class randomizerT : public snapshot_manager::windowT {
-    const legacy::subsetT m_subset;
-    legacy::maskT m_mask;
-    const legacy::moldT m_mold;
+    const aniso::subsetT m_subset;
+    aniso::maskT m_mask;
+    const aniso::moldT m_mold;
 
 public:
-    randomizerT(const legacy::subsetT& subset, const legacy::maskT& mask, const legacy::moldT& mold)
-        : m_subset(subset), m_mask(mask), m_mold{legacy::approximate(subset, mold), mold.lock} {
+    randomizerT(const aniso::subsetT& subset, const aniso::maskT& mask, const aniso::moldT& mold)
+        : m_subset(subset), m_mask(mask), m_mold{aniso::approximate(subset, mold), mold.lock} {
         assert(!m_subset.empty());
         assert(m_subset.contains(m_mask));
         assert(m_subset.contains(m_mold.rule));
         c_locked_1 = 0, c_free = 0, has_lock = false;
         // TODO: share with `edit_rule`.
-        for (const auto& scan : legacy::scan(m_subset.get_par(), m_mask, m_mold)) {
+        for (const auto& scan : aniso::scan(m_subset.get_par(), m_mask, m_mold)) {
             if (scan.locked_0 || scan.locked_1) {
                 has_lock = true;
             } else {
@@ -1168,7 +1168,7 @@ public:
 private:
     previewer::configT config{previewer::configT::_220_160};
     static constexpr const int page_size = 6, perline = 3;
-    using pageT = std::array<legacy::ruleT, page_size>;
+    using pageT = std::array<aniso::ruleT, page_size>;
     std::vector<pageT> pages;
     int page_no = 0;
 
@@ -1197,9 +1197,9 @@ private:
     void make_page() {
         for (auto& rule : pages.emplace_back()) {
             if (exact_mode) {
-                rule = legacy::randomize_c(m_subset, m_mask, m_mold, global_mt19937(), round(rate * c_free));
+                rule = aniso::randomize_c(m_subset, m_mask, m_mold, global_mt19937(), round(rate * c_free));
             } else {
-                rule = legacy::randomize_p(m_subset, m_mask, m_mold, global_mt19937(), rate);
+                rule = aniso::randomize_p(m_subset, m_mask, m_mold, global_mt19937(), rate);
             }
         }
         page_no = pages.size() - 1;
@@ -1216,7 +1216,7 @@ private:
     };
 
 private:
-    bool display(std::optional<legacy::moldT>& out) override {
+    bool display(std::optional<aniso::moldT>& out) override {
         bool assigned = false;
 
         if (set_spec()) {
@@ -1282,9 +1282,9 @@ private:
 };
 
 static snapshot_manager snapshots;
-static bool show_snapshots(std::optional<legacy::moldT>& out) { return snapshots.display(out); }
+static bool show_snapshots(std::optional<aniso::moldT>& out) { return snapshots.display(out); }
 
-static void take_snapshot(const legacy::subsetT& subset, const legacy::maskT& mask, const legacy::moldT& mold) {
+static void take_snapshot(const aniso::subsetT& subset, const aniso::maskT& mask, const aniso::moldT& mold) {
     snapshots.accept<randomizerT>(subset, mask, mold);
 }
 #endif // ENABLE_BATCH_PREVIEWER

@@ -119,8 +119,8 @@ public:
         texture = create_texture(SDL_TEXTUREACCESS_STATIC, width, height);
         // Using heap allocation to avoid "Function uses XXX bytes of stack" warning.
         std::unique_ptr<Uint32[][3][3]> pixels(new Uint32[512][3][3]);
-        legacy::for_each_code([&](legacy::codeT code) {
-            const legacy::situT situ = legacy::decode(code);
+        aniso::for_each_code([&](aniso::codeT code) {
+            const aniso::situT situ = aniso::decode(code);
             const bool fill[3][3] = {{situ.q, situ.w, situ.e}, {situ.a, situ.s, situ.d}, {situ.z, situ.x, situ.c}};
             for (int y = 0; y < 3; ++y) {
                 for (int x = 0; x < 3; ++x) {
@@ -141,14 +141,14 @@ public:
     static SDL_Texture* get() { return texture; }
 };
 
-void code_image(legacy::codeT code, int zoom, const ImVec4& tint_col, const ImVec4& border_col) {
+void code_image(aniso::codeT code, int zoom, const ImVec4& tint_col, const ImVec4& border_col) {
     const ImVec2 size(3 * zoom, 3 * zoom);
     const ImVec2 uv0(0, code * (1.0f / 512));
     const ImVec2 uv1(1, (code + 1) * (1.0f / 512));
     ImGui::Image(code_atlas::get(), size, uv0, uv1, tint_col, border_col);
 }
 
-bool code_button(legacy::codeT code, int zoom, const ImVec4& bg_col, const ImVec4& tint_col) {
+bool code_button(aniso::codeT code, int zoom, const ImVec4& bg_col, const ImVec4& tint_col) {
     const ImVec2 size(3 * zoom, 3 * zoom);
     const ImVec2 uv0(0, code * (1.0f / 512));
     const ImVec2 uv1(1, (code + 1) * (1.0f / 512));

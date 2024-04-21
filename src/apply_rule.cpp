@@ -12,7 +12,7 @@
 
 using clockT = std::chrono::steady_clock;
 
-[[nodiscard]] static ImTextureID make_screen(const legacy::tileT& tile) {
+[[nodiscard]] static ImTextureID make_screen(const aniso::tileT& tile) {
     return make_screen(tile.width(), tile.height(), [&tile](int y) { return tile.line(y); });
 }
 
@@ -24,15 +24,15 @@ static void zoom_image(ImTextureID texture, ImVec2 texture_size, ImVec2 region_c
     ImGui::Image(texture, region_size * zoom, min_pos / texture_size, max_pos / texture_size);
 }
 
-static bool strobing(const legacy::ruleT& rule) {
-    constexpr legacy::codeT all_0{0}, all_1{511};
+static bool strobing(const aniso::ruleT& rule) {
+    constexpr aniso::codeT all_0{0}, all_1{511};
     return rule[all_0] == 1 && rule[all_1] == 0;
 }
 
 // `tileT` is able to serve as the building block for boundless space (`tileT::gather` was
 // initially designed to enable this extension) but that's complicated, and torus space is enough to
 // show the effect of the rules.
-static void run_torus(legacy::tileT& tile, legacy::tileT& temp, const legacy::rule_like auto& rule) {
+static void run_torus(aniso::tileT& tile, aniso::tileT& temp, const aniso::rule_like auto& rule) {
     assert(&tile != &temp);
 
     tile.gather_torus();
@@ -42,12 +42,12 @@ static void run_torus(legacy::tileT& tile, legacy::tileT& temp, const legacy::ru
 
 // Copy the subrange and run as a torus space, recording all invoked mappings.
 // This is good at capturing "self-contained" patterns (oscillators/spaceships).
-static legacy::moldT::lockT capture_closed(const legacy::tileT& source, const legacy::tileT::rangeT& range,
-                                           const legacy::ruleT& rule) {
-    legacy::tileT tile = legacy::copy(source, range);
-    legacy::tileT temp(tile.size());
+static aniso::moldT::lockT capture_closed(const aniso::tileT& source, const aniso::tileT::rangeT& range,
+                                          const aniso::ruleT& rule) {
+    aniso::tileT tile = aniso::copy(source, range);
+    aniso::tileT temp(tile.size());
 
-    legacy::moldT::lockT lock{};
+    aniso::moldT::lockT lock{};
 
     // (wontfix) It's possible that the loop fails to catch all invocations in very rare cases,
     // due to that `limit` is not large enough.
@@ -55,7 +55,7 @@ static legacy::moldT::lockT capture_closed(const legacy::tileT& source, const le
     // Loop until there has been `limit` generations without newly invoked mappings.
     const int limit = 100;
     for (int g = limit; g > 0; --g) {
-        run_torus(tile, temp, [&](legacy::codeT code) {
+        run_torus(tile, temp, [&](aniso::codeT code) {
             if (!lock[code]) {
                 g = limit;
                 lock[code] = true;
@@ -70,7 +70,7 @@ static legacy::moldT::lockT capture_closed(const legacy::tileT& source, const le
 // `capture_closed` is not suitable for capturing patterns that are not self-contained (what happens in the
 // copied subrange (treated as torus space) is not exactly what we see in the source space)
 // In these cases we need a way to record what actually happened in the range.
-static void capture_open(const legacy::tileT& source, legacy::tileT::rangeT range, legacy::moldT::lockT& lock) {
+static void capture_open(const aniso::tileT& source, aniso::tileT::rangeT range, aniso::moldT::lockT& lock) {
     if (range.width() <= 2 || range.height() <= 2) {
         return;
     }
@@ -95,12 +95,12 @@ public:
 };
 
 class torusT {
-    legacy::tileT m_tile, m_temp;
+    aniso::tileT m_tile, m_temp;
     int m_gen;
 
 public:
     struct initT {
-        legacy::tileT::sizeT size;
+        aniso::tileT::sizeT size;
         uint32_t seed;
         densityT density;
 
@@ -109,8 +109,8 @@ public:
 
     explicit torusT(const initT& init) : m_tile(init.size), m_temp(init.size), m_gen(0) { restart(init); }
 
-    legacy::tileT& tile() { return m_tile; }
-    const legacy::tileT& tile() const { return m_tile; }
+    aniso::tileT& tile() { return m_tile; }
+    const aniso::tileT& tile() const { return m_tile; }
     int gen() const { return m_gen; }
 
     void restart(const initT& init) {
@@ -118,12 +118,12 @@ public:
         m_temp.resize(init.size);
 
         std::mt19937 rand(init.seed);
-        legacy::random_fill(m_tile, rand, init.density.get());
+        aniso::random_fill(m_tile, rand, init.density.get());
 
         m_gen = 0;
     }
 
-    void run(const legacy::ruleT& rule, int count = 1) {
+    void run(const aniso::ruleT& rule, int count = 1) {
         for (int c = 0; c < count; ++c) {
             run_torus(m_tile, m_temp, rule);
 #if 0
@@ -166,9 +166,9 @@ public:
 };
 
 class runnerT {
-    static constexpr legacy::tileT::sizeT min_size{.width = 20, .height = 10};
-    static constexpr legacy::tileT::sizeT max_size{.width = 1600, .height = 1200};
-    static legacy::tileT::sizeT size_clamped(legacy::tileT::sizeT size) {
+    static constexpr aniso::tileT::sizeT min_size{.width = 20, .height = 10};
+    static constexpr aniso::tileT::sizeT max_size{.width = 1600, .height = 1200};
+    static aniso::tileT::sizeT size_clamped(aniso::tileT::sizeT size) {
         return {.width = std::clamp(size.width, min_size.width, max_size.width),
                 .height = std::clamp(size.height, min_size.height, max_size.height)};
     }
@@ -177,7 +177,7 @@ class runnerT {
     static constexpr ImVec2 min_canvas_size{min_size.width * max_zoom, min_size.height* max_zoom};
 
     struct ctrlT {
-        legacy::ruleT rule{};
+        aniso::ruleT rule{};
 
         static constexpr int pace_min = 1, pace_max = 80;
         int pace = 1;
@@ -225,14 +225,14 @@ class runnerT {
     // will work well in all cases)
     ImVec2 last_known_canvas_size = min_canvas_size;
 
-    std::optional<legacy::tileT> paste = std::nullopt;
-    legacy::tileT::posT paste_beg{0, 0}; // Valid if paste.has_value().
+    std::optional<aniso::tileT> paste = std::nullopt;
+    aniso::tileT::posT paste_beg{0, 0}; // Valid if paste.has_value().
 
     struct selectT {
         bool active = true;
-        legacy::tileT::posT beg{0, 0}, end{0, 0}; // [] instead of [).
+        aniso::tileT::posT beg{0, 0}, end{0, 0}; // [] instead of [).
 
-        legacy::tileT::rangeT to_range() const {
+        aniso::tileT::rangeT to_range() const {
             const auto [xmin, xmax] = std::minmax(beg.x, end.x);
             const auto [ymin, ymax] = std::minmax(beg.y, end.y);
 
@@ -244,7 +244,7 @@ class runnerT {
     };
     std::optional<selectT> m_sel = std::nullopt;
 
-    legacy::moldT::lockT m_lock{}; // For open-capture.
+    aniso::moldT::lockT m_lock{}; // For open-capture.
 
 public:
     // TODO: redesign pause logics...
@@ -254,7 +254,7 @@ public:
     // For example, there are a lot of static variables in `display`, and the keyboard controls are not designed
     // for per-object use.
 
-    void apply_rule(const legacy::ruleT& rule, bool& temp_pause /* Workaround */) {
+    void apply_rule(const aniso::ruleT& rule, bool& temp_pause /* Workaround */) {
         if (m_ctrl.rule != rule) {
             m_ctrl.rule = rule;
             m_ctrl.anti_strobing = true;
@@ -267,7 +267,7 @@ public:
         }
     }
 
-    std::optional<legacy::moldT::lockT> display(bool& temp_pause /* Workaround */) {
+    std::optional<aniso::moldT::lockT> display(bool& temp_pause /* Workaround */) {
         // (Shadowing `::imgui_KeyPressed`)
         // TODO: or use ImGui::SetNextFrameWantCaptureKeyboard when the Canvas button is active?
         auto imgui_KeyPressed = [active = GImGui->ActiveId == ImGui::GetID("Canvas")](ImGuiKey key, bool repeat) {
@@ -275,7 +275,7 @@ public:
         };
         static bool background = 0; // TODO: move elsewhere...
 
-        std::optional<legacy::moldT::lockT> out = std::nullopt;
+        std::optional<aniso::moldT::lockT> out = std::nullopt;
 
         assert(m_init.size == m_torus.tile().size());
         assert(m_init.size == size_clamped(m_init.size));
@@ -295,7 +295,7 @@ public:
             }
             ImGui::SameLine();
             ImGui::Text("Generation:%d, density:%.4f", m_torus.gen(),
-                        float(legacy::count(m_torus.tile())) / m_torus.tile().area());
+                        float(aniso::count(m_torus.tile())) / m_torus.tile().area());
             ImGui::Separator();
         }
 
@@ -449,7 +449,7 @@ public:
 
         ImGui::Separator();
 
-        const legacy::tileT::sizeT tile_size = m_torus.tile().size();
+        const aniso::tileT::sizeT tile_size = m_torus.tile().size();
         const ImVec2 screen_size(tile_size.width * screen_zoom, tile_size.height * screen_zoom);
 
         static bool lock_mouse = false; // Lock scrolling control and window moving.
@@ -552,19 +552,19 @@ public:
                 assert(paste->width() <= tile_size.width && paste->height() <= tile_size.height);
                 paste_beg.x = std::clamp(paste_beg.x, 0, tile_size.width - paste->width());
                 paste_beg.y = std::clamp(paste_beg.y, 0, tile_size.height - paste->height());
-                const legacy::tileT::posT paste_end = paste_beg + paste->size();
+                const aniso::tileT::posT paste_end = paste_beg + paste->size();
 
                 // (wontfix) Wasteful, but after all this works...
-                legacy::tileT temp = legacy::copy(m_torus.tile(), {{paste_beg, paste_end}});
-                (background == 0 ? legacy::blit<legacy::blitE::Or>
-                                 : legacy::blit<legacy::blitE::And>)(m_torus.tile(), paste_beg, *paste, std::nullopt);
+                aniso::tileT temp = aniso::copy(m_torus.tile(), {{paste_beg, paste_end}});
+                (background == 0 ? aniso::blit<aniso::blitE::Or>
+                                 : aniso::blit<aniso::blitE::And>)(m_torus.tile(), paste_beg, *paste, std::nullopt);
                 texture = make_screen(m_torus.tile());
                 if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
                     m_ctrl.mark_written();
                     temp_pause = true;
                     paste.reset();
                 } else { // Restore.
-                    legacy::blit<legacy::blitE::Copy>(m_torus.tile(), paste_beg, temp);
+                    aniso::blit<aniso::blitE::Copy>(m_torus.tile(), paste_beg, temp);
                 }
 
                 drawlist->AddImage(texture, screen_min, screen_max);
@@ -617,8 +617,8 @@ public:
                     paste_beg.y = std::clamp(cely - paste->height() / 2, 0, tile_size.height - paste->height());
                 } else {
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-                        const legacy::tileT::posT pos{.x = std::clamp(celx, 0, tile_size.width - 1),
-                                                      .y = std::clamp(cely, 0, tile_size.height - 1)};
+                        const aniso::tileT::posT pos{.x = std::clamp(celx, 0, tile_size.width - 1),
+                                                     .y = std::clamp(cely, 0, tile_size.height - 1)};
                         m_sel = {.active = true, .beg = pos, .end = pos};
                     } else if (m_sel && m_sel->active && r_down) {
                         m_sel->end.x = std::clamp(celx, 0, tile_size.width - 1);
@@ -685,7 +685,7 @@ public:
                     if (adopt_eagerly) {
                         out = lock;
                     } else {
-                        legacy::for_each_code([&](legacy::codeT c) { m_lock[c] = m_lock[c] || lock[c]; });
+                        aniso::for_each_code([&](aniso::codeT c) { m_lock[c] = m_lock[c] || lock[c]; });
                     }
                 });
                 term("Capture (open)", "L (repeatable)", ImGuiKey_None, true, [&] {
@@ -704,7 +704,7 @@ public:
                 }
                 ImGui::SameLine();
                 int count = 0;
-                legacy::for_each_code([&](legacy::codeT code) { count += m_lock[code]; });
+                aniso::for_each_code([&](aniso::codeT code) { count += m_lock[code]; });
                 ImGui::Text("Buffer lock: %d/512", count);
             });
 
@@ -736,19 +736,19 @@ public:
                 fill_den.step_slide("Fill density");
                 term("Random fill", "+/=", ImGuiKey_Equal, true, [&] {
                     assert(m_sel);
-                    legacy::random_fill(m_torus.tile(), global_mt19937(), fill_den.get(), m_sel->to_range());
+                    aniso::random_fill(m_torus.tile(), global_mt19937(), fill_den.get(), m_sel->to_range());
                     m_ctrl.mark_written();
                     temp_pause = true;
                 });
                 term("Clear inside", "Backspace", ImGuiKey_Backspace, true, [&] {
                     assert(m_sel);
-                    legacy::clear_inside(m_torus.tile(), m_sel->to_range(), background);
+                    aniso::clear_inside(m_torus.tile(), m_sel->to_range(), background);
                     m_ctrl.mark_written();
                     temp_pause = true;
                 });
                 term("Clear outside", "0 (zero)", ImGuiKey_0, true, [&] {
                     assert(m_sel);
-                    legacy::clear_outside(m_torus.tile(), m_sel->to_range(), background);
+                    aniso::clear_outside(m_torus.tile(), m_sel->to_range(), background);
                     m_ctrl.mark_written();
                     temp_pause = true;
                 });
@@ -765,7 +765,7 @@ public:
                 });
                 term("Shrink", "S", ImGuiKey_S, true, [&] {
                     assert(m_sel);
-                    const auto [begin, end] = legacy::bounding_box(m_torus.tile(), m_sel->to_range(), background);
+                    const auto [begin, end] = aniso::bounding_box(m_torus.tile(), m_sel->to_range(), background);
                     if (begin != end) {
                         m_sel = {.active = false, .beg = begin, .end = {.x = end.x - 1, .y = end.y - 1}};
                     } else {
@@ -779,7 +779,7 @@ public:
                 auto copy_sel = [&] {
                     assert(m_sel);
                     std::string rle_str =
-                        legacy::to_RLE_str(add_rule ? &m_ctrl.rule : nullptr, m_torus.tile(), m_sel->to_range());
+                        aniso::to_RLE_str(add_rule ? &m_ctrl.rule : nullptr, m_torus.tile(), m_sel->to_range());
                     if (copy_silently) {
                         ImGui::SetClipboardText(rle_str.c_str());
                     } else {
@@ -794,7 +794,7 @@ public:
                 term("Copy", "C", ImGuiKey_C, true, [&] { copy_sel(); });
                 term("Cut", "X", ImGuiKey_X, true, [&] {
                     copy_sel();
-                    legacy::clear_inside(m_torus.tile(), m_sel->to_range());
+                    aniso::clear_inside(m_torus.tile(), m_sel->to_range());
                     m_ctrl.mark_written();
                     temp_pause = true;
                 });
@@ -802,7 +802,7 @@ public:
                     if (const char* text = ImGui::GetClipboardText()) {
                         // TODO: better handling/message...
                         try {
-                            paste.emplace(legacy::from_RLE_str(text, tile_size));
+                            paste.emplace(aniso::from_RLE_str(text, tile_size));
                         } catch (const std::exception& err) {
                             messenger::add_msg(err.what());
                         }
@@ -823,7 +823,7 @@ public:
     }
 };
 
-std::optional<legacy::moldT::lockT> apply_rule(const legacy::ruleT& rule) {
+std::optional<aniso::moldT::lockT> apply_rule(const aniso::ruleT& rule) {
     static runnerT runner;
     bool temp_pause = false;
     runner.apply_rule(rule, temp_pause);
@@ -851,15 +851,15 @@ void previewer::configT::_set() {
 }
 
 // TODO: support ctrl + drag to rotate?
-void previewer::_preview(uint64_t id, const configT& config, const legacy::ruleT& rule, bool interactive) {
+void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT& rule, bool interactive) {
     struct termT {
         bool active = false;
         int seed = {};
-        legacy::ruleT rule = {};
-        legacy::tileT tile = {};
+        aniso::ruleT rule = {};
+        aniso::tileT tile = {};
     };
     static std::unordered_map<uint64_t, termT> terms;
-    static legacy::tileT temps[configT::Count];
+    static aniso::tileT temps[configT::Count];
 
     static unsigned latest = ImGui::GetFrameCount();
     if (const unsigned frame = ImGui::GetFrameCount(); frame != latest) {
@@ -898,7 +898,7 @@ void previewer::_preview(uint64_t id, const configT& config, const legacy::ruleT
         term.seed = config.seed;
         term.rule = rule;
         std::mt19937 rand(config.seed);
-        legacy::random_fill(term.tile, rand, 0.5);
+        aniso::random_fill(term.tile, rand, 0.5);
     }
 
     // (`IsItemActive` does not work as preview-window is based on `Dummy`.)

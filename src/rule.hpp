@@ -16,7 +16,7 @@
 
 static_assert(INT_MAX >= INT32_MAX);
 
-namespace legacy {
+namespace aniso {
 
 #ifdef ENABLE_TESTS
     namespace _tests {
@@ -355,4 +355,4 @@ namespace legacy {
     }  // namespace _tests
 #endif // ENABLE_TESTS
 
-} // namespace legacy
+} // namespace aniso

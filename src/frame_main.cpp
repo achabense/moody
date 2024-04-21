@@ -3,12 +3,12 @@
 // TODO: improve recorder logic if possible...
 // Never empty.
 class recorderT {
-    std::vector<legacy::moldT> m_record;
+    std::vector<aniso::moldT> m_record;
     int m_pos;
 
 public:
     recorderT() {
-        m_record.push_back({.rule = legacy::game_of_life(), .lock{}});
+        m_record.push_back({.rule = aniso::game_of_life(), .lock{}});
         m_pos = 0;
     }
 
@@ -17,7 +17,7 @@ public:
     // [0, size() - 1]
     int pos() const { return m_pos; }
 
-    void update(const legacy::moldT& mold) {
+    void update(const aniso::moldT& mold) {
         if (mold != m_record[m_pos]) {
             const int last = size() - 1;
             if (m_pos == last && last != 0 && mold == m_record[last - 1]) {
@@ -35,7 +35,7 @@ public:
         }
     }
 
-    legacy::moldT current() const {
+    aniso::moldT current() const {
         assert(m_pos >= 0 && m_pos < size());
         return m_record[m_pos];
     }
@@ -47,7 +47,7 @@ public:
 
     void clear() {
         // `m_record = {m_record[m_pos]}` will not free the memory.
-        m_record = std::vector<legacy::moldT>{m_record[m_pos]};
+        m_record = std::vector<aniso::moldT>{m_record[m_pos]};
         m_pos = 0;
     }
 
@@ -55,7 +55,7 @@ private:
     void set_pos(int pos) { m_pos = std::clamp(pos, 0, size() - 1); }
 };
 
-static void assign_val(legacy::moldT& mold, legacy::extrT::valT& val) {
+static void assign_val(aniso::moldT& mold, aniso::extrT::valT& val) {
     if (val.lock) {
         mold.lock = *val.lock;
         mold.rule = val.rule;
@@ -72,13 +72,13 @@ void frame_main() {
     messenger::display();
 
     static recorderT recorder;
-    legacy::moldT current = recorder.current();
+    aniso::moldT current = recorder.current();
     bool update = false;
 
     static bool show_file = false;
     static bool show_clipboard = false;
     static bool show_doc = false;
-    auto load_rule = [&](bool& flag, const char* title, std::optional<legacy::extrT::valT> (*load_fn)()) {
+    auto load_rule = [&](bool& flag, const char* title, std::optional<aniso::extrT::valT> (*load_fn)()) {
         ImGui::Checkbox(title, &flag);
         if (flag) {
             ImGui::SetNextWindowSize({600, 400}, ImGuiCond_FirstUseEver);
@@ -179,14 +179,14 @@ void frame_main() {
             static bool with_lock = false;
             if (with_lock) {
                 assert(manage_lock::enabled());
-                imgui_StrCopyable(legacy::to_MAP_str(current), imgui_Str);
+                imgui_StrCopyable(aniso::to_MAP_str(current), imgui_Str);
                 with_lock = ImGui::IsItemHovered();
             } else {
-                imgui_StrCopyable(legacy::to_MAP_str(current.rule), imgui_Str);
+                imgui_StrCopyable(aniso::to_MAP_str(current.rule), imgui_Str);
                 if (manage_lock::enabled()) {
                     ImGui::SameLine(0, ImGui::CalcTextSize(" ").x - 1 /* For correct alignment */);
                     std::string lock_str = "[";
-                    legacy::_misc::to_MAP(lock_str, current.lock);
+                    aniso::_misc::to_MAP(lock_str, current.lock);
                     lock_str += "]";
                     imgui_StrDisabled(lock_str);
                     with_lock = ImGui::IsItemHovered();
