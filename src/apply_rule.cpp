@@ -668,13 +668,10 @@ public:
                 imgui_StrTooltip("(...)",
                                  "Closed-capture: Run the selected area as torus space (with the current rule), to "
                                  "record all mappings. Depending on 'Adopt eagerly', the result will be integrated to "
-                                 "the buffer lock (as shown by 'Count:.../512'), or will replace the lock for the "
-                                 "current rule directly.)\n\n"
+                                 "the buffer lock, or will replace the lock for the current rule directly.)\n\n"
                                  "Open-capture: Record what there exists in the selected area for the current frame. "
                                  "The capturing area does not include the border. The result will always be integrated "
-                                 "to the buffer lock.\n\n"
-                                 "'Clear' clears the buffer lock.\n"
-                                 "'Adopt' sets the lock for the current rule to the buffer lock.");
+                                 "to the buffer lock.");
                 ImGui::SameLine();
                 static bool adopt_eagerly = true;
                 set_tag(adopt_eagerly, "Adopt eagerly",
@@ -708,7 +705,7 @@ public:
                 ImGui::SameLine();
                 int count = 0;
                 legacy::for_each_code([&](legacy::codeT code) { count += m_lock[code]; });
-                ImGui::Text("Count:%d/512", count);
+                ImGui::Text("Buffer lock: %d/512", count);
             });
 
             if (other_op) {

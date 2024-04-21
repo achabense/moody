@@ -15,12 +15,9 @@ The program is able to load all MAP rules from a file or from the clipboard. Rul
 
 If you find some interesting patterns you can also select and save as RLE string.
 
-#### Examples found by this program
-(Rule with pics)
-
 #### Getting started
 As a starting point, it will help a lot if you are familiar with Convay's Game-of-Life rule.
 See the "Documents" part in the program to get familiar with the concepts and operations.
 
-#### Dependency & Building
-The project is organized as a CMake-project. The program is written in C++20 with the help of [ImGui](https://github.com/ocornut/imgui) and [SDL2](https://github.com/libsdl-org/SDL) library. (ImGui is carried by this project; SDL2 will be fetched automatically by CMake). From my experience, the project can be opened and built directly by Visual Studio (with CMake tools available).
+#### Dependencies & Building
+The project uses CMake for building. The program is written in C++20 using [ImGui](https://github.com/ocornut/imgui) and [SDL2](https://github.com/libsdl-org/SDL) libraries. (ImGui is copied in this project; SDL2 will be fetched automatically by CMake.) In my experience, the project can be opened and built directly in Visual Studio (CMake tools required).

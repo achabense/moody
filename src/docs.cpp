@@ -1,7 +1,7 @@
 // TODO: simplest way to use this program... (randomize, and saving the rules...)
 
 const char* const doc_about =
-    R"(In these documents (as well as the ones opened via "Load file" or "Clipboard"), you can left-click the rules to see their effects and right-click the lines to copy the text (drag to select multiple lines). For more details see "Program I/O".
+    R"(In these documents (as well as the ones opened via 'Load file' or 'Clipboard'), you can left-click the rules to set them to... and right-click the lines to copy the text (drag to select multiple lines). For more details see the "Program I/O" section.
 
 ...
 MAP+sQSUIzICkiQgAiAEKBAhrIGFgAUbAAA4AChgnAAAw6CAkAIgKCAlASgIACgIQBbqCqhEQAAkFQAARIDAQQRBA
@@ -11,53 +11,50 @@ MAP7KV6wLHQiAHIPICBCAhlIqKAhAuKAFBoYmCFEAACIUzbAIAsAsCBJoAANhiIBEBSUICEMQiQFgRBg
 const char* const doc_tips = R"(...)";
 
 const char* const doc_workings =
-    R"(This section describes the exact workings of subsets, masks and the major rule operations.
+    R"(This section describes the exact workings of subsets, masks and major rule operations.
 
-In this program, a MAP rule is located by a series of subsets. These subsets are uniformly composable in the form of:
+In this program, a MAP rule is located by a series of subsets. Uniformly, these subsets can be composed in the form of:
 S = (M, P) (if not empty), where:
 1. M is a MAP rule specified to belong to S, and P is a partition of all cases.
 2. A rule R belongs to S iff in each group in P, the values of the rule are either all-the-same or all-the-different from those in M.
 '2.' can also be defined in terms of XOR operations ~ (R ^ M) has either all 0 or all 1 in each group in P.
 
-As a consequence, there are:
+As a consequence, taking S = (M, P), there are:
+-- If P has k groups, then there are 2^k rules in S.
+-- For any two rules in S, in each group in P, the values of the two rules must be either all-the-same or all-the-different from each other, just like them to M. In this sense, it does not matter which rule serves as M in S.
+-- If a rule R belongs to S, by flipping all values in a group of R, you will always get another rule in S. Conversely, if R does not belong to S, then by flipping the values you essentially get rules in S' = (R, S.P). More generally, from any rule in S, by flipping all values in some groups, you are able to get to any rule in the set.
+---->: describe in terms of reachability instead...
 
->> If P has k groups, then there are 2^k rules in S.
-
->> For any two rules that belong to the same subset S = (M, P), in each group in P, the values of the two rules must be either all-the-same or all-the-different from each other, just like them to M. In this sense, it does not matter which rule serves as M in S.
-
->> It's natural to define the "distance" between the two rules (in S) as the number of groups where they have different values.
+-- It's natural to define the "distance" between the two rules (in S) as the number of groups where they have different values.
 For example, here are some rules that all have distance = 1 (in the isotropic set) to the Game-of-Life rule:
 MAPARYXbhZofOgWaH7oaIDogBZofuhogOiAaIDoAIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAAACAAIAAAAAAAA
 MAPARYXfhZofugWan7oaIDogBZofuhogOiAaIDogIgAgAAWaH7oeIDogGiA6ICAAIAAaMDogIAAgACAAIAAAAAAAA
 MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6YSAAIQAaIDogIAAgACAAIQAAAAAAA
 In this program it's fairly easy to find such rules.
 
->> If a rule R belongs to S = (M, P), by flipping all values in a group of R, you will always get another rule in S. Conversely, if R does not belong to S, then by flipping the values you essentially get rules in S' = (R, S.P). More generally, from any rule in S, by flipping all values in some groups, you are able to get to any rule in the set.
----->: describe in terms of reachability instead...
+Obviously the whole MAP ruleset can be composed in the same way. And finally, it can be proven that, the intersection of such subsets must be of the same structure (if not empty). Therefore, the above conclusions apply to any combinations of these sets.
 
->> Obviously the whole MAP ruleset can be defined this way. And finally, it can be proven that, the intersection of such subsets must be of the same structure. That is, S1 & S2 -> (R', P') (if not empty).
-Therefore, the above conclusions apply to any combinations of these sets. As a result, the program provides the ability to select the subsets freely (as long as the result is not empty) - the program will calculate the intersection of the selected subsets (with the whole MAP set), and ...
-
-The working set, and the active mask (directly called "mask" in the program...)
-
-The program decide to make M immutable and designate an "active" mask that do the real observation (XOR-masking)...
-
+With these backgrounds, it will be much clearer to explain what happens in the program:
+...
+As a result, the program provides the ability to select the subsets freely (as long as the result is not empty) - the program will calculate the intersection of the selected subsets (with the whole MAP set), called the working set W. ...
+The program decides to make M immutable and designate an "active" mask that do the real observation (XOR-masking)...
 (The active mask)
 In most situations at least one of 'Zero' or 'Identity' will work, that's actually because the supported subsets are either defined based on 'Zero' or 'Identity' mask. There do exist situations where neither works, ...
-
-With the above background, it will be much clearer to explain what happens in the program:
+(*)
 0. For the selected subsets, the program calculates their intersection (with the whole MAP set) as the working set W = (M, P).
 1. Then you need to decide a working mask M' to actively measure the rules. To allow for further editions, M' must belong to W.
 W.M is immutable but is exposed as 'Native', so that there is at least a viable rule in the set.
 2. The current rule C is XOR-masked by the M', into a sequence of 0/1. The rule belongs to the working set (in other words, every selected subset) iff, the masked values has ......
 3. '<00.. Prev/Next 11..>' generates new rules based on the relation of C and M', in such a way that:
-'<00..' sets the current rule to......
-By 'Next'......
+'<00..' sets the current rule to M', and '11..>' sets the current rule to the one ...
+By 'Next', the current rule will be ...... 'Prev' does the same thing with exactly the reverse order.
 4. 'Randomize' generates randomized rules in W with specified distance to M'.
 5. The random-access section displays the masked values...
-By left-clicking the button you get a rule with each value in the group flipped. As a result, if the current rule C already belongs to W, the result will still belong to W. Otherwise, the operation essentially defines (C, W.P).
+By left-clicking the button you get a rule with each value in the group flipped. As a result, if the current rule C already belongs to W, the result will still belong to W. Otherwise, the operation essentially gets rules in (C, W.P).
+As a result, the result is only dependent on the partition of the working set...
 ... The design is intentional...
 
+TODO: move to another section?
 If the working set is small enough (it has only a few groups), the most direct way to explore the set is simply to check every rule in it.
 
 For example, try selecting both 'S.c.' and 'Tot(+s)' (the self-complementary and inner-totalistic rules). In this case, both 'Zero' and 'Identity' do not work, so you may need to select the 'Native' mask.
@@ -189,23 +186,6 @@ For example, suppose the "Zero" mask belongs to the subset (which is true in mos
 
 Here is a useful tip: when doing randomize, you can bind the <- -> key to undo/redo and set a larger pace, then you can ...
 
-
-In a small subset, ...
-In a large subset...
-Starting from one of Zero or Identity, (or Native if necessary) mask, get randomized rules until you find interesting ones. Then you can try to find nearby rules with permutative mode / randomization with small distance.
-
-In some subsets, sometimes you may find rules like this:
-(from rul33.txt; better example...)
-MAPA0wFEBBTV2EGZnFywDNkKEYRDigbKHiJ6DIklgrKDhYnSAit2JIckGwBtsuJBFMGAPAc5TPYilLBNImEJIhUoA
-However (... -> dist=1)
-MAPA0wFEBFTV2EGdnFywDNkKEYRDigbKHiJ6DIklgrKDhYnSAit2JIckGwBtsuJBFMGAPAc5TvYilLBtImEJIhUoA
-
-There is no need to stick to the original mask. You can switch to a new mask whenever you find a "better" rule. This way you are going to "wander" in the , with each important step "fixed" by the identity mask. This turns out to be able to help find a lot of interesting rules.
-...
-MAPA00FARBSVXAPZnFywDNmKEYRDigbKHqJ6GIkbgrKDhZnSAi93pIekGxBtsuJBFMGAPAc5THYSNLJNImEpAjUIA
-x = 6, y = 4
-4bob$6b$4obo$5bo!
-
 ---- Random-access edition
 Each group is shown by one of the cases that belongs to it.
 
@@ -290,11 +270,14 @@ MAPAjaoGRYMbAUJCY78PLH9F3RZ5I6GChkQ1aZIFMMgJBp3BiKINUAIUWLoKJrChCqIYsgRKaAJj3pKQ
 
 
 'C4':
-'C4' is a strict subset of 'C2'. In 'C4', oftentimes (for example, by getting randomized rules) you will find interesting die-patterns:
+'C4' is a strict subset of 'C2'. In 'C4', oftentimes (for example, by getting randomized rules) you will find rules with complex dynamics but where everything dies finally:
 MAPAkMwkQDI20gEBSC4F/gYtzNEmgAVCB0ookwgwMEGAA0FExCAo8gCgFw4ACAqEgALNCnhuUQcmQlgahCx2ACRHg
-It's highly likely there are oscillators or spaceships close to it. (The following rule has huge shaceships.)
+It's highly likely that there exist rules with interesting oscillators or spaceships close to it. For example, the following rule has (C4) distance = 1 to the above one, but has huge spaceships:
 MAPAkMwkwDo20gEBSC4F/gItzNkmkA1iBkookwgwMEGgA0FExCAo8gigFw4AAAqEgALNCnhsUQcmQlgahCx2ACRHg
 
+Another pair of example:
+MAPA0wFMBFTd2EGdnFywDNkKEYRDqgbKPiJ6DIklgrKDhYnSAit2JIckGwBtsuJBFMGAPAc5TvYilLBtImEJIhUoA
+MAPA0wFEBFTV2EGdnFywDNkKEYRDigbKHiJ6DIklgrKDhYnSAit2JIckGwBtsuJBFMGAPAc5TvYilLBtImEJIhUoA
 
 --- Rules with state symmetry (the self-complementary rules)
 ('S.c.' ...)
