@@ -3,12 +3,12 @@
 const char* const doc_about =
     R"(In these documents (as well as the ones opened via "Load file" or "Clipboard"), you can left-click the rules to see their effects and right-click the lines to copy the text (drag to select multiple lines). For more details see "Program I/O".
 
---- The sentiment
 ...
 MAP+sQSUIzICkiQgAiAEKBAhrIGFgAUbAAA4AChgnAAAw6CAkAIgKCAlASgIACgIQBbqCqhEQAAkFQAARIDAQQRBA
-I hope this is impressive enough. It was picked from many randomized rules many years ago ... (... background of this program)
-
 MAP7KV6wLHQiAHIPICBCAhlIqKAhAuKAFBoYmCFEAACIUzbAIAsAsCBJoAANhiIBEBSUICEMQiQFgRBgAJKgAA4gA)";
+
+// TODO: add tips (dealing with white background etc...)
+const char* const doc_tips = R"(...)";
 
 const char* const doc_workings =
     R"(This section describes the exact workings of subsets, masks and the major rule operations.
@@ -21,7 +21,7 @@ S = (M, P) (if not empty), where:
 
 As a consequence, there are:
 
->> Suppose there are k groups in P, then there are 2^k rules in S.
+>> If P has k groups, then there are 2^k rules in S.
 
 >> For any two rules that belong to the same subset S = (M, P), in each group in P, the values of the two rules must be either all-the-same or all-the-different from each other, just like them to M. In this sense, it does not matter which rule serves as M in S.
 
@@ -33,13 +33,14 @@ MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6YSAAIQAaIDogIAAgACAA
 In this program it's fairly easy to find such rules.
 
 >> If a rule R belongs to S = (M, P), by flipping all values in a group of R, you will always get another rule in S. Conversely, if R does not belong to S, then by flipping the values you essentially get rules in S' = (R, S.P). More generally, from any rule in S, by flipping all values in some groups, you are able to get to any rule in the set.
--->...
+---->: describe in terms of reachability instead...
 
->> Obviously the whole MAP ruleset can be defined this way. And finally, it can be proven that, the intersection of such subsets are of the same structure. That is, S1 & S2 -> (R', P') (if not empty).
+>> Obviously the whole MAP ruleset can be defined this way. And finally, it can be proven that, the intersection of such subsets must be of the same structure. That is, S1 & S2 -> (R', P') (if not empty).
 Therefore, the above conclusions apply to any combinations of these sets. As a result, the program provides the ability to select the subsets freely (as long as the result is not empty) - the program will calculate the intersection of the selected subsets (with the whole MAP set), and ...
+
 The working set, and the active mask (directly called "mask" in the program...)
 
-The program decide to make M immutable and designate an "active" mask that do the real observation...
+The program decide to make M immutable and designate an "active" mask that do the real observation (XOR-masking)...
 
 (The active mask)
 In most situations at least one of 'Zero' or 'Identity' will work, that's actually because the supported subsets are either defined based on 'Zero' or 'Identity' mask. There do exist situations where neither works, ...
@@ -64,13 +65,12 @@ There are only 5 groups ~ 2^5=32 rules in the set, so it's fairly reasonable to 
 MAPAAAAAQABARcAAQEXARcXfwABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf3//f////w
 
 If the working set is large, then it becomes infeasible to test all rules. Typically, we can:
-1. Try randomized rules. (If the W.P has k groups, then the more close the specified distance is to k/2, the more likely that the result will be unrelated to the masking rule.)
+1. Try randomized rules. (If the W.P has k groups, then the more close the specified distance is to k/2, the more likely the result will be unrelated to the masking rule.)
 2. If there are rules (the current rule) in the set known to be special/promising, we can check rules that are close to it.
-2.1. We can set the mask to the current rule ('<< Cur'), then try 'Randomize' with a small distance, or we can also do 'Prev/Next' - the whole-set traversal starts with the rules that are closest to the masking rule, meaning that ...
+2.1. We can set the mask to the current rule ('<< Cur'), then try 'Randomize' with a small distance, or we can also do 'Prev/Next' - the whole-set traversal starts with the rules that are closest to the masking rule (distance = 1), meaning that ...
 2.2. By turning on the 'Preview mode' for the random-access section, we can test rules that...
 
-Sometimes we may also want to jump outside of the predefined subsets. This can be... See the "Rules in the wild" section for more info.
-
+Sometimes we may also want to jump outside of the predefined subsets. This can lead to surprising discoveries sometimes... See the "Atypical rules" section for more info.
 
 )";
 
@@ -240,12 +240,12 @@ The best way to get familiar with a subset is to generate randomized rules in it
 
 
 --- None
-This is typically what you will get in default density (without any constraints):
+This is typically what you will get in the default density:
 MAPYaxTu9YJm9UZsagD9KrzcclQXH5nLwLTGALPMYhZeR6QeYRX6y7WoAw4DDpCQnTjY7k71qW7iQtvjMBxLGNBBg
 
 MAPBRAACkiAAUiATAhmCQkIEYMBgCBDCBFHUqQgJUQAAEAiAAmANgIkRAAISUA0ADgAAZAQAmAMFTCJgAAAYEYEgA
 
-It's possible to get non-trivial rules that do not belong to any well-defined subsets. See "Rules in the wild" part for details.
+It's possible to get non-trivial rules that do not belong to any well-defined subsets. See the "Atypical rules" section for details.
 
 
 --- Rules with native symmetry
@@ -335,11 +335,35 @@ This is an amazing rule.
 
 MAP7ohmmYgAmWbuiGaZiACZZogAmWYAEWaIiACZZgARZoiIAJlmABFmiIgAmWYAEWaIABFmiBFmiAAAEWaIEWaIAA
 
---- Atypical subsets
 
+MAPAAAAEQAREXcAAAARABERdwAREXcRd3f/ABERdxF3d/8AERF3EXd3/wAREXcRd3f/EXd3/3f///8Rd3f/d////w
 )";
 
-const char* const doc_program_IO =
+const char* const doc_atypical =
+    R"( TODO: These are totally based on random-access flippings; should give more explanations for random-access in "workings" section...
+
+
+Typically you will explore rules in the well-defined subsets supported by the program. These subsets, however, take up only an extremely small part of all MAP rules. For example, the largest subset in this program is the native 'C2' rules, which has 272 groups, meaning it takes up only 2^(272-512) ~ 2^-240 of all possible MAP rules.
+
+This section shows what may be gotten with this program. For sanity....
+
+Here is the same hex-C6 rule shown in the "Rules in different subsets" section. Notice that it also belongs to the native 'C2' subset, which is inevitable as hex-C6 is actually a strict subset of native C2.
+MAPEUQRVSLdM4gRRBFVIt0ziCK7IswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHMRIiqIpnMEQ
+
+The following part is based on this rule. Before moving on, do:
+1. Turn on 'Preview mode' in the rule-edition plane.
+2. Set a large pace for the preview windows (in 'Settings') and the main window.
+
+By selecting only native-C2, we bring it to a wider context.
+MAPEUQxVSLdM4gRRBFVIt0ziCK7oswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHMRIiqIpnMEQ
+
+By the way, for an arbitrary native-C2 rule, if you do random-access flippings in hex-C6, the result will still belong to native-C2
+(... as native-C2.P is a refinement of hex-C6.P, so you will effectively flip (one or) multiple groups of C2 at the same time.) ... The same applies to, for example, random-flipping groups of native-isotropic rules upon C4 rules....
+
+.......
+)";
+
+const char* const doc_IO =
     R"(Some strings will be marked with grey borders when you hover on them. You can right-click on them to copy the text to the clipboard. For example, the current rule (with or without the lock) can be copied this way. The path in the "Load file" is also copyable.
 
 In these documents, you can right-click the lines to copy them (drag to select multiple lines). The line(s) will be displayed as a single piece of copyable string in the popup, then you can right-click that string to copy to the clipboard. As you will see, this document ends with an RLE-pattern blob. ......
@@ -432,43 +456,13 @@ This is a feature similar to "Capture" to help find still-life based patterns...
 )";
 #endif
 
-const char* const doc_atypical =
-    R"(Typically you will explore rules that belong to several of the "well-defined" subsets. These subsets, however, take up just a small part of all MAP rules. With the help of "lock" feature it's possible to generate very strange rules that do not belong to any well-defined subsets.
-
-Here is the same example in ...
-MAPEUQRVSLdM4gRRBFVIt0ziCK7IswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHMRIiqIpnMEQ
-
-If you try to capture the oscillator, you'll get:
-MAPEUQRVSLdM4gRRBFVIt0ziCK7IswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHMRIiqIpnMEQ [/////////////////////P//////9+///u32/+/vu/L////+/v//3v///f3/7v/+//7/+v///uv8/t39//vneA]
-
-Do the "Recognize" and you will find that all the groups are locked - The oscillator relies on ....
-However, not all groups are fully locked, which means if you switch to a wider subsets...
-
-The native C2 subset
-MAPEUQRVSLdM4gRRBFVIt0ziCK7IswiABFEIrsizCIAFUVVAEQRmYiqIlUARBOZiKoizESIqyKZzBHMRIiqIpncEw
-MAPEUQRVSLdM4gRRBFVIt0ziiK7IswiABFEIrsjzCIAFUxVAEQRmYiqIlUARBOZiKojzESIqiKZzAHMRIqqIpnMFQ
-MAPEUQRVSLdM4gRRBFVIt0ziiK7IswiABFEIrsizCIAEUxVAEQRmYiqIlUARBGZiaojzESIqyKZzBHMRIiqIp3cFA
-MAPEUQRVSLdM4gRRBFVIt0ziCK7IswiABFEI7sizCIAEUVVAEQRmYiqIlUARBGZiaojzESIqyKZzAHORIiqIp3cFg
-MAPEUQRVSLdM4gRRBFVIt0ziCK7IswiABFEIrsizCIAFURVAEQRmYiqIlUARBOZiaojzESIqiKZzBHMRIiqIp3MFQ
-
-x = 7, y = 5
-b3o3b$2b2o3b$4ob2o$b2o2b2o$2bo3bo!
-
-C2 takes up a much larger part of the MAP rules. But that's still "only" 2^272 rules...
-
-MAPEUQRVSLdM4gRRBFVIt0ziCK7IswiABFEI6srzCIAFUVVAEQQmIiqI1UARBOZmaojzEWIryKZzQXPRYioIp3EFQ [/////v///////v/+9vr79f///9v//b+6+P/4+fTHvCT/+//v/+//3v/2+PH/rqvK/63//v/99+v55vXe/nrzsQ]
-MAPEUQRVCLdM4gRRBFVItkziiK7IswiABEAIKsoyCIAFBxVAEQAmIiqA1UIQBGZiOoCzEWIryKZxRHJRYCoIp3AEQ [/////v///////v/+9vr79f///9v//b+6+P/4+fTHvCT/+//v/+//3v/2+PH/rqvK/63//v/99+v55vXe/nrzsQ]
-MAPEUQRVCLdM4gRRBFVItkziiK7IswiABEAIKsoyCIAFBxVAEQAmIiqA1UIQBGZiOoCzEWIryKZxRHJRYCoIp3AEQ [/////v/////////+/////////////f/6+v/4//7v/2T/+//v/////v/++vH/7rvO//3//v//9+v9/v3+/nr/uQ]
-MAPEUQRVCLdM4gRRBFUItkziiK7IswiABEEIasuyCIAFAZVBEQAmIiqAlUIQBGZiKoizEWIryKZxQHJRIKpIhjAEQ [/////v/////////+/////////////f/6+v/4//7v/2T/+//v/////v/++vH/7rvO//3//v//9+v9/v3+/nr/uQ]
-These things are insane, so let's stop here.)";
-
 // TODO: the documents are currently unordered.
 extern const char* const docs[][2]{{"About this program", doc_about},
+                                   {"Program I/O", doc_IO},
                                    {"Subset, mask and rule operations", doc_workings},
                                    // {"Concepts", doc_concepts},
                                    // {"Workflow", doc_workflow},
                                    {"Rules in different subsets", doc_subsets},
+                                   {"Atypical rules", doc_atypical},
                                    {"Lock and capture", /*doc_lock_and_capture*/ "This section is not finished yet :("},
-                                   {"Rules in the wild", doc_atypical},
-                                   {"Program I/O", doc_program_IO},
                                    {/* null terminator */}};
