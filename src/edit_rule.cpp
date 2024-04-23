@@ -738,6 +738,7 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
                          "2. 'Next' to iterate. The left/right arrow key will be bound to 'Prev/Next' after you "
                          "click the button.");
 
+        // TODO: move this to the right plane (before 'Restart')?
         ImGui::SameLine();
         guarded_block(true /* Unconditional */, [&] {
             if (ImGui::Button("Rev")) {
