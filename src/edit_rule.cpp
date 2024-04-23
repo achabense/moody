@@ -463,13 +463,13 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
             "See 'Zero/Identity' for examples.\n"
             "When both the current rule and the masking rule belong to the working set, the distance between the two "
             "rules can be defined as the number of groups where they have different values.\n\n"
-            "(The exact workings are more complex than explained here. For details see the \"Concept\" part "
-            "in \"Documents\".)";
+            "(The exact workings are more complex than explained here. For details see the \"Subset, mask ...\" "
+            "section in \"Documents\".)";
 
         // TODO: add record for custom masks?
         static aniso::maskT mask_custom{{}};
 
-        enum maskE { Zero, Identity, Native, Custom };
+        enum maskE { Zero, Identity, Native, Custom }; // TODO: better name for 'Native'?
         struct termT {
             const char* label;
             const char* desc;
@@ -510,7 +510,7 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
         ImGui::AlignTextToFramePadding();
         imgui_StrTooltip("(...)", about_mask);
         ImGui::SameLine();
-        imgui_Str("Mask =");
+        imgui_Str("Mask ~");
         for (const maskE m : {Zero, Identity, Native, Custom}) {
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
             if (ImGui::RadioButton(mask_terms[m].label, mask_tag == m)) {
@@ -549,7 +549,9 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
 
     // TODO: more filtering modes?
     // Will not hide "impure" groups even when there are locks.
-    static bool hide_locked = false;
+    // Enabled by default; this will have no effect before `manage_lock::enabled`, as the lock part is
+    // guaranteed to be empty before that.
+    static bool hide_locked = true;
     manage_lock::display([&](bool visible) {
         if (!visible) {
             return;
@@ -568,9 +570,10 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
                 return_lock(aniso::enhance_lock(subset, mold));
             }
         });
-        imgui_ItemTooltip("\"Saturate\" the locked groups to keep the full effect of the locks when switching to a"
-                          "\"wider\" working set. For use cases see the \"Lock and capture\" part in \"Documents\".\n"
-                          "(This is available only when the current rule belongs to the working set.)");
+        imgui_ItemTooltip(
+            "\"Saturate\" the locked groups to keep the full effect of the locks when switching to a"
+            "\"wider\" working set. For use cases see the \"Lock and capture\" section in \"Documents\".\n"
+            "(This is available only when the current rule belongs to the working set.)");
         ImGui::SameLine();
         ImGui::Checkbox("Hide locked groups", &hide_locked);
         ImGui::SameLine();
@@ -581,13 +584,12 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
     // Disable all edit operations if !subset.contains(mask), including those that do not really need
     // the mask to be valid (for example, `trans_reverse`, which does not actually rely on subsets).
     if (!mask_avail) {
-        imgui_StrWrapped("This mask does not belong to the working set (in other words, the rule does not belong to "
+        imgui_StrWrapped("This rule does not belong to the working set (in other words, the rule does not belong to "
                          "all the selected subsets). Consider trying other masks.\n\n"
                          "1. At least one of 'Zero', 'Identity' and 'Native' will work. Especially, 'Native' will "
                          "always work.\n"
                          "2. If the current rule belongs to the working set, it can also serve as a valid 'Custom' "
-                         "mask ('<< Cur').\n\n"
-                         "For more details see the \"Workflow\" part in \"Documents\".",
+                         "mask ('<< Cur').",
                          item_width);
         return std::nullopt;
     }
@@ -630,7 +632,7 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
     const auto scanlist = aniso::scan(par, mask, mold);
 
     static bool preview_mode = false;
-    static previewer::configT config{previewer::configT::_160_160};
+    static previewer::configT config{previewer::configT::_220_160};
     {
         const int c_group = par.k();
         int c_0 = 0, c_1 = 0, c_x = 0;
@@ -760,6 +762,8 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
 #if 0
         // TODO: whether to expose this? This is conceptually well-defined, but very hard to explain and
         // the effect may not be as expected.
+        // TODO: ... sometimes this is really useful...
+        // combine with batch preview -> approximated by different sets?
         ImGui::SameLine();
         guarded_block(compatible, [&] {
             if (ImGui::Button("Approximate")) {

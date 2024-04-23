@@ -703,6 +703,12 @@ static void load_rule_from_memory(std::optional<aniso::extrT::valT>& out) {
     };
 
     if (!doc_id) {
+        imgui_Str("Starry (v 0.9-beta) by github user 'achabense'.");
+        imgui_Str("The latest version is available at: ");
+        ImGui::SameLine(0, 0);
+        imgui_StrCopyable("https://github.com/achabense/starry", imgui_Str);
+
+        ImGui::Separator();
         select();
     } else {
         const bool close = ImGui::SmallButton("Close");

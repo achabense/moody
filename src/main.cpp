@@ -176,8 +176,8 @@ int main(int, char**) {
 
     // Create window with SDL_Renderer graphics context
     const SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-    window =
-        SDL_CreateWindow("MAP-rule explorer", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
+    window = SDL_CreateWindow("Starry", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720,
+                              window_flags);
     if (!window) {
         resource_failure();
     }
@@ -263,7 +263,7 @@ int main(int, char**) {
         // Make collapsed windows obvious to see. Set outside of `frame_main` for convenience.
         // TODO: the collapse and close buttons always take ImGuiCol_ButtonXXX (bright-blue) and
         // look strange in the reddish background.
-        ImGui::PushStyleColor(ImGuiCol_TitleBgCollapsed, IM_COL32(180, 0, 90, 128));
+        ImGui::PushStyleColor(ImGuiCol_TitleBgCollapsed, IM_COL32(180, 0, 120, 128));
         frame_main();
         ImGui::PopStyleColor();
 

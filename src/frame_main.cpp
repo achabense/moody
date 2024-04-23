@@ -74,6 +74,9 @@ void frame_main() {
     static recorderT recorder;
     aniso::moldT current = recorder.current();
     bool update = false;
+    if (!manage_lock::enabled()) { // ~ `assert_implies`
+        assert(current.lock == aniso::moldT::lockT{});
+    }
 
     static bool show_file = false;
     static bool show_clipboard = false;
@@ -148,6 +151,8 @@ void frame_main() {
 
         ImGui::Separator();
 
+        // TODO: rename 'Prev/Next'? is 'Undo/Redo' suitable?
+        // Use icons? https://github.com/ocornut/imgui/blob/master/docs/FONTS.md#using-icon-fonts
         ImGui::AlignTextToFramePadding();
         imgui_StrTooltip(
             "(...)",
@@ -175,7 +180,6 @@ void frame_main() {
         }
 
         {
-            // TODO: whether to display the lock part when it is never enabled?
             static bool with_lock = false;
             if (with_lock) {
                 assert(manage_lock::enabled());

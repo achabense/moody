@@ -195,6 +195,7 @@ class runnerT {
 
         bool pause = false;
 
+        // TODO: pause for some fixed time for user-editions?
         clockT::time_point last_written = {};
         void mark_written() { last_written = clockT::now(); }
 
