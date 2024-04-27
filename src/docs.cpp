@@ -8,9 +8,7 @@ MAP+sQSUIzICkiQgAiAEKBAhrIGFgAUbAAA4AChgnAAAw6CAkAIgKCAlASgIACgIQBbqCqhEQAAkFQAA
 MAP7KV6wLHQiAHIPICBCAhlIqKAhAuKAFBoYmCFEAACIUzbAIAsAsCBJoAANhiIBEBSUICEMQiQFgRBgAJKgAA4gA)";
 
 const char* const doc_overview =
-    R"(TODO: about MAP-rule...
-
-At any time, the "current rule" is shown in the right plane (which is an editable torus space; the operations are recorded in the tooltips (...)). As you see, it is the Game-of-Life rule initially.
+    R"(At any time, the "current rule" is shown in the right plane (which is an editable torus space; the operations are recorded in the tooltips (...)). As you see, it is the Game-of-Life rule initially.
 
 The MAP-string for the current rule is shown at the top taking up a single line. You can right-click the text to copy it to the clipboard. The paths in the 'Load file' window can be copied in the same way.
 The program keeps the record for the current rule. You can undo/redo via '<| Prev/Next |>'. The program manages several sequences of rules in the same way (in the form of 'First Prev/Next Last'). When any of them is activated, the left/right arrow keys are bound to the sequence ('Prev/Next') for convenience.
@@ -27,16 +25,17 @@ The left plane provides ways to analyze and "modify" the current rule based on a
 The subsets that the current rule belongs to are marked with light-green borders.
 To modify the rule, you need to firstly specify a "working set", which is the set you are going to explore. You can select multiple subsets, the program will get the intersection of them as the working set. For example, if you select 'All' (isotropic rules; selected by default) and 'S.c.' (self-complementary rules), this means you are going to explore the rules that are both isotropic and self-complementary.
 After that you need to select a "mask", which is an arbitrary rule to perform XOR-masking on the current rule ??? (TODO: too impl-specific?), based on which you can see the values and generate new rules. To proceed you'd need to ensure the mask belongs to the working rule ('Native' will always work).
-The and 'Randomize' and '<00.. Prev/Next 11..>' provides ways to generate new rules based on the mask (as well as the current rule when it comes to 'Prev/Next'):
-'Randomize' ......
-'<00.. Prev/Next 11..>', together with the current rule ........
+'Randomize' and '<00.. Prev/Next 11..>' provide ways to generate new rules based on the mask (as well as the current rule for 'Prev/Next'):
+'Randomize' generates randomized rules with specified distance to the mask.
+'<00.. Prev/Next 11..>', together with the current rule, defines a sequence of all rules in the working set, in the form of .....
 ......
-The random-access section ... by turning on 'Preview mode', ...
+The random-access section displays each group.....
+    by turning on 'Preview mode', you will get ......
 For detailed descriptions see the next section ("Subset, mask and rule operations").
 
-The program also has a way to generate rules ensuring certain patterns. See the "Lock and capture" section for details.
-For example, with this feature, it's easy to find rules like this:
+The program also has a way to generate rules ensuring certain patterns. For example, in this program it's also easy to find rules like this:
 MAPARYSZhYAPEgSaBCgCAAAgABAEsAIAIgASIDgAIAAgAASQAIAaACggACAAICAAIAASICogIAAAACAAAAAAAAAAA
+See the "Lock and capture" section for details.
 )";
 
 const char* const doc_workings =
@@ -65,7 +64,7 @@ MAPARYXbhZofOgWaH7oaIDogBZofuhogOiAaIDoAIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAAACAA
 MAPARYXfhZofugWan7oaIDogBZofuhogOiAaIDogIgAgAAWaH7oeIDogGiA6ICAAIAAaMDogIAAgACAAIAAAAAAAA
 MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6YSAAIQAaIDogIAAgACAAIQAAAAAAA
 
-Obviously the whole MAP ruleset can be composed in the same way. And finally, it can be proven that, the intersection of such subsets must be of the same structure (if not empty). Therefore, the above conclusions apply to any combinations of these sets, and in the program you can combine different subsets freely.
+Obviously the whole MAP ruleset can be composed in the same way. And finally, it can be proven that, the intersection (&) of such subsets must be of the same structure (if not empty). Therefore, the above conclusions apply to any combinations of these sets, and in the program you can combine different subsets freely.
 
 With these backgrounds, it will be much clearer to explain what happens in the program when it comes to rule edition:
 1. For the selected subsets, the program calculates their intersection (with the whole MAP set) as the working set W = (M, P).
@@ -81,12 +80,11 @@ By 'Next', the current rule will be ...... 'Prev' does the same thing with exact
 By left-clicking the button you get a rule with values flipped for every case in that group. As a result, if the current rule C already belongs to W, the result will still belong to W. Otherwise, the operation essentially gets rules in (C, W.P).
 Formally speaking, random-access edition defines S' = (C, W.P), which is W itself if C already belongs to W. And, at any time it presents a "slice" of all rules that have distance = 1 to C in S'. With 'Preview mode' turned on this would be obvious.
 
-TODO: move to another section?
 If the working set is small enough (having only a few groups), the most direct way to explore the set is simply to check every rule in it.
 
-For example, select both 'S.c.' and 'Tot(+s)' (the self-complementary and inner-totalistic rules). (In this case, both 'Zero' and 'Identity' do not work, so you'd need to select the 'Native' mask.) There are only 5 groups ~ 2^5=32 rules in the set, so it's fairly reasonable to check all of them. By clicking '<00..' you start from M', which happens to be the "voting" rule:
+Take 'S.c. & Tot(+s)' (the self-complementary and inner-totalistic rules) for example. (In this case, neither 'Zero' nor 'Identity' works, so you'd need to select the 'Native' mask.) There are only 5 groups ~ 2^5=32 rules in the set, so it's fairly reasonable to check all of them. By clicking '<00..' you will start from M', which happens to be the "voting" rule:
 MAPAAAAAQABARcAAQEXARcXfwABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf3//f////w
-Then you can click 'Next' to iterate - ......
+Then you can click 'Next' to iterate - firstly all rules having distance = 1 to M', then 2, ..., until the rule gotten by '11..>'.
 
 If the working set is large, then it becomes infeasible to test all rules. In these cases:
 1. Using the mask-based generation feature, we can set the mask to the current rule ('<< Cur'), then try 'Randomize' with a small distance, or we can also do 'Prev/Next' - the whole-set traversal starts with the rules that are closest to the masking rule (distance = 1)
@@ -99,10 +97,11 @@ If the W.P has k groups, then the more close the specified distance is to k/2, t
 
 Sometimes we may also want to jump outside of the predefined subsets. This can be done via random-access edition, and may lead to surprising discoveries. See the "Atypical rules" section for more info.)";
 
-const char* const doc_subsets =
-    R"(The following rules are selected from different subsets. You can click the 'Recognize' button to select the subsets they belong to.
+const char* const doc_rules =
+    R"(The following rules are selected from different subsets. You can click a rule and then 'Recognize' to select the subsets it belongs to.
 (Notice that 'Recognize' cannot reflect the relations between different subsets. For example, if you select '|' and '-', the working set will also belong to 'C2' (the rules in '|' and '-' will always belong to 'C2') By 'Recognize' ......)
 (To get familiar with the relation between subsets you can ....)
+(For relations between subsets: if you select a single subset and some subsets turn dull-blue, this means the subset you select belongs to these subsets... (....Take the initial situ for example...))
 
 --- None
 This is typically what you will get in the default density:
@@ -162,43 +161,47 @@ MAPAhghuE0QgywsgCBAwliAgE0RiiAAAOCQwkgwwAQABABjiEUgFggeESnGQEIUAACBAEQCUKCIkWBkg
 
 
 --- Rules with state symmetry (the self-complementary rules)
-('S.c.' ...)
-Spaceships and oscillators do exists ... (found using the 'Lock & Capture' feature in this program)...
+This is supported in the program via 'S.c.'; I cannot find a more suitable label for this :|
+There do exist self-complementary rules that allow for spaceships and oscillators. For example, the following rule is found using the 'Lock & Capture' feature in this program:
 MAPARcTZhegPEwRdxPuFCBIzyBmF8A8+4g3RMD7A+03nz8DBhNIPyD83RPuIMP8F5n7DO3714g3EXfNw/oXmTcXfw
 
 MAPgAAAAQABARcAAQEXARcXfwABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf3//f////g
 
 
-/////////////////////////////////////////////
-(Outer-) Totalistic:
+--- Totalistic rules
+Totalistic rules have no additional spatial symmetries than common isotropic rules.
+
+Outer-totalistic:
 Aah! The Game-of-Life rule.
 MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA
 
-(Inner-) Totalistic:
+Inner-totalistic:
 MAPAAAAAQABARcAAQEXARcXfwABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf3//f////g
 
 --- Rules emulating Von-Neumann neighborhood
-Isotropic:
+Von-Neumann neighborhood is compatible with native symmetries - you can combine 'Von' with native symmetry terms ......
+
+Isotropic ('native-All & Von'):
 MAPAAD/zAAzzP8AAP/MADPM/wAz/zMz/zP/ADP/MzP/M/8AAP/MADPM/wAA/8wAM8z/ADP/MzP/M/8AM/8zM/8z/w
 MAP/8wz/8wA/wD/zDP/zAD/AMwAzMwAAMwAzADMzAAAzAD/zDP/zAD/AP/MM//MAP8AzADMzAAAzADMAMzMAADMAA
 MAP/8wz/8zM/8z/zDP/zMz/zP8A/8wAAMwA/wD/zAAAzAD/zDP/zMz/zP/MM//MzP/M/wD/zAAAzAD/AP/MAADMAA
 
 
-C2
+C2 ('native-C2 & Von'):
 MAPADMAMwD/M/8AMwAzAP8z/wAzM8z//8zMADMzzP//zMwAMwAzAP8z/wAzADMA/zP/ADMzzP//zMwAMzPM///MzA
 MAPzP8zAMwzAMzM/zMAzDMAzDMAzADMzAAAMwDMAMzMAADM/zMAzDMAzMz/MwDMMwDMMwDMAMzMAAAzAMwAzMwAAA
 MAPzP8zAMwzAADM/zMAzDMAADMzzAD/zAAAMzPMAP/MAADM/zMAzDMAAMz/MwDMMwAAMzPMAP/MAAAzM8wA/8wAAA
 
 
 --- Rules emulating hexagonal neighborhood
-Isotropic:
+Isotropic ('All'):
 MAPEVWIADNmABERVYgAM2YAERHuABF37gAAEe4AEXfuAAARdwAA7u4RABF3AADu7hEA/6oARMwRIoj/qgBEzBEiiA
 MAPEUQRRCLuIhERRBFEIu4iETOqAJlmiBFEM6oAmWaIEURVZgARzIiZIlVmABHMiJki7gCIZgARZpnuAIhmABFmmQ
 
-a-d & q-c & w-x:
+'a-d & q-c & w-x':
 MAPiAAAAAAAACKIAAAAAAAAIgAAACIAMwAAAAAAIgAzAAAAERFVAGYAuwAREVUAZgC7ESIiMxFVACIRIiIzEVUAIg
 
-a|q & q|w & w|d:
+'a|q & q|w & w|d':
 MAPADNmu1UR3XcAM2a7VRHdd0RE3WaIALvdRETdZogAu90iiLvdIgBmuyKIu90iAGa7AMxm/6oA/3cAzGb/qgD/dw
 MAPAGYRImbuRO4AZhEiZu5E7mYRZpmqAP9VZhFmmaoA/1VmzGb/EQCZM2bMZv8RAJkz7gBmMwCIVe7uAGYzAIhV7g
 
@@ -212,8 +215,9 @@ MAPRABVAIgAmd1EAFUAiACZ3YgAqu5VdyIAiACq7lV3IgAAEVURAGaIqgARVREAZoiqESJEZlVEqgARI
 MAPqsxEACIRiACqzEQAIhGIAAAAmQAAAACIAACZAAAAAIiIIgAAAABEAIgiAAAAAEQAiEQAACIAAACIRAAAIgAAAA
 
 'C6' alone:
+'C6' is a strict subset of both 'C2' and 'C3'.
 MAPEUQRVSLdM4gRRBFVIt0ziCK7IswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHMRIiqIpnMEQ
-This is an amazing rule.
+This is an amazing rule. As you will see, the next section ("Atypical rules") is based on this rule.
 
 MAPEUQRRCKqIjMRRBFEIqoiMzOIEZkAqgCIM4gRmQCqAIhERABEzETdAEREAETMRN0AuwCqRAARIoi7AKpEABEiiA
 
@@ -221,6 +225,8 @@ MAPEUQRRCKqIjMRRBFEIqoiMzOIEZkAqgCIM4gRmQCqAIhERABEzETdAEREAETMRN0AuwCqRAARIoi7A
 ......
 MAPEURmqiKIzAARRGaqIojMACKIzAAAAIgAIojMAAAAiABEAKqIiAAAAEQAqoiIAAAAiAAAAAAAAACIAAAAAAAAAA
 MAP7ohmmYgAmWbuiGaZiACZZogAmWYAEWaIiACZZgARZoiIAJlmABFmiIgAmWYAEWaIABFmiBFmiAAAEWaIEWaIAA
+
+The voting rule in hexagonal neighborhood:
 MAPAAAAEQAREXcAAAARABERdwAREXcRd3f/ABERdxF3d/8AERF3EXd3/wAREXcRd3f/EXd3/3f///8Rd3f/d////w
 
 --- Misc
@@ -241,14 +247,14 @@ const char* const doc_atypical =
 ... and shows some "atypical" use cases of random-access edition......
 This section is based on random-access edition, and shows what may be gotten when the edition takes place when the working set is the MAP-set, .......... For sanity....
 
-Here is the same hex-C6 rule shown in the "Rules in different subsets" section. Notice that it also belongs to the native 'C2' subset, which is inevitable as hex-C6 is actually a strict subset of native C2.
+Here is the same hex-C6 rule shown in the "Rules in different subsets" section.
 MAPEUQRVSLdM4gRRBFVIt0ziCK7IswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHMRIiqIpnMEQ
 
-The following part is based on this rule. Before moving on, do:
+The following part is based on this rule. Before moving on:
 1. Turn on 'Preview mode' in the rule-edition plane.
 2. Set a large pace for the preview windows (in 'Settings') and the main window.
 
-By selecting only native-C2, we bring it to a wider context.
+Notice that it also belongs to the native 'C2' subset, which is inevitable as hex-C6 is actually a strict subset of native C2. By selecting only native-C2, we bring it to a wider context...
 MAPEUQxVSLdM4gRRBFVIt0ziCK7oswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHMRIiqIpnMEQ
 
 By the way, for an arbitrary native-C2 rule, if you do random-access flippings in hex-C6, the result will still belong to native-C2
@@ -353,7 +359,7 @@ const char* const doc_lock_and_capture = "This section is not finished yet :(";
 extern const char* const docs[][2]{{"About this program", doc_about},
                                    {"Overview", doc_overview},
                                    {"Subset, mask and rule operations", doc_workings},
-                                   {"Rules in different subsets", doc_subsets},
+                                   {"Rules in different subsets", doc_rules},
                                    {"Atypical rules", doc_atypical},
                                    {"Lock and capture", doc_lock_and_capture},
                                    {/* null terminator */}};

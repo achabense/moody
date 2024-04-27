@@ -71,7 +71,6 @@ inline float wrap_len() {
     return ImGui::GetFontSize() * 35.0f;
 }
 
-// TODO: whether to support shortcut in `imgui_StepSliderInt`?
 inline bool button_with_shortcut(const char* label, ImGuiKey shortcut = ImGuiKey_None, const ImVec2& size = {}) {
     bool ret = ImGui::Button(label, size);
     if (shortcut != ImGuiKey_None && !imgui_TestItemFlag(ImGuiItemFlags_Disabled)) {

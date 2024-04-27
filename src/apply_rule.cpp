@@ -126,16 +126,6 @@ public:
     void run(const aniso::ruleT& rule, int count = 1) {
         for (int c = 0; c < count; ++c) {
             run_torus(m_tile, m_temp, rule);
-#if 0
-            // Add salt; the effect is amazing sometimes...
-            // This is mostly an "off-topic" feature; whether to add a mode to enable this?
-            m_tile.for_each_line(m_tile.entire_range(), [](std::span<bool> line) {
-                static std::mt19937 rand{1};
-                for (bool& b : line) {
-                    b ^= ((rand() & 0x1fff) == 0);
-                }
-            });
-#endif
             ++m_gen;
         }
     }
@@ -324,7 +314,7 @@ public:
             imgui_StrTooltip("(?)", [] {
                 imgui_Str("+p: ");
                 ImGui::SameLine(0, 0);
-                imgui_Str("Run manually (advance generation by actual-pace, controlled by the button/keypress).");
+                imgui_Str("Run manually (advance generation by actual-pace, controlled by the button/'N').");
                 imgui_Str("+1: ");
                 ImGui::SameLine(0, 0);
                 imgui_Str("Advance generation by 1 instead of actual-pace. This is useful for changing the parity "
@@ -489,8 +479,8 @@ public:
         static bool other_op = true;
         ImGui::Checkbox("Range operations", &other_op);
         ImGui::SameLine();
-        imgui_StrTooltip("(!)", "The related keyboard shortcuts are available only when this tag is set on. (The "
-                                "window can be collapsed.)"); // TODO: not reasonable...
+        imgui_StrTooltip("(!)", "The keyboard shortcuts are available only when this tag is set on. (It does "
+                                "not matter whether the window is collapsed.)"); // TODO: not reasonable...
 
         if (m_sel) {
             ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
