@@ -12,7 +12,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(SDL2)
 
-project(starry)
+project(Astral)
 
 file(GLOB imgui_src CONFIGURE_DEPENDS imgui/* imgui/backends/*)
 

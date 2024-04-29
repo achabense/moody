@@ -1,4 +1,4 @@
-### Starry
+### Astral
 This program is designed for exploring 2-state CA rules in the range-1 Moore neighborhood (aka ["MAP rules"](https://golly.sourceforge.io/Help/Algorithms/QuickLife.html#map)).
 ![screenshot](screenshot.png)
 
@@ -12,7 +12,7 @@ This program is designed for exploring 2-state CA rules in the range-1 Moore nei
 - "Lock & capture" - the program is able to extract value constraints from patterns and generate rules under the constraints (for example, rules allowing for gliders).
 
 #### Getting started
-See the "Documents" part in the program to get familiar with the concepts and operations. I'd recommend firstly checking the "Rules in different subsets" section to get some idea about what can be found with this program.
+See the "Documents" part in the program to get familiar with the concepts and operations. I'd recommend firstly checking the "Rules in different subsets" section to get some sense about what can be found with this program.
 
 The operations are either accessible via buttons, or recorded somewhere in the tooltips. Most importantly, here is how to save rules/patterns:
 - Saving/undoing rules: right-click the MAP-string to save the current rule to the clipboard; use the widgets right above the MAP-string for undoing/redoing.

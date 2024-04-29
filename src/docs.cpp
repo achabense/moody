@@ -1,5 +1,3 @@
-// TODO: simplest way to use this program... (randomize, and saving the rules...)
-
 const char* const doc_about =
     R"(In these documents (as well as the ones opened via 'Load file' or 'Clipboard'), you can left-click the rules to set them to... and right-click the lines to copy the text (drag to select multiple lines).
 
@@ -10,11 +8,11 @@ MAP7KV6wLHQiAHIPICBCAhlIqKAhAuKAFBoYmCFEAACIUzbAIAsAsCBJoAANhiIBEBSUICEMQiQFgRBg
 const char* const doc_overview =
     R"(At any time, the "current rule" is shown in the right plane (which is an editable torus space; the operations are recorded in the tooltips (...)). As you see, it is the Game-of-Life rule initially.
 
-The MAP-string for the current rule is shown at the top taking up a single line. You can right-click the text to copy it to the clipboard. The paths in the 'Load file' window can be copied in the same way.
-The program keeps the record for the current rule. You can undo/redo via '<| Prev/Next |>'. The program manages several sequences of rules in the same way (in the form of 'First Prev/Next Last'). When any of them is activated, the left/right arrow keys are bound to the sequence ('Prev/Next') for convenience.
+The MAP-string for the current rule is shown at the top taking up a single line. You can right-click the text to save to the clipboard. The paths in the 'Load file' window can be copied in the same way.
+The program keeps the record for the current rule. You can undo/redo via '<| Prev/Next |>'. The program manages several sequences of rules in the form of 'First Prev/Next Last'. When any of them is activated, the left/right arrow keys are bound to 'Prev/Next' for convenience.
 
 In the right plane, you can right-click to select area and press 'C' (no need for ctrl) to save the pattern as RLE-string to the clipboard, and press 'V' to paste the pattern from the clipboard (left-click to decide where to paste).
-Notice that when copying patterns to the white background, you'd need to set 'Background' to 1 in the 'Ranges operations' window.
+Notice that when pasting patterns to the white background, you'd need to set 'Background' to 1 in the 'Ranges operations' window.
 
 In these documents, as well as those opened in 'Load file' or 'Clipboard', you can left-click the rule-string (will be highlighted when hovered) to replace the current rule. For example, here is an RLE blob (a "rocket" in the Day & Night rule) - you can firstly click the header line to load the rule, and then copy the following lines (up to the '!' mark, with or without the header line (x = ...)) to paste and see the effect.
 x = 7, y = 14, rule = MAPARYBFxZoF34WaBd+aIF+6RZoF35ogX7paIF+6YEX6ZcWaBd+aIF+6WiBfumBF+mXaIF+6YEX6ZeBF+mXF3+Xfw
@@ -39,25 +37,22 @@ See the "Lock and capture" section for details.
 )";
 
 const char* const doc_workings =
-    R"(This section describes the exact workings of subsets, masks and major rule operations. If you are new to this program, I'd recommend firstly checking the "Rules in different subsets" section to get some idea about what can be found with this program.
+    R"(This section describes the exact workings of subsets, masks and major rule operations. If you are not familiar with this program, I'd recommend firstly checking the "Rules in different subsets" section to get some sense about what can be found with this program.
 
 The program works with a series of subsets, each representing certain properties. For example, a rule is isotropic iff it belongs to the isotropic subset ('Native symmetry/All').
 These subsets can uniformly be composed in the form of:
 S = (M, P) (if not empty), where:
 1. M is a MAP rule specified to belong to S, and P is a partition of all cases.
-2. A rule R belongs to S iff in each group in P, the values of the rule are either all-the-same or all-the-different from those in M.
+2. A rule R belongs to S iff in each group in P, the values of the rule are either all-the-same or all-the-different from those in M. This can also be defined in terms of XOR-masking operations ~ (R ^ M) is either all-0 or all-1 in each group in P.
 
-TODO: about "mask"...
-'2.' can also be defined in terms of XOR-masking operations ~ (R ^ M) has either all 0 or all 1 in each group in P.
-
-For example, an isotropic rule must be either all-0 or all-1 in the following group, or in other words, the values for these cases must be either all-the-same or all-the-different from the all-zero rule(00000....).
+For example, an isotropic rule must have the same value in the following group, or in other words, the values for these cases must be either all-the-same or all-the-different from the all-zero rule(00000....).
 100 110 011 001 000 000 000 000
 100 000 000 001 100 000 001 000
 000 000 000 000 100 110 001 011
 
 As a consequence, taking non-empty S = (M, P), there are:
 1. If P has k groups, then there are 2^k rules in S.
-2. For any two rules in S, in each group in P, the values of the two rules must be either all-the-same or all-the-different from each other, just like their relation with M. As a result, from any rule in S (certainly including M), by flipping all values in some groups of P, you are able to get to any other rules in the set - in this sense, it does not matter which rule serves as M in S. Conversely, if a rule R does not belong to S, then by flipping the values you essentially get rules in S' = (R, S.P).
+2. For any two rules in S, in each group in P, the values of the two rules must be either all-the-same or all-the-different from each other, just like their relation with M. As a result, from any rule in S (certainly including M), by flipping all values in some groups of P, you are able to get to any other rules in the set - in this sense, it does not matter which rule serves as M in S.
 3. It's natural to define the "distance" between the two rules (in S) as the number of groups where they have different values.
 For example, here are some rules that all have distance = 1 (in the isotropic set) to the Game-of-Life rule. In this program it's fairly easy to find such rules.
 MAPARYXbhZofOgWaH7oaIDogBZofuhogOiAaIDoAIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAAACAAIAAAAAAAA
@@ -66,25 +61,30 @@ MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6YSAAIQAaIDogIAAgACAA
 
 Obviously the whole MAP ruleset can be composed in the same way. And finally, it can be proven that, the intersection (&) of such subsets must be of the same structure (if not empty). Therefore, the above conclusions apply to any combinations of these sets, and in the program you can combine different subsets freely.
 
-With these backgrounds, it will be much clearer to explain what happens in the program when it comes to rule edition:
-1. For the selected subsets, the program calculates their intersection (with the whole MAP set) as the working set W = (M, P).
-2. Then you need to decide a mask M' to actively measure the rules. To allow for further editions, M' must belong to W.
-W.M is immutable, but M' can be set to it via 'Native', so that there is at least a viable rule in the set.
-..........
-3. The current rule C is XOR-masked by the M', into a sequence of 0/1 on a per-case basis. If C belongs to W, the values in each group are either all-0 or all-1, so ......
-4. '<00.. Prev/Next 11..>' generates new rules based on C and M', in such a way that:
-'<00..' sets the current rule to M', and '11..>' sets the current rule to the rule with values different from M' in every group.
-By 'Next', the current rule will be ...... 'Prev' does the same thing with exactly the reverse order.
-5. 'Randomize' generates randomized rules in W with specified distance to M'.
-6. The random-access section displays the masked values......
-By left-clicking the button you get a rule with values flipped for every case in that group. As a result, if the current rule C already belongs to W, the result will still belong to W. Otherwise, the operation essentially gets rules in (C, W.P).
-Formally speaking, random-access edition defines S' = (C, W.P), which is W itself if C already belongs to W. And, at any time it presents a "slice" of all rules that have distance = 1 to C in S'. With 'Preview mode' turned on this would be obvious.
+With these backgrounds, it will be much clearer to explain what happens in the program:
+1. For the selected subsets, the program will firstly calculate their intersection (with the whole MAP set) as the working set W = (M, P).
+(If nothing is selected, the working set is the MAP set itself.)
+2. Then you need to decide a rule M' (called "mask") to guide how to "observe" the current rule and generate new rules. To allow for further editions, M' must belong to W.
+(W.M is immutable, but is exposed as 'Native', so that there is at least one viable mask.)
+
+For the current rule C:
+3. '<00.. Prev/Next 11..>' generates new rules based on C and M', in such a way that C will iterate through all rules in W:
+'<00..' sets C to M', and '11..>' sets C to the rule with values different from M' in all cases.
+'Next' generates rules based on C and M', so that C will become the "next" rule in such a sequence: starting from M' ('<00..'), then all rules having distance = 1 to M', then distance = 2, ..., until '11..>'. 'Prev' does the same thing reversely.
+4. 'Randomize' generates randomized rules in W with specified distance to M'.
+(Notice that if C already belongs to W, it can serve as a valid mask (M') via '<< Cur'.)
+
+5. In the random-access section, the values of C are viewed through M' (XOR-masked by M') as a sequence of 0/1, and grouped by W.P. If C belongs to W, the masked values in each group must be either all-0 or all-1, so it's enough to represent each group with one of cases in it.
+6. By left-clicking a group you will get a rule with all values in that group flipped. Therefore, if C already belongs to W, the result will still belong to W. Otherwise, the operation actually gets rules in (C, W.P). In other words, the operation defines S' = (C, W.P), which is W itself if C already belongs to W.
+(With 'Preview mode' turned on, the program is able to present a "slice" of all rules that have distance = 1 to C in S'.)
+
+Let's look at some use cases.
 
 If the working set is small enough (having only a few groups), the most direct way to explore the set is simply to check every rule in it.
-
-Take 'S.c. & Tot(+s)' (the self-complementary and inner-totalistic rules) for example. (In this case, neither 'Zero' nor 'Identity' works, so you'd need to select the 'Native' mask.) There are only 5 groups ~ 2^5=32 rules in the set, so it's fairly reasonable to check all of them. By clicking '<00..' you will start from M', which happens to be the "voting" rule:
+Take 'S.c. & Tot(+s)' (the self-complementary and inner-totalistic rules) for example. There are only 5 groups ~ 2^5=32 rules in the set, so it's fairly reasonable to check all of them. Typically, it does not matter which rule serves as the mask if you decide to iterate through the whole working set. However, in this case, neither 'Zero' nor 'Identity' works, so you'd need to select the 'Native' mask. By clicking '<00..' you will start from M', which happens to be the "voting" rule:
 MAPAAAAAQABARcAAQEXARcXfwABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf3//f////w
-Then you can click 'Next' to iterate - firstly all rules having distance = 1 to M', then 2, ..., until the rule gotten by '11..>'.
+Then you can click 'Next' to iterate. (For convenience, after clicking '<00..', the left/right arrow keys will be bound to 'Prev/Next'.) The next rule will be:
+MAPgAAAAQABARcAAQEXARcXfwABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf3//f////g
 
 If the working set is large, then it becomes infeasible to test all rules. In these cases:
 1. Using the mask-based generation feature, we can set the mask to the current rule ('<< Cur'), then try 'Randomize' with a small distance, or we can also do 'Prev/Next' - the whole-set traversal starts with the rules that are closest to the masking rule (distance = 1)
@@ -95,15 +95,18 @@ If the W.P has k groups, then the more close the specified distance is to k/2, t
 2. Using the random-access feature, by turning on the 'Preview mode', we have a direct view of the "slice" of S'/W that contains every rule having distance = 1 to the current rule...
 ("wander")
 
+Here is the same rule in the "About this program" section. It turns out that .......
+MAP+sQSUIzICkiQgAiAEKBAhrIGFgAUbAAA4AChgnAAAw6CAkAIgKCAlASgIACgIQBbqCqhEQAAkFQAARIDAQQRBA
+For example, below is one of the rules that have distance = 1 to this rule. ......
+MAP+sASUIjICkiAgAiAEKBAhrIGFgAUbAAAoAChgnAAAw6AAkAIgKCAlAQgIAAgIQBboCqhEQAAkFQAARIDAQQRBA
+
 Sometimes we may also want to jump outside of the predefined subsets. This can be done via random-access edition, and may lead to surprising discoveries. See the "Atypical rules" section for more info.)";
 
 const char* const doc_rules =
     R"(The following rules are selected from different subsets. You can click a rule and then 'Recognize' to select the subsets it belongs to.
-(Notice that 'Recognize' cannot reflect the relations between different subsets. For example, if you select '|' and '-', the working set will also belong to 'C2' (the rules in '|' and '-' will always belong to 'C2') By 'Recognize' ......)
-(To get familiar with the relation between subsets you can ....)
-(For relations between subsets: if you select a single subset and some subsets turn dull-blue, this means the subset you select belongs to these subsets... (....Take the initial situ for example...))
+(Notice that 'Recognize' cannot reflect the relations between different subsets. For example, 'Recognize' a rule in '| & -' will always select 'C2' as well, as '| & -' is a strict subset of 'C2'.)
 
---- None
+--- Rules that do not belong to any supported subsets
 This is typically what you will get in the default density:
 MAPYaxTu9YJm9UZsagD9KrzcclQXH5nLwLTGALPMYhZeR6QeYRX6y7WoAw4DDpCQnTjY7k71qW7iQtvjMBxLGNBBg
 
@@ -115,6 +118,8 @@ It's possible to get non-trivial rules that do not belong to any well-defined su
 Isotropic ('All'):
 MAPgAQFFAQABgAQAFRABgAAAgAAAAAAAAASRAhAggQAAioCFA4AAAAIEBKKzIDQBIAADAQIEEAAkHABAIAAAAAAAQ
 MAP/vj70upsmjLqi43n7oQwBt6ogHzgl26yvYiBohgzzqj4/MUi0YS9FLcNSGNF6DlJ50KB3MAzsOAWRNpFDDINBA
+MAPBSEBKiGAcMxBVCdvQAH//ySAf8+AAd1aAEE/DwAT728JCDX/DgF9/6VEf34MAX7bAAB3/QkTVX3Mkf57g397Xw
+MAPyC6AMHTtIsiwIAEF8IQAkX7sMoHssoEkcRAggcAgFECiqgEAIIQFgyGlAEOlyRkgK4ggBgIggQgWBUh0BYQuSA
 
 
 '-' alone ('|' is essentially the same as '-'):
@@ -136,15 +141,12 @@ MAPAjaoGxYMbAUJCY78PLH9F3RZ5M6GChkQ1aZIFMMgpBp3BiKINUAoUWLoKJrChCqIYsgRKaAJj3pKQ
 'C4' alone:
 'C4' is a strict subset of 'C2'. In 'C4', oftentimes (for example, by getting randomized rules) you will find rules with complex dynamics but where everything dies finally:
 MAPAkMwkQDI20gEBSC4F/gYtzNEmgAVCB0ookwgwMEGAA0FExCAo8gCgFw4ACAqEgALNCnhuUQcmQlgahCx2ACRHg
-It's highly likely that there exist rules with interesting oscillators or spaceships close such rules. For example, the following rule has (C4) distance = 1 to the above one, but has huge spaceships:
+It's highly likely that there exist rules with interesting oscillators or spaceships close to such rules. For example, the following rule has (C4) distance = 1 to the above one, but has huge spaceships:
 MAPAkMwkwDo20gEBSC4F/gItzNkmkA1iBkookwgwMEGgA0FExCAo8gigFw4AAAqEgALNCnhsUQcmQlgahCx2ACRHg
 
-Another pair of examples:
+Another pair of examples. It will be very helpful for finding such rules if you turn on 'Preview mode' in the random-access plane.
 MAPA0wFMBFTd2EGdnFywDNkKEYRDqgbKPiJ6DIklgrKDhYnSAit2JIckGwBtsuJBFMGAPAc5TvYilLBtImEJIhUoA
 MAPA0wFEBFTV2EGdnFywDNkKEYRDigbKHiJ6DIklgrKDhYnSAit2JIckGwBtsuJBFMGAPAc5TvYilLBtImEJIhUoA
-
-................
-(You can easily find such rules by turning on 'Preview mode' in the left plane.)
 
 
 Both '| & -' and '\ & /' belong to the 'C2' subset (which is NOT true reversely - a rule that belongs to 'C2' may not belong to any of '|, -, \ or /').
@@ -156,8 +158,6 @@ MAP7AKSABAAABLAAwAAAQBgSKACABgQIEISEhCAIKkEAKCIAQAoEQAASIAAAAAAEgAAEuGAAAIEIKAAS
 '\ & /':
 MAPAhghuAgQgywsgCBAwliAgA0RiiAAAOCQgggwwAQABABBCEUgFAgeESlGQEIUAACBAEQCUKCIkWBkAMCRIAABRA
 MAPAxEkiDlAgEIC2mcMDTWcNhDDmAcEHBZKjUUNInwAZqgRQggGb5AAtAJqmisCKGlJYJIlOJh5EFnCyBoFohglFA
-TODO: or ??
-MAPAhghuE0QgywsgCBAwliAgE0RiiAAAOCQwkgwwAQABABjiEUgFggeESnGQEIUAACBAEQCUKCIkWBkgMCRIAABRA
 
 
 --- Rules with state symmetry (the self-complementary rules)
@@ -198,6 +198,7 @@ Isotropic ('All'):
 MAPEVWIADNmABERVYgAM2YAERHuABF37gAAEe4AEXfuAAARdwAA7u4RABF3AADu7hEA/6oARMwRIoj/qgBEzBEiiA
 MAPEUQRRCLuIhERRBFEIu4iETOqAJlmiBFEM6oAmWaIEURVZgARzIiZIlVmABHMiJki7gCIZgARZpnuAIhmABFmmQ
 
+Both 'a-d & q-c & w-x' and 'a|q & q|w & w|d' belong to the 'C3' subset (see below).
 'a-d & q-c & w-x':
 MAPiAAAAAAAACKIAAAAAAAAIgAAACIAMwAAAAAAIgAzAAAAERFVAGYAuwAREVUAZgC7ESIiMxFVACIRIiIzEVUAIg
 
@@ -205,7 +206,6 @@ MAPiAAAAAAAACKIAAAAAAAAIgAAACIAMwAAAAAAIgAzAAAAERFVAGYAuwAREVUAZgC7ESIiMxFVACIRI
 MAPADNmu1UR3XcAM2a7VRHdd0RE3WaIALvdRETdZogAu90iiLvdIgBmuyKIu90iAGa7AMxm/6oA/3cAzGb/qgD/dw
 MAPAGYRImbuRO4AZhEiZu5E7mYRZpmqAP9VZhFmmaoA/1VmzGb/EQCZM2bMZv8RAJkz7gBmMwCIVe7uAGYzAIhV7g
 
-Both 'a-d & q-c & w-x' and 'a|q & q|w & w|d' belong to the 'C3' subset.
 
 'C2' alone:
 MAPzIgAAIgAACLMiAAAiAAAIkQRZgAAAACIRBFmAAAAAIjuAGYRAAAAAO4AZhEAAAAAABEAETMAVQAAEQARMwBVAA
