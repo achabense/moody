@@ -547,6 +547,7 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
     const bool contained = subset.contains(mold.rule);
     assert_implies(contained, compatible);
 
+    // TODO: support sorting? (e.g. !contained < !pure < 1 < 0 < locked)
     // TODO: more filtering modes?
     // Will not hide "impure" groups even when there are locks.
     // Enabled by default; this will have no effect before `manage_lock::enabled`, as the lock part is
