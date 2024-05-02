@@ -1,9 +1,12 @@
 const char* const doc_about =
-    R"(In these documents (as well as the ones opened via 'Load file' or 'Clipboard'), you can left-click the rules to set them to... and right-click the lines to copy the text (drag to select multiple lines).
+    R"(In these documents (as well as the ones opened in 'Load file' or 'Clipboard'), you can left-click the rules to load them, or right-click the lines to copy the text (drag to select multiple lines).
 
-...
+This program is for exploring "MAP rules". The project originated from a trivial program I made in 2021, which was poorly written and never made public. Still, I managed to find some interesting discoveries with it (by looking through many, many randomized rules). Here are two of them.
+
 MAP+sQSUIzICkiQgAiAEKBAhrIGFgAUbAAA4AChgnAAAw6CAkAIgKCAlASgIACgIQBbqCqhEQAAkFQAARIDAQQRBA
 MAP7KV6wLHQiAHIPICBCAhlIqKAhAuKAFBoYmCFEAACIUzbAIAsAsCBJoAANhiIBEBSUICEMQiQFgRBgAJKgAA4gA
+
+The project was then abandoned for many years. Last year I felt an urgency to bring it to completion. Thankfully it's mostly finished now.
 )";
 
 const char* const doc_overview =
@@ -13,25 +16,24 @@ The MAP-string for the current rule is shown at the top taking up a single line.
 The program keeps the record for the current rule. You can undo/redo via '<| Prev/Next |>' (above the MAP-string). The program manages several sequences of rules in the form of 'First Prev/Next Last'. When a sequence is activated, the left/right arrow keys are bound to 'Prev/Next' for convenience.
 
 In the right plane, you can right-click to select area and press 'C' (no need for 'Ctrl') to save the pattern as RLE-string to the clipboard, and press 'V' to paste the pattern from the clipboard (left-click to decide where to paste).
-(Notice that when pasting patterns to the white background, you'd need to set 'Background' to 1 in the 'Ranges operations' window.)
+(Notice that when pasting patterns to white background, you'd need to set 'Background' to 1 in the 'Ranges operations' window.)
 
-In these documents, as well as those opened in 'Load file' or 'Clipboard', you can left-click the rule-string (will be highlighted when hovered) to replace the current rule, or right-click to copy the lines to the clipboard (drag to select multiple lines).
-For example, here is an RLE blob (a "rocket" in the Day & Night rule) - you can firstly click the header line to load the rule, and then copy the following lines (up to the '!' mark, with or without the header line to paste and see the effect.
+In these documents, as well as those opened in 'Load file' or 'Clipboard', you can left-click the rule-string to replace the current rule, or right-click to copy the lines to the clipboard (drag to select multiple lines).
+For example, here is an RLE blob (a "rocket" in the Day & Night rule) - you can firstly click the header line to load the rule, and then copy the following lines (up to the '!' mark, with or without the header line) to paste and see the effect.
 x = 7, y = 14, rule = MAPARYBFxZoF34WaBd+aIF+6RZoF35ogX7paIF+6YEX6ZcWaBd+aIF+6WiBfumBF+mXaIF+6YEX6ZeBF+mXF3+Xfw
 3bo3b$2b3o2b$b5ob$ob3obo$2b3o2b$2b3o2b$ob3obo$ob3obo$b5ob$b
 5ob$3bo3b$7b$2b3o2b$2bobo2b!
 
-The left plane provides ways to analyze and "edit" the current rule based on a series of subsets. For detailed descriptions see the next section ("Subset, mask and rule operations"). In short:
+The left plane provides ways to analyze and modify the current rule based on a series of subsets. For detailed descriptions see the next section ("Subset, mask and rule operations"). In short:
 
 The subsets that the current rule belongs to will be marked with light-green borders.
-To edit the rule, you need to firstly specify a "working set", which is the set you are going to explore. You can select multiple subsets - the program will get the intersection of them as the working set. For example, if you select 'All' (isotropic rules; selected by default) and 'S.c.' (self-complementary rules), you are going to explore the rules that are both isotropic and self-complementary.
-After that you need to select a "mask" (masking rule) to guide how to observe the current rule and generate new rules. To proceed you'd need to ensure the mask belongs to the working rule ('Native' will always work).
-
+To edit the rule, you need to firstly specify a "working set", which is the set you are going to explore. You can select multiple subsets - the program will calculate the intersection of them as the working set. For example, if you select 'All' (isotropic rules; selected by default) and 'S.c.' (self-complementary rules), you are going to explore the rules that are both isotropic and self-complementary.
+Then you need to select a "mask" (masking rule) to guide how to observe the current rule and generate new rules. To proceed you'd need to ensure the mask belongs to the working rule ('Native' will always work).
+To modify the current rule:
 'Randomize' generates randomized rules in the working set with specified "distance" (number of groups where two rules have different values) to the masking rule.
-'<00.. Prev/Next 11..>', together with the current rule, defines a sequence in the form of - the masking rule, then all rules with distance = 1 to the masking rule, then 2, ..., until max distance. You can iterate through the whole working set with this.
-.......(random-access edition) The values are viewed through the mask..... by clicking the group you will get a rule ...
-(Preview mode...).....
-......
+'<00.. Prev/Next 11..>' generates rules based on the mask and current rule, so that the current rule will iterate through the whole working set - firstly the masking rule, then all rules with distance = 1 to the masking rule, then 2, ..., until max distance.
+(The current rule should belong to the working set to enable 'Prev/Next'.)
+In the random-access section, the values of the current rule are viewed through the mask and grouped by the working set. By clicking a group you will flip all values in that group. By turning on 'Preview mode' you are able to see the effect without replacing the current rule.
 
 The program also has a way to generate rules ensuring certain value constraints (allowing for certain patterns). For example, in this program it's easy to find rules like this:
 MAPARYSZhYAPEgSaBCgCAAAgABAEsAIAIgASIDgAIAAgAASQAIAaACggACAAICAAIAASICogIAAAACAAAAAAAAAAA
@@ -63,6 +65,7 @@ MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6YSAAIQAaIDogIAAgACAA
 
 Obviously the whole MAP ruleset can be composed in the same way. And finally, it can be proven that, the intersection (&) of such subsets must be of the same structure (if not empty). Therefore, the above conclusions apply to any combinations of these sets, and in the program you can combine different subsets freely.
 
+
 With these backgrounds, it will be much clearer to explain what happens in the program:
 1. For the selected subsets, the program will firstly calculate their intersection (with the whole MAP set) as the working set W = (M, P).
 (If nothing is selected, the working set is the MAP set itself.)
@@ -70,17 +73,19 @@ With these backgrounds, it will be much clearer to explain what happens in the p
 (W.M is immutable, but is exposed as 'Native', so that there is at least one viable mask.)
 
 For the current rule C:
-3. '<00.. Prev/Next 11..>' generates new rules based on C and M', in such a way that C will iterate through all rules in W:
+3. 'Randomize' generates randomized rules in W with specified distance to M'.
+4. '<00.. Prev/Next 11..>' generates new rules based on C and M', in such a way that C will iterate through all rules in W:
 '<00..' sets C to M', and '11..>' sets C to the rule with values different from M' in all cases.
 'Next' generates rules based on C and M', so that C will become the "next" rule in such a sequence: starting from M' ('<00..'), then all rules having distance = 1 to M', then distance = 2, ..., until '11..>'. 'Prev' does the same thing reversely.
-4. 'Randomize' generates randomized rules in W with specified distance to M'.
 (Notice that if C already belongs to W, it can serve as a valid mask (M') via '<< Cur'.)
 
 5. In the random-access section, the values of C are viewed through M' (XOR-masked by M') as a sequence of 0/1, and grouped by W.P. If C belongs to W, the masked values in each group must be either all-0 or all-1, so it's enough to represent each group with one of cases in it.
 6. By left-clicking a group you will get a rule with all values in that group flipped. Therefore, if C already belongs to W, the result will still belong to W. Otherwise, the operation actually gets rules in (C, W.P). In other words, the operation defines S' = (C, W.P), which is W itself if C already belongs to W.
+(The masking rule has no effect on the result of random-access edition.)
 (With 'Preview mode' turned on, the program is able to present a "slice" of all rules that have distance = 1 to C in S'.)
 
-Let's look at some use cases.
+
+Here are some use cases.
 
 If the working set is small enough (having only a few groups), the most direct way to explore the set is simply to check every rule in it.
 Take 'S.c. & Tot(+s)' (the self-complementary and inner-totalistic rules) for example. There are only 5 groups ~ 2^5=32 rules in the set, so it's fairly reasonable to check all of them. Typically, it does not matter which rule serves as the mask if you decide to iterate through the whole working set. However, in this case, neither 'Zero' nor 'Identity' works, so you'd need to select the 'Native' mask. By clicking '<00..' you will start from M', which happens to be the "voting" rule:
@@ -88,41 +93,44 @@ MAPAAAAAQABARcAAQEXARcXfwABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf
 Then you can click 'Next' to iterate. (For convenience, after clicking '<00..', the left/right arrow keys will be bound to 'Prev/Next'.) The next rule will be:
 MAPgAAAAQABARcAAQEXARcXfwABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf3//f////g
 
-If the working set is large, then it becomes infeasible to test all rules. In these cases:
-1. Using the mask-based generation feature, we can set the mask to the current rule ('<< Cur'), then try 'Randomize' with a small distance, or we can also do 'Prev/Next' - the whole-set traversal starts with the rules that are closest to the masking rule (distance = 1)
-TODO: small dist vs k/2...
-If there are rules (the current rule) in the set known to be special/promising, we can check rules that are close to it.
-If the W.P has k groups, then the more close the specified distance is to k/2, the more likely the result will be unrelated to the masking rule.
+If the working set is large, then it's infeasible to test all rules. In these cases, aside from getting randomized rules ('Randomize' with arbitrary distance), if there are interesting/promising rules known to belong to the set, you can try to inspect rules that are close to them. Based on the current rule, this can be done in three ways:
+1. (After '<< Cur') 'Randomize' with a small distance.
+2. (After '<< Cur') 'Next' still works - the iteration will start from the nearest rules (those with distance = 1).
+3. (Random-access) 'Preview mode' provides a direct view of all rules with distance = 1 to the current rule.
 
-2. Using the random-access feature, by turning on the 'Preview mode', we have a direct view of the "slice" of S'/W that contains every rule having distance = 1 to the current rule...
-("wander")
-
-Here is the same rule in the "About this program" section. It turns out that .......
+For example, here is the same rule in the "About this program" section:
 MAP+sQSUIzICkiQgAiAEKBAhrIGFgAUbAAA4AChgnAAAw6CAkAIgKCAlASgIACgIQBbqCqhEQAAkFQAARIDAQQRBA
-For example, below is one of the rules that have distance = 1 to this rule. ......
+It turns out that there exist a lot of amazing rules close to it (in the isotropic set). As a lot of rules involve large oscillators or spaceships, I'd recommend using the 'Next' approach to avoid missing important discoveries. Below is one of the rules with distance = 1 to it.
 MAP+sASUIjICkiAgAiAEKBAhrIGFgAUbAAAoAChgnAAAw6AAkAIgKCAlAQgIAAgIQBboCqhEQAAkFQAARIDAQQRBA
+Once you find another interesting rule, you can move on starting from it instead. Here is another rule that has distance = 1 to the above one.
+x = 5, y = 27, rule = MAP+sASUIjICmiAgAiAEKBAhrIGFiAUbCCAoAChgnAAAw6AAkAIgKCAlAQgIAAgIQBboCqhEQAAkFQAARIDAQQRBA
+2ob2o$obobo$b3ob$obobo$2ob2o$5o$5o$5o$5o$5o$5o$5o$5o$5o$5o$
+5o$5o$5o$5o$5o$5o$5o$2ob2o$obobo$b3ob$obobo$2ob2o!
+(The pattern is to be pasted into white background. To enable this, set 'Background' to 1 in the 'Ranges operations' window. The pattern will split into two huge spaceships.)
 
-Sometimes we may also want to jump outside of the predefined subsets. This can be done via random-access edition, and may lead to surprising discoveries. See the "Atypical rules" section for more info.
+By "wandering" in the working set in this way, you can collect a series of rules that are close from each other.
+
+
+Sometimes you may also want to jump outside of the predefined subsets. This can be done via random-access edition, and may lead to surprising discoveries. See the "Atypical rules" section for more info.
 )";
 
 const char* const doc_rules =
     R"(The following rules are selected from different subsets. You can click a rule and then 'Recognize' to select all the subsets the rule belongs to.
-(Notice that 'Recognize' cannot reflect the relations between different subsets. For example, 'Recognize' a rule in '| & -' will always select 'C2' as well, as '| & -' is a strict subset of 'C2'.)
+(Notice that 'Recognize' cannot reflect the relations between different subsets.)
 
 
 ---- Rules with native symmetry
-
 Isotropic ('All', selected by default):
 MAPgAQFFAQABgAQAFRABgAAAgAAAAAAAAASRAhAggQAAioCFA4AAAAIEBKKzIDQBIAADAQIEEAAkHABAIAAAAAAAQ
 MAP/vj70upsmjLqi43n7oQwBt6ogHzgl26yvYiBohgzzqj4/MUi0YS9FLcNSGNF6DlJ50KB3MAzsOAWRNpFDDINBA
 MAPBSEBKiGAcMxBVCdvQAH//ySAf8+AAd1aAEE/DwAT728JCDX/DgF9/6VEf34MAX7bAAB3/QkTVX3Mkf57g397Xw
 MAPyC6AMHTtIsiwIAEF8IQAkX7sMoHssoEkcRAggcAgFECiqgEAIIQFgyGlAEOlyRkgK4ggBgIggQgWBUh0BYQuSA
 
-'-' alone ('|' is essentially the same as '-'):
+'-' alone ('|' (alone) is essentially the same as '-'):
 MAPUwUFEETEhAeCBAFowogSBgEAAkAyAAAAggMAgDEFSQoEAgFJBEAQEQjEgACIk4DA0BggAGAEQNGgkMkIEBQRig
 MAPIKAkAIAAABAJAAgABFACAoCCoAABIQAAAAAGBAJABIFACEADAAIAAgAAlBVDABAAACEQCBQIQEhAAgEMJCAAEQ
 
-'\' alone ('/' is essentially the same as '\'):
+'\' alone ('/' (alone) is essentially the same as '\'):
 MAPEUwRQHEGwsIwQQlGQBgAFETB8AEAARBIEmABoA4aKABgjHPAk6gQ5DwAAcQAABKQoGAyZQsCgBggwBAIieYiCQ
 MAPQAjggAIIgAAgAAAACQAAAAAAgAAggAAAKIQAAAAAAAAAAAIAAiEgAAgACIAICAEgACAAggAARAAKkAAEAABAAA
 
@@ -143,54 +151,56 @@ MAPA0wFMBFTd2EGdnFywDNkKEYRDqgbKPiJ6DIklgrKDhYnSAit2JIckGwBtsuJBFMGAPAc5TvYilLBt
 MAPA0wFEBFTV2EGdnFywDNkKEYRDigbKHiJ6DIklgrKDhYnSAit2JIckGwBtsuJBFMGAPAc5TvYilLBtImEJIhUoA
 
 '| & -':
+Both '| & -' and '\ & /' (see below) are strict subsets of 'C2' (which is not true reversely - a rule that belongs to 'C2' may not belong to any of '|, -, \ or /').
 MAPIAJIChAAUMgAELFhAQCBgIAASWAABCgAAEZCAIIQhAAAAaOBAgApgAAQAAICIRAAAJAYhBwCAAAACWhIQQRIAA
 MAP7AKSABAAABLAAwAAAQBgSKACABgQIEISEhCAIKkEAKCIAQAoEQAASIAAAAAAEgAAEuGAAAIEIKAASgAAWAEAAA
 
 '\ & /':
 MAPAhghuAgQgywsgCBAwliAgA0RiiAAAOCQgggwwAQABABBCEUgFAgeESlGQEIUAACBAEQCUKCIkWBkAMCRIAABRA
 MAPAxEkiDlAgEIC2mcMDTWcNhDDmAcEHBZKjUUNInwAZqgRQggGb5AAtAJqmisCKGlJYJIlOJh5EFnCyBoFohglFA
-Notice that both '| & -' and '\ & /' belong to the 'C2' subset (which is NOT true reversely - a rule that belongs to 'C2' may not belong to any of '|, -, \ or /').
+
 
 ---- Rules with state symmetry (the self-complementary rules)
-This is supported in the program via 'S.c.' (I cannot find a more suitable shorthand for this).
+Self-complementary rules are supported in the program via 'S.c.'.
 
 There do exist self-complementary rules that allow for spaceships and oscillators. For example, the following rule is found using the 'Lock & Capture' feature in this program:
 MAPARcTZhegPEwRdxPuFCBIzyBmF8A8+4g3RMD7A+03nz8DBhNIPyD83RPuIMP8F5n7DO3714g3EXfNw/oXmTcXfw
 
 
 ---- Totalistic rules
-Totalistic rules are strict subset of isotropic rules. 
+Totalistic rules are strict subset of isotropic rules.
 
-Outer-totalistic:
+Outer-totalistic ('Tot'):
 MAPARYAARZoARcWaAEXaIEXfxZoARdogRd/aIEXf4EXf/8WaAEXaIEXf2iBF3+BF3//aIEXf4EXf/+BF3//F3///g
 MAPgAAAAQAAARcAAAEXAAEXfwAAARcAARd/AAEXfwEXf/8AAAEXAAEXfwABF38BF3//AAEXfwEXf/8BF3//F3///g
 
-Inner-totalistic:
+Inner-totalistic ('Tot(+s)'):
 MAPAAAAAQABARcAAQEXARcXfwABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf3//f////g
 
-Though conceptually "simpler", totalistic rules have no additional symmetry properties than common isotropic rules. However, ... ("refine")........
+Though conceptually "simpler", totalistic rules have no additional symmetry properties than common isotropic rules. However, it's a good idea to "refine" totalistic rules in larger subsets like isotropic set. Take the voting rule for example:
 MAPAAAAAQABARcAAQEXARcXfwABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf3//f////w
 The following rule has distance = 1 to the voting rule in the isotropic set.
 MAPIIAAAYABARcAAQEXARcXf4ABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf3//f////w
-The voting rule is also self-complementary........
+
 
 ---- Rules emulating hexagonal neighborhood
-The subsets at the last line are rules emulating hexagonal symmetries. For example, the spaceships in the following rule have different shapes in different directions, but they are conceptually the same thing in the imaginary corresponding hexagonal rule.
+The subsets at the last line emulate symmetries in the hexagonal tiling. For example, the two kinds of spaceships in the following rule are conceptually the same thing in the corresponding hexagonal rule (in the real hexagonal tiling).
 MAPEUQAIiIARGYRRAAiIgBEZgCIVSIAAO6IAIhVIgAA7ogAADPuiABEiAAAM+6IAESIiABmAAAAAACIAGYAAAAAAA
 
 Isotropic ('All', not to be confused with real isotropic rules):
 MAPEVWIADNmABERVYgAM2YAERHuABF37gAAEe4AEXfuAAARdwAA7u4RABF3AADu7hEA/6oARMwRIoj/qgBEzBEiiA
 MAPEUQRRCLuIhERRBFEIu4iETOqAJlmiBFEM6oAmWaIEURVZgARzIiZIlVmABHMiJki7gCIZgARZpnuAIhmABFmmQ
+MAPEURmqiKIzO4RRGaqIojM7iKI/yIAALvuIoj/IgAAu+5EAP/diABE7kQA/92IAETuiAB3IgAARACIAHciAABEAA
 
-'a-d' alone ('q-c' and 'w-x' are essentially the same as 'a-d'):
+'a-d' alone ('q-c' and 'w-x' (alone) are essentially the same as 'a-d'):
 MAPIhFmZgCZRAAiEWZmAJlEAAAAqu5ERKoAAACq7kREqgCZEcz/ABFVAJkRzP8AEVUAIqoAIgC7IgAiqgAiALsiAA
 MAPAMwARIiIIgAAzABEiIgiAETdEYgAM0QARN0RiAAzRAAiMwAAAHeIACIzAAAAd4gAEWZEAABmAAARZkQAAGYAAA
 
-'a|q' alone ('q|w' and 'w|d' are essentially the same as 'a|q'):
+'a|q' alone ('q|w' and 'w|d' (alone) are essentially the same as 'a|q'):
 MAPAAAAAKoAiAAAAAAAqgCIAAAAIhEiRBEiAAAiESJEESKIEYgAqgAARIgRiACqAABEqgARIrsiAACqABEiuyIAAA
 MAPIncAVUQidwAidwBVRCJ3AO5EAEREAAAR7kQAREQAABEAqgCIAEQidwCqAIgARCJ3RACImSIR/2ZEAIiZIhH/Zg
 
-'C2' alone (not to be confused with native 'C2' subset; however, notice this is a subset of native 'C2'):
+'C2' alone (not to be confused with native 'C2'; however, notice this is a subset of native 'C2'):
 MAPzIgAAIgAACLMiAAAiAAAIkQRZgAAAACIRBFmAAAAAIjuAGYRAAAAAO4AZhEAAAAAABEAETMAVQAAEQARMwBVAA
 
 'C3' alone:
@@ -200,56 +210,50 @@ MAPqsxEACIRiACqzEQAIhGIAAAAmQAAAACIAACZAAAAAIiIIgAAAABEAIgiAAAAAEQAiEQAACIAAACIR
 'C6' alone:
 'C6' is a strict subset of both 'C2' and 'C3'.
 MAPEUQRVSLdM4gRRBFVIt0ziCK7IswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHMRIiqIpnMEQ
-MAPEUQRRCKqIjMRRBFEIqoiMzOIEZkAqgCIM4gRmQCqAIhERABEzETdAEREAETMRN0AuwCqRAARIoi7AKpEABEiiA
 MAPEVURRDO7IjMRVRFEM7siMzPdEZkAuxHMM90RmQC7EcxERABV/1XdIkREAFX/Vd0iu92qZrvuZoi73apmu+5miA
 
 'a-d & q|w':
 MAPESIRAESZAGYRIhEARJkAZncARDOZACKIdwBEM5kAIoh3mSJEAABViHeZIkQAAFWI/zOZVVWIMwD/M5lVVYgzAA
-MAPABF3IhERRP8AEXciERFE/3cAu1UAIsyqdwC7VQAizKp3AN2qAEQzzHcA3aoARDPMZoj/VYiIM4hmiP9ViIgziA
+You may also try 'q-c & w|d' or 'w-x & a|q'.
 
-Both 'a-d & q-c & w-x' and 'a|q & q|w & w|d' belong to the 'C3' subset.
 'a-d & q-c & w-x':
+Both 'a-d & q-c & w-x' and 'a|q & q|w & w|d' (see below) are strict subsets of 'C3'.
 MAPiAAAAAAAACKIAAAAAAAAIgAAACIAMwAAAAAAIgAzAAAAERFVAGYAuwAREVUAZgC7ESIiMxFVACIRIiIzEVUAIg
 
 'a|q & q|w & w|d':
 MAPAGYRImbuRO4AZhEiZu5E7mYRZpmqAP9VZhFmmaoA/1VmzGb/EQCZM2bMZv8RAJkz7gBmMwCIVe7uAGYzAIhV7g
 
 
-......
-MAPEURmqiKIzAARRGaqIojMACKIzAAAAIgAIojMAAAAiABEAKqIiAAAAEQAqoiIAAAAiAAAAAAAAACIAAAAAAAAAA
-MAP7ohmmYgAmWbuiGaZiACZZogAmWYAEWaIiACZZgARZoiIAJlmABFmiIgAmWYAEWaIABFmiBFmiAAAEWaIEWaIAA
+---- Rules emulating von-Neumann neighborhood
+Von-Neumann neighborhood is compatible with native symmetries - you can combine 'Von' with native symmetry subsets directly.
 
-The voting rule in hexagonal neighborhood:
+Isotropic ('Von & All'):
+MAPzADMAAD/AADMAMwAAP8AADMzAAAzzAAAMzMAADPMAADMAMwAAP8AAMwAzAAA/wAAMzMAADPMAAAzMwAAM8wAAA
+MAP/8wz/8wA/wD/zDP/zAD/AMwAzMwAAMwAzADMzAAAzAD/zDP/zAD/AP/MM//MAP8AzADMzAAAzADMAMzMAADMAA
+
+C2 ('Von & C2'):
+MAPADMAMwD/M/8AMwAzAP8z/wAzM8z//8zMADMzzP//zMwAMwAzAP8z/wAzADMA/zP/ADMzzP//zMwAMzPM///MzA
+MAPzP8zAMwzAADM/zMAzDMAADMzzAD/zAAAMzPMAP/MAADM/zMAzDMAAMz/MwDMMwAAMzPMAP/MAAAzM8wA/8wAAA
+
+Interestingly, there also exist voting rules in von-Neumann and hexagonal neighborhood:
+MAPAAAAMwAzM/8AAAAzADMz/wAzM/8z////ADMz/zP///8AAAAzADMz/wAAADMAMzP/ADMz/zP///8AMzP/M////w
 MAPAAAAEQAREXcAAAARABERdwAREXcRd3f/ABERdxF3d/8AERF3EXd3/wAREXcRd3f/EXd3/3f///8Rd3f/d////w
 
 
----- Rules emulating Von-Neumann neighborhood
-Von-Neumann neighborhood is compatible with native symmetries - you can combine 'Von' with native symmetry terms to get rules.......
-
-Isotropic ('native-All & Von'):
-MAPAAD/zAAzzP8AAP/MADPM/wAz/zMz/zP/ADP/MzP/M/8AAP/MADPM/wAA/8wAM8z/ADP/MzP/M/8AM/8zM/8z/w
-MAP/8wz/8wA/wD/zDP/zAD/AMwAzMwAAMwAzADMzAAAzAD/zDP/zAD/AP/MM//MAP8AzADMzAAAzADMAMzMAADMAA
-MAP/8wz/8zM/8z/zDP/zMz/zP8A/8wAAMwA/wD/zAAAzAD/zDP/zMz/zP/MM//MzP/M/wD/zAAAzAD/AP/MAADMAA
-
-C2 ('native-C2 & Von'):
-MAPADMAMwD/M/8AMwAzAP8z/wAzM8z//8zMADMzzP//zMwAMwAzAP8z/wAzADMA/zP/ADMzzP//zMwAMzPM///MzA
-MAPzP8zAMwzAMzM/zMAzDMAzDMAzADMzAAAMwDMAMzMAADM/zMAzDMAzMz/MwDMMwDMMwDMAMzMAAAzAMwAzMwAAA
-MAPzP8zAMwzAADM/zMAzDMAADMzzAD/zAAAMzPMAP/MAADM/zMAzDMAAMz/MwDMMwAAMzPMAP/MAAAzM8wA/8wAAA
-
-
 ---- Misc
-In case you never tried, ...
+You can specify the neighborhood by yourself - 'q/w/e/a/s/d/z/x/c' are for rules whose values are "independent" of the corresponding cell. For example, 'Hex' is just a convenient way to represent 'e & z'.
 
-You can specify the "neighborhood" by ..... (for example, 'Hex' is just a convenient way to represent 'e & z')...
-For example, in the following rules....
+'q & a & z & -':
+As the values are independent of 'q', 'a' and 'z', "infomation" can only pass from right to left:
 MAPIjP/7iIz/+4zAN3/MwDd/92Zu//dmbv/Zrvud2a77nciM//uIjP/7jMA3f8zAN3/3Zm7/92Zu/9mu+53Zrvudw
 MAPAMwzzADMM8wRqnfuEap37iJm3XciZt13RAD/M0QA/zMAzDPMAMwzzBGqd+4RqnfuImbddyJm3XdEAP8zRAD/Mw
 
-....
-MAPoKAAAKCgAAAKCgoKCgoKCqCgAACgoAAACgoKCgoKCgpQUFBQUFBQUAAAAAAAAAAAUFBQUFBQUFAAAAAAAAAAAA
+'w & a & d & x & All (isotropic)':
+MAPoKAAAKCgAAAFBQAABQUAAKCgAACgoAAABQUAAAUFAAAFBQAABQUAAF9fAABfXwAABQUAAAUFAABfXwAAX18AAA
 MAP+vqlpfr6paWgoFVVoKBVVfr6paX6+qWloKBVVaCgVVWgoA8PoKAPDwAA+voAAPr6oKAPD6CgDw8AAPr6AAD6+g
 MAP+vqlpfr6paWlpVBQpaVQUPr6paX6+qWlpaVQUKWlUFClpQoKpaUKCl9foKBfX6CgpaUKCqWlCgpfX6CgX1+goA
 
+It's reluctant to regard 's' as "independent of the center cell". However, there are a lot of strange rules in the 's & S.c.' subset.
 's & S.c. & /':
 MAPBQEFARUeFR4HQQdBHz0fPQcBBwEHBQcFBwEHASUFJQVfW19bfx9/H18fXx9/H38fQwdDB30ffR+HV4dXf19/Xw
 MAPAUABQFUVVRUZkRmRNZ41nlEAUQAVFRUVogGiARYRFhF3l3eXf7p/uldXV1f/df91hlOGU3ZndmdXVVdV/X/9fw
@@ -259,15 +263,10 @@ MAPACEAIYCBgIFVVVVVX3dfdxGdEZ0BVQFVd313fUN/Q38BPQE9QRFBEVV/VX9Gd0Z3EQURBVVVVVV+/
 MAPEgASAAEJAQk1bzVvHVYdVlVFVUUZERkR9hH2EX1/fX8BQQFBd5B3kHdnd2ddVV1VlUeVRwlTCVNvf29//7f/tw
 
 
----- Rules that do not belong to any supported subsets
-This is typically what you will get in the default density:
-MAPYaxTu9YJm9UZsagD9KrzcclQXH5nLwLTGALPMYhZeR6QeYRX6y7WoAw4DDpCQnTjY7k71qW7iQtvjMBxLGNBBg
-
-MAPBRAACkiAAUiATAhmCQkIEYMBgCBDCBFHUqQgJUQAAEAiAAmANgIkRAAISUA0ADgAAZAQAmAMFTCJgAAAYEYEgA
-
-It's possible to get non-trivial rules that do not belong to any well-defined subsets. See the "Atypical rules" section for details.
+Finally, it's possible to get non-trivial rules that do not belong to any well-defined subsets (no symmetries, no independencies). See the "Atypical rules" section for details.
 )";
 
+#if 0
 // TODO: finish...
 const char* const doc_atypical =
     R"(Typically you will explore rules in the well-defined subsets supported by the program. These subsets, however, take up only an extremely small part of all MAP rules. For example, the largest subset in this program is the native 'C2' rules, which has 272 groups, meaning it takes up only 2^(272-512) ~ 2^-240 of all possible MAP rules.
@@ -292,19 +291,16 @@ By the way, for an arbitrary native-C2 rule, if you do random-access flippings i
 MAPEUQ1VSLdo5gRRBFVItUziCK7oswiCBlEoruizCIAEURVCEQRkYiqIl0AzBEZiKoiRESIKiqRzJHMTACqKpnMEQ
 .......
 )";
+#else
+const char* const doc_atypical = "This section is not finished yet :(";
+#endif
 
 #if 0
 // TODO: rewrite...
 const char* const doc_concepts =
     R"(
-A lock is an array associated with a MAP rule, that marks some parts of the rule as contributor for something to happen.
-Essentially this defines another kind of subsets R[L] - a MAP rule "is compatible with" (belongs to) it iff the rule has the same value as R for any "locked" case.
-
-You can find a lot of interesting rules without "lock". However, some rules are unlikely discoverable by chance without this feature. Here is an example - an isotropic and self-complementary rule where gliders occur naturally:
 MAPARYSZxZtPVoUYRG2cMoGoxdsEtJst5ppcpLka9c/q58GKgMUKdi2sWmmEsm0t8kXOp+s8ZJ3edelQ0mXGbeXfw [/OI4QIQCgACAwBAAAAAQAIAAEMCLAAAAgIAAAAAAAACKAAAAgAKAgAAAAAAAAKAAgACAgAAAAACAAAAAAAAAAA]
-MAPARYTZxZsPVoQYRH2UMoGoxdkEtIst5p7coLka9c/r78CCgMUKdi+sSGmEsu0t9kXOp+s9ZB3efelQ8mXGTeXfw
-
-You will learn about how to find rules like this in the "Lock and capture" section.)";
+MAPARYTZxZsPVoQYRH2UMoGoxdkEtIst5p7coLka9c/r78CCgMUKdi+sSGmEsu0t9kXOp+s9ZB3efelQ8mXGTeXfw)";
 
 const char* const doc_IO =
     R"(Some strings will be marked with grey borders when you hover on them. You can right-click on them to copy the text to the clipboard. For example, the current rule (with or without the lock) can be copied this way. The path in the "Load file" is also copyable.

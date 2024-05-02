@@ -4,7 +4,7 @@ This program is designed for exploring 2-state CA rules in the range-1 Moore nei
 
 #### Features
 - Rules are saved as MAP-strings, so you are able to test them in other programs like Golly. Also, patterns can be saved as RLE-strings.
-- Subset-based rule analysis and edition. The supported subsets include isotropic/totalistic rules in Moore/hexagonal/Von-Neumann neighborhood, self-complementary rules and so on. You can combine multiple subsets to explore rules in the intersection of them (for example, self-complementary isotropic rules).
+- Subset-based rule analysis and edition. The supported subsets include isotropic/totalistic rules in Moore/hexagonal/von-Neumann neighborhood, self-complementary rules and so on. You can combine multiple subsets to explore rules in the intersection of them (for example, self-complementary isotropic rules).
     - Rule-analysis: the program is able to tell whether a MAP-rule is isotropic/self-complementary etc.
     - Rule-edition: the program is able to generate (theoretically all possible) rules in any supported subsets.
 - Preview mode, making it easier to "know" which direction to edit for for more interesting rules.
@@ -14,7 +14,7 @@ This program is designed for exploring 2-state CA rules in the range-1 Moore nei
 #### Getting started
 See the "Documents" part in the program to get familiar with the concepts and operations. I'd recommend firstly checking the "Rules in different subsets" section to get some sense about what can be found with this program.
 
-The operations are either accessible via buttons, or recorded somewhere in the tooltips. Most importantly, here is how to save rules/patterns:
+The operations are either accessible via buttons, or recorded somewhere in the tooltips. As a starting point, here is how to save rules/patterns:
 - Saving/undoing rules: right-click the MAP-string to save the current rule to the clipboard; use the widgets right above the MAP-string for undoing/redoing.
 - Saving patterns: right-click to select area and press 'C' to save the pattern to the clipboard (as RLE-string).
 
@@ -24,11 +24,11 @@ The operations are either accessible via buttons, or recorded somewhere in the t
 
 #### Recent plans
 - Cleanups for rule lists (those in `rules/...`). There are going to be refined lists of rules in the formal releases.
-- Finish documentation for the "lock & capture" feature.
+- Finish documentation.
 - Refine visual/layout.
 - Add support for unbounded space.
 - Add support for batch-preview mode for 'Randomize' etc.
 - Refine and stabilize keyboard/mouse controls etc. Some controls may be different in the formal release.
 - (Maybe) Add a convenient way to save rules directly into files.
 - (Maybe) Add support for icons/fonts.
-- (Maybe) Make some controls user-customizable.
+- (Maybe) Make some controls/default settings user-customizable.

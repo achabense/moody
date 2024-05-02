@@ -179,8 +179,8 @@ public:
             "(Try the last line for symmetric hexagonal rules (remember to unselect native-symmetry terms).)");
         terms_misc.emplace_back(
             "Von", &ignore_von,
-            "Rules in the Von-Neumann neighborhood. (The rules that are independent of 'q/e/z/c'.)\n\n"
-            "(For symmetric Von-Neumann rules you can directly combine this with native-symmetry terms.)");
+            "Rules in the von-Neumann neighborhood. (The rules that are independent of 'q/e/z/c'.)\n\n"
+            "(For symmetric von-Neumann rules you can directly combine this with native-symmetry terms.)");
         terms_misc.emplace_back("S.c.", &self_complementary, "Self-complementary rules.");
 
         terms_native.emplace_back("All", &native_isotropic,
@@ -207,8 +207,8 @@ public:
             "rules.");
         terms_totalistic.emplace_back("Hex", &hex_tot_exc_s, "Outer-totalistic hexagonal rules.");
         terms_totalistic.emplace_back("Hex(+s)", &hex_tot_inc_s, "Inner-totalistic hexagonal rules.");
-        terms_totalistic.emplace_back("Von", &von_tot_exc_s, "Outer-totalistic Von-Neumann rules.");
-        terms_totalistic.emplace_back("Von(+s)", &von_tot_inc_s, "Inner-totalistic Von-Neumann rules.");
+        terms_totalistic.emplace_back("Von", &von_tot_exc_s, "Outer-totalistic von-Neumann rules.");
+        terms_totalistic.emplace_back("Von(+s)", &von_tot_inc_s, "Inner-totalistic von-Neumann rules.");
 
         // q w -    q w
         // a s d ~ a s d
