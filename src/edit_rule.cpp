@@ -673,7 +673,7 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
             if (ImGui::Button(exact_mode ? "Exactly###Mode" : "Around ###Mode")) {
                 exact_mode = !exact_mode;
             }
-
+            quick_info("< Around / Exactly.");
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
             ImGui::SetNextItemWidth(item_width);
             if (imgui_StepSliderInt("##Quantity", &free_dist, 0, c_free,
@@ -787,6 +787,7 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
 #endif
         ImGui::SameLine();
         ImGui::Checkbox("Preview mode", &preview_mode);
+        quick_info("^ Try this!");
         if (preview_mode) {
             ImGui::SameLine();
             config.set("Settings", "Restart");

@@ -71,6 +71,30 @@ inline float wrap_len() {
     return ImGui::GetFontSize() * 35.0f;
 }
 
+inline void quick_info(const char* msg) {
+    // (`ImGui::IsKeyDown` is not suitable here.)
+    if (ImGui::GetKeyData(ImGuiKey_H)->Down && ImGui::IsItemVisible()) {
+        imgui_ItemRect(IM_COL32_WHITE);
+        const ImVec2 size = ImGui::CalcTextSize(msg);
+        const ImVec2 begin = [&]() -> ImVec2 {
+            const ImVec2 min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax();
+            if (msg[0] == '<') {
+                return ImVec2(max.x + ImGui::GetStyle().ItemSpacing.x, min.y);
+            } else if (msg[0] == '^') {
+                return ImVec2(min.x, max.y + ImGui::GetStyle().ItemSpacing.y);
+            } else {
+                assert(msg[0] == 'v');
+                return ImVec2(min.x, min.y - ImGui::GetStyle().ItemSpacing.y - size.y);
+            }
+        }();
+        const ImVec2 end(begin.x + size.x, begin.y + size.y);
+        ImDrawList* const drawlist = ImGui::GetForegroundDrawList();
+        drawlist->AddRectFilled(begin, end, IM_COL32(60, 60, 60, 255));
+        drawlist->AddRect(begin, end, IM_COL32_WHITE);
+        drawlist->AddText(begin, IM_COL32_WHITE, msg);
+    }
+}
+
 inline bool button_with_shortcut(const char* label, ImGuiKey shortcut = ImGuiKey_None, const ImVec2& size = {}) {
     bool ret = ImGui::Button(label, size);
     if (shortcut != ImGuiKey_None && !imgui_TestItemFlag(ImGuiItemFlags_Disabled)) {

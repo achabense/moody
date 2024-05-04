@@ -166,12 +166,16 @@ void frame_main() {
 
         const ImGuiID id_prev =
             ImGui::GetID("Prev"); // For `sequence::bind_to` (when the rule is gotten by randomization.)
+        ImGui::BeginGroup();
         sequence::seq(
             "<|", "Prev", "Next", "|>", //
             [&] { recorder.set_first(); }, [&] { recorder.set_prev(); }, [&] { recorder.set_next(); },
             [&] { recorder.set_last(); });
+        ImGui::EndGroup();
+        quick_info("v For undo/redo.");
         ImGui::SameLine();
         ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1 /* [1, size()] */);
+        quick_info("< Right-click to clear.");
         if (ImGui::BeginPopupContextItem("", ImGuiPopupFlags_MouseButtonRight)) {
             if (ImGui::Selectable("Clear")) {
                 recorder.clear();
@@ -187,6 +191,7 @@ void frame_main() {
                 with_lock = ImGui::IsItemHovered();
             } else {
                 imgui_StrCopyable(aniso::to_MAP_str(current.rule), imgui_Str);
+                quick_info("< Right-click to copy to the clipboard.");
                 if (manage_lock::enabled()) {
                     ImGui::SameLine(0, ImGui::CalcTextSize(" ").x - 1 /* For correct alignment */);
                     std::string lock_str = "[";

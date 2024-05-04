@@ -297,6 +297,7 @@ public:
             imgui_StrTooltip("(...)", "Keyboard shortcuts:\n"
                                       "R: Restart    Space: Pause\nN/M (repeatable): +p/+1\n"
                                       "1/2 (repeatable): -/+ Pace\n3/4 (repeatable): -/+ Gap time\n");
+            quick_info("< Keyboard shortcuts.");
             ImGui::SameLine();
             ImGui::Checkbox("Pause", &m_ctrl.pause);
             ImGui::PushButtonRepeat(true);
@@ -460,6 +461,7 @@ public:
             bool enabled = !lock_mouse;
             ImGui::Checkbox("Enabling scrolling and window moving", &enabled);
         });
+        quick_info("< Mouse operations.");
         if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
             lock_mouse = !lock_mouse;
         }

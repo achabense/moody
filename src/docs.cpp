@@ -16,7 +16,7 @@ The MAP-string for the current rule is shown at the top taking up a single line.
 The program keeps the record for the current rule. You can undo/redo via '<| Prev/Next |>' (above the MAP-string). The program manages several sequences of rules in the form of 'First Prev/Next Last'. When a sequence is activated, the left/right arrow keys are bound to 'Prev/Next' for convenience.
 
 In the right plane, you can right-click to select area and press 'C' (no need for 'Ctrl') to save the pattern as RLE-string to the clipboard, and press 'V' to paste the pattern from the clipboard (left-click to decide where to paste).
-(Notice that when pasting patterns to white background, you'd need to set 'Background' to 1 in the 'Ranges operations' window.)
+(Notice that when pasting patterns to white background, you'd need to set 'Background' to 1 in the 'Range operations' window.)
 
 In these documents, as well as those opened in 'Load file' or 'Clipboard', you can left-click the rule-string to replace the current rule, or right-click to copy the lines to the clipboard (drag to select multiple lines).
 For example, here is an RLE blob (a "rocket" in the Day & Night rule) - you can firstly click the header line to load the rule, and then copy the following lines (up to the '!' mark, with or without the header line) to paste and see the effect.
@@ -87,7 +87,7 @@ For the current rule C:
 
 Here are some use cases.
 
-If the working set is small enough (having only a few groups), the most direct way to explore the set is simply to check every rule in it.
+If the working set is small enough (having only a few groups), the most direct way to explore the set is to check every rule in it.
 Take 'S.c. & Tot(+s)' (the self-complementary and inner-totalistic rules) for example. There are only 5 groups ~ 2^5=32 rules in the set, so it's fairly reasonable to check all of them. Typically, it does not matter which rule serves as the mask if you decide to iterate through the whole working set. However, in this case, neither 'Zero' nor 'Identity' works, so you'd need to select the 'Native' mask. By clicking '<00..' you will start from M', which happens to be the "voting" rule:
 MAPAAAAAQABARcAAQEXARcXfwABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf3//f////w
 Then you can click 'Next' to iterate. (For convenience, after clicking '<00..', the left/right arrow keys will be bound to 'Prev/Next'.) The next rule will be:
@@ -106,7 +106,7 @@ Once you find another interesting rule, you can move on starting from it instead
 x = 5, y = 27, rule = MAP+sASUIjICmiAgAiAEKBAhrIGFiAUbCCAoAChgnAAAw6AAkAIgKCAlAQgIAAgIQBboCqhEQAAkFQAARIDAQQRBA
 2ob2o$obobo$b3ob$obobo$2ob2o$5o$5o$5o$5o$5o$5o$5o$5o$5o$5o$
 5o$5o$5o$5o$5o$5o$5o$2ob2o$obobo$b3ob$obobo$2ob2o!
-(The pattern is to be pasted into white background. To enable this, set 'Background' to 1 in the 'Ranges operations' window. The pattern will split into two huge spaceships.)
+(The pattern is to be pasted into white background. To enable this, set 'Background' to 1 in the 'Range operations' window. The pattern will split into two huge spaceships.)
 
 By "wandering" in the working set in this way, you can collect a series of rules that are close from each other.
 
