@@ -451,6 +451,18 @@ public:
                 ret = true;
             }
 
+            // I feel uncomfortable about this...
+            const float w = [] {
+                float w = ImGui::GetFrameHeight() + imgui_ItemInnerSpacingX() + ImGui::CalcTextSize("Preview mode").x;
+                if (preview_mode) {
+                    w += 2 * imgui_ItemSpacingX() + 4 * ImGui::GetStyle().FramePadding.x +
+                         ImGui::CalcTextSize("SettingsRestart").x;
+                }
+                return w;
+            }();
+            if (ImGui::GetItemRectMax().x + 16 + w <= ImGui::GetWindowPos().x + ImGui::GetContentRegionMax().x) {
+                ImGui::SameLine(0, 16);
+            }
             ImGui::Checkbox("Preview mode", &preview_mode);
             if (preview_mode) {
                 ImGui::SameLine();

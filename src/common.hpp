@@ -76,7 +76,7 @@ inline void quick_info(const char* msg) {
     if (ImGui::GetKeyData(ImGuiKey_H)->Down && ImGui::IsItemVisible()) {
         imgui_ItemRect(IM_COL32_WHITE);
         const ImVec2 size = ImGui::CalcTextSize(msg);
-        const ImVec2 begin = [&]() -> ImVec2 {
+        const ImVec2 msg_min = [&]() -> ImVec2 {
             const ImVec2 min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax();
             if (msg[0] == '<') {
                 return ImVec2(max.x + ImGui::GetStyle().ItemSpacing.x, min.y);
@@ -87,11 +87,11 @@ inline void quick_info(const char* msg) {
                 return ImVec2(min.x, min.y - ImGui::GetStyle().ItemSpacing.y - size.y);
             }
         }();
-        const ImVec2 end(begin.x + size.x, begin.y + size.y);
+        const ImVec2 msg_max(msg_min.x + size.x, msg_min.y + size.y);
         ImDrawList* const drawlist = ImGui::GetForegroundDrawList();
-        drawlist->AddRectFilled(begin, end, IM_COL32(60, 60, 60, 255));
-        drawlist->AddRect(begin, end, IM_COL32_WHITE);
-        drawlist->AddText(begin, IM_COL32_WHITE, msg);
+        drawlist->AddRectFilled(msg_min, msg_max, IM_COL32(60, 60, 60, 255));
+        drawlist->AddRect(msg_min, msg_max, IM_COL32_WHITE);
+        drawlist->AddText(msg_min, IM_COL32_WHITE, msg);
     }
 }
 

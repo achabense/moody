@@ -124,6 +124,8 @@ inline bool imgui_TestItemFlag(ImGuiItemFlags_ flag) { //
     return (GImGui->CurrentItemFlags & flag) != 0;
 }
 
+inline float imgui_ItemSpacingX() { return ImGui::GetStyle().ItemSpacing.x; }
+
 inline float imgui_ItemInnerSpacingX() { return ImGui::GetStyle().ItemInnerSpacing.x; }
 
 // TODO: many controls in the program are relying on these functions (which are not well-designed)...

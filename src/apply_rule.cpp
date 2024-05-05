@@ -361,7 +361,7 @@ public:
             }
         }
         ImGui::EndGroup();
-        ImGui::SameLine(0, ImGui::GetStyle().ItemSpacing.x + ImGui::CalcTextSize("  ").x);
+        ImGui::SameLine(0, imgui_ItemSpacingX() + ImGui::CalcTextSize("  ").x);
         ImGui::BeginGroup();
         {
             torusT::initT init = m_init;
