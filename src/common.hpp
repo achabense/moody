@@ -73,7 +73,7 @@ inline float wrap_len() {
 
 inline void quick_info(const char* msg) {
     // (`ImGui::IsKeyDown` is not suitable here.)
-    if (ImGui::GetKeyData(ImGuiKey_H)->Down && ImGui::IsItemVisible()) {
+    if (!ImGui::GetIO().WantTextInput && ImGui::GetKeyData(ImGuiKey_H)->Down && ImGui::IsItemVisible()) {
         imgui_ItemRect(IM_COL32_WHITE);
         const ImVec2 size = ImGui::CalcTextSize(msg);
         const ImVec2 msg_min = [&]() -> ImVec2 {

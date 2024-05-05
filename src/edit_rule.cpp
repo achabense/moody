@@ -547,12 +547,6 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
     const bool contained = subset.contains(mold.rule);
     assert_implies(contained, compatible);
 
-    // TODO: support sorting? (e.g. !contained < !pure < 1 < 0 < locked)
-    // TODO: more filtering modes?
-    // Will not hide "impure" groups even when there are locks.
-    // Enabled by default; this will have no effect before `manage_lock::enabled`, as the lock part is
-    // guaranteed to be empty before that.
-    static bool hide_locked = true;
     manage_lock::display([&](bool visible) {
         if (!visible) {
             return;
@@ -575,11 +569,6 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
             "\"Saturate\" the locked groups to keep the full effect of the locks when switching to a"
             "\"wider\" working set. For use cases see the \"Lock and capture\" section in \"Documents\".\n"
             "(This is available only when the current rule belongs to the working set.)");
-        ImGui::SameLine();
-        ImGui::Checkbox("Hide locked groups", &hide_locked);
-        ImGui::SameLine();
-        imgui_StrTooltip("(?)", "Hide locked groups in the random-access section.\n"
-                                "(Only \"pure\" (light-blue) groups can be hidden.)");
     });
 
     // Disable all edit operations if !subset.contains(mask), including those that do not really need
@@ -848,110 +837,118 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
         }();
 
         int n = 0;
-        par.for_each_group([&](int j, const aniso::groupT& group) {
-            const bool has_lock = scanlist[j].any_locked();
-            const bool pure = scanlist[j].all_0() || scanlist[j].all_1();
-            if (hide_locked && has_lock && pure) {
-                return;
-            }
-            if (n % perline != 0) {
-                ImGui::SameLine(0, spacing);
-            } else {
-                ImGui::Separator();
-            }
-            ++n;
 
-            const bool incomptible = scanlist[j].locked_0 != 0 && scanlist[j].locked_1 != 0;
-            const aniso::codeT head = group[0];
-
-            // TODO: better color... (will be ugly if using green colors...)
-            // _ButtonHovered: ImVec4(0.26f, 0.59f, 0.98f, 1.00f)
-            // [0]:Button, [1]:Hover, [2]:Active
-            static const ImVec4 button_col_normal[3]{
-                {0.26f, 0.59f, 0.98f, 0.70f}, {0.26f, 0.59f, 0.98f, 0.85f}, {0.26f, 0.59f, 0.98f, 1.00f}};
-            static const ImVec4 button_col_impure[3]{
-                {0.26f, 0.59f, 0.98f, 0.30f}, {0.26f, 0.59f, 0.98f, 0.40f}, {0.26f, 0.59f, 0.98f, 0.50f}};
-            static const ImVec4 button_col_incomptible[3]{{0.6f, 0, 0, 1}, {0.8f, 0, 0, 1}, {0.9f, 0, 0, 1}};
-            const ImVec4* const button_color = pure           ? button_col_normal
-                                               : !incomptible ? button_col_impure
-                                                              : button_col_incomptible;
-
-            if (preview_mode) {
-                ImGui::BeginGroup();
-            }
-            ImGui::PushStyleColor(ImGuiCol_Button, button_color[0]);
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, button_color[1]);
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, button_color[2]);
-            if (code_button(head, zoom)) {
-                aniso::ruleT rule = mold.rule;
-                for (aniso::codeT code : group) {
-                    rule[code] = !rule[code];
+        using counterT = decltype(scanlist)::value_type;
+        assert(par.k() <= 512);
+        std::array<bool, 512> shown{};
+        for (auto select : {+[](const counterT& c) { return !c.all_0() && !c.all_1(); }, //
+                            +[](const counterT& c) { return !c.any_locked(); },          //
+                            +[](const counterT& c) { return c.any_locked(); }}) {
+            par.for_each_group([&](int j, const aniso::groupT& group) {
+                if (shown[j] || !select(scanlist[j])) {
+                    return;
                 }
-                bind_undo = true;
-                return_rule(rule);
-            } else if (manage_lock::enabled() && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
-                aniso::moldT::lockT lock = mold.lock;
-                for (aniso::codeT code : group) {
-                    lock[code] = !has_lock;
+                shown[j] = true;
+                const bool has_lock = scanlist[j].any_locked();
+                const bool pure = scanlist[j].all_0() || scanlist[j].all_1();
+                if (n % perline != 0) {
+                    ImGui::SameLine(0, spacing);
+                } else {
+                    ImGui::Separator();
                 }
-                bind_undo = true; // TODO: whether to bind-undo for locks?
-                return_lock(lock);
-            }
-            ImGui::PopStyleColor(3);
+                ++n;
 
-            const bool show_group = ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip);
+                const bool incomptible = scanlist[j].locked_0 != 0 && scanlist[j].locked_1 != 0;
+                const aniso::codeT head = group[0];
 
-            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-            align_text(ImGui::GetItemRectSize().y);
-            imgui_Str(preview_mode ? labels_preview[masked[head]] : labels_normal[masked[head]]);
-            if (has_lock) {
-                const ImU32 col = scanlist[j].all_locked() ? IM_COL32_WHITE : IM_COL32(128, 128, 128, 255);
-                imgui_ItemRect(col, ImVec2(-2, -2));
-            }
+                // TODO: better color... (will be ugly if using green colors...)
+                // _ButtonHovered: ImVec4(0.26f, 0.59f, 0.98f, 1.00f)
+                // [0]:Button, [1]:Hover, [2]:Active
+                static const ImVec4 button_col_normal[3]{
+                    {0.26f, 0.59f, 0.98f, 0.70f}, {0.26f, 0.59f, 0.98f, 0.85f}, {0.26f, 0.59f, 0.98f, 1.00f}};
+                static const ImVec4 button_col_impure[3]{
+                    {0.26f, 0.59f, 0.98f, 0.30f}, {0.26f, 0.59f, 0.98f, 0.40f}, {0.26f, 0.59f, 0.98f, 0.50f}};
+                static const ImVec4 button_col_incomptible[3]{{0.6f, 0, 0, 1}, {0.8f, 0, 0, 1}, {0.9f, 0, 0, 1}};
+                const ImVec4* const button_color = pure           ? button_col_normal
+                                                   : !incomptible ? button_col_impure
+                                                                  : button_col_incomptible;
 
-            if (preview_mode) {
-                previewer::preview(j, config, [&] {
+                if (preview_mode) {
+                    ImGui::BeginGroup();
+                }
+                ImGui::PushStyleColor(ImGuiCol_Button, button_color[0]);
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, button_color[1]);
+                ImGui::PushStyleColor(ImGuiCol_ButtonActive, button_color[2]);
+                if (code_button(head, zoom)) {
                     aniso::ruleT rule = mold.rule;
                     for (aniso::codeT code : group) {
                         rule[code] = !rule[code];
                     }
-                    return rule;
-                });
-                ImGui::EndGroup();
-            }
+                    bind_undo = true;
+                    return_rule(rule);
+                } else if (manage_lock::enabled() && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+                    aniso::moldT::lockT lock = mold.lock;
+                    for (aniso::codeT code : group) {
+                        lock[code] = !has_lock;
+                    }
+                    bind_undo = true; // TODO: whether to bind-undo for locks?
+                    return_lock(lock);
+                }
+                ImGui::PopStyleColor(3);
 
-            if (show_group && ImGui::BeginTooltip()) {
-                // TODO: move elsewhere...
-                imgui_Str(manage_lock::enabled() ? "Left-click to flip the values.\nRight-click to toggle the lock."
-                                                 : "Left-click to flip the values.");
-                ImGui::Separator();
-                ImGui::Text("Group size: %d", (int)group.size());
-                const int max_to_show = 48;
-                for (int x = 0; const aniso::codeT code : group) {
-                    if (x++ % 8 != 0) {
-                        ImGui::SameLine();
-                    }
-                    code_image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
-                    ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                    align_text(ImGui::GetItemRectSize().y);
-                    imgui_Str(labels_normal[masked[code]]);
-                    if (mold.lock[code]) {
-                        imgui_ItemRect(IM_COL32_WHITE, ImVec2(-2, -2));
-                    }
-                    if (x == max_to_show) {
-                        break;
-                    }
+                const bool show_group = ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip);
+
+                ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                align_text(ImGui::GetItemRectSize().y);
+                imgui_Str(preview_mode ? labels_preview[masked[head]] : labels_normal[masked[head]]);
+                if (has_lock) {
+                    const ImU32 col = scanlist[j].all_locked() ? IM_COL32_WHITE : IM_COL32(128, 128, 128, 255);
+                    imgui_ItemRect(col, ImVec2(-2, -2));
                 }
-                if (group.size() > max_to_show) {
-                    imgui_Str("...");
+
+                if (preview_mode) {
+                    previewer::preview(j, config, [&] {
+                        aniso::ruleT rule = mold.rule;
+                        for (aniso::codeT code : group) {
+                            rule[code] = !rule[code];
+                        }
+                        return rule;
+                    });
+                    ImGui::EndGroup();
                 }
-                ImGui::EndTooltip();
-            }
-        });
-        ImGui::PopStyleVar(1);
-        if (n == 0) {
-            imgui_Str("No free groups");
+
+                if (show_group && ImGui::BeginTooltip()) {
+                    // TODO: move elsewhere...
+                    imgui_Str(manage_lock::enabled() ? "Left-click to flip the values.\nRight-click to toggle the lock."
+                                                     : "Left-click to flip the values.");
+                    ImGui::Separator();
+                    ImGui::Text("Group size: %d", (int)group.size());
+                    const int max_to_show = 48;
+                    for (int x = 0; const aniso::codeT code : group) {
+                        if (x++ % 8 != 0) {
+                            ImGui::SameLine();
+                        }
+                        code_image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
+                        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                        align_text(ImGui::GetItemRectSize().y);
+                        imgui_Str(labels_normal[masked[code]]);
+                        if (mold.lock[code]) {
+                            imgui_ItemRect(IM_COL32_WHITE, ImVec2(-2, -2));
+                        }
+                        if (x == max_to_show) {
+                            break;
+                        }
+                    }
+                    if (group.size() > max_to_show) {
+                        imgui_Str("...");
+                    }
+                    ImGui::EndTooltip();
+                }
+            });
         }
+        assert(n == par.k());
+
+        ImGui::PopStyleVar(1);
     }
     if (preview_mode) {
         ImGui::PopStyleColor();
