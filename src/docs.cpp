@@ -28,7 +28,7 @@ The left plane provides ways to analyze and modify the current rule based on a s
 
 The subsets that the current rule belongs to will be marked with light-green borders.
 To edit the rule, you need to firstly specify a "working set", which is the set you are going to explore. You can select multiple subsets - the program will calculate the intersection of them as the working set. For example, if you select 'All' (isotropic rules; selected by default) and 'S.c.' (self-complementary rules), you are going to explore the rules that are both isotropic and self-complementary.
-Then you need to select a "mask" (masking rule) to guide how to observe the current rule and generate new rules. To proceed you'd need to ensure the mask belongs to the working rule ('Native' will always work).
+Then you need to select a "mask" (masking rule) to guide how to observe the current rule and generate new rules.
 To modify the current rule:
 'Randomize' generates randomized rules in the working set with specified "distance" (number of groups where two rules have different values) to the masking rule.
 '<00.. Prev/Next 11..>' generates rules based on the mask and current rule, so that the current rule will iterate through the whole working set - firstly the masking rule, then all rules with distance = 1 to the masking rule, then 2, ..., until max distance.
@@ -88,7 +88,7 @@ For the current rule C:
 Here are some use cases.
 
 If the working set is small enough (having only a few groups), the most direct way to explore the set is to check every rule in it.
-Take 'S.c. & Tot(+s)' (the self-complementary and inner-totalistic rules) for example. There are only 5 groups ~ 2^5=32 rules in the set, so it's fairly reasonable to check all of them. Typically, it does not matter which rule serves as the mask if you decide to iterate through the whole working set. However, in this case, neither 'Zero' nor 'Identity' works, so you'd need to select the 'Native' mask. By clicking '<00..' you will start from M', which happens to be the "voting" rule:
+Take 'S.c. & Tot(+s)' (the self-complementary and inner-totalistic rules) for example. There are only 5 groups ~ 2^5=32 rules in the set, so it's fairly reasonable to check all of them. Typically, it does not matter which rule serves as the mask if you decide to iterate through the whole working set. However, in this case, neither 'Zero' nor 'Identity' works, so you'd need to stick to the 'Native' mask. By clicking '<00..' you will start from M', which happens to be the "voting" rule:
 MAPAAAAAQABARcAAQEXARcXfwABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf3//f////w
 Then you can click 'Next' to iterate. (For convenience, after clicking '<00..', the left/right arrow keys will be bound to 'Prev/Next'.) The next rule will be:
 MAPgAAAAQABARcAAQEXARcXfwABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf3//f////g

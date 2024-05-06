@@ -268,9 +268,9 @@ public:
             return hit;
         };
         auto check = [&](termT& term, bool show_title = false) -> void {
-            if (put_term(term.set->contains(mold.rule) ? Contained
-                         : compatible(*term.set, mold) ? Compatible
-                                                       : Incompatible,
+            if (put_term(term.set->contains(mold.rule)        ? Contained
+                         : aniso::compatible(*term.set, mold) ? Compatible
+                                                              : Incompatible,
                          term.selected                 ? Selected
                          : term.set->includes(current) ? Including
                          : term.disabled               ? Disabled
@@ -337,9 +337,9 @@ public:
             ImGui::SameLine();
             imgui_Str("Subsets ~");
             ImGui::SameLine();
-            put_term(current.contains(mold.rule) ? Contained
-                     : compatible(current, mold) ? Compatible
-                                                 : Incompatible,
+            put_term(current.contains(mold.rule)        ? Contained
+                     : aniso::compatible(current, mold) ? Compatible
+                                                        : Incompatible,
                      None, nullptr, false);
             imgui_ItemTooltip("The working set. (See '(...)' for explanation.)");
 
@@ -452,21 +452,24 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
     const aniso::subsetT& subset = selector.select_subset(mold);
     assert(!subset.empty());
 
+    const bool compatible = aniso::compatible(subset, mold);
+    const bool contained = subset.contains(mold.rule);
+    assert_implies(contained, compatible);
+
     ImGui::Separator();
 
     // Select mask.
     char chr_0 = '0', chr_1 = '1';
     const aniso::maskT& mask = [&]() -> const aniso::maskT& {
         const char* const about_mask =
-            "A mask is an arbitrary rule to perform XOR masking for other rules.\n"
-            "Some rules are special enough, so that the values masked by them have natural interpretations. "
-            "See 'Zero/Identity' for examples.\n"
-            "When both the current rule and the masking rule belong to the working set, the distance between the two "
-            "rules can be defined as the number of groups where they have different values.\n\n"
+            "A mask is an arbitrary rule (in the working set) to perform XOR masking for other rules.\n\n"
+            "Some rules are special enough (for example, 'Zero/Identity'), so that the values masked by them have "
+            "natural interpretations.\n"
+            "If a rule belongs to the working set, its distance to the masking rule can be defined as the number "
+            "of groups where they have different values.\n\n"
             "(The exact workings are more complex than explained here. For details see the \"Subset, mask ...\" "
             "section in \"Documents\".)";
 
-        // TODO: add record for custom masks?
         static aniso::maskT mask_custom{{}};
 
         enum maskE { Zero, Identity, Native, Custom }; // TODO: better name for 'Native'?
@@ -495,9 +498,8 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
              "set (neither 'Zero' nor 'Identity' works, and there are no existing rules to serve as custom mask).",
              'o', 'i'},
 
-            // TODO: is right-click control a good idea?
             {"Custom",
-             "Custom rule; you can click the '<< Cur' button (or right-click this) to set this to the current rule.\n"
+             "Custom rule; you can click '<< Cur' to set this to the current rule.\n"
              "Different:'i', same:'o'. This is a useful tool to help find interesting rules based on existing ones. "
              "For example, the smaller the distance is, the more likely that the rule behaves similar to the masking "
              "rule.",
@@ -507,20 +509,30 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
         const aniso::maskT* const mask_ptrs[]{&aniso::mask_zero, &aniso::mask_identity, &subset.get_mask(),
                                               &mask_custom};
 
+        if (!subset.contains(*mask_ptrs[mask_tag])) {
+            mask_tag = Native;
+        }
+
         ImGui::AlignTextToFramePadding();
         imgui_StrTooltip("(...)", about_mask);
         ImGui::SameLine();
         imgui_Str("Mask ~");
         for (const maskE m : {Zero, Identity, Native, Custom}) {
+            const bool m_avail = subset.contains(*mask_ptrs[m]);
+
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-            if (ImGui::RadioButton(mask_terms[m].label, mask_tag == m)) {
-                mask_tag = m;
-            } else if (m == Custom && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
-                mask_tag = m;
-                mask_custom = {mold.rule};
-            }
+            guarded_block(m_avail, [&] {
+                if (ImGui::RadioButton(mask_terms[m].label, mask_tag == m)) {
+                    mask_tag = m;
+                }
+            });
 
             itemtooltip_with_previewer([&] {
+                if (!m_avail) {
+                    imgui_Str("This rule does not belong to the working set.");
+                    ImGui::Separator();
+                }
+
                 imgui_Str(mask_terms[m].desc);
                 ImGui::Separator();
                 previewer::preview(-1, previewer::configT::_220_160, *mask_ptrs[m], false);
@@ -530,30 +542,27 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
         }
 
         ImGui::SameLine();
-        if (ImGui::Button("<< Cur")) {
-            mask_custom = {mold.rule};
-            mask_tag = Custom;
+        guarded_block(contained, [&] {
+            if (ImGui::Button("<< Cur")) {
+                mask_custom = {mold.rule};
+                mask_tag = Custom;
+            }
+        });
+        if (!contained) {
+            imgui_ItemTooltip("The current rule does not belong to the working set.");
         }
 
         chr_0 = mask_terms[mask_tag].chr_0;
         chr_1 = mask_terms[mask_tag].chr_1;
+        assert(subset.contains(*mask_ptrs[mask_tag]));
         return *mask_ptrs[mask_tag];
     }();
 
     ImGui::Separator();
 
-    const bool mask_avail = subset.contains(mask);
-    const bool compatible = aniso::compatible(subset, mold);
-    const bool contained = subset.contains(mold.rule);
-    assert_implies(contained, compatible);
-
     manage_lock::display([&](bool visible) {
         if (!visible) {
             return;
-        }
-        if (!mask_avail) {
-            // TODO: better message... whether to disable the operations?
-            imgui_StrDisabled("\nConsider selecting a valid mask first.");
         }
         ImGui::SeparatorText("Lock edition");
         if (ImGui::Button("Clear lock")) {
@@ -570,19 +579,6 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
             "\"wider\" working set. For use cases see the \"Lock and capture\" section in \"Documents\".\n"
             "(This is available only when the current rule belongs to the working set.)");
     });
-
-    // Disable all edit operations if !subset.contains(mask), including those that do not really need
-    // the mask to be valid (for example, `trans_reverse`, which does not actually rely on subsets).
-    if (!mask_avail) {
-        imgui_StrWrapped("This rule does not belong to the working set (in other words, the rule does not belong to "
-                         "all the selected subsets). Consider trying other masks.\n\n"
-                         "1. At least one of 'Zero', 'Identity' and 'Native' will work. Especially, 'Native' will "
-                         "always work.\n"
-                         "2. If the current rule belongs to the working set, it can also serve as a valid 'Custom' "
-                         "mask ('<< Cur').",
-                         item_width);
-        return std::nullopt;
-    }
 
 #if 0
     // (Replaced by mixed-mode.)
@@ -837,7 +833,6 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
         }();
 
         int n = 0;
-
         using counterT = decltype(scanlist)::value_type;
         assert(par.k() <= 512);
         std::array<bool, 512> shown{};
@@ -849,6 +844,7 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
                     return;
                 }
                 shown[j] = true;
+
                 const bool has_lock = scanlist[j].any_locked();
                 const bool pure = scanlist[j].all_0() || scanlist[j].all_1();
                 if (n % perline != 0) {
