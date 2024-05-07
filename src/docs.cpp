@@ -13,27 +13,26 @@ const char* const doc_overview =
     R"(At any time, the program has a rule shown in the right plane (which is an editable torus space; the operations are recorded in the tooltips (...)). This is later called the "current rule". As you see, it is the Game-of-Life rule initially.
 
 The MAP-string for the current rule is shown at the top taking up a single line. You can right-click the text to save to the clipboard. The paths in the 'Load file' window can be copied in the same way.
-The program keeps the record for the current rule. You can undo/redo via '<| Prev/Next |>' (above the MAP-string). The program manages several sequences of rules in the form of 'First Prev/Next Last'. When a sequence is activated, the left/right arrow keys are bound to 'Prev/Next' for convenience.
+The program keeps the record for the current rule. You can undo/redo via '<| Prev/Next |>' (above the MAP-string). The program manages several sequences of rules in the form of 'First Prev/Next Last'. When a sequence is activated, the left/right arrow keys will be bound to its 'Prev/Next' for convenience.
 
-In the right plane, you can right-click to select area and press 'C' (no need for 'Ctrl') to save the pattern as RLE-string to the clipboard, and press 'V' to paste the pattern from the clipboard (left-click to decide where to paste).
-(Notice that when pasting patterns to white background, you'd need to set 'Background' to 1 in the 'Range operations' window.)
+In the right plane, you can right-click to select area and press 'C' (no need for 'Ctrl') to save the pattern as RLE-string to the clipboard, or press 'V' to paste the pattern from the clipboard (left-click to decide where to paste).
+(When pasting patterns to white background, you'd need to set 'Background' to 1 in the 'Range operations' window.)
 
 In these documents, as well as those opened in 'Load file' or 'Clipboard', you can left-click the rule-string to replace the current rule, or right-click to copy the lines to the clipboard (drag to select multiple lines).
-For example, here is an RLE blob (a "rocket" in the Day & Night rule) - you can firstly click the header line to load the rule, and then copy the following lines (up to the '!' mark, with or without the header line) to paste and see the effect.
+For example, here is an RLE blob (a "rocket" in the Day & Night rule) - you can firstly click the header line to load the rule, and then copy the following lines (from '3bo...' up to the '!' mark) to paste and see the effect.
 x = 7, y = 14, rule = MAPARYBFxZoF34WaBd+aIF+6RZoF35ogX7paIF+6YEX6ZcWaBd+aIF+6WiBfumBF+mXaIF+6YEX6ZeBF+mXF3+Xfw
 3bo3b$2b3o2b$b5ob$ob3obo$2b3o2b$2b3o2b$ob3obo$ob3obo$b5ob$b
 5ob$3bo3b$7b$2b3o2b$2bobo2b!
 
 The left plane provides ways to analyze and modify the current rule based on a series of subsets. For detailed descriptions see the next section ("Subset, mask and rule operations"). In short:
-
 The subsets that the current rule belongs to will be marked with light-green borders.
-To edit the rule, you need to firstly specify a "working set", which is the set you are going to explore. You can select multiple subsets - the program will calculate the intersection of them as the working set. For example, if you select 'All' (isotropic rules; selected by default) and 'S.c.' (self-complementary rules), you are going to explore the rules that are both isotropic and self-complementary.
+You need to firstly specify a "working set", which is the set you are going to explore. You can select multiple subsets - the program will calculate the intersection of them as the working set. For example, if you select 'All' (isotropic rules; selected by default) and 'S.c.' (self-complementary rules), you are going to explore the rules that are both isotropic and self-complementary.
 Then you need to select a "mask" (masking rule) to guide how to observe the current rule and generate new rules.
 To modify the current rule:
 'Randomize' generates randomized rules in the working set with specified "distance" (number of groups where two rules have different values) to the masking rule.
 '<00.. Prev/Next 11..>' generates rules based on the mask and current rule, so that the current rule will iterate through the whole working set - firstly the masking rule, then all rules with distance = 1 to the masking rule, then 2, ..., until max distance.
 (The current rule should belong to the working set to enable 'Prev/Next'.)
-In the random-access section, the values of the current rule are viewed through the mask and grouped by the working set. By clicking a group you will flip all values in that group. By turning on 'Preview mode' you are able to see the effect without replacing the current rule.
+In the random-access section, the values of the current rule are viewed through the mask and grouped by the working set. By clicking a group you will flip all values of the current rule in that group. By turning on 'Preview mode' you are able to see the effect without replacing the current rule.
 
 The program also has a way to generate rules ensuring certain value constraints (allowing for certain patterns). For example, in this program it's easy to find rules like this:
 MAPARYSZhYAPEgSaBCgCAAAgABAEsAIAIgASIDgAIAAgAASQAIAaACggACAAICAAIAASICogIAAAACAAAAAAAAAAA
@@ -58,7 +57,7 @@ As a consequence, taking non-empty S = (M, P), there are:
 1. If P has k groups, then there are 2^k rules in S.
 2. For any two rules in S, in each group in P, the values of the two rules must be either all-the-same or all-the-different from each other, just like their relation with M. As a result, from any rule in S (certainly including M), by flipping all values in some groups of P, you are able to get to any other rules in the set - in this sense, it does not matter which rule serves as M in S.
 3. It's natural to define the "distance" between the two rules (in S) as the number of groups where they have different values.
-For example, here are some rules that all have distance = 1 (in the isotropic set) to the Game-of-Life rule. In this program it's fairly easy to find such rules.
+For example, here are some rules that have distance = 1 (in the isotropic set) to the Game-of-Life rule. In this program it's fairly easy to find such rules.
 MAPARYXbhZofOgWaH7oaIDogBZofuhogOiAaIDoAIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAAACAAIAAAAAAAA
 MAPARYXfhZofugWan7oaIDogBZofuhogOiAaIDogIgAgAAWaH7oeIDogGiA6ICAAIAAaMDogIAAgACAAIAAAAAAAA
 MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6YSAAIQAaIDogIAAgACAAIQAAAAAAA
@@ -69,16 +68,15 @@ Obviously the whole MAP ruleset can be composed in the same way. And finally, it
 With these backgrounds, it will be much clearer to explain what happens in the program:
 1. For the selected subsets, the program will firstly calculate their intersection (with the whole MAP set) as the working set W = (M, P).
 (If nothing is selected, the working set is the MAP set itself.)
-2. Then you need to decide a rule M' (called "mask") to guide how to "observe" the current rule and generate new rules. To allow for further editions, M' must belong to W.
+2. Then you need to decide a rule M' in W (called "mask") to guide how to "observe" the current rule and generate new rules.
 (W.M is immutable, but is exposed as 'Native', so that there is at least one viable mask.)
+(If the current rule already belongs to W, it can serve as a valid mask (M') via '<< Cur'.)
 
 For the current rule C:
 3. 'Randomize' generates randomized rules in W with specified distance to M'.
 4. '<00.. Prev/Next 11..>' generates new rules based on C and M', in such a way that C will iterate through all rules in W:
 '<00..' sets C to M', and '11..>' sets C to the rule with values different from M' in all cases.
 'Next' generates rules based on C and M', so that C will become the "next" rule in such a sequence: starting from M' ('<00..'), then all rules having distance = 1 to M', then distance = 2, ..., until '11..>'. 'Prev' does the same thing reversely.
-(Notice that if C already belongs to W, it can serve as a valid mask (M') via '<< Cur'.)
-
 5. In the random-access section, the values of C are viewed through M' (XOR-masked by M') as a sequence of 0/1, and grouped by W.P. If C belongs to W, the masked values in each group must be either all-0 or all-1, so it's enough to represent each group with one of cases in it.
 6. By left-clicking a group you will get a rule with all values in that group flipped. Therefore, if C already belongs to W, the result will still belong to W. Otherwise, the operation actually gets rules in (C, W.P). In other words, the operation defines S' = (C, W.P), which is W itself if C already belongs to W.
 (The masking rule has no effect on the result of random-access edition.)

@@ -147,17 +147,18 @@ public:
         // TODO: refine descriptions.
         terms_ignore.emplace_back(
             "q", &ignore_q,
-            "Independent of 'q'. That is, for any two cases where only 'q' is different, the mapped "
-            "values are the same. So the rules will work as if the neighborhood does not include 'q'.\n"
-            "The same applies to 'w/e/a/d/z/x/c'.\n\n"
+            "Rules whose values are independent of 'q'. That is, for any two cases where only 'q' is different, "
+            "the mapped values are the same.\n"
+            "(Therefore, these rules will behave as if the neighborhood does not include 'q'. The same applies to "
+            "'w/e/a/d/z/x/c'.)\n\n"
             "('q/w/e/a/s/d/z/x/c' are named after the keys in 'qwerty' keyboard.)");
         terms_ignore.emplace_back("w", &ignore_w, "See 'q' for details.");
         terms_ignore.emplace_back("e", &ignore_e, "See 'q' for details.");
         terms_ignore.emplace_back("a", &ignore_a, "See 'q' for details.");
         terms_ignore.emplace_back(
             "s", &ignore_s_z,
-            "For any two cases where only 's' is different, the mapped values are the same. So when 'q/w/e/a/d/z/x/c' "
-            "are the same, there must be: either s:0->1, s:1->1 or s:0->0, s:1->0.\n\n"
+            "For any two cases where only 's' is different, the mapped values are the same.\n"
+            "(When 'q/w/e/a/d/z/x/c' are the same, there must be: either s:0->1, s:1->1 or s:0->0, s:1->0.)\n\n"
             "(This is defined in the same way as 'q', but it's strange to treat this as \"independent of 's'\".)");
         terms_ignore.emplace_back("d", &ignore_d, "See 'q' for details.");
         terms_ignore.emplace_back("z", &ignore_z, "See 'q' for details.");
@@ -169,18 +170,17 @@ public:
                                 "the values are the same (either s:0->0, s:1->1 or s:0->1, s:1->0).");
         terms_misc.emplace_back(
             "Hex", &ignore_hex,
-            "Rules that emulate the hexagonal rules (by ignoring 'e/z'). In this program the emulation support for "
-            "hexagonal rules are all based on ignoring 'e/z' instead of 'q/c'.\n\n"
-            "(Try the last line for symmetric hexagonal rules (remember to unselect native-symmetry terms).)");
+            "Rules that emulate hexagonal neighborhood (by making the values independent of 'e/z'). "
+            "See the last line for demonstration.");
         terms_misc.emplace_back(
             "Von", &ignore_von,
-            "Rules in the von-Neumann neighborhood. (The rules that are independent of 'q/e/z/c'.)\n\n"
+            "Rules in the von-Neumann neighborhood. (Rules whose values are independent of 'q/e/z/c'.)\n\n"
             "(For symmetric von-Neumann rules you can directly combine this with native-symmetry terms.)");
         terms_misc.emplace_back("S.c.", &self_complementary, "Self-complementary rules.");
 
         terms_native.emplace_back("All", &native_isotropic,
-                                  "Isotropic MAP rules. (The rules that preserve all symmetries.) "
-                                  "This is actually the intersection of the following subsets in this line.",
+                                  "Isotropic MAP rules. (Rules that preserve all symmetries.)\n\n"
+                                  "(This is equal to the intersection of the following subsets in this line.)",
                                   true /* Selected */);
         terms_native.emplace_back("|", &native_refl_wsx,
                                   "Rules that preserve reflection symmetry, taking '|' as the axis.");
@@ -193,13 +193,12 @@ public:
 
         terms_totalistic.emplace_back(
             "Tot", &native_tot_exc_s,
-            "Outer-totalistic MAP rules (where the B/S notation applies, and where the "
-            "Game-of-Life rule was defined). The values are dependent on 's' and 'q+w+e+a+d+z+x+c'.");
+            "Outer-totalistic MAP rules. That is, the values are dependent on 's' and 'q+w+e+a+d+z+x+c'.\n\n"
+            "(This is where the B/S notation applies.)");
         terms_totalistic.emplace_back(
             "Tot(+s)", &native_tot_inc_s,
             "Inner-totalistic MAP rules. That is, the values are only dependent on "
-            "'q+w+e+a+s+d+z+x+c' (including 's'). This is a strict subset of outer-totalistic "
-            "rules.");
+            "'q+w+e+a+s+d+z+x+c' (including 's'). This is a strict subset of outer-totalistic rules.");
         terms_totalistic.emplace_back("Hex", &hex_tot_exc_s, "Outer-totalistic hexagonal rules.");
         terms_totalistic.emplace_back("Hex(+s)", &hex_tot_inc_s, "Inner-totalistic hexagonal rules.");
         terms_totalistic.emplace_back("Von", &von_tot_exc_s, "Outer-totalistic von-Neumann rules.");
@@ -208,9 +207,9 @@ public:
         // q w -    q w
         // a s d ~ a s d
         // - x c    x c"
-        terms_hex.emplace_back(
-            "All", &hex_isotropic,
-            "Rules that emulate isotropic hexagonal rules. (The intersection of the following subsets in this line.)");
+        terms_hex.emplace_back("All", &hex_isotropic,
+                               "Rules that emulate isotropic hexagonal rules.\n\n"
+                               "(Remember to unselect native-symmetry terms when working with this line.)");
         terms_hex.emplace_back(
             "a-d", &hex_refl_asd,
             "Rules that emulate reflection symmetry in the hexagonal tiling, taking the axis from 'a to d'.");
@@ -221,7 +220,7 @@ public:
         terms_hex.emplace_back("w|d", &hex_refl_wd, "Ditto, the reflection axis is vertical to 'w to d'.");
         terms_hex.emplace_back("C2", &hex_C2,
                                "Rules that emulate C2 symmetry in the hexagonal tiling.\n"
-                               "Notice this is different from native C2 rules.");
+                               "(Not to be confused with native C2 rules.)");
         terms_hex.emplace_back("C3", &hex_C3, "C3 symmetry.");
         terms_hex.emplace_back("C6", &hex_C6, "C6 symmetry. This is a strict subset of C2/C3.");
 
@@ -798,19 +797,10 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
                 [&] { return_rule(aniso::seq_mixed::next(subset, mask, mold)); },
                 [&] { return_rule(aniso::seq_mixed::last(subset, mask, mold)); }, !contained);
         });
-#if 0
-        ImGui::SameLine();
-        if (contained) {
-            ImGui::Text("%s:%d", !has_lock ? "Distance" : "Free dist", c_1 - c_locked_1);
-        } else {
-            ImGui::Text("%s:N/A", !has_lock ? "Distance" : "Free dist");
-        }
-#endif
         ImGui::SameLine();
         imgui_StrTooltip("(?)",
                          "Iterate through the whole working set, by firstly iterating through all rules that have "
                          "distance = 1 to the masking rule, then 2, 3, ..., until max distance.\n\n"
-                         // "Here 'Distance:...' refers to the distance from the current rule to the mask.\n\n"
                          "For example, suppose the current rule belongs to the working set. To iterate through all "
                          "rules that have distance = 1 to the current rule, you can:\n"
                          "1. '<< Cur' to set the current rule as the custom mask.\n"

@@ -12,9 +12,9 @@ This program is designed for exploring 2-state CA rules in the range-1 Moore nei
 - "Lock & capture" - the program is able to extract value constraints from patterns and generate rules under the constraints (for example, rules allowing for gliders).
 
 #### Getting started
-See the "Documents" part in the program to get familiar with the concepts and operations. I'd recommend firstly checking the "Rules in different subsets" section to get some sense about what can be found with this program.
+In the program: press 'H' to learn about basic operations; check every tooltip; check the "Documents" (in the program) to get familiar with the concepts and workflow.
 
-The operations are either accessible via buttons, or recorded somewhere in the tooltips. As a starting point, here is how to save rules/patterns:
+As a starting point, here is how to save rules/patterns:
 - Saving/undoing rules: right-click the MAP-string to save the current rule to the clipboard; use the widgets right above the MAP-string for undoing/redoing.
 - Saving patterns: right-click to select area and press 'C' to save the pattern to the clipboard (as RLE-string).
 

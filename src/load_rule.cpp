@@ -719,7 +719,7 @@ static void load_rule_from_memory(std::optional<aniso::extrT::valT>& out) {
     };
 
     if (!doc_id) {
-        imgui_Str("Astral (v 0.9.0 pre-release) by github user 'achabense'.");
+        imgui_Str("'Astral' by github user 'achabense'.");
         imgui_Str("The latest version is available at: ");
         ImGui::SameLine(0, 0);
         imgui_StrCopyable("https://github.com/achabense/astral", imgui_Str);

@@ -146,7 +146,7 @@ void frame_main() {
         ImGui::Text("| (%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
 #else
         ImGui::SameLine();
-        ImGui::Text("  (%.1f FPS)", ImGui::GetIO().Framerate);
+        ImGui::Text("(%.1f FPS)", ImGui::GetIO().Framerate);
 #endif // !NDEBUG
 
         ImGui::Separator();
