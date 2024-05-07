@@ -27,7 +27,6 @@ The operations are either accessible via buttons, or recorded somewhere in the t
 - Finish documentation.
 - Refine visual/layout.
 - Add support for unbounded space.
-- Add support for batch-preview mode for 'Randomize' etc.
 - Refine and stabilize keyboard/mouse controls etc. Some controls may be different in the formal release.
 - (Maybe) Add a convenient way to save rules directly into files.
 - (Maybe) Add support for icons/fonts.

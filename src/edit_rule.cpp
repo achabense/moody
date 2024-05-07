@@ -2,11 +2,6 @@
 
 #include "common.hpp"
 
-// TODO: incomplete and unpolished.
-#ifndef NDEBUG
-#define ENABLE_BATCH_PREVIEWER
-#endif // !NDEBUG
-
 namespace aniso {
     namespace _subsets {
         static const subsetT ignore_q = make_subset({mp_ignore_q});
@@ -423,10 +418,94 @@ public:
     }
 };
 
-#ifdef ENABLE_BATCH_PREVIEWER
-static bool show_snapshots(std::optional<aniso::moldT>& out);
-static void take_snapshot(const aniso::subsetT& subset, const aniso::maskT& mask, const aniso::moldT& mold);
-#endif // ENABLE_BATCH_PREVIEWER
+class batch_adapter {
+    static const int page_size = 6, perline = 3;
+    using pageT = std::array<aniso::moldT, page_size>;
+    std::vector<pageT> pages;
+    int page_no = 0;
+
+    previewer::configT config{previewer::configT::_220_160};
+
+public:
+    void display(std::function<aniso::moldT()> gen, std::optional<aniso::moldT>& out, bool bind) {
+        auto make_page = [&] {
+            for (aniso::moldT& mold : pages.emplace_back()) {
+                mold = gen();
+            }
+            page_no = pages.size() - 1;
+        };
+
+        auto set_page = [&](int p, bool force = false) {
+            if (p < 0) {
+                return;
+            } else if (p < pages.size()) {
+                page_no = p;
+            } else if (force) {
+                make_page();
+            }
+        };
+
+        if (bind) {
+            sequence::bind_to(ImGui::GetID(">>>"));
+        }
+        sequence::seq(
+            "<|", "<<", ">>>", "|>", //
+            [&] { set_page(0); }, [&] { set_page(page_no - 1); }, [&] { set_page(page_no + 1, true); },
+            [&] { set_page((int)pages.size() - 1); });
+        ImGui::SameLine();
+        if (ImGui::Button("Generate")) {
+            make_page();
+            sequence::bind_to(ImGui::GetID(">>>"));
+        }
+        quick_info("v '>>>' has the same effect when you are at the last page.");
+        ImGui::SameLine();
+        if (!pages.empty()) {
+            ImGui::Text("Page:%d At:%d", (int)pages.size(), page_no + 1);
+
+            // (Using the same style as in `frame_main`.)
+            quick_info("^ Right-click to clear.");
+            if (ImGui::BeginPopupContextItem("", ImGuiPopupFlags_MouseButtonRight)) {
+                if (ImGui::Selectable("Clear")) {
+                    pages = std::vector<pageT>{};
+                    page_no = 0;
+                }
+                ImGui::EndPopup();
+            }
+        } else {
+            imgui_Str("Page:N/A");
+        }
+
+        if (!pages.empty()) {
+            ImGui::SameLine(0, 16);
+            ImGui::BeginDisabled();
+            bool b = true;
+            ImGui::Checkbox("Preview mode", &b);
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+            config.set("Settings", "Restart");
+            ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(32, 32, 32, 255));
+            if (auto child = imgui_ChildWindow("Page", {}, ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY)) {
+                for (int j = 0; auto& mold : pages[page_no]) {
+                    if (j % perline != 0) {
+                        ImGui::SameLine(0, 16); // (The same value as in `edit_rule`.)
+                    } else {
+                        ImGui::Separator();
+                    }
+                    ++j;
+                    ImGui::BeginGroup();
+                    ImGui::PushID(j);
+                    if (ImGui::Button(">> Cur")) {
+                        out = mold;
+                    }
+                    ImGui::PopID();
+                    previewer::preview(j, config, mold.rule);
+                    ImGui::EndGroup();
+                }
+            }
+            ImGui::PopStyleColor();
+        }
+    }
+};
 
 std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo) {
     std::optional<aniso::moldT> out = std::nullopt;
@@ -668,36 +747,42 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
                 assert(round(rate * c_free) == free_dist);
             }
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-            if (ImGui::Button("Randomize")) {
-                bind_undo = true;
-                if (exact_mode) {
-                    return_rule(aniso::randomize_c(subset, mask, mold, global_mt19937(), free_dist));
-                } else {
-                    return_rule(aniso::randomize_p(subset, mask, mold, global_mt19937(), rate));
+            static bool show_rand = false;
+            const bool clicked = ImGui::Button("Randomize");
+            if (clicked) {
+                assert(compatible); // Otherwise, the button should be disabled.
+                show_rand = true;
+                ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
+                if (ImGui::IsMousePosValid()) {
+                    const ImVec2 mouse_pos = ImGui::GetIO().MousePos;
+                    ImGui::SetNextWindowPos(ImVec2(mouse_pos.x + 2, mouse_pos.y + 2), ImGuiCond_Always);
+                }
+            }
+            // TODO: ideally, !compatible should only disable generation ('>>>' at last page.).
+            if (show_rand && compatible) {
+                if (auto window = imgui_Window("Randomize", &show_rand,
+                                               ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
+                    static batch_adapter batch;
+                    batch.display(
+                        [&]() -> aniso::moldT {
+                            if (exact_mode) {
+                                return {aniso::randomize_c(subset, mask, mold, global_mt19937(), free_dist), mold.lock};
+                            } else {
+                                return {aniso::randomize_p(subset, mask, mold, global_mt19937(), rate), mold.lock};
+                            }
+                        },
+                        out, clicked);
                 }
             }
         });
         ImGui::SameLine();
-        imgui_StrTooltip("(?)", "Generate randomized rules with intended distance to the mask.\n\n"
-                                "For example, if you are using the 'Zero' mask and distance = 51, 'Randomize' "
+        imgui_StrTooltip("(?)", "Generate randomized rules with intended distance to the mask. A window with "
+                                "'Generate' will appear after you click 'Randomize'.\n\n"
+                                "For example, if you are using the 'Zero' mask and distance = 51, 'Generate' "
                                 "will generate rules with 51 groups having '1'.\n"
                                 "Also, suppose the current rule belongs to the working set, you can set it to "
-                                "the custom mask, and 'Randomize' with low distance to generate rules that "
-                                "are \"close\" to it.\n\n"
-                                "For convenience, if you do 'Randomize', the left/right arrow key will be "
-                                "automatically bound to undo/redo.");
-
-#ifdef ENABLE_BATCH_PREVIEWER
-        ImGui::SameLine();
-        guarded_block(compatible, [&] {
-            if (ImGui::Button("Snapshot")) {
-                take_snapshot(subset, mask, mold);
-            }
-        });
-        if (show_snapshots(out)) {
-            // bind_undo = true;
-        }
-#endif // ENABLE_BATCH_PREVIEWER
+                                "the custom mask, and 'Generate' with low distance to generate rules that "
+                                "are \"close\" to it.");
 
         guarded_block(compatible, [&] {
             sequence::seq(
@@ -1095,196 +1180,3 @@ std::optional<aniso::moldT> static_constraints() {
     }
     return std::nullopt;
 }
-
-#ifdef ENABLE_BATCH_PREVIEWER
-class snapshot_manager {
-public:
-    class windowT {
-        bool open = true;
-        inline static int id = 0;
-        int index = id++;
-        friend snapshot_manager;
-
-    public:
-        virtual ~windowT() = default;
-
-    private:
-        virtual bool display(std::optional<aniso::moldT>& out) = 0;
-    };
-
-    template <class T>
-    void accept(const aniso::subsetT& subset, const aniso::maskT& mask, const aniso::moldT& mold) {
-        m_snapshots.push_back(std::unique_ptr<windowT>(new T(subset, mask, mold)));
-    }
-
-    // TODO: add closing confirmation...
-    bool display(std::optional<aniso::moldT>& out) {
-        bool assigned = false;
-        for (const auto& ptr : m_snapshots) {
-            const std::string title = "Snapshot " + std::to_string(ptr->index);
-            if (auto window = imgui_Window(title.c_str(), &ptr->open,
-                                           ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
-                assigned = ptr->display(out) || assigned; // Cannot be reversed.
-            }
-        }
-        std::erase_if(m_snapshots, [](const auto& ptr) { return !ptr->open; });
-        return assigned;
-    }
-
-private:
-    std::vector<std::unique_ptr<windowT>> m_snapshots;
-};
-
-// TODO: show information about `m_subset`, `m_mask`, and `m_mold`.
-// TODO: should be able to switch between masks in the same way as `edit_rule`.
-// TODO: enable accepting current rule as mask?
-// TODO: support batch-preview for `seq_mixed` as well.
-class randomizerT : public snapshot_manager::windowT {
-    const aniso::subsetT m_subset;
-    aniso::maskT m_mask;
-    const aniso::moldT m_mold;
-
-public:
-    randomizerT(const aniso::subsetT& subset, const aniso::maskT& mask, const aniso::moldT& mold)
-        : m_subset(subset), m_mask(mask), m_mold{aniso::approximate(subset, mold), mold.lock} {
-        assert(!m_subset.empty());
-        assert(m_subset.contains(m_mask));
-        assert(m_subset.contains(m_mold.rule));
-        c_locked_1 = 0, c_free = 0, has_lock = false;
-        // TODO: share with `edit_rule`.
-        for (const auto& scan : aniso::scan(m_subset.get_par(), m_mask, m_mold)) {
-            if (scan.locked_0 || scan.locked_1) {
-                has_lock = true;
-            } else {
-                ++c_free;
-            }
-
-            if (scan.locked_1) {
-                ++c_locked_1;
-            }
-        }
-    }
-
-private:
-    previewer::configT config{previewer::configT::_220_160};
-    static constexpr const int page_size = 6, perline = 3;
-    using pageT = std::array<aniso::ruleT, page_size>;
-    std::vector<pageT> pages;
-    int page_no = 0;
-
-    double rate = 0.5;
-    bool exact_mode = false;
-    /*const*/ int c_locked_1, c_free;
-    /*const*/ bool has_lock;
-
-    // TODO: share with `edit_rule`.
-    bool set_spec() {
-        int free_dist = round(rate * c_free);
-        if (ImGui::Button(exact_mode ? "Exactly###Mode" : "Around ###Mode")) {
-            exact_mode = !exact_mode;
-        }
-
-        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-        ImGui::SetNextItemWidth(item_width);
-        if (imgui_StepSliderInt("##Quantity", &free_dist, 0, c_free, has_lock ? "(Free) %d" : "%d") && c_free != 0) {
-            rate = double(free_dist) / c_free;
-            assert(round(rate * c_free) == free_dist);
-        }
-        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-        return ImGui::Button("Randomize");
-    }
-
-    void make_page() {
-        for (auto& rule : pages.emplace_back()) {
-            if (exact_mode) {
-                rule = aniso::randomize_c(m_subset, m_mask, m_mold, global_mt19937(), round(rate * c_free));
-            } else {
-                rule = aniso::randomize_p(m_subset, m_mask, m_mold, global_mt19937(), rate);
-            }
-        }
-        page_no = pages.size() - 1;
-    }
-
-    void set_page(int p, bool force = false) {
-        if (p < 0) {
-            return;
-        } else if (p < pages.size()) {
-            page_no = p;
-        } else if (force) {
-            make_page();
-        }
-    };
-
-private:
-    bool display(std::optional<aniso::moldT>& out) override {
-        bool assigned = false;
-
-        if (set_spec()) {
-            make_page();
-            sequence::bind_to(ImGui::GetID("<<"));
-        }
-
-        ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
-        sequence::seq(
-            "<|", "<<", ">>>", "|>", //
-            [&] { set_page(0); }, [&] { set_page(page_no - 1); }, [&] { set_page(page_no + 1, true); },
-            [&] { set_page(pages.size() - 1); });
-        ImGui::SameLine();
-        if (!pages.empty()) {
-            ImGui::Text("Page:%d At:%d", (int)pages.size(), page_no + 1);
-        } else {
-            imgui_Str("Page:N/A");
-        }
-        // (Using the same style as in `frame_main`.)
-        if (!pages.empty() && ImGui::BeginPopupContextItem("", ImGuiPopupFlags_MouseButtonRight)) {
-            if (ImGui::Selectable("Clear")) {
-                pages = std::vector<pageT>{};
-                page_no = 0;
-            }
-            ImGui::EndPopup();
-        }
-
-        if (!pages.empty()) {
-            ImGui::BeginDisabled();
-            bool b = true;
-            ImGui::Checkbox("Preview mode", &b);
-            ImGui::EndDisabled();
-            ImGui::SameLine();
-            config.set("Settings", "Restart");
-            ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(32, 32, 32, 255));
-            if (auto child = imgui_ChildWindow("Page", {}, ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY)) {
-                for (int j = 0; auto& rule : pages[page_no]) {
-                    if (j % perline != 0) {
-                        ImGui::SameLine(0, 16); // (The same value as in `edit_rule`.)
-                    } else {
-                        ImGui::Separator();
-                    }
-                    ++j;
-                    ImGui::BeginGroup();
-                    ImGui::PushID(j);
-                    if (ImGui::Button(">> Cur")) {
-                        out.emplace(rule, m_mold.lock);
-                        assigned = true;
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::Button(">> Mask")) {
-                        m_mask = {rule};
-                    }
-                    ImGui::PopID();
-                    previewer::preview(j, config, rule);
-                    ImGui::EndGroup();
-                }
-            }
-            ImGui::PopStyleColor();
-        }
-        return assigned;
-    }
-};
-
-static snapshot_manager snapshots;
-static bool show_snapshots(std::optional<aniso::moldT>& out) { return snapshots.display(out); }
-
-static void take_snapshot(const aniso::subsetT& subset, const aniso::maskT& mask, const aniso::moldT& mold) {
-    snapshots.accept<randomizerT>(subset, mask, mold);
-}
-#endif // ENABLE_BATCH_PREVIEWER
