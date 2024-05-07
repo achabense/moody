@@ -366,9 +366,15 @@ class textT {
     };
     std::optional<selT> m_sel = std::nullopt;
 
+    bool preview_mode = true;
+    previewer::configT config{previewer::configT::_220_160};
+
 public:
     textT() {}
     textT(std::string_view str) { append(str); }
+
+    // (Avoid overwriting preview settings by accident.)
+    textT& operator=(const textT&) = delete;
 
     bool has_rule() const { return !m_rules.empty(); }
 
@@ -419,10 +425,6 @@ public:
 #endif
         }
 
-        // TODO: whether to share the same config across the windows?
-        static bool preview_mode = true;
-        static previewer::configT config(previewer::configT::_220_160);
-
         bool ret = false;
         const int total = m_rules.size();
 
@@ -452,7 +454,7 @@ public:
             }
 
             // I feel uncomfortable about this...
-            const float w = [] {
+            const float w = [&] {
                 float w = ImGui::GetFrameHeight() + imgui_ItemInnerSpacingX() + ImGui::CalcTextSize("Preview mode").x;
                 if (preview_mode) {
                     w += 2 * imgui_ItemSpacingX() + 4 * ImGui::GetStyle().FramePadding.x +
@@ -612,7 +614,9 @@ static void load_rule_from_file(std::optional<aniso::extrT::valT>& out) {
 
     auto try_load = [](const pathT& p) -> bool {
         try {
-            text = textT(load_binary(p));
+            const std::string str = load_binary(p);
+            text.clear();
+            text.append(str);
             return true;
         } catch (...) {
             return false;

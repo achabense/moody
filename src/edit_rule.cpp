@@ -448,31 +448,28 @@ public:
         if (bind) {
             sequence::bind_to(ImGui::GetID(">>>"));
         }
-        sequence::seq(
-            "<|", "<<", ">>>", "|>", //
-            [&] { set_page(0); }, [&] { set_page(page_no - 1); }, [&] { set_page(page_no + 1, true); },
-            [&] { set_page((int)pages.size() - 1); });
-        ImGui::SameLine();
         if (ImGui::Button("Generate")) {
             make_page();
             sequence::bind_to(ImGui::GetID(">>>"));
         }
         quick_info("v '>>>' has the same effect when you are at the last page.");
         ImGui::SameLine();
+        sequence::seq(
+            "<|", "<<", ">>>", "|>", //
+            [&] { set_page(0); }, [&] { set_page(page_no - 1); }, [&] { set_page(page_no + 1, true); },
+            [&] { set_page((int)pages.size() - 1); });
+        ImGui::SameLine();
         if (!pages.empty()) {
-            ImGui::Text("Page:%d At:%d", (int)pages.size(), page_no + 1);
-
-            // (Using the same style as in `frame_main`.)
-            quick_info("^ Right-click to clear.");
-            if (ImGui::BeginPopupContextItem("", ImGuiPopupFlags_MouseButtonRight)) {
-                if (ImGui::Selectable("Clear")) {
-                    pages = std::vector<pageT>{};
-                    page_no = 0;
-                }
-                ImGui::EndPopup();
-            }
+            ImGui::Text("Total:%d At:%d", (int)pages.size(), page_no + 1);
         } else {
-            imgui_Str("Page:N/A");
+            ImGui::Text("Total:%d At:N/A", (int)pages.size());
+        }
+        quick_info("^ Right-click to clear.");
+        // (Using the same style as in `frame_main`.)
+        bool clear = false; // Put off for more stable visual.
+        if (ImGui::BeginPopupContextItem("", ImGuiPopupFlags_MouseButtonRight)) {
+            clear = ImGui::Selectable("Clear");
+            ImGui::EndPopup();
         }
 
         if (!pages.empty()) {
@@ -483,6 +480,10 @@ public:
             ImGui::EndDisabled();
             ImGui::SameLine();
             config.set("Settings", "Restart");
+            // Guarantee the child is at least as wide as the previous line.
+            ImGui::SetNextWindowSizeConstraints(
+                ImVec2(ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x - ImGui::GetStyle().WindowPadding.x, 0),
+                ImVec2(FLT_MAX, FLT_MAX));
             ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(32, 32, 32, 255));
             if (auto child = imgui_ChildWindow("Page", {}, ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY)) {
                 for (int j = 0; auto& mold : pages[page_no]) {
@@ -503,6 +504,11 @@ public:
                 }
             }
             ImGui::PopStyleColor();
+        }
+
+        if (clear && !pages.empty()) {
+            pages = std::vector<pageT>{};
+            page_no = 0;
         }
     }
 };
