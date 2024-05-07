@@ -664,40 +664,6 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
             "(This is available only when the current rule belongs to the working set.)");
     });
 
-#if 0
-    // (Replaced by mixed-mode.)
-    guarded_block(compatible, [&] {
-        sequence::seq(
-            "<00..", "Dec", "Inc", "11..>", //
-            [&] { return_rule(aniso::seq_int::min(subset, mask, mold)); },
-            [&] { return_rule(aniso::seq_int::dec(subset, mask, mold)); },
-            [&] { return_rule(aniso::seq_int::inc(subset, mask, mold)); },
-            [&] { return_rule(aniso::seq_int::max(subset, mask, mold)); }, !contained);
-    });
-    ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
-    guarded_block(contained, [&] {
-        sequence::seq(
-            "<1.0.", "Prev", "Next", "0.1.>", //
-            [&] { return_rule(aniso::seq_perm::first(subset, mask, mold)); },
-            [&] { return_rule(aniso::seq_perm::prev(subset, mask, mold)); },
-            [&] { return_rule(aniso::seq_perm::next(subset, mask, mold)); },
-            [&] { return_rule(aniso::seq_perm::last(subset, mask, mold)); });
-    });
-    ImGui::SameLine();
-    // TODO: about the interaction with locks...
-    imgui_StrTooltip("(?)", "Left : Iterate through the whole working set.\n\n"
-                            "Right: Iterate through all the rules in the working set that have the same distance to "
-                            "the masking rule (as that of the current rule).\n"
-                            "(In other words, if the distance between the current rule and the mask is k, this will "
-                            "iterate through all the rules that have distance = k to the mask.)\n\n"
-                            "For example, suppose the current rule belongs to the working set. "
-                            "To iterate through all the rules that have distance = 1 to the current rule, you can:\n"
-                            "1. '<< Cur' to set the current rule as the custom mask.\n"
-                            "2. 'Inc'. After this, the distance to the mask will be 1.\n"
-                            "3. 'Next' to iterate. The left/right arrow key will be bound to 'Prev/Next' after you "
-                            "click the button.");
-#endif
-
     const aniso::partitionT& par = subset.get_par();
     const auto scanlist = aniso::scan(par, mask, mold);
 
