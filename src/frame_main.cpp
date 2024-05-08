@@ -35,9 +35,9 @@ public:
         }
     }
 
-    aniso::moldT current() const {
+    const aniso::moldT* current() const {
         assert(m_pos >= 0 && m_pos < size());
-        return m_record[m_pos];
+        return &m_record[m_pos];
     }
 
     void set_next() { set_pos(m_pos + 1); }
@@ -55,48 +55,25 @@ private:
     void set_pos(int pos) { m_pos = std::clamp(pos, 0, size() - 1); }
 };
 
-static void assign_val(aniso::moldT& mold, aniso::extrT::valT& val) {
-    if (val.lock) {
-        mold.lock = *val.lock;
-        mold.rule = val.rule;
-    } else {
-        if (!mold.compatible(val.rule)) {
-            mold.lock = {};
-        }
-        mold.rule = val.rule;
-    }
-}
-
 // TODO: make some tooltips interactive?
 void frame_main() {
     messenger::display();
 
     static recorderT recorder;
-    aniso::moldT current = recorder.current();
-    bool update = false;
-    if (!manage_lock::enabled()) { // ~ `assert_implies`
-        assert(current.lock == aniso::moldT::lockT{});
-    }
+    bool freeze = false;
+    sync_point sync(recorder.current());
 
     static bool show_file = false;
     static bool show_clipboard = false;
     static bool show_doc = false;
-    auto load_rule = [&](bool& flag, const char* title, std::optional<aniso::extrT::valT> (*load_fn)()) {
+    auto load_rule = [&](bool& flag, const char* title, void (*load_fn)(sync_point&)) {
         ImGui::Checkbox(title, &flag);
         if (flag) {
             ImGui::SetNextWindowSize({600, 400}, ImGuiCond_FirstUseEver);
             ImGui::SetNextWindowSizeConstraints(ImVec2(400, 300), ImVec2(FLT_MAX, FLT_MAX));
             ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
             if (auto window = imgui_Window(title, &flag)) {
-                if (auto out = load_fn()) {
-                    if (manage_lock::enabled()) {
-                        assert(manage_lock::enabled());
-                        assign_val(current, *out);
-                    } else {
-                        current = {out->rule, {}};
-                    }
-                    update = true;
-                }
+                load_fn(sync);
             }
         }
     };
@@ -106,10 +83,8 @@ void frame_main() {
         assert(manage_lock::enabled());
         ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
         if (auto window = imgui_Window("Static constraints", &show_static, ImGuiWindowFlags_AlwaysAutoResize)) {
-            if (auto out = static_constraints()) { // TODO: bind-undo in this case?
-                current = *out;
-                update = true;
-            }
+            // TODO: bind-undo in this case?
+            static_constraints(sync);
         }
     }
 
@@ -169,8 +144,8 @@ void frame_main() {
         ImGui::BeginGroup();
         sequence::seq(
             "<|", "Prev", "Next", "|>", //
-            [&] { recorder.set_first(); }, [&] { recorder.set_prev(); }, [&] { recorder.set_next(); },
-            [&] { recorder.set_last(); });
+            [&] { freeze = true, recorder.set_first(); }, [&] { freeze = true, recorder.set_prev(); },
+            [&] { freeze = true, recorder.set_next(); }, [&] { freeze = true, recorder.set_last(); });
         ImGui::EndGroup();
         quick_info("v For undo/redo.");
         ImGui::SameLine();
@@ -178,7 +153,7 @@ void frame_main() {
         quick_info("< Right-click to clear.");
         if (ImGui::BeginPopupContextItem("", ImGuiPopupFlags_MouseButtonRight)) {
             if (ImGui::Selectable("Clear")) {
-                recorder.clear();
+                freeze = true, recorder.clear();
             }
             ImGui::EndPopup();
         }
@@ -187,15 +162,15 @@ void frame_main() {
             static bool with_lock = false;
             if (with_lock) {
                 assert(manage_lock::enabled());
-                imgui_StrCopyable(aniso::to_MAP_str(current), imgui_Str);
+                imgui_StrCopyable(aniso::to_MAP_str(sync.current), imgui_Str);
                 with_lock = ImGui::IsItemHovered();
             } else {
-                imgui_StrCopyable(aniso::to_MAP_str(current.rule), imgui_Str);
+                imgui_StrCopyable(aniso::to_MAP_str(sync.current.rule), imgui_Str);
                 quick_info("< Right-click to copy to the clipboard.");
                 if (manage_lock::enabled()) {
                     ImGui::SameLine(0, ImGui::CalcTextSize(" ").x - 1 /* For correct alignment */);
                     std::string lock_str = "[";
-                    aniso::_misc::to_MAP(lock_str, current.lock);
+                    aniso::_misc::to_MAP(lock_str, sync.current.lock);
                     lock_str += "]";
                     imgui_StrDisabled(lock_str);
                     with_lock = ImGui::IsItemHovered();
@@ -210,26 +185,20 @@ void frame_main() {
             ImGui::TableNextColumn();
             if (auto child = imgui_ChildWindow("Edit", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
                 bool bind_undo = false;
-                if (auto out = edit_rule(current, bind_undo)) {
-                    current = *out;
-                    update = true;
-                }
+                edit_rule(sync, bind_undo);
                 if (bind_undo) {
                     sequence::bind_to(id_prev);
                 }
             }
             ImGui::TableNextColumn();
             if (auto child = imgui_ChildWindow("Apply", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
-                if (auto out = apply_rule(current.rule)) {
-                    current.lock = *out;
-                    update = true;
-                }
+                apply_rule(sync);
             }
             ImGui::EndTable();
         }
     }
 
-    if (update) {
-        recorder.update(current);
+    if (!freeze && sync.out) {
+        recorder.update(*sync.out);
     }
 }

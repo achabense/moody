@@ -426,7 +426,7 @@ class batch_adapter {
     previewer::configT config{previewer::configT::_220_160};
 
 public:
-    void display(std::function<aniso::moldT()> gen, std::optional<aniso::moldT>& out, bool bind) {
+    void display(std::function<aniso::moldT()> gen, sync_point& out, bool bind) {
         auto make_page = [&] {
             for (aniso::moldT& mold : pages.emplace_back()) {
                 mold = gen();
@@ -485,7 +485,7 @@ public:
                 ImVec2(FLT_MAX, FLT_MAX));
             ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(32, 32, 32, 255));
             if (auto child = imgui_ChildWindow("Page", {}, ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY)) {
-                for (int j = 0; auto& mold : pages[page_no]) {
+                for (int j = 0; const aniso::moldT& mold : pages[page_no]) {
                     if (j % perline != 0) {
                         ImGui::SameLine(0, 16); // (The same value as in `edit_rule`.)
                     } else {
@@ -495,7 +495,7 @@ public:
                     ImGui::BeginGroup();
                     ImGui::PushID(j);
                     if (ImGui::Button(">> Cur")) {
-                        out = mold;
+                        out.set_mold(mold);
                     }
                     ImGui::PopID();
                     previewer::preview(j, config, mold.rule);
@@ -512,11 +512,9 @@ public:
     }
 };
 
-std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo) {
-    std::optional<aniso::moldT> out = std::nullopt;
-    auto return_rule = [&out, &mold](const aniso::ruleT& rule) { out.emplace(rule, mold.lock); };
-    auto return_lock = [&out, &mold](const aniso::moldT::lockT& lock) { out.emplace(mold.rule, lock); };
-    auto return_mold = [&out](const aniso::moldT& mold) { out.emplace(mold); };
+void edit_rule(sync_point& sync, bool& bind_undo) {
+    const aniso::moldT& mold = sync.current;
+
     auto guarded_block = [](const bool enable, const auto& fn) {
         if (!enable) {
             ImGui::BeginDisabled();
@@ -650,12 +648,12 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
         }
         ImGui::SeparatorText("Lock edition");
         if (ImGui::Button("Clear lock")) {
-            return_lock({});
+            sync.set_lock({});
         }
         ImGui::SameLine();
         guarded_block(contained, [&] {
             if (ImGui::Button("Enhance lock")) {
-                return_lock(aniso::enhance_lock(subset, mold));
+                sync.set_lock(aniso::enhance_lock(subset, mold));
             }
         });
         imgui_ItemTooltip(
@@ -742,7 +740,7 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
                                 return {aniso::randomize_p(subset, mask, mold, global_mt19937(), rate), mold.lock};
                             }
                         },
-                        out, clicked);
+                        sync, clicked);
                 }
             }
         });
@@ -758,10 +756,10 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
         guarded_block(compatible, [&] {
             sequence::seq(
                 "<00..", "Prev", "Next", "11..>", //
-                [&] { return_rule(aniso::seq_mixed::first(subset, mask, mold)); },
-                [&] { return_rule(aniso::seq_mixed::prev(subset, mask, mold)); },
-                [&] { return_rule(aniso::seq_mixed::next(subset, mask, mold)); },
-                [&] { return_rule(aniso::seq_mixed::last(subset, mask, mold)); }, !contained);
+                [&] { sync.set_rule(aniso::seq_mixed::first(subset, mask, mold)); },
+                [&] { sync.set_rule(aniso::seq_mixed::prev(subset, mask, mold)); },
+                [&] { sync.set_rule(aniso::seq_mixed::next(subset, mask, mold)); },
+                [&] { sync.set_rule(aniso::seq_mixed::last(subset, mask, mold)); }, !contained);
         });
         ImGui::SameLine();
         imgui_StrTooltip("(?)",
@@ -777,7 +775,7 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
         ImGui::SameLine();
         guarded_block(true /* Unconditional */, [&] {
             if (ImGui::Button("Rev")) {
-                return_mold(aniso::trans_reverse(mold));
+                sync.set_mold(aniso::trans_reverse(mold));
             }
         });
         itemtooltip_with_previewer([&] {
@@ -800,7 +798,7 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
         ImGui::SameLine();
         guarded_block(compatible, [&] {
             if (ImGui::Button("Approximate")) {
-                return_rule(aniso::approximate(subset, mold));
+                sync.set_rule(aniso::approximate(subset, mold));
             }
         });
         itemtooltip_with_previewer([&] {
@@ -928,14 +926,14 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
                         rule[code] = !rule[code];
                     }
                     bind_undo = true;
-                    return_rule(rule);
+                    sync.set_rule(rule);
                 } else if (manage_lock::enabled() && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
                     aniso::moldT::lockT lock = mold.lock;
                     for (aniso::codeT code : group) {
                         lock[code] = !has_lock;
                     }
                     bind_undo = true; // TODO: whether to bind-undo for locks?
-                    return_lock(lock);
+                    sync.set_lock(lock);
                 }
                 ImGui::PopStyleColor(3);
 
@@ -996,12 +994,10 @@ std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo)
     if (preview_mode) {
         ImGui::PopStyleColor();
     }
-
-    return out;
 }
 
 // TODO: move to "apply_rule.cpp"? (as this is a special type of capture...)
-std::optional<aniso::moldT> static_constraints() {
+void static_constraints(sync_point& out) {
     enum stateE { Any_background, O, I, O_background, I_background };
     const int r = 9;
     static stateE board[r][r]{/* Any_background... */};
@@ -1138,7 +1134,6 @@ std::optional<aniso::moldT> static_constraints() {
                 }
             }
         }
-        return mold;
+        out.set_mold(mold);
     }
-    return std::nullopt;
 }

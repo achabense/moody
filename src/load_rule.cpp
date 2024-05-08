@@ -400,7 +400,7 @@ public:
 
     // TODO: refactor... the logics have been a mess...
     // (Workaround: using `rewind` tag to reset the scroll after opening new files.)
-    void display(std::optional<aniso::extrT::valT>& out, bool rewind = false) {
+    void display(sync_point& out, bool rewind = false) {
         if (m_sel && ImGui::IsMouseReleased(ImGuiMouseButton_Right) /* From anywhere */) {
             std::string str;
             const auto [min, max] = m_sel->minmax();
@@ -567,7 +567,7 @@ public:
             assert(m_pos && *m_pos >= 0 && *m_pos < total);
             // (Relying on `sequence::seq` to be in the same level in the id-stack.)
             sequence::bind_to(ImGui::GetID("Next"));
-            out = m_rules[*m_pos];
+            out.set_val(m_rules[*m_pos]);
         }
     }
 };
@@ -605,7 +605,7 @@ static std::string load_binary(const pathT& path) {
 
 // TODO: support opening multiple files?
 // TODO: add a mode to avoid opening files without rules?
-static void load_rule_from_file(std::optional<aniso::extrT::valT>& out) {
+void load_file(sync_point& out) {
     static file_nav nav;
 
     static textT text;
@@ -675,7 +675,7 @@ static void load_rule_from_file(std::optional<aniso::extrT::valT>& out) {
     }
 }
 
-static void load_rule_from_clipboard(std::optional<aniso::extrT::valT>& out) {
+void load_clipboard(sync_point& out) {
     static textT text;
     static bool rewind = false;
     if (ImGui::SmallButton("Read clipboard")) {
@@ -702,7 +702,7 @@ static void load_rule_from_clipboard(std::optional<aniso::extrT::valT>& out) {
 // Defined in "docs.cpp". [0]:title [1]:contents, null-terminated.
 extern const char* const docs[][2];
 
-static void load_rule_from_memory(std::optional<aniso::extrT::valT>& out) {
+void load_doc(sync_point& out) {
     static textT text;
     static bool rewind = false;
     static std::optional<int> doc_id = std::nullopt;
@@ -744,23 +744,4 @@ static void load_rule_from_memory(std::optional<aniso::extrT::valT>& out) {
             doc_id.reset();
         }
     }
-}
-
-// Preserving the `load_rule_from_xx` functions to allow for integration.
-std::optional<aniso::extrT::valT> load_file() {
-    std::optional<aniso::extrT::valT> out = std::nullopt;
-    load_rule_from_file(out);
-    return out;
-}
-
-std::optional<aniso::extrT::valT> load_clipboard() {
-    std::optional<aniso::extrT::valT> out = std::nullopt;
-    load_rule_from_clipboard(out);
-    return out;
-}
-
-std::optional<aniso::extrT::valT> load_doc() {
-    std::optional<aniso::extrT::valT> out = std::nullopt;
-    load_rule_from_memory(out);
-    return out;
 }

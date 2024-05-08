@@ -40,13 +40,14 @@ bool set_home(const char* u8path = nullptr); // nullptr ~ filesystem::current_pa
 void frame_main();
 
 // Managed by `frame_main`.
-std::optional<aniso::extrT::valT> load_file();
-std::optional<aniso::extrT::valT> load_clipboard();
-std::optional<aniso::extrT::valT> load_doc();
+class sync_point;
+void load_file(sync_point&);
+void load_clipboard(sync_point&);
+void load_doc(sync_point&);
 // (`bind_undo` is a workaround to allow for binding to undo/redo for certain operations.)
-std::optional<aniso::moldT> edit_rule(const aniso::moldT& mold, bool& bind_undo);
-std::optional<aniso::moldT> static_constraints();
-std::optional<aniso::moldT::lockT> apply_rule(const aniso::ruleT& rule);
+void edit_rule(sync_point&, bool& bind_undo);
+void static_constraints(sync_point&);
+void apply_rule(sync_point&);
 
 // Returns a texture with width/height exactly = w/h, for the (cell) data represented by `getline`.
 // There must be: getline(0...h-1) -> bool[w].
@@ -300,6 +301,42 @@ public:
             ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
             auto window = imgui_Window("Lock & capture", &m_opened, ImGuiWindowFlags_AlwaysAutoResize);
             append(window.visible);
+        }
+    }
+};
+
+class sync_point {
+    friend void frame_main();
+
+    std::optional<aniso::moldT> out = std::nullopt;
+    sync_point(const aniso::moldT* p_current) : current(*p_current) {
+        if (!manage_lock::enabled()) { // ~ `assert_implies`
+            assert(current.lock == aniso::moldT::lockT{});
+        }
+    }
+
+public:
+    const aniso::moldT current;
+
+    void set_rule(const aniso::ruleT& rule) { out.emplace(rule, current.lock); }
+    void set_lock(const aniso::moldT::lockT& lock) {
+        assert(manage_lock::enabled());
+        out.emplace(current.rule, lock);
+    }
+    void set_mold(const aniso::moldT& mold) {
+        if (!manage_lock::enabled()) {
+            assert(mold.lock == aniso::moldT::lockT{});
+        }
+        out.emplace(mold);
+    }
+    void set_val(const aniso::extrT::valT& val) {
+        out.emplace(val.rule); // ~ `out.lock` is value-initialized (== {}).
+        if (manage_lock::enabled()) {
+            if (val.lock) {
+                out->lock = *val.lock;
+            } else if (current.compatible(val.rule)) {
+                out->lock = current.lock;
+            }
         }
     }
 };

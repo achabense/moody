@@ -245,9 +245,10 @@ public:
     // For example, there are a lot of static variables in `display`, and the keyboard controls are not designed
     // for per-object use.
 
-    void apply_rule(const aniso::ruleT& rule, bool& temp_pause /* Workaround */) {
-        if (m_ctrl.rule != rule) {
-            m_ctrl.rule = rule;
+    void display(sync_point& sync) {
+        bool temp_pause = false;
+        if (m_ctrl.rule != sync.current.rule) {
+            m_ctrl.rule = sync.current.rule;
             m_ctrl.anti_strobing = true;
             m_ctrl.pause = false;
             m_torus.restart(m_init);
@@ -256,17 +257,13 @@ public:
 
             temp_pause = true;
         }
-    }
 
-    std::optional<aniso::moldT::lockT> display(bool& temp_pause /* Workaround */) {
         // (Shadowing `::imgui_KeyPressed`)
         // TODO: or use ImGui::SetNextFrameWantCaptureKeyboard when the Canvas button is active?
         auto imgui_KeyPressed = [active = GImGui->ActiveId == ImGui::GetID("Canvas")](ImGuiKey key, bool repeat) {
             return (active || !ImGui::GetIO().WantCaptureKeyboard) && ImGui::IsKeyPressed(key, repeat);
         };
         static bool background = 0; // TODO: move elsewhere...
-
-        std::optional<aniso::moldT::lockT> out = std::nullopt;
 
         assert(m_init.size == m_torus.tile().size());
         assert(m_init.size == size_clamped(m_init.size));
@@ -676,7 +673,7 @@ public:
                     assert(m_sel);
                     const auto lock = capture_closed(m_torus.tile(), m_sel->to_range(), m_ctrl.rule);
                     if (adopt_eagerly) {
-                        out = lock;
+                        sync.set_lock(lock);
                     } else {
                         aniso::for_each_code([&](aniso::codeT c) { m_lock[c] = m_lock[c] || lock[c]; });
                     }
@@ -693,7 +690,7 @@ public:
                 }
                 ImGui::SameLine();
                 if (ImGui::Button("Adopt")) {
-                    out = m_lock;
+                    sync.set_lock(m_lock);
                 }
                 ImGui::SameLine();
                 int count = 0;
@@ -811,16 +808,12 @@ public:
         }
 
         m_ctrl.run(m_torus, extra_step, temp_pause);
-
-        return out;
     }
 };
 
-std::optional<aniso::moldT::lockT> apply_rule(const aniso::ruleT& rule) {
+void apply_rule(sync_point& sync) {
     static runnerT runner;
-    bool temp_pause = false;
-    runner.apply_rule(rule, temp_pause);
-    return runner.display(temp_pause);
+    return runner.display(sync);
 }
 
 void previewer::configT::_set() {
