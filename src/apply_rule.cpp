@@ -658,7 +658,7 @@ public:
                 imgui_StrTooltip("(...)",
                                  "Closed-capture: Run the selected area as torus space (with the current rule), to "
                                  "record all mappings. Depending on 'Adopt eagerly', the result will be integrated to "
-                                 "the buffer lock, or will replace the lock for the current rule directly.)\n\n"
+                                 "the buffer lock, or will replace the lock for the current rule directly.\n\n"
                                  "Open-capture: Record what there exists in the selected area for the current frame. "
                                  "The capturing area does not include the border. The result will always be integrated "
                                  "to the buffer lock.");

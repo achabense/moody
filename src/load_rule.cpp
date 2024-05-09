@@ -581,7 +581,7 @@ static std::string too_long(uintmax_t size, int max_size) {
                        max_size / 1024.0);
 }
 
-static std::string load_binary(const pathT& path) {
+[[nodiscard]] static bool load_binary(const pathT& path, std::string& str) {
     std::error_code ec{};
     const auto size = std::filesystem::file_size(path, ec);
     if (!ec && size <= max_size) {
@@ -590,7 +590,8 @@ static std::string load_binary(const pathT& path) {
             std::string data(size, '\0');
             file.read(data.data(), size);
             if (file && file.gcount() == size) {
-                return data;
+                str.swap(data);
+                return true;
             }
         }
     }
@@ -600,7 +601,7 @@ static std::string load_binary(const pathT& path) {
     } else {
         messenger::add_msg("Failed to load file:\n{}", cpp17_u8string(path));
     }
-    throw 0;
+    return false;
 }
 
 // TODO: support opening multiple files?
@@ -613,14 +614,12 @@ void load_file(sync_point& out) {
     static std::optional<pathT> path;
 
     auto try_load = [](const pathT& p) -> bool {
-        try {
-            const std::string str = load_binary(p);
+        if (std::string str; load_binary(p, str)) {
             text.clear();
             text.append(str);
             return true;
-        } catch (...) {
-            return false;
         }
+        return false;
     };
 
     if (!path) {
