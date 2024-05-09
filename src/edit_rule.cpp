@@ -663,7 +663,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
     });
 
     const aniso::partitionT& par = subset.get_par();
-    const auto scanlist = aniso::scan(par, mask, mold);
+    const auto scanlist = aniso::scanT::scanlist(par, mask, mold);
 
     static bool preview_mode = false;
     static previewer::configT config{previewer::configT::_220_160};
@@ -878,12 +878,11 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
         }();
 
         int n = 0;
-        using counterT = decltype(scanlist)::value_type;
         assert(par.k() <= 512);
         std::array<bool, 512> shown{};
-        for (auto select : {+[](const counterT& c) { return !c.all_0() && !c.all_1(); }, //
-                            +[](const counterT& c) { return !c.any_locked(); },          //
-                            +[](const counterT& c) { return c.any_locked(); }}) {
+        for (auto select : {+[](const aniso::scanT& c) { return !c.all_0() && !c.all_1(); }, //
+                            +[](const aniso::scanT& c) { return !c.any_locked(); },          //
+                            +[](const aniso::scanT& c) { return c.any_locked(); }}) {
             par.for_each_group([&](int j, const aniso::groupT& group) {
                 if (shown[j] || !select(scanlist[j])) {
                     return;

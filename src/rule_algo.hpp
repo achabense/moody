@@ -304,31 +304,34 @@ namespace aniso {
         return subsetT{};
     }
 
-    inline auto scan(const partitionT& par, const maskT& mask, const moldT& mold) {
-        struct counterT {
-            int free_0 = 0, free_1 = 0;
-            int locked_0 = 0, locked_1 = 0; // 0/1 means masked value.
+    struct scanT {
+        int free_0 = 0, free_1 = 0;
+        int locked_0 = 0, locked_1 = 0; // 0/1 means masked value.
 
-            bool any_locked() const { return locked_0 || locked_1; }
-            bool all_locked() const { return !free_0 && !free_1; }
+        bool any_locked() const { return locked_0 || locked_1; }
+        bool all_locked() const { return !free_0 && !free_1; }
 
-            bool all_0() const { return !free_1 && !locked_1; }
-            bool all_1() const { return !free_0 && !locked_0; }
-        };
+        bool all_0() const { return !free_1 && !locked_1; }
+        bool all_1() const { return !free_0 && !locked_0; }
 
-        const ruleT_masked r = mask ^ mold.rule;
-        std::vector<counterT> vec(par.k());
-        par.for_each_group([&](int j, const groupT& group) {
+        scanT() = default;
+        scanT(const groupT& group, const maskT& mask, const moldT& mold) {
             for (codeT code : group) {
+                const bool v = mask[code] ^ mold.rule[code];
                 if (mold.lock[code]) {
-                    r[code] ? ++vec[j].locked_1 : ++vec[j].locked_0;
+                    v ? ++locked_1 : ++locked_0;
                 } else {
-                    r[code] ? ++vec[j].free_1 : ++vec[j].free_0;
+                    v ? ++free_1 : ++free_0;
                 }
             }
-        });
-        return vec;
-    }
+        }
+
+        static std::vector<scanT> scanlist(const partitionT& par, const maskT& mask, const moldT& mold) {
+            std::vector<scanT> vec(par.k());
+            par.for_each_group([&](int j, const groupT& group) { vec[j] = scanT(group, mask, mold); });
+            return vec;
+        }
+    };
 
     // Test whether there exists any rule that belongs to both `subset` and `mold`.
     // (subset.contains(rule) && mold.compatible(rule))
@@ -348,11 +351,10 @@ namespace aniso {
 
         const maskT& mask = subset.get_mask();
         const partitionT& par = subset.get_par();
-        const auto scanlist = scan(par, mask, mold);
 
         ruleT_masked r{};
-        par.for_each_group([&](int j, const groupT& group) {
-            const auto& scan = scanlist[j];
+        par.for_each_group([&](const groupT& group) {
+            const scanT scan(group, mask, mold);
             // If there are locks, `v` must be the locked value to guarantee `mold.compatible`.
             // Otherwise, if v = 0 the "distance" will be free_1; if v = 1 the "distance" will be free_0.
             // So for example, if free_0 = 9, free_1 = 3, then v should be 0 to make "distance" = free_1 = 3.
