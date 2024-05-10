@@ -2,6 +2,9 @@
 
 #include "common.hpp"
 
+// TODO: incorporate moldT into the subset system (let the working set be the intersection of subsetT and moldT)?
+// How to support an editable moldT that can be incompatible with the current rule?
+
 namespace aniso {
     namespace _subsets {
         static const subsetT ignore_q = make_subset({mp_ignore_q});
@@ -515,12 +518,15 @@ public:
 void edit_rule(sync_point& sync, bool& bind_undo) {
     const aniso::moldT& mold = sync.current;
 
-    auto guarded_block = [](const bool enable, const auto& fn) {
+    // (A "reason" parameter would be convenient, but it works poorly with clang-format...)
+    auto guarded_block = [](const bool enable, const auto& fn /*, const char* reason = nullptr*/) {
         if (!enable) {
             ImGui::BeginDisabled();
+            ImGui::BeginGroup();
         }
         fn();
         if (!enable) {
+            ImGui::EndGroup();
             ImGui::EndDisabled();
         }
     };
@@ -656,10 +662,16 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                 sync.set_lock(aniso::enhance_lock(subset, mold));
             }
         });
-        imgui_ItemTooltip(
-            "\"Saturate\" the locked groups to keep the full effect of the locks when switching to a"
-            "\"wider\" working set. For use cases see the \"Lock and capture\" section in \"Documents\".\n"
-            "(This is available only when the current rule belongs to the working set.)");
+        imgui_ItemTooltip([&] {
+            if (!contained) {
+                imgui_Str("The current rule does not belong to the working set.");
+                ImGui::Separator();
+            }
+            imgui_Str("\"Saturate\" the locked groups in the working set.\n\n"
+                      "For example, suppose the working set is the isotropic set, and the constraints represent a "
+                      "capture of a glider in one direction. Then this can enhance the constraints to gliders in all "
+                      "directions.");
+        });
     });
 
     const aniso::partitionT& par = subset.get_par();
@@ -744,6 +756,9 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                 }
             }
         });
+        if (!compatible) {
+            imgui_ItemTooltip("Incompatible.");
+        }
         ImGui::SameLine();
         imgui_StrTooltip("(?)", "Generate randomized rules with intended distance to the mask. A window with "
                                 "'Generate' will appear after you click 'Randomize'.\n\n"
@@ -759,8 +774,12 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                 [&] { sync.set_rule(aniso::seq_mixed::first(subset, mask, mold)); },
                 [&] { sync.set_rule(aniso::seq_mixed::prev(subset, mask, mold)); },
                 [&] { sync.set_rule(aniso::seq_mixed::next(subset, mask, mold)); },
-                [&] { sync.set_rule(aniso::seq_mixed::last(subset, mask, mold)); }, !contained);
+                [&] { sync.set_rule(aniso::seq_mixed::last(subset, mask, mold)); },
+                contained ? nullptr : "The current rule does not belong to the working set.");
         });
+        if (!compatible) {
+            imgui_ItemTooltip("Incompatible.");
+        }
         ImGui::SameLine();
         imgui_StrTooltip("(?)",
                          "Iterate through the whole working set, by firstly iterating through all rules that have "
@@ -836,14 +855,13 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
             ImGui::SameLine();
             imgui_StrTooltip(
                 "(?)",
-                "The current rule does not belong to the working set. (Check the dull-blue groups for details.)\n"
+                "The current rule does not belong to the working set. (Check the dull-blue groups for details.)\n\n"
                 "(To get a rule in the working set you can try any of '<00..', '11..>', or 'Randomize'.)");
         } else {
             ImGui::Text("Groups:%d !compatible", c_group);
             ImGui::SameLine();
-            imgui_StrTooltip("(?)", "There don't exist rules in the working set that also have the same locked "
+            imgui_StrTooltip("(?)", "There don't exist rules in the working set that have the same locked "
                                     "values as the current rule. (Check the red groups for details.)");
-            // TODO: add tips for what to do in this case...
         }
     }
 

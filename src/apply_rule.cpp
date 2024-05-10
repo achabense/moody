@@ -639,7 +639,7 @@ public:
                     }
                 }
                 if (!enabled) {
-                    imgui_ItemTooltip("This operation is meaningful only when there are selected areas.");
+                    imgui_ItemTooltip("There is no selected area.");
                 }
             };
 

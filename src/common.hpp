@@ -111,17 +111,19 @@ class sequence {
 
     inline static ImGuiID bound_id = 0;
 
-    // (`disable` is a workaround for dec/inc pair in `edit_rule`...)
+    // (`disable` is a workaround for a sequence in `edit_rule`...)
     static tagE seq(const char* label_first, const char* label_prev, const char* label_next, const char* label_last,
-                    bool disable) {
+                    const char* const disable) {
         tagE tag = None;
 
         if (ImGui::Button(label_first)) {
             tag = First;
         }
+        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
 
         if (disable) {
             ImGui::BeginDisabled();
+            ImGui::BeginGroup();
         }
         const ImGuiID id_prev = ImGui::GetID(label_prev);
         const ImGuiID id_next = ImGui::GetID(label_next);
@@ -130,8 +132,6 @@ class sequence {
         const bool bound = !disabled && (bound_id == id_prev || bound_id == id_next);
         const ImGuiKey shortcut_prev = bound ? ImGuiKey_LeftArrow : ImGuiKey_None;
         const ImGuiKey shortcut_next = bound ? ImGuiKey_RightArrow : ImGuiKey_None;
-
-        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
         if (button_with_shortcut(label_prev, shortcut_prev)) {
             tag = Prev;
         }
@@ -140,7 +140,11 @@ class sequence {
             tag = Next;
         }
         if (disable) {
+            ImGui::EndGroup();
             ImGui::EndDisabled();
+            if (!imgui_TestItemFlag(ImGuiItemFlags_Disabled)) {
+                imgui_ItemTooltip(disable);
+            }
         }
 
         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
@@ -160,7 +164,7 @@ public:
 
     static void seq(const char* label_first, const char* label_prev, const char* label_next, const char* label_last,
                     const auto& act_first, const auto& act_prev, const auto& act_next, const auto& act_last,
-                    bool disable = false) {
+                    const char* disable = nullptr) {
         switch (seq(label_first, label_prev, label_next, label_last, disable)) {
             case None: return;
             case First: act_first(); return;
