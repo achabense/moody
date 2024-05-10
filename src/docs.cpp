@@ -264,34 +264,38 @@ MAPEgASAAEJAQk1bzVvHVYdVlVFVUUZERkR9hH2EX1/fX8BQQFBd5B3kHdnd2ddVV1VlUeVRwlTCVNvf
 Finally, it's possible to get non-trivial rules that do not belong to any well-defined subsets (no symmetries, no independencies). See the "Atypical rules" section for details.
 )";
 
-#if 0
-// TODO: finish...
+// TODO: unfinished; better title...
 const char* const doc_atypical =
-    R"(Typically you will explore rules in the well-defined subsets supported by the program. These subsets, however, take up only an extremely small part of all MAP rules. For example, the largest subset in this program is the native 'C2' rules, which has 272 groups, meaning it takes up only 2^(272-512) ~ 2^-240 of all possible MAP rules.
+    R"(This section is based on random-access edition (as explained in "Subset, mask ..."). To recap, for the current rule C and working set W = (M, P), the operation flips the values in a group in W.P, and therefore defines S' = (C, W.P), which is W itself if C already belongs to W.
 
-... and shows some "atypical" use cases of random-access edition......
-This section is based on random-access edition, and shows what may be gotten when the edition takes place when the working set is the MAP-set, .......... For sanity....
+For the subsets in the form of (M, P), if a set S1 is a subset of another one S2, its partition must be strictly "coarser" than that of S2 - each group in S1.P must wholly cover one or several groups in S2.P. In the program, to learn about the relation between two subsets, you can select one subset, and the sets that turn dull-blue are strict supersets of the selected one. For example, the isotropic set is a strict subset of '-', '|', ..., 'C4' etc.
 
-Here is the same hex-C6 rule shown in the "Rules in different subsets" section.
+When performing random-access edition in W, suppose the current rule belongs to S:
+1. If W is a strict superset of S (for example, the current rule is totalistic, while W is the isotropic set):
+.......
+The random-access edition can be considered ... "refine"... The result must belong to W, but may not belong to S.
+There has been some examples in the previous sections. For example, when talking about the rules with distance = 1 to the Game-of-Life rule in the isotropic set, ......
+Also notice that the whole MAP set is a strict superset of any other sets. ......
+
+2. If conversely, S is a strict superset of W (for example, W is the isotropic set, while the current rule only belongs to 'C4'):
+The current rule may not belong to W, but editing in W is not meaningless - the result must still belong to S. The reason is that, S.P is a refinement of W.P, so when you flip a group in W.P, one or several groups in S.P are flipped at the same time.
+3. If S and W are irrelevant, you may consider the result as a random MAP rule.
+
+Here is the same hex-C6 rule shown in the "Rules in different subsets" section. The following part is based on this rule. Before moving on, I'd recommend turning on 'Preview mode' in the rule-edition plane, and set a large pace for the preview windows (in 'Settings') as well as the main window.
 MAPEUQRVSLdM4gRRBFVIt0ziCK7IswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHMRIiqIpnMEQ
 
-The following part is based on this rule. Before moving on:
-1. Turn on 'Preview mode' in the rule-edition plane.
-2. Set a large pace for the preview windows (in 'Settings') and the main window.
-
-Notice that it also belongs to the native 'C2' subset, which is inevitable as hex-C6 is actually a strict subset of native C2. By selecting only native-C2, we bring it to a wider context...
+By looking around in the native-C2 set ...
 MAPEUQxVSLdM4gRRBFVIt0ziCK7oswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHMRIiqIpnMEQ
+MAPEUQRVSLdM4gQRBFVIt0ziCK7IswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHERIiqIpnMEQ
 
-By the way, for an arbitrary native-C2 rule, if you do random-access flippings in hex-C6, the result will still belong to native-C2
-(... as native-C2.P is a refinement of hex-C6.P, so you will effectively flip (one or) multiple groups of C2 at the same time.) ... The same applies to, for example, random-flipping groups of native-isotropic rules upon C4 rules....
+Typically you will explore rules in the well-defined subsets supported in the program. These subsets, however, take up only an extremely small part of all MAP rules. For example, the largest subset in this program is the native 'C2' rules, which has 272 groups, meaning it takes up only 2^(272-512) ~ 2^-240 of all possible MAP rules. By "refining" rules in other sets (especially those with rotational symmetries).....
 
+For example, the following rules have only a single case different from the C6 rule.
+MAPEUQRVSLdM4gRRBFVIt0ziCK7IswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHIRIiqIpnMEQ
+MAPEUQRVSLdM4gRRBFVMt0ziCK7IswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHMRIiqIpnMEQ
 
-MAPEUQ1VSLdo5gRRBFVItUziCK7oswiCBlEoruizCIAEURVCEQRkYiqIl0AzBEZiKoiRESIKiqRzJHMTACqKpnMEQ
-.......
+MAPEUQRVSLdM4gRRBFVMt0ziCq7IsQiABlEIrsizCIAEURXAEwRmYiqIlUARBGZgIoizESoqiKZzBHMRIiqIpnMEQ
 )";
-#else
-const char* const doc_atypical = "This section is not finished yet :(";
-#endif
 
 #if 0
 // TODO: rewrite...
