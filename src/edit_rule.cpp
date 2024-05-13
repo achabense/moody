@@ -1020,7 +1020,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
 // TODO: move to "apply_rule.cpp"? (as this is a special type of capture...)
 void static_constraints(sync_point& out) {
     enum stateE { Any_background, O, I, O_background, I_background };
-    const int r = 9;
+    const int r = 10;
     static stateE board[r][r]{/* Any_background... */};
     static stateE state_lbutton = I;
     const stateE state_rbutton = Any_background;
@@ -1050,9 +1050,9 @@ void static_constraints(sync_point& out) {
         term(O_background, ": Background 0.");
         term(I_background, ": Background 1.");
         term(Any_background, ": Any background.");
-        imgui_Str("By 'Adopt', you will get a rule-lock pair that will satisfy the constraints represented by the "
-                  "arrangements. For example, a pattern of white cells surrounded by any-background cells will mean "
-                  "the pattern will keep stable whatever its surroundings are.");
+        imgui_Str("By 'Adopt', you will get a rule-lock pair that can satisfy the constraints represented by the "
+                  "arrangements. (For example, a pattern of white cells surrounded by any-background cells will keep "
+                  "stable whatever its surroundings are.)");
     };
 
     ImGui::AlignTextToFramePadding();
@@ -1063,9 +1063,9 @@ void static_constraints(sync_point& out) {
                 s = Any_background;
             }
         }
-        for (int y = 2; y <= 5; ++y) {
-            for (int x = 2; x <= 5; ++x) {
-                board[y][x] = ((x == 3 || x == 4) && (y == 3 || y == 4)) ? O : I;
+        for (int y = 1; y <= 4; ++y) {
+            for (int x = 1; x <= 4; ++x) {
+                board[y][x] = ((x == 2 || x == 3) && (y == 2 || y == 3)) ? O : I;
             }
         }
     }
@@ -1099,7 +1099,6 @@ void static_constraints(sync_point& out) {
 
     // Display-only; the value of `state_lbutton` is controlled by mouse-scrolling.
     ImGui::BeginDisabled();
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {2, 2});
     for (const stateE s : {O, I, O_background, I_background}) {
         if (s != O) {
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
@@ -1111,7 +1110,6 @@ void static_constraints(sync_point& out) {
         imgui_ItemRectFilled(cols[s]);
         imgui_ItemRect(IM_COL32(200, 200, 200, 255));
     }
-    ImGui::PopStyleVar();
     ImGui::EndDisabled();
 
     ImGui::BeginGroup();

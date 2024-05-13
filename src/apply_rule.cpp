@@ -655,20 +655,26 @@ public:
                 ImGui::SeparatorText("Pattern capturing");
 
                 ImGui::AlignTextToFramePadding();
-                imgui_StrTooltip("(...)",
-                                 "Closed-capture: Run the selected area as torus space (with the current rule), to "
-                                 "record all mappings. Depending on 'Adopt eagerly', the result will be integrated to "
-                                 "the buffer lock, or will replace the lock for the current rule directly.\n\n"
-                                 "Open-capture: Record what there exists in the selected area for the current frame. "
-                                 "The capturing area does not include the border. The result will always be integrated "
-                                 "to the buffer lock.");
+                imgui_StrTooltip(
+                    "(...)", "Open-capture: Record what there exists in the selected area (in the current frame, "
+                             "not including the border). The result will always be integrated to the buffer lock.\n\n"
+                             "Closed-capture: Run the selected area as torus space (with the current rule) and "
+                             "record all mappings. Depending on 'Adopt eagerly', the result will be integrated to "
+                             "the buffer lock, or will replace the current lock directly.");
                 ImGui::SameLine();
                 static bool adopt_eagerly = true;
                 set_tag(adopt_eagerly, "Adopt eagerly",
                         "For closed-capture, whether to adopt the result directly, or append to the buffer lock "
-                        "just like open-capture.");
+                        "like open-capture.");
                 // TODO: like those controlled by `other_op`, the shortcuts are not available when the window
                 // tag is off.
+                term("Capture (open)", "O (repeatable)", ImGuiKey_None, true, [&] {
+                    assert(m_sel);
+                    capture_open(m_torus.tile(), m_sel->to_range(), m_lock);
+                });
+                if (m_sel && imgui_KeyPressed(ImGuiKey_O, true)) {
+                    capture_open(m_torus.tile(), m_sel->to_range(), m_lock);
+                }
                 term("Capture (closed)", "P", ImGuiKey_P, true, [&] {
                     assert(m_sel);
                     const auto lock = capture_closed(m_torus.tile(), m_sel->to_range(), m_ctrl.rule);
@@ -678,13 +684,6 @@ public:
                         aniso::for_each_code([&](aniso::codeT c) { m_lock[c] = m_lock[c] || lock[c]; });
                     }
                 });
-                term("Capture (open)", "L (repeatable)", ImGuiKey_None, true, [&] {
-                    assert(m_sel);
-                    capture_open(m_torus.tile(), m_sel->to_range(), m_lock);
-                });
-                if (m_sel && imgui_KeyPressed(ImGuiKey_L, true)) {
-                    capture_open(m_torus.tile(), m_sel->to_range(), m_lock);
-                }
                 if (ImGui::Button("Clear##buffer")) {
                     m_lock = {};
                 }
