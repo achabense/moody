@@ -685,17 +685,17 @@ public:
                 if (m_sel && imgui_KeyPressed(ImGuiKey_L, true)) {
                     capture_open(m_torus.tile(), m_sel->to_range(), m_lock);
                 }
-                if (ImGui::Button("Clear")) {
+                if (ImGui::Button("Clear##buffer")) {
                     m_lock = {};
                 }
                 ImGui::SameLine();
-                if (ImGui::Button("Adopt")) {
+                if (ImGui::Button("Adopt##buffer")) {
                     sync.set_lock(m_lock);
                 }
                 ImGui::SameLine();
                 int count = 0;
                 aniso::for_each_code([&](aniso::codeT code) { count += m_lock[code]; });
-                ImGui::Text("Buffer lock: %d/512", count);
+                ImGui::Text("Buffer: %d/512", count);
             });
 
             if (other_op) {

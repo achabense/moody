@@ -78,16 +78,6 @@ void frame_main() {
         }
     };
 
-    static bool show_static = false;
-    if (show_static) {
-        assert(manage_lock::enabled());
-        ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
-        if (auto window = imgui_Window("Static constraints", &show_static, ImGuiWindowFlags_AlwaysAutoResize)) {
-            // TODO: bind-undo in this case?
-            static_constraints(sync);
-        }
-    }
-
     const ImGuiWindowFlags flags =
         ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus;
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
@@ -102,11 +92,6 @@ void frame_main() {
         load_rule(show_doc, "Documents", load_doc);
         ImGui::SameLine();
         manage_lock::checkbox();
-        manage_lock::display([](bool visible) {
-            if (visible) {
-                ImGui::Checkbox("Static constraints", &show_static);
-            }
-        });
 #ifndef NDEBUG
         ImGui::SameLine();
         imgui_Str("  (Debug mode)");
@@ -196,6 +181,23 @@ void frame_main() {
             }
             ImGui::EndTable();
         }
+
+        // TODO: better layout...
+        manage_lock::display([&](bool visible) {
+            if (visible) {
+                static bool show_static = false;
+                ImGui::SeparatorTextEx(0, "Static constraints", nullptr,
+                                       imgui_ItemInnerSpacingX() + ImGui::GetFrameHeight());
+                ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                ImGui::Checkbox("##static", &show_static);
+                if (show_static) {
+                    // TODO: bind-undo in this case?
+                    ImGui::PushID("static");
+                    static_constraints(sync);
+                    ImGui::PopID();
+                }
+            }
+        });
     }
 
     if (!freeze && sync.out) {

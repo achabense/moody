@@ -652,13 +652,13 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
         if (!visible) {
             return;
         }
-        ImGui::SeparatorText("Lock edition");
-        if (ImGui::Button("Clear lock")) {
+        ImGui::SeparatorText("Current lock");
+        if (ImGui::Button("Clear##current")) {
             sync.set_lock({});
         }
         ImGui::SameLine();
         guarded_block(contained, [&] {
-            if (ImGui::Button("Enhance lock")) {
+            if (ImGui::Button("Enhance##current")) {
                 sync.set_lock(aniso::enhance_lock(subset, mold));
             }
         });
@@ -672,6 +672,10 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                       "capture of a glider in one direction. Then this can enhance the constraints to gliders in all "
                       "directions.");
         });
+        ImGui::SameLine();
+        int count = 0;
+        aniso::for_each_code([&](aniso::codeT code) { count += sync.current.lock[code]; });
+        ImGui::Text("Count: %d/512", count);
     });
 
     const aniso::partitionT& par = subset.get_par();
@@ -1035,6 +1039,8 @@ void static_constraints(sync_point& out) {
             imgui_Str(desc);
         };
 
+        imgui_Str("(You can right-click this '(...)' to get an example.)");
+        ImGui::Separator();
         imgui_Str("Operations:\n"
                   "Left-click the cell to set the value.\n"
                   "Right-click to set back to any-background.\n"
@@ -1051,6 +1057,18 @@ void static_constraints(sync_point& out) {
 
     ImGui::AlignTextToFramePadding();
     imgui_StrTooltip("(...)", description);
+    if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+        for (auto& l : board) {
+            for (auto& s : l) {
+                s = Any_background;
+            }
+        }
+        for (int y = 2; y <= 5; ++y) {
+            for (int x = 2; x <= 5; ++x) {
+                board[y][x] = ((x == 3 || x == 4) && (y == 3 || y == 4)) ? O : I;
+            }
+        }
+    }
     ImGui::SameLine();
     if (ImGui::Button("Clear")) {
         for (auto& l : board) {
@@ -1060,8 +1078,24 @@ void static_constraints(sync_point& out) {
         }
     }
     ImGui::SameLine();
-    const bool ret = ImGui::Button("Adopt"); // TODO: whether to return nothing if the board is empty?
-    // TODO: add some examples?
+    const bool empty = [] {
+        for (const auto& l : board) {
+            for (const auto& s : l) {
+                if (s != Any_background) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }();
+    if (empty) {
+        ImGui::BeginDisabled();
+    }
+    const bool ret = ImGui::Button("Adopt");
+    if (empty) {
+        ImGui::EndDisabled();
+        imgui_ItemTooltip("Empty.");
+    }
 
     // Display-only; the value of `state_lbutton` is controlled by mouse-scrolling.
     ImGui::BeginDisabled();
