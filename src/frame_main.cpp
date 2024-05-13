@@ -3,12 +3,12 @@
 // TODO: improve recorder logic if possible...
 // Never empty.
 class recorderT {
-    std::vector<aniso::moldT> m_record;
+    std::vector<aniso::ruleT> m_record;
     int m_pos;
 
 public:
     recorderT() {
-        m_record.push_back({.rule = aniso::game_of_life(), .lock{}});
+        m_record.push_back(aniso::game_of_life());
         m_pos = 0;
     }
 
@@ -17,27 +17,27 @@ public:
     // [0, size() - 1]
     int pos() const { return m_pos; }
 
-    void update(const aniso::moldT& mold) {
-        if (mold != m_record[m_pos]) {
+    const aniso::ruleT& current() const {
+        assert(m_pos >= 0 && m_pos < size());
+        return m_record[m_pos];
+    }
+
+    void update(const aniso::ruleT& rule) {
+        if (rule != m_record[m_pos]) {
             const int last = size() - 1;
-            if (m_pos == last && last != 0 && mold == m_record[last - 1]) {
+            if (m_pos == last && last != 0 && rule == m_record[last - 1]) {
                 m_pos = last - 1;
-            } else if (m_pos == last - 1 && mold == m_record[last]) {
+            } else if (m_pos == last - 1 && rule == m_record[last]) {
                 m_pos = last;
             } else {
                 // TODO: or reverse([m_pos]...[last])? or do nothing?
                 if (m_pos != last) {
                     std::swap(m_record[m_pos], m_record[last]);
                 }
-                m_record.push_back(mold);
+                m_record.push_back(rule);
                 set_last();
             }
         }
-    }
-
-    const aniso::moldT* current() const {
-        assert(m_pos >= 0 && m_pos < size());
-        return &m_record[m_pos];
     }
 
     void set_next() { set_pos(m_pos + 1); }
@@ -47,7 +47,7 @@ public:
 
     void clear() {
         // `m_record = {m_record[m_pos]}` will not free the memory.
-        m_record = std::vector<aniso::moldT>{m_record[m_pos]};
+        m_record = std::vector<aniso::ruleT>{m_record[m_pos]};
         m_pos = 0;
     }
 
@@ -60,8 +60,10 @@ void frame_main() {
     messenger::display();
 
     static recorderT recorder;
+    static aniso::moldT::lockT lock;
+    static bool enable_lock = false;
     bool freeze = false;
-    sync_point sync(recorder.current());
+    sync_point sync(recorder.current(), lock, enable_lock);
 
     static bool show_file = false;
     static bool show_clipboard = false;
@@ -91,7 +93,7 @@ void frame_main() {
         ImGui::SameLine();
         load_rule(show_doc, "Documents", load_doc);
         ImGui::SameLine();
-        manage_lock::checkbox();
+        ImGui::Checkbox("Lock & capture", &sync.enable_lock_next);
 #ifndef NDEBUG
         ImGui::SameLine();
         imgui_Str("  (Debug mode)");
@@ -144,21 +146,22 @@ void frame_main() {
         }
 
         {
-            static bool with_lock = false;
-            if (with_lock) {
-                assert(manage_lock::enabled());
+            static bool hover_lock = false;
+            if (sync.enable_lock && hover_lock) {
                 imgui_StrCopyable(aniso::to_MAP_str(sync.current), imgui_Str);
-                with_lock = ImGui::IsItemHovered();
+                hover_lock = ImGui::IsItemHovered();
             } else {
                 imgui_StrCopyable(aniso::to_MAP_str(sync.current.rule), imgui_Str);
                 quick_info("< Right-click to copy to the clipboard.");
-                if (manage_lock::enabled()) {
+                if (sync.enable_lock) {
                     ImGui::SameLine(0, ImGui::CalcTextSize(" ").x - 1 /* For correct alignment */);
                     std::string lock_str = "[";
                     aniso::_misc::to_MAP(lock_str, sync.current.lock);
                     lock_str += "]";
                     imgui_StrDisabled(lock_str);
-                    with_lock = ImGui::IsItemHovered();
+                    hover_lock = ImGui::IsItemHovered();
+                } else {
+                    hover_lock = false;
                 }
             }
         }
@@ -183,7 +186,7 @@ void frame_main() {
         }
 
         // TODO: better layout...
-        manage_lock::display([&](bool visible) {
+        sync.display_if_enable_lock([&](bool visible) {
             if (visible) {
                 static bool show_static = false;
                 ImGui::SeparatorTextEx(0, "Static constraints", nullptr,
@@ -200,7 +203,14 @@ void frame_main() {
         });
     }
 
-    if (!freeze && sync.out) {
-        recorder.update(*sync.out);
+    enable_lock = sync.enable_lock_next;
+    if (!freeze) {
+        if (sync.out_rule) {
+            recorder.update(*sync.out_rule);
+        }
+        if (sync.out_lock) {
+            assert(sync.enable_lock);
+            lock = *sync.out_lock;
+        }
     }
 }

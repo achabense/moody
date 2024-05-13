@@ -275,72 +275,54 @@ private:
     static void _preview(uint64_t id, const configT& config, const aniso::ruleT& rule, bool interactive);
 };
 
-// Ensure that users won't touch this feature unexpectedly.
-// The program will behave as if the feature doesn't exist.
-class manage_lock {
-    inline static bool m_enabled = false, m_opened = false;
-
-public:
-    // Managed by `frame_main`.
-    static void checkbox() {
-        if (!m_enabled) {
-            assert(!m_opened);
-            ImGui::BeginDisabled();
-            ImGui::Checkbox("Lock & capture", &m_opened);
-            ImGui::EndDisabled();
-            // TODO: more explanations...
-            imgui_ItemTooltip("Not enabled; double-click to enable.");
-            if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
-                ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                m_enabled = true;
-            }
-        } else {
-            ImGui::Checkbox("Lock & capture", &m_opened);
-        }
-    }
-
-    static bool enabled() { return m_enabled; }
-    static void display(const std::invocable<bool> auto& append) {
-        if (m_opened) {
-            ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
-            auto window = imgui_Window("Lock & capture", &m_opened, ImGuiWindowFlags_AlwaysAutoResize);
-            append(window.visible);
-        }
-    }
-};
-
+// The program will behave as if the lock feature doesn't exist when !enable_lock.
 class sync_point {
     friend void frame_main();
 
-    std::optional<aniso::moldT> out = std::nullopt;
-    sync_point(const aniso::moldT* p_current) : current(*p_current) {
-        if (!manage_lock::enabled()) { // ~ `assert_implies`
-            assert(current.lock == aniso::moldT::lockT{});
-        }
+    std::optional<aniso::ruleT> out_rule = std::nullopt;
+    std::optional<aniso::moldT::lockT> out_lock = std::nullopt;
+    bool enable_lock_next;
+
+    sync_point(const aniso::ruleT& rule, const aniso::moldT::lockT& lock, bool enable_lock)
+        : current{rule, enable_lock ? lock : aniso::moldT::lockT{}}, enable_lock(enable_lock) {
+        enable_lock_next = enable_lock;
     }
 
 public:
     const aniso::moldT current;
+    const bool enable_lock;
 
-    void set_rule(const aniso::ruleT& rule) { out.emplace(rule, current.lock); }
+    void set_rule(const aniso::ruleT& rule) {
+        out_rule.emplace(rule);
+        out_lock.reset();
+    }
     void set_lock(const aniso::moldT::lockT& lock) {
-        assert(manage_lock::enabled());
-        out.emplace(current.rule, lock);
+        assert(enable_lock);
+        out_rule.reset();
+        out_lock.emplace(lock);
     }
     void set_mold(const aniso::moldT& mold) {
-        if (!manage_lock::enabled()) {
-            assert(mold.lock == aniso::moldT::lockT{});
+        out_rule.emplace(mold.rule);
+        if (enable_lock) {
+            out_lock.emplace(mold.lock);
+        } else {
+            out_lock.reset();
         }
-        out.emplace(mold);
     }
     void set_val(const aniso::extrT::valT& val) {
-        out.emplace(val.rule); // ~ `out.lock` is value-initialized (== {}).
-        if (manage_lock::enabled()) {
-            if (val.lock) {
-                out->lock = *val.lock;
-            } else if (current.compatible(val.rule)) {
-                out->lock = current.lock;
-            }
+        out_rule.emplace(val.rule);
+        if (enable_lock && val.lock) {
+            out_lock.emplace(*val.lock);
+        } else {
+            out_lock.reset();
+        }
+    }
+
+    void display_if_enable_lock(const std::invocable<bool> auto& append) {
+        if (enable_lock) {
+            ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
+            auto window = imgui_Window("Lock & capture", &enable_lock_next, ImGuiWindowFlags_AlwaysAutoResize);
+            append(window.visible);
         }
     }
 };

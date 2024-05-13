@@ -231,7 +231,10 @@ public:
         update_current();
     }
 
-    const aniso::subsetT& select_subset(const aniso::moldT& mold) {
+    const aniso::subsetT& select_subset(const sync_point& target) {
+        assert_implies(!target.enable_lock, target.current.lock == aniso::moldT::lockT{});
+        const aniso::moldT& mold = target.current;
+
         enum ringE { Contained, Compatible, Incompatible };
         enum centerE { Selected, Including, Disabled, None }; // TODO: add "equals" relation?
         auto put_term = [size = square_size()](ringE ring, centerE center, const char* title /* Optional */,
@@ -303,7 +306,7 @@ public:
                 ImGui::Separator();
                 imgui_Str("The ring color reflects the relation between the subset and the current rule-lock pair:");
                 explain(Contained, None, nullptr, "The rule belongs to this subset.");
-                if (!manage_lock::enabled()) {
+                if (!target.enable_lock) {
                     explain(Compatible, None, nullptr, "The rule does not belong to this subset.");
                 } else {
                     explain(
@@ -422,17 +425,17 @@ public:
 
 class batch_adapter {
     static const int page_size = 6, perline = 3;
-    using pageT = std::array<aniso::moldT, page_size>;
+    using pageT = std::array<aniso::ruleT, page_size>;
     std::vector<pageT> pages;
     int page_no = 0;
 
     previewer::configT config{previewer::configT::_220_160};
 
 public:
-    void display(std::function<aniso::moldT()> gen, sync_point& out, bool bind) {
+    void display(std::function<aniso::ruleT()> gen, sync_point& out, bool bind) {
         auto make_page = [&] {
-            for (aniso::moldT& mold : pages.emplace_back()) {
-                mold = gen();
+            for (aniso::ruleT& rule : pages.emplace_back()) {
+                rule = gen();
             }
             page_no = pages.size() - 1;
         };
@@ -488,7 +491,7 @@ public:
                 ImVec2(FLT_MAX, FLT_MAX));
             ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(32, 32, 32, 255));
             if (auto child = imgui_ChildWindow("Page", {}, ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY)) {
-                for (int j = 0; const aniso::moldT& mold : pages[page_no]) {
+                for (int j = 0; const aniso::ruleT& rule : pages[page_no]) {
                     if (j % perline != 0) {
                         ImGui::SameLine(0, 16); // (The same value as in `edit_rule`.)
                     } else {
@@ -498,10 +501,10 @@ public:
                     ImGui::BeginGroup();
                     ImGui::PushID(j);
                     if (ImGui::Button(">> Cur")) {
-                        out.set_mold(mold);
+                        out.set_rule(rule);
                     }
                     ImGui::PopID();
-                    previewer::preview(j, config, mold.rule);
+                    previewer::preview(j, config, rule);
                     ImGui::EndGroup();
                 }
             }
@@ -516,8 +519,6 @@ public:
 };
 
 void edit_rule(sync_point& sync, bool& bind_undo) {
-    const aniso::moldT& mold = sync.current;
-
     // (A "reason" parameter would be convenient, but it works poorly with clang-format...)
     auto guarded_block = [](const bool enable, const auto& fn /*, const char* reason = nullptr*/) {
         if (!enable) {
@@ -537,9 +538,10 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
     };
 
     static subset_selector selector;
-    const aniso::subsetT& subset = selector.select_subset(mold);
+    const aniso::subsetT& subset = selector.select_subset(sync);
     assert(!subset.empty());
 
+    const aniso::moldT& mold = sync.current;
     const bool compatible = aniso::compatible(subset, mold);
     const bool contained = subset.contains(mold.rule);
     assert_implies(contained, compatible);
@@ -648,7 +650,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
 
     ImGui::Separator();
 
-    manage_lock::display([&](bool visible) {
+    sync.display_if_enable_lock([&](bool visible) {
         if (!visible) {
             return;
         }
@@ -749,11 +751,11 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                                                ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
                     static batch_adapter batch;
                     batch.display(
-                        [&]() -> aniso::moldT {
+                        [&]() -> aniso::ruleT {
                             if (exact_mode) {
-                                return {aniso::randomize_c(subset, mask, mold, global_mt19937(), free_dist), mold.lock};
+                                return aniso::randomize_c(subset, mask, mold, global_mt19937(), free_dist);
                             } else {
-                                return {aniso::randomize_p(subset, mask, mold, global_mt19937(), rate), mold.lock};
+                                return aniso::randomize_p(subset, mask, mold, global_mt19937(), rate);
                             }
                         },
                         sync, clicked);
@@ -948,12 +950,12 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                     }
                     bind_undo = true;
                     sync.set_rule(rule);
-                } else if (manage_lock::enabled() && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+                } else if (sync.enable_lock && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
                     aniso::moldT::lockT lock = mold.lock;
                     for (aniso::codeT code : group) {
                         lock[code] = !has_lock;
                     }
-                    bind_undo = true; // TODO: whether to bind-undo for locks?
+                    // bind_undo = true;
                     sync.set_lock(lock);
                 }
                 ImGui::PopStyleColor(3);
@@ -980,9 +982,8 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                 }
 
                 if (show_group && ImGui::BeginTooltip()) {
-                    // TODO: move elsewhere...
-                    imgui_Str(manage_lock::enabled() ? "Left-click to flip the values.\nRight-click to toggle the lock."
-                                                     : "Left-click to flip the values.");
+                    imgui_Str(sync.enable_lock ? "Left-click to flip the values.\nRight-click to toggle the lock."
+                                               : "Left-click to flip the values.");
                     ImGui::Separator();
                     ImGui::Text("Group size: %d", (int)group.size());
                     const int max_to_show = 48;

@@ -651,7 +651,7 @@ public:
 
             // Pattern capturing.
             // TODO: enable getting current.lock?
-            manage_lock::display([&](bool /* visible */) {
+            sync.display_if_enable_lock([&](bool /* visible */) {
                 ImGui::SeparatorText("Pattern capturing");
 
                 ImGui::AlignTextToFramePadding();
