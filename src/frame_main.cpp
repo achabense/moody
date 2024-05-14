@@ -185,14 +185,11 @@ void frame_main() {
             ImGui::EndTable();
         }
 
-        // TODO: better layout...
         sync.display_if_enable_lock([&](bool visible) {
             if (visible) {
                 static bool show_static = false;
-                ImGui::SeparatorTextEx(0, "Static constraints", nullptr,
-                                       imgui_ItemInnerSpacingX() + ImGui::GetFrameHeight());
-                ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                ImGui::Checkbox("##static", &show_static);
+                ImGui::Separator();
+                ImGui::Checkbox("Static constraints", &show_static);
                 if (show_static) {
                     // TODO: bind-undo in this case?
                     ImGui::PushID("static");

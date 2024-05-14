@@ -235,8 +235,6 @@ class runnerT {
     };
     std::optional<selectT> m_sel = std::nullopt;
 
-    aniso::moldT::lockT m_lock{}; // For open-capture.
-
 public:
     // TODO: redesign pause logics...
     // TODO: better control logics... (`display` is horribly written due to unorganized control logics...)
@@ -253,7 +251,6 @@ public:
             m_ctrl.pause = false;
             m_torus.restart(m_init);
             m_ctrl.mark_written();
-            m_lock = {};
 
             temp_pause = true;
         }
@@ -652,49 +649,37 @@ public:
             // Pattern capturing.
             // TODO: enable getting current.lock?
             sync.display_if_enable_lock([&](bool /* visible */) {
-                ImGui::SeparatorText("Pattern capturing");
+                ImGui::Separator();
 
                 ImGui::AlignTextToFramePadding();
                 imgui_StrTooltip(
                     "(...)", "Open-capture: Record what there exists in the selected area (in the current frame, "
-                             "not including the border). The result will always be integrated to the buffer lock.\n\n"
+                             "not including the border). The result will always be integrated to the current lock.\n\n"
                              "Closed-capture: Run the selected area as torus space (with the current rule) and "
-                             "record all mappings. Depending on 'Adopt eagerly', the result will be integrated to "
-                             "the buffer lock, or will replace the current lock directly.");
+                             "record all mappings. Depending on 'Replace', the result will replace the current lock "
+                             "directly, or will be integrated to the current lock (like open-capture).");
                 ImGui::SameLine();
-                static bool adopt_eagerly = true;
-                set_tag(adopt_eagerly, "Adopt eagerly",
-                        "For closed-capture, whether to adopt the result directly, or append to the buffer lock "
-                        "like open-capture.");
-                // TODO: like those controlled by `other_op`, the shortcuts are not available when the window
-                // tag is off.
+                static bool replace = true;
+                ImGui::Checkbox("Replace", &replace);
                 term("Capture (open)", "O (repeatable)", ImGuiKey_None, true, [&] {
                     assert(m_sel);
-                    capture_open(m_torus.tile(), m_sel->to_range(), m_lock);
+                    auto lock = sync.current.lock;
+                    capture_open(m_torus.tile(), m_sel->to_range(), lock);
+                    sync.set_lock(lock);
                 });
                 if (m_sel && imgui_KeyPressed(ImGuiKey_O, true)) {
-                    capture_open(m_torus.tile(), m_sel->to_range(), m_lock);
+                    auto lock = sync.current.lock;
+                    capture_open(m_torus.tile(), m_sel->to_range(), lock);
+                    sync.set_lock(lock);
                 }
                 term("Capture (closed)", "P", ImGuiKey_P, true, [&] {
                     assert(m_sel);
-                    const auto lock = capture_closed(m_torus.tile(), m_sel->to_range(), m_ctrl.rule);
-                    if (adopt_eagerly) {
-                        sync.set_lock(lock);
-                    } else {
-                        aniso::for_each_code([&](aniso::codeT c) { m_lock[c] = m_lock[c] || lock[c]; });
+                    auto lock = capture_closed(m_torus.tile(), m_sel->to_range(), m_ctrl.rule);
+                    if (!replace) {
+                        aniso::for_each_code([&](aniso::codeT c) { lock[c] = lock[c] || sync.current.lock[c]; });
                     }
+                    sync.set_lock(lock);
                 });
-                if (ImGui::Button("Clear##buffer")) {
-                    m_lock = {};
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("Adopt##buffer")) {
-                    sync.set_lock(m_lock);
-                }
-                ImGui::SameLine();
-                int count = 0;
-                aniso::for_each_code([&](aniso::codeT code) { count += m_lock[code]; });
-                ImGui::Text("Buffer: %d/512", count);
             });
 
             if (other_op) {

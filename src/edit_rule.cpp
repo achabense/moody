@@ -654,7 +654,6 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
         if (!visible) {
             return;
         }
-        ImGui::SeparatorText("Current lock");
         if (ImGui::Button("Clear##current")) {
             sync.set_lock({});
         }
@@ -670,8 +669,8 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                 ImGui::Separator();
             }
             imgui_Str("\"Saturate\" the locked groups in the working set.\n\n"
-                      "For example, suppose the working set is the isotropic set, and the constraints represent a "
-                      "capture of a glider in one direction. Then this can enhance the constraints to gliders in all "
+                      "For example, suppose the working set is the isotropic set, and the constraints represent the "
+                      "capture of a glider in one direction, then this can enhance the constraints to gliders in all "
                       "directions.");
         });
         ImGui::SameLine();
