@@ -765,7 +765,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
             imgui_ItemTooltip("Incompatible.");
         }
         ImGui::SameLine();
-        imgui_StrTooltip("(?)", "Generate randomized rules with intended distance to the mask. A window with "
+        imgui_StrTooltip("(?)", "Generate random rules with intended distance to the mask. A window with "
                                 "'Generate' will appear after you click 'Randomize'.\n\n"
                                 "For example, if you are using the 'Zero' mask and distance = 51, 'Generate' "
                                 "will generate rules with 51 groups having '1'.\n"

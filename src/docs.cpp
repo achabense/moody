@@ -9,6 +9,7 @@ MAP7KV6wLHQiAHIPICBCAhlIqKAhAuKAFBoYmCFEAACIUzbAIAsAsCBJoAANhiIBEBSUICEMQiQFgRBg
 The project was then abandoned for many years. Last year I felt an urgency to bring it to completion. Thankfully it's mostly finished now.
 )";
 
+// TODO: about the lock & capture feature...
 const char* const doc_overview =
     R"(At any time, the program has a rule shown in the right plane (which is an editable torus space; the operations are recorded in the tooltips (...)). This is later called the "current rule". As you see, it is the Game-of-Life rule initially.
 
@@ -29,7 +30,7 @@ The subsets that the current rule belongs to will be marked with light-green bor
 You need to firstly specify a "working set", which is the set you are going to explore. You can select multiple subsets - the program will calculate the intersection of them as the working set. For example, if you select 'All' (isotropic rules; selected by default) and 'S.c.' (self-complementary rules), you are going to explore the rules that are both isotropic and self-complementary.
 Then you need to select a "mask" (masking rule) to guide how to observe the current rule and generate new rules.
 To modify the current rule:
-'Randomize' generates randomized rules in the working set with specified "distance" (number of groups where two rules have different values) to the masking rule.
+'Randomize' generates random rules in the working set with specified "distance" (number of groups where two rules have different values) to the masking rule.
 '<00.. Prev/Next 11..>' generates rules based on the mask and current rule, so that the current rule will iterate through the whole working set - firstly the masking rule, then all rules with distance = 1 to the masking rule, then 2, ..., until max distance.
 (The current rule should belong to the working set to enable 'Prev/Next'.)
 In the random-access section, the values of the current rule are viewed through the mask and grouped by the working set. By clicking a group you will flip all values of the current rule in that group. By turning on 'Preview mode' you are able to see the effect without replacing the current rule.
@@ -39,6 +40,7 @@ MAPARYSZhYAPEgSaBCgCAAAgABAEsAIAIgASIDgAIAAgAASQAIAaACggACAAICAAIAASICogIAAAACAA
 See the "Lock and capture" section for details.
 )";
 
+// TODO: ways to know about the distance in the program (custom mask)...
 const char* const doc_workings =
     R"(This section describes the exact workings of subsets, masks and major rule operations. If you are not familiar with this program, I'd recommend firstly checking the "Rules in different subsets" section to get some sense about what can be found with this program.
 
@@ -73,7 +75,7 @@ With these backgrounds, it will be much clearer to explain what happens in the p
 (If the current rule already belongs to W, it can serve as a valid mask (M') via '<< Cur'.)
 
 For the current rule C:
-3. 'Randomize' generates randomized rules in W with specified distance to M'.
+3. 'Randomize' generates random rules in W with specified distance to M'.
 4. '<00.. Prev/Next 11..>' generates new rules based on C and M', in such a way that C will iterate through all rules in W:
 '<00..' sets C to M', and '11..>' sets C to the rule with values different from M' in all cases.
 'Next' generates rules based on C and M', so that C will become the "next" rule in such a sequence: starting from M' ('<00..'), then all rules having distance = 1 to M', then distance = 2, ..., until '11..>'. 'Prev' does the same thing reversely.
@@ -91,7 +93,7 @@ MAPAAAAAQABARcAAQEXARcXfwABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf
 Then you can click 'Next' to iterate. (For convenience, after clicking '<00..', the left/right arrow keys will be bound to 'Prev/Next'.) The next rule will be:
 MAPgAAAAQABARcAAQEXARcXfwABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf3//f////g
 
-If the working set is large, then it's infeasible to test all rules. In these cases, aside from getting randomized rules ('Randomize' with arbitrary distance), if there are interesting/promising rules known to belong to the set, you can try to inspect rules that are close to them. Based on the current rule, this can be done in three ways:
+If the working set is large, then it's infeasible to test all rules. In these cases, aside from getting random rules ('Randomize' with arbitrary distance), if there are interesting/promising rules known to belong to the set, you can try to inspect rules that are close to them. Based on the current rule, this can be done in three ways:
 1. (After '<< Cur') 'Randomize' with a small distance.
 2. (After '<< Cur') 'Next' still works - the iteration will start from the nearest rules (those with distance = 1).
 3. (Random-access) 'Preview mode' provides a direct view of all rules with distance = 1 to the current rule.
@@ -109,7 +111,7 @@ x = 5, y = 27, rule = MAP+sASUIjICmiAgAiAEKBAhrIGFiAUbCCAoAChgnAAAw6AAkAIgKCAlAQ
 By "wandering" in the working set in this way, you can collect a series of rules that are close from each other.
 
 
-Sometimes you may also want to jump outside of the predefined subsets. This can be done via random-access edition, and may lead to surprising discoveries. See the "Atypical rules" section for more info.
+Sometimes you may also want to jump outside of the predefined subsets. This can be done via random-access edition, and may lead to surprising discoveries. See the "More about random-access edition" section for more info.
 )";
 
 const char* const doc_rules =
@@ -138,7 +140,7 @@ MAP2AAAAQAAAQCAAAAQAAAAAAAAAAAAAAAAAAAAQAAAAACAAAAAAAACAAAAAAAAAAAAgAAAAAAACAAAA
 MAPAj6qGRYEbAUJCY78vDHdV3RZxOaGCikQ1abIFMMgJBp3BiKINUAoCWLoKJrShCqIYswRCaAJjzpKQhA4KBiQyA
 
 'C4' alone:
-'C4' is a strict subset of 'C2'. In 'C4', sometimes (for example, by getting randomized rules) you will find rules where there are complex dynamics, but everything dies finally:
+'C4' is a strict subset of 'C2'. In 'C4', sometimes (for example, by getting random rules) you will find rules where there are complex dynamics, but everything dies finally:
 MAPAkMwkQDI20gEBSC4F/gYtzNEmgAVCB0ookwgwMEGAA0FExCAo8gCgFw4ACAqEgALNCnhuUQcmQlgahCx2ACRHg
 It's highly likely that there exist rules with interesting oscillators or spaceships nearby. For example, the following rule has (C4) distance = 1 to the above one, but has huge spaceships:
 MAPAkMwkwDo20gEBSC4F/gItzNkmkA1iBkookwgwMEGgA0FExCAo8gigFw4AAAqEgALNCnhsUQcmQlgahCx2ACRHg
@@ -261,14 +263,15 @@ MAPACEAIYCBgIFVVVVVX3dfdxGdEZ0BVQFVd313fUN/Q38BPQE9QRFBEVV/VX9Gd0Z3EQURBVVVVVV+/
 MAPEgASAAEJAQk1bzVvHVYdVlVFVUUZERkR9hH2EX1/fX8BQQFBd5B3kHdnd2ddVV1VlUeVRwlTCVNvf29//7f/tw
 
 
-Finally, it's possible to get non-trivial rules that do not belong to any well-defined subsets (no symmetries, no independencies). See the "Atypical rules" section for details.
+Finally, it's possible to get non-trivial rules that do not belong to any well-defined subsets (no symmetries, no independencies). See the next section ("More about random-access edition") for details.
 )";
 
-// TODO: unfinished; better title...
-const char* const doc_atypical =
-    R"(This section is based on random-access edition (as explained in "Subset, mask ..."). To recap, for the current rule C and working set W = (M, P), the operation flips the values in a group in W.P, and therefore defines S' = (C, W.P), which is W itself if C already belongs to W.
+// TODO: finish...
+const char* const doc_random_access =
+    R"(This section covers more aspects about random-access edition (as explained in "Subset, mask ..."). To recap, for the current rule C and working set W = (M, P), the operation flips the values in a group in W.P, and therefore defines S' = (C, W.P), which is W itself if C already belongs to W.
 
-For the subsets in the form of (M, P), if a set S1 is a subset of another one S2, its partition must be strictly "coarser" than that of S2 - each group in S1.P must wholly cover one or several groups in S2.P. In the program, to learn about the relation between two subsets, you can select one subset, and the sets that turn dull-blue are strict supersets of the selected one. For example, the isotropic set is a strict subset of '-', '|', ..., 'C4' etc.
+For the sets in the form of (M, P), if a set S1 is a subset of another one S2, its partition must be strictly "coarser" than that of S2. In other words, each group in S1.P must wholly cover one or several groups in S2.P. For example, the isotropic set is a strict subset of '-', '|', ..., 'C4' etc, and its partition ......
+(In the program, to know about the relation between two subsets, you can select one subset, and the sets that turn dull-blue are strict supersets of the selected one.)
 
 When performing random-access edition in W, suppose the current rule belongs to S:
 1. If W is a strict superset of S (for example, the current rule is totalistic, while W is the isotropic set):
@@ -278,114 +281,81 @@ There has been some examples in the previous sections. For example, when talking
 Also notice that the whole MAP set is a strict superset of any other sets. ......
 
 2. If conversely, S is a strict superset of W (for example, W is the isotropic set, while the current rule only belongs to 'C4'):
-The current rule may not belong to W, but editing in W is not meaningless - the result must still belong to S. The reason is that, S.P is a refinement of W.P, so when you flip a group in W.P, one or several groups in S.P are flipped at the same time.
+The current rule may not belong to W, but editing in W is not meaningless - the result must still belong to S. As S.P is a refinement of W.P, when you flip a group in W.P, one or several groups in S.P are flipped at the same time.
 3. If S and W are irrelevant, you may consider the result as a random MAP rule.
 
 Here is the same hex-C6 rule shown in the "Rules in different subsets" section. The following part is based on this rule. Before moving on, I'd recommend turning on 'Preview mode' in the rule-edition plane, and set a large pace for the preview windows (in 'Settings') as well as the main window.
 MAPEUQRVSLdM4gRRBFVIt0ziCK7IswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHMRIiqIpnMEQ
 
-By looking around in the native-C2 set ...
+As hex-C6 is a subset of native-C2, you can refine it in it. Here are two rules that have distance = 1 in the native-C2 subset:
 MAPEUQxVSLdM4gRRBFVIt0ziCK7oswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHMRIiqIpnMEQ
 MAPEUQRVSLdM4gQRBFVIt0ziCK7IswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHERIiqIpnMEQ
 
-Typically you will explore rules in the well-defined subsets supported in the program. These subsets, however, take up only an extremely small part of all MAP rules. For example, the largest subset in this program is the native 'C2' rules, which has 272 groups, meaning it takes up only 2^(272-512) ~ 2^-240 of all possible MAP rules. By "refining" rules in other sets (especially those with rotational symmetries).....
+Typically you will explore rules in the well-defined subsets supported in the program. These subsets, however, take up only an extremely small part of all MAP rules. For example, the largest subset in this program is the native 'C2' rules, which has 272 groups, meaning it takes up only 2^(272-512) ~ 2^-240 of all possible MAP rules. By "refining" rules in the MAP set from other subsets (especially those with rotational symmetries).....
 
 For example, the following rules have only a single case different from the C6 rule.
 MAPEUQRVSLdM4gRRBFVIt0ziCK7IswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHIRIiqIpnMEQ
 MAPEUQRVSLdM4gRRBFVMt0ziCK7IswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHMRIiqIpnMEQ
 
+(wander)
 MAPEUQRVSLdM4gRRBFVMt0ziCq7IsQiABlEIrsizCIAEURXAEwRmYiqIlUARBGZgIoizESoqiKZzBHMRIiqIpnMEQ
 )";
 
-#if 0
-// TODO: rewrite...
-const char* const doc_concepts =
-    R"(
-MAPARYSZxZtPVoUYRG2cMoGoxdsEtJst5ppcpLka9c/q58GKgMUKdi2sWmmEsm0t8kXOp+s8ZJ3edelQ0mXGbeXfw [/OI4QIQCgACAwBAAAAAQAIAAEMCLAAAAgIAAAAAAAACKAAAAgAKAgAAAAAAAAKAAgACAgAAAAACAAAAAAAAAAA]
-MAPARYTZxZsPVoQYRH2UMoGoxdkEtIst5p7coLka9c/r78CCgMUKdi+sSGmEsu0t9kXOp+s9ZB3efelQ8mXGTeXfw)";
+const char* const doc_lock_and_capture = R"(The program has a way to ...
+All of the following features are controlled by the 'Lock & capture' tag.
 
-const char* const doc_IO =
-    R"(Some strings will be marked with grey borders when you hover on them. You can right-click on them to copy the text to the clipboard. For example, the current rule (with or without the lock) can be copied this way. The path in the "Load file" is also copyable.
+A constraint is a "lock" associated with a MAP rule, that marks some parts of the rule as components... if a rule implies all possible patterns...
+The "lock" part is not meaningful on its own.
+(format...)
 
-In these documents, you can right-click the lines to copy them (drag to select multiple lines). The line(s) will be displayed as a single piece of copyable string in the popup, then you can right-click that string to copy to the clipboard. As you will see, this document ends with an RLE-pattern blob. ......
+So this represents another category of subsets - ...
 
-There are two recognizable formats that you can left-click directly to set as the current rule:
-A MAP rule will be highlighted in green when hovered:
-MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA
-A rule-lock pair will be highlighted in yellow when hovered:
-MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA [AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA]
+Mainly to accommodate for the concept of "capture"...
+(Closed-capture) Suppose there is a single spaceship flying in the (torus) space. You know it will roam in the space indefinitely - nothing else will happen, and will invoke only a subset of all cases.... (And if you record the invocations, from a certain point there will no longer be ...).
+Any rule that have the same locked values will allow for such a spaceship...
 
-The rules are read on a per-line basis (mainly because it's hard to render the text/locate with cursors cross physical lines etc). If there are more than one rules in a line only the first rule will be recognized. (This might be improved in the future.)
+In short, this feature can help you know about the "uniqueness" of a pattern, and generate rules that satisfy the constraint...
+(For example ... patterns that covers all cases 512/512)
+Suppose there are k groups in the working set, and a capture locks q groups. (the possibility; dependent on the working set)...
 
-If you left-click a rule-lock pair, both the rule and lock part will be overwritten.
-Otherwise (if it's a plain rule), the program will firstly test whether the rule "fits" into the locked part, and will clear the lock if the rule does not fit in. The rule part is assigned normally. This will be useful when you read a list of rules (the first of which is a pair, and the following are plain rules generated from it).
-When you click on a rule-lock pair, the working state will be set to it. This makes it easy to know that the following several rules are of the same origin, and you don't have to go back to the original lock if you want to generate new rules based on the lock. If you don't need the lock you can always clear it by the "Clear lock" button.
-
-)";
-#endif
-
-// TODO: finish...
-#if 0
-const char* const doc_lock_and_capture = R"(...
-
-About how the lock is set for plain rules when reading from these documents...
-
-MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA [AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA]
-
----- Pattern capture
-Below is a glider that travels "southwest". If you copy the following 3 lines and paste...
-x = 12, y = 15
-12b$12b$12b$12b$12b$12b$12b$4bo7b$3bo8b$3b3o6b$12b$12b$12b$
-12b$12b!
-
-(vs - ; the bounding-box is not enough for capture...)
-x = 3, y = 3
-bob$o2b$3o!
-
-By pressing 'P'... (about how "capture" works ...)
-As a result, you will get:
-MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA [/OI4QIQCgACAwBAAAAAQAIAAEMCLAAAAgIAAAAAAAACKAAAAgAKAgAAAAAAAAKAAgACAgAAAAACAAAAAAAAAAA]
-
-Selecting self-complementary and isotropic subset...
+When you enable the lock, some parts of the program will behave differently:
+The introduction of "lock" introduces a new relation between subsets...
+Rule-generation will work as if the working set is intersected with the constraint - the locked groups are skipped: 'Randomize' will now generate ... Traversal...
+In the random-access section, the locked groups are ... right-click ....
 (About dull-green ring and red ring (totalistic rule has dull green ring but does not work with self-complementary...))
 
-The "Zero" mask does not fit at this time (as it's not a self-complementary rule). As a result, select "Identity" mask...
+Capture - open vs closed
+Closed-capture is useful when the pattern has clear boundary and is foreseeable (spaceships, oscillators and still-life in the pure background)
+(bounding-box)
+It's meaningless to capture an arbitrary area in the rule with highly-active dynamics...
 
-"Randomize"... though every rule satisfies the lock (which means given the same initial state the capture uses, the result will be the same) this does not mean the captured thing is easy to [emerge] naturally...
-
-Finally we find:
-MAPARcSZhehPEwRdxeuNABMzyBsF8BsoYg3RND/A80Xmz8DJhdMPwD03RPuesn8F8n7DM3/04oXEXfNw3oXmbcXfw
-
-It will be much easier to find similar rules based on this rule - you can set the rule as the mask ("Take current"), and set a low distance ... For example, ...
-MAPARcTZhegPEwRdxPuFCBIzyBmF8A8+4g3RMD7A+03nz8DBhNIPyD83RPuIMP8F5n7DO3714g3EXfNw/oXmTcXfw
-
----- Open capture vs closed capture... TODO with examples...
-
----- Lock-enhancement
-Let's go back to this lock.
+Below is a glider that travels "southwest".
+By pressing 'P'... (about how "capture" works ...)
 MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA [/OI4QIQCgACAwBAAAAAQAIAAEMCLAAAAgIAAAAAAAACKAAAAgAKAgAAAAAAAAKAAgACAgAAAAACAAAAAAAAAAA]
 
-If you "Enhance" the lock in the isotropic subset, you will get:
-MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA [//Z65r4SvEjQ4JCgABAQgIDRksSLAIwAwKDgAIDAwACKAIICqAKggICAAKCAAKAAiICoiKCIAACAIAAAIAAAAA]
+Open-capture.... (agar-spaceship, spaceship guns etc)
+(parity...)
 
-In the isotropic subset the two lock have the same effect - the transformation operations will skip any groups that have locked cases. When you switch to a "wider" subset, however...
-For example, if you clear the selected subsets (the largest set - the MAP ruleset itself) you will find the locked groups...
-Below are two rules randomly generated in the MAP set
-MAPABJSQAQAAgBgQBCghAIEAGAAUMEIAAAEAZIAEAJBEIFCAAAABCCAzQChEgEAAIAAQACCgICAkRCCAFISAoAIBA
+MAPARYSZxZtPVoUYRG2cMoGoxdsEtJst5ppcpLka9c/q58GKgMUKdi2sWmmEsm0t8kXOp+s8ZJ3edelQ0mXGbeXfw [/OI4QIQCgACAwBAAAAAQAIAAEMCLAAAAgIAAAAAAAACKAAAAgAKAgAAAAAAAAKAAgACAgAAAAACAAAAAAAAAAA]
+MAPARYTZxZsPVoQYRH2UMoGoxdkEtIst5p7coLka9c/r78CCgMUKdi+sSGmEsu0t9kXOp+s9ZB3efelQ8mXGTeXfw
 
-MAPARcTZhYBPMgVYRCgAAAAyXBAUsEIYIgCQIrwgIQCgQQCIAIUaEDikAmBGICCQJgBSYGugNgDKACJEABhAlIAAA
+Selecting self-complementary and isotropic subset...
+"Randomize"... though every rule satisfies the constraints, this does not mean the captured thing is easy to emerge naturally...
+MAPARcSZhehPEwRdxeuNABMzyBsF8BsoYg3RND/A80Xmz8DJhdMPwD03RPuesn8F8n7DM3/04oXEXfNw3oXmbcXfw
+It will be much easier to find similar rules based on existing ones...
+MAPARcTZhegPEwRdxPuFCBIzyBmF8A8+4g3RMD7A+03nz8DBhNIPyD83RPuIMP8F5n7DO3714g3EXfNw/oXmTcXfw
 
----- Static constraints
-This is a feature similar to "Capture" to help find still-life based patterns...
+Lock-enhancement
+(The glider in one direction -> in all directions...) (in the isotropic set, the two constrains have the same effect).... in the MAP set...
+
+"Static constraints"
+This is a feature similar to "Capture" to help find still-life patterns...
 )";
-#else
-const char* const doc_lock_and_capture = "This section is not finished yet :(";
-#endif
 
 extern const char* const docs[][2]{{"About this program", doc_about},
                                    {"Overview", doc_overview},
                                    {"Subset, mask and rule operations", doc_workings},
                                    {"Rules in different subsets", doc_rules},
-                                   {"Atypical rules", doc_atypical},
+                                   {"More about random-access edition", doc_random_access},
                                    {"Lock and capture", doc_lock_and_capture},
                                    {/* null terminator */}};

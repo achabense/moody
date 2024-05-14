@@ -53,7 +53,7 @@ static aniso::moldT::lockT capture_closed(const aniso::tileT& source, const anis
     // due to that `limit` is not large enough.
 
     // Loop until there has been `limit` generations without newly invoked mappings.
-    const int limit = 100;
+    const int limit = 120;
     for (int g = limit; g > 0; --g) {
         run_torus(tile, temp, [&](aniso::codeT code) {
             if (!lock[code]) {
@@ -257,8 +257,9 @@ public:
 
         // (Shadowing `::imgui_KeyPressed`)
         // TODO: or use ImGui::SetNextFrameWantCaptureKeyboard when the Canvas button is active?
-        auto imgui_KeyPressed = [active = GImGui->ActiveId == ImGui::GetID("Canvas")](ImGuiKey key, bool repeat) {
-            return (active || !ImGui::GetIO().WantCaptureKeyboard) && ImGui::IsKeyPressed(key, repeat);
+        const bool canvas_active = GImGui->ActiveId == ImGui::GetID("Canvas");
+        auto imgui_KeyPressed = [canvas_active](ImGuiKey key, bool repeat) {
+            return (canvas_active || !ImGui::GetIO().WantCaptureKeyboard) && ImGui::IsKeyPressed(key, repeat);
         };
         static bool background = 0; // TODO: move elsewhere...
 
@@ -667,7 +668,9 @@ public:
                     capture_open(m_torus.tile(), m_sel->to_range(), lock);
                     sync.set_lock(lock);
                 });
-                if (m_sel && imgui_KeyPressed(ImGuiKey_O, true)) {
+                // `ImGui::IsKeyDown(..., repeat = true)` does not return true in every frame.
+                if (m_sel && (canvas_active || !ImGui::GetIO().WantCaptureKeyboard) &&
+                    ImGui::GetKeyData(ImGuiKey_O)->Down) {
                     auto lock = sync.current.lock;
                     capture_open(m_torus.tile(), m_sel->to_range(), lock);
                     sync.set_lock(lock);

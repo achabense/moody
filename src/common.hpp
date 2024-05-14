@@ -73,7 +73,7 @@ inline float wrap_len() {
 }
 
 inline void quick_info(const char* msg) {
-    // (`ImGui::IsKeyDown` is not suitable here.)
+    // `ImGui::IsKeyDown(..., repeat = true)` does not return true in every frame.
     if (!ImGui::GetIO().WantTextInput && ImGui::GetKeyData(ImGuiKey_H)->Down && ImGui::IsItemVisible()) {
         imgui_ItemRect(IM_COL32_WHITE);
         const ImVec2 size = ImGui::CalcTextSize(msg);
@@ -100,7 +100,7 @@ inline bool button_with_shortcut(const char* label, ImGuiKey shortcut = ImGuiKey
     bool ret = ImGui::Button(label, size);
     if (shortcut != ImGuiKey_None && !imgui_TestItemFlag(ImGuiItemFlags_Disabled)) {
         const bool pressed = imgui_KeyPressed(shortcut, imgui_TestItemFlag(ImGuiItemFlags_ButtonRepeat));
-        imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_ButtonActive, pressed ? 0.3 : 1.0));
+        imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_ButtonActive, pressed ? 0.3f : 1.0f));
         ret = ret || pressed;
     }
     return ret;

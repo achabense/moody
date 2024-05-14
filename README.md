@@ -24,7 +24,6 @@ As a starting point, here is how to save rules/patterns:
 
 #### Recent plans
 - Cleanups for rule lists (those in `rules/...`). There are going to be refined lists of rules in the formal releases.
-- Finish documentation.
 - Refine visual/layout.
 - Add support for unbounded space.
 - Refine and stabilize keyboard/mouse controls etc. Some controls may be different in the formal release.
