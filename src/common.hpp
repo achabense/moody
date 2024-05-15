@@ -73,8 +73,7 @@ inline float wrap_len() {
 }
 
 inline void quick_info(const char* msg) {
-    // `ImGui::IsKeyDown(..., repeat = true)` does not return true in every frame.
-    if (!ImGui::GetIO().WantTextInput && ImGui::GetKeyData(ImGuiKey_H)->Down && ImGui::IsItemVisible()) {
+    if (!ImGui::GetIO().WantTextInput && ImGui::IsKeyDown(ImGuiKey_H) && ImGui::IsItemVisible()) {
         imgui_ItemRect(IM_COL32_WHITE);
         const ImVec2 size = ImGui::CalcTextSize(msg);
         const ImVec2 msg_min = [&]() -> ImVec2 {

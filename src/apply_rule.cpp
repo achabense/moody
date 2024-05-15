@@ -668,9 +668,8 @@ public:
                     capture_open(m_torus.tile(), m_sel->to_range(), lock);
                     sync.set_lock(lock);
                 });
-                // `ImGui::IsKeyDown(..., repeat = true)` does not return true in every frame.
-                if (m_sel && (canvas_active || !ImGui::GetIO().WantCaptureKeyboard) &&
-                    ImGui::GetKeyData(ImGuiKey_O)->Down) {
+                // (`ImGui::IsKeyPressed(..., repeat = true)` does not return true in every frame.)
+                if (m_sel && (canvas_active || !ImGui::GetIO().WantCaptureKeyboard) && ImGui::IsKeyDown(ImGuiKey_O)) {
                     auto lock = sync.current.lock;
                     capture_open(m_torus.tile(), m_sel->to_range(), lock);
                     sync.set_lock(lock);
