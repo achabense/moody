@@ -88,6 +88,7 @@ inline void quick_info(const char* msg) {
             }
         }();
         const ImVec2 msg_max(msg_min.x + size.x, msg_min.y + size.y);
+        // TODO: ideally, the message should be rendered on the foreground of individual windows...
         ImDrawList* const drawlist = ImGui::GetForegroundDrawList();
         drawlist->AddRectFilled(msg_min, msg_max, IM_COL32(60, 60, 60, 255));
         drawlist->AddRect(msg_min, msg_max, IM_COL32_WHITE);
@@ -320,7 +321,8 @@ public:
     void display_if_enable_lock(const std::invocable<bool> auto& append) {
         if (enable_lock) {
             ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
-            auto window = imgui_Window("Lock & capture", &enable_lock_next, ImGuiWindowFlags_AlwaysAutoResize);
+            // (wontfix) Will append to the same window if there are to be multiple instances (won't happen).
+            auto window = imgui_Window("Lock & capture (experimental)", &enable_lock_next, ImGuiWindowFlags_AlwaysAutoResize);
             append(window.visible);
         }
     }

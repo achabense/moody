@@ -648,20 +648,27 @@ public:
             };
 
             // Pattern capturing.
-            // TODO: enable getting current.lock?
             sync.display_if_enable_lock([&](bool /* visible */) {
                 ImGui::Separator();
 
                 ImGui::AlignTextToFramePadding();
                 imgui_StrTooltip(
-                    "(...)", "Open-capture: Record what there exists in the selected area (in the current frame, "
-                             "not including the border). The result will always be integrated to the current lock.\n\n"
+                    "(...)", "Open-capture: Record what there exists in the selected area (in the current frame, and "
+                             "not including the border). The result will always be appended to the current lock.\n\n"
                              "Closed-capture: Run the selected area as torus space (with the current rule) and "
-                             "record all mappings. Depending on 'Replace', the result will replace the current lock "
-                             "directly, or will be integrated to the current lock (like open-capture).");
+                             "record all mappings. Depending on the setting, the result will replace the current lock "
+                             "directly, or will be appended to the current lock like open-capture.");
                 ImGui::SameLine();
                 static bool replace = true;
-                ImGui::Checkbox("Replace", &replace);
+                if (ImGui::RadioButton("Replace", replace)) {
+                    replace = true;
+                }
+                ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                if (ImGui::RadioButton("Append", !replace)) {
+                    replace = false;
+                }
+                ImGui::SameLine();
+                imgui_StrTooltip("(?)", "This affects only closed-capture. See '(...)' for explanation.");
                 term("Capture (open)", "O (repeatable)", ImGuiKey_None, true, [&] {
                     assert(m_sel);
                     auto lock = sync.current.lock;

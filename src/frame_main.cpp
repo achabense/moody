@@ -55,10 +55,14 @@ private:
     void set_pos(int pos) { m_pos = std::clamp(pos, 0, size() - 1); }
 };
 
-// TODO: make some tooltips interactive?
 void frame_main() {
     messenger::display();
 
+    // TODO: the constraint model (constraint = {recorder.current(), lock}) is very fragile now.
+    // The meaning of the constraint may be changed unexpectedly when:
+    // 1. `recorder.set_xx` switches to a !compatible rule.
+    // 2. `load_fn` loads a !compatible rule.
+    // 3. the rule is modified during `!enable_lock`.
     static recorderT recorder;
     static aniso::moldT::lockT lock;
     static bool enable_lock = false;
@@ -92,7 +96,7 @@ void frame_main() {
         load_rule(show_clipboard, "Clipboard", load_clipboard);
         ImGui::SameLine();
         load_rule(show_doc, "Documents", load_doc);
-        ImGui::SameLine();
+        ImGui::SameLine(), imgui_Str(" "), ImGui::SameLine();
         ImGui::Checkbox("Lock & capture", &sync.enable_lock_next);
 #ifndef NDEBUG
         ImGui::SameLine();
@@ -105,10 +109,10 @@ void frame_main() {
             ImGui::ShowDemoWindow(&show_demo);
         }
         ImGui::SameLine();
-        ImGui::Text("| (%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
+        ImGui::Text("  (%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
 #else
         ImGui::SameLine();
-        ImGui::Text("(%.1f FPS)", ImGui::GetIO().Framerate);
+        ImGui::Text("  (%.1f FPS)", ImGui::GetIO().Framerate);
 #endif // !NDEBUG
 
         ImGui::Separator();
@@ -120,7 +124,7 @@ void frame_main() {
             "(...)",
             "Below is the MAP-string for the current rule (as shown in the right plane). You can right-click the rule "
             "to copy to the clipboard.\n\n"
-            "Here '<| Prev/Next |>' represents the record for the current rule. You can undo/redo the editions "
+            "Here '<| Prev/Next |>' represents the record for the current rule. You can undo/redo the modifications "
             "with it. When you click the button the left/right arrow key will be bound to 'Prev/Next'.\n"
             "(If you want to clear the record, you can right-click the 'Total:.. At:..' text, and then click 'Clear' "
             "in the popup to confirm.)");

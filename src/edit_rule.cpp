@@ -676,7 +676,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
         ImGui::SameLine();
         int count = 0;
         aniso::for_each_code([&](aniso::codeT code) { count += sync.current.lock[code]; });
-        ImGui::Text("Count: %d/512", count);
+        ImGui::Text("Locked: %d/512", count);
     });
 
     const aniso::partitionT& par = subset.get_par();

@@ -9,6 +9,7 @@ MAP7KV6wLHQiAHIPICBCAhlIqKAhAuKAFBoYmCFEAACIUzbAIAsAsCBJoAANhiIBEBSUICEMQiQFgRBg
 The project was then abandoned for many years. Last year I felt an urgency to bring it to completion. Thankfully it's mostly finished now.
 )";
 
+// TODO: about MAP rules...
 // TODO: about the lock & capture feature...
 const char* const doc_overview =
     R"(At any time, the program has a rule shown in the right plane (which is an editable torus space; the operations are recorded in the tooltips (...)). This is later called the "current rule". As you see, it is the Game-of-Life rule initially.
@@ -40,7 +41,6 @@ MAPARYSZhYAPEgSaBCgCAAAgABAEsAIAIgASIDgAIAAgAASQAIAaACggACAAICAAIAASICogIAAAACAA
 See the "Lock and capture" section for details.
 )";
 
-// TODO: ways to know about the distance in the program (custom mask)...
 const char* const doc_workings =
     R"(This section describes the exact workings of subsets, masks and major rule operations. If you are not familiar with this program, I'd recommend firstly checking the "Rules in different subsets" section to get some sense about what can be found with this program.
 
@@ -80,8 +80,9 @@ For the current rule C:
 '<00..' sets C to M', and '11..>' sets C to the rule with values different from M' in all cases.
 'Next' generates rules based on C and M', so that C will become the "next" rule in such a sequence: starting from M' ('<00..'), then all rules having distance = 1 to M', then distance = 2, ..., until '11..>'. 'Prev' does the same thing reversely.
 5. In the random-access section, the values of C are viewed through M' (XOR-masked by M') as a sequence of 0/1, and grouped by W.P. If C belongs to W, the masked values in each group must be either all-0 or all-1, so it's enough to represent each group with one of cases in it.
+(The numbers of groups of W.P, and groups in W.P where the values of C are different(1)/same(0) than M', are shown in the form of 'Groups:k (1:x 0:y)'. 'x' has the same meaning as the distance.)
 6. By left-clicking a group you will get a rule with all values in that group flipped. Therefore, if C already belongs to W, the result will still belong to W. Otherwise, the operation actually gets rules in (C, W.P). In other words, the operation defines S' = (C, W.P), which is W itself if C already belongs to W.
-(The masking rule has no effect on the result of random-access edition.)
+(The masking rule has no effect on the result of random-access editing.)
 (With 'Preview mode' turned on, the program is able to present a "slice" of all rules that have distance = 1 to C in S'.)
 
 
@@ -111,7 +112,7 @@ x = 5, y = 27, rule = MAP+sASUIjICmiAgAiAEKBAhrIGFiAUbCCAoAChgnAAAw6AAkAIgKCAlAQ
 By "wandering" in the working set in this way, you can collect a series of rules that are close from each other.
 
 
-Sometimes you may also want to jump outside of the predefined subsets. This can be done via random-access edition, and may lead to surprising discoveries. See the "More about random-access edition" section for more info.
+Sometimes you may also want to jump outside of the predefined subsets. This can be done via random-access editing, and may lead to surprising discoveries. See the "More about random-access editing" section for more info.
 )";
 
 const char* const doc_rules =
@@ -263,44 +264,43 @@ MAPACEAIYCBgIFVVVVVX3dfdxGdEZ0BVQFVd313fUN/Q38BPQE9QRFBEVV/VX9Gd0Z3EQURBVVVVVV+/
 MAPEgASAAEJAQk1bzVvHVYdVlVFVUUZERkR9hH2EX1/fX8BQQFBd5B3kHdnd2ddVV1VlUeVRwlTCVNvf29//7f/tw
 
 
-Finally, it's possible to get non-trivial rules that do not belong to any well-defined subsets (no symmetries, no independencies). See the next section ("More about random-access edition") for details.
+Finally, it's possible to get non-trivial rules that do not belong to any well-defined subsets (no symmetries, no independencies). See the next section ("More about random-access editing") for details.
 )";
 
-// TODO: finish...
 const char* const doc_random_access =
-    R"(This section covers more aspects about random-access edition (as explained in "Subset, mask ..."). To recap, for the current rule C and working set W = (M, P), the operation flips the values in a group in W.P, and therefore defines S' = (C, W.P), which is W itself if C already belongs to W.
+    R"(This section covers more aspects about random-access editing (as explained in "Subset, mask and rule operations"). To recap, for the current rule C and working set W = (M, P), the operation flips all the values in a group in W.P, and therefore, the result belongs to S' = (C, W.P), which is W itself if C already belongs to W.
 
-For the sets in the form of (M, P), if a set S1 is a subset of another one S2, its partition must be strictly "coarser" than that of S2. In other words, each group in S1.P must wholly cover one or several groups in S2.P. For example, the isotropic set is a strict subset of '-', '|', ..., 'C4' etc, and its partition ......
-(In the program, to know about the relation between two subsets, you can select one subset, and the sets that turn dull-blue are strict supersets of the selected one.)
+For the sets in the form of (M, P), if a set S1 is a subset of another set S2, its partition must be strictly "coarser" than that of S2. In other words, each group in S1.P must fully cover one or several groups in S2.P. For example, the isotropic set is a subset of '-', '|', ..., 'C4' etc, so its partition is strictly coarser than theirs.
+(In the program, the working set is a subset of the ones that turn dull-blue, and any set is a subset of the whole MAP set.)
 
-When performing random-access edition in W, suppose the current rule belongs to S:
-1. If W is a strict superset of S (for example, the current rule is totalistic, while W is the isotropic set):
-.......
-The random-access edition can be considered ... "refine"... The result must belong to W, but may not belong to S.
-There has been some examples in the previous sections. For example, when talking about the rules with distance = 1 to the Game-of-Life rule in the isotropic set, ......
-Also notice that the whole MAP set is a strict superset of any other sets. ......
+Based on this, when performing random-access editing in W, suppose the current rule belongs to S != W:
+1. If S is a strict subset of W (for example, the current rule is totalistic, while W is the isotropic set):
+As the rule also belongs to W, the result of random-access editing will belong to W as well (but may no longer belong to S). In this case, the operation can be considered "refining" the rule in a broader context (set). There have been some examples in the previous sections. For example, when talking about "distance", the rules with distance = 1 to the Game-of-Life rule in the isotropic set are gotten this way.
+(This includes editing any rule in the MAP set (which the default one if you select no subset) - the random-access editing will always flip the value for a single case.)
 
-2. If conversely, S is a strict superset of W (for example, W is the isotropic set, while the current rule only belongs to 'C4'):
-The current rule may not belong to W, but editing in W is not meaningless - the result must still belong to S. As S.P is a refinement of W.P, when you flip a group in W.P, one or several groups in S.P are flipped at the same time.
-3. If S and W are irrelevant, you may consider the result as a random MAP rule.
+2. If conversely, W is a strict subset of S (for example, W is the isotropic set, while the current rule only belongs to 'C4'):
+The result may not belong to W (as the current rule may not belong to W), but must still belong to S. This is because S.P is a refinement of W.P, so flipping a group in W.P has the same effect as flipping one or several groups in S.P.
+3. Otherwise, if S and W are irrelevant, you may consider the result as a random MAP rule.
 
-Here is the same hex-C6 rule shown in the "Rules in different subsets" section. The following part is based on this rule. Before moving on, I'd recommend turning on 'Preview mode' in the rule-edition plane, and set a large pace for the preview windows (in 'Settings') as well as the main window.
+
+Case 1 is especially useful.
+
+Here is the same hex-C6 rule shown in the "Rules in different subsets" section. Hex-C6 is a subset of hex-C2, which is a subset of native-C2, which is further a subset of the whole MAP set.
+The later rules are all "refined" from this rule. (You can easily find such rules with the help of preview mode.) Before moving on, I'd recommend setting it as the masking rule ('<< Cur'), and setting a large pace for the preview windows (in 'Settings') as well as the main window (as the dynamics of these rules are complex and relatively slow).
 MAPEUQRVSLdM4gRRBFVIt0ziCK7IswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHMRIiqIpnMEQ
 
-As hex-C6 is a subset of native-C2, you can refine it in it. Here are two rules that have distance = 1 in the native-C2 subset:
+It turns out that, there are a lot of amazing rules with only native-C2 symmetry close to the C6 rule. Here are two rules that have distance = 1 to it in the native-C2 subset:
 MAPEUQxVSLdM4gRRBFVIt0ziCK7oswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHMRIiqIpnMEQ
 MAPEUQRVSLdM4gQRBFVIt0ziCK7IswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHERIiqIpnMEQ
 
-Typically you will explore rules in the well-defined subsets supported in the program. These subsets, however, take up only an extremely small part of all MAP rules. For example, the largest subset in this program is the native 'C2' rules, which has 272 groups, meaning it takes up only 2^(272-512) ~ 2^-240 of all possible MAP rules. By "refining" rules in the MAP set from other subsets (especially those with rotational symmetries).....
-
-For example, the following rules have only a single case different from the C6 rule.
+And the following rules have only a single case different from the C6 rule (distance = 1 in the MAP set; no symmetry):
 MAPEUQRVSLdM4gRRBFVIt0ziCK7IswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHIRIiqIpnMEQ
 MAPEUQRVSLdM4gRRBFVMt0ziCK7IswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHMRIiqIpnMEQ
-
-(wander)
-MAPEUQRVSLdM4gRRBFVMt0ziCq7IsQiABlEIrsizCIAEURXAEwRmYiqIlUARBGZgIoizESoqiKZzBHMRIiqIpnMEQ
+Just like the symmetric rules, in these rules, the state will converge to irregular-shaped spaceships. However, these complex spaceships do not exist in any symmetric rules.
+After all, the subsets supported in the program take up only an extremely small part of all MAP rules - the largest subset in this program is the native-C2 set, which has 272 groups, meaning it takes up only 2^(272-512) ~ 2^-240 of all possible MAP rules.
 )";
 
+#if 0
 const char* const doc_lock_and_capture = R"(The program has a way to ...
 All of the following features are controlled by the 'Lock & capture' tag.
 
@@ -351,11 +351,14 @@ Lock-enhancement
 "Static constraints"
 This is a feature similar to "Capture" to help find still-life patterns...
 )";
+#else
+const char* const doc_lock_and_capture = "This section is not finished yet :(";
+#endif
 
 extern const char* const docs[][2]{{"About this program", doc_about},
                                    {"Overview", doc_overview},
                                    {"Subset, mask and rule operations", doc_workings},
                                    {"Rules in different subsets", doc_rules},
-                                   {"More about random-access edition", doc_random_access},
+                                   {"More about random-access editing", doc_random_access},
                                    {"Lock and capture", doc_lock_and_capture},
                                    {/* null terminator */}};
