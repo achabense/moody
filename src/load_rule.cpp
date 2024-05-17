@@ -30,18 +30,23 @@ static pathT cpp17_u8path(const std::string_view path) { //
 // I hate this part so much...
 // (This is horribly inefficient, but there are not going to be too many calls in each frame, so let it go.)
 [[nodiscard]] static std::string clip_path(const pathT& p, const float avail_w, bool* clipped = nullptr) {
+    auto set_clipped = [&clipped](bool b) {
+        if (clipped) {
+            *clipped = b;
+        }
+    };
     if (p.empty()) {
-        clipped && (*clipped = false);
+        set_clipped(false);
         return "";
     }
 
     std::string full_str = cpp17_u8string(p);
     const float full_w = ImGui::CalcTextSize(full_str.c_str()).x;
     if (full_w <= avail_w) {
-        clipped && (*clipped = false);
+        set_clipped(false);
         return full_str;
     } else {
-        clipped && (*clipped = true);
+        set_clipped(true);
         if (!p.has_relative_path()) {
             return full_str;
         }
