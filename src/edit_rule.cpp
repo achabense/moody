@@ -242,14 +242,19 @@ public:
             ImGui::Dummy(size);
             const bool hit = interactive && center != Disabled && ImGui::IsItemClicked(ImGuiMouseButton_Left);
 
-            const ImU32 cent_col_disabled = !title ? IM_COL32(120, 30, 0, 255) : IM_COL32(0, 0, 0, 90);
             const ImU32 cent_col = center == Selected    ? IM_COL32(65, 150, 255, 255) // Roughly _ButtonHovered
                                    : center == Including ? IM_COL32(25, 60, 100, 255)  // Roughly _Button
-                                   : center == Disabled  ? cent_col_disabled
                                                          : IM_COL32_BLACK_TRANS;
             const ImU32 ring_col = ring == Contained    ? IM_COL32(0, 255, 0, 255)   // Light green
                                    : ring == Compatible ? IM_COL32(0, 100, 0, 255)   // Dull green
                                                         : IM_COL32(200, 45, 0, 255); // Red
+            ImU32 title_col = IM_COL32_WHITE;
+            if (center == Disabled) {
+                title_col = IM_COL32(150, 150, 150, 255);
+                if (!title) {
+                    title = "-";
+                }
+            }
 
             imgui_ItemRectFilled(IM_COL32_BLACK);
             if (title && (center == None || center == Disabled)) {
@@ -257,9 +262,10 @@ public:
                 const ImVec2 sz = ImGui::CalcTextSize(title, title + 1);
                 const ImVec2 pos(min.x + floor((size.x - sz.x) / 2),
                                  min.y + floor((size.y - sz.y) / 2) - 1 /* -1 for better visual effect */);
-                ImGui::GetWindowDrawList()->AddText(pos, IM_COL32_WHITE, title, title + 1);
+                ImGui::GetWindowDrawList()->AddText(pos, title_col, title, title + 1);
+            } else {
+                imgui_ItemRectFilled(cent_col, ImVec2(4, 4));
             }
-            imgui_ItemRectFilled(cent_col, center == Disabled ? ImVec2(5, 5) : ImVec2(4, 4));
             imgui_ItemRect(ring_col);
             if (interactive && center != Disabled && ImGui::IsItemHovered()) {
                 imgui_ItemRectFilled(IM_COL32(255, 255, 255, 45));
@@ -287,8 +293,8 @@ public:
         {
             ImGui::AlignTextToFramePadding();
             imgui_StrTooltip("(...)", [&] {
-                auto explain = [&](ringE ring, centerE center, const char* title /* Optional */, const char* desc) {
-                    put_term(ring, center, title, false);
+                auto explain = [&](ringE ring, centerE center, const char* desc) {
+                    put_term(ring, center, nullptr, false);
                     ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                     ImGui::AlignTextToFramePadding(); // `Dummy` does not align automatically.
                     imgui_Str(": ");
@@ -305,34 +311,30 @@ public:
                     "the working set will be the whole MAP set.");
                 ImGui::Separator();
                 imgui_Str("The ring color reflects the relation between the subset and the current rule-lock pair:");
-                explain(Contained, None, nullptr, "The rule belongs to this subset.");
+                explain(Contained, None, "The rule belongs to this subset.");
                 if (!target.enable_lock) {
-                    explain(Compatible, None, nullptr, "The rule does not belong to this subset.");
+                    explain(Compatible, None, "The rule does not belong to this subset.");
                 } else {
                     explain(
-                        Compatible, None, nullptr,
+                        Compatible, None,
                         "The rule does not belong to this subset, but there exist rules in the subset that meet the "
                         "constraints (locked values) posed by rule-lock pair.\n"
                         "(Notice that the [intersection] of such subsets may still contain no rules that satisfy the "
                         "constraints. )");
                     explain(
-                        Incompatible, None, nullptr,
+                        Incompatible, None,
                         "The rule does not belong to this subset, and the constraints cannot be satisfied by any rule "
                         "in this subset.");
                 }
 
                 ImGui::Separator();
                 imgui_Str("The center color reflects the selection details:");
-                put_term(Compatible, None, nullptr, false);
-                ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                explain(Compatible, None, "x", "Not selected.");
-                explain(Compatible, Selected, nullptr, "Selected.");
-                explain(Compatible, Including, nullptr,
+                explain(Compatible, None, "Not selected.");
+                explain(Compatible, Selected, "Selected.");
+                explain(Compatible, Including,
                         "Not selected, but the working set already belongs to this subset, so it will behave "
                         "as if this is selected too.");
-                put_term(Compatible, Disabled, nullptr, false);
-                ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                explain(Compatible, Disabled, "x", "Not selectable, otherwise the working set will be empty.");
+                explain(Compatible, Disabled, "Not selectable, otherwise the working set will be empty.");
             });
             ImGui::SameLine();
             imgui_Str("Subsets ~");
