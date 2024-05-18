@@ -873,7 +873,8 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
     if (preview_mode) {
         ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(32, 32, 32, 255));
     }
-    if (auto child = imgui_ChildWindow("Details")) {
+    if (auto child = imgui_ChildWindow("Groups")) {
+        // set_scroll_by_up_down(ImGui::GetFrameHeight() * (preview_mode ? 2 : 1));
         const char labels_normal[2][3]{{'-', chr_0, '\0'}, {'-', chr_1, '\0'}};
         const char labels_preview[2][9]{{'-', chr_0, ' ', '-', '>', ' ', chr_1, ':', '\0'},
                                         {'-', chr_1, ' ', '-', '>', ' ', chr_0, ':', '\0'}};

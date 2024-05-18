@@ -96,6 +96,16 @@ inline void quick_info(const char* msg) {
     }
 }
 
+inline void set_scroll_by_up_down(float dy) {
+    if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) {
+        if (imgui_KeyPressed(ImGuiKey_DownArrow, true)) {
+            ImGui::SetScrollY(ImGui::GetScrollY() + dy);
+        } else if (imgui_KeyPressed(ImGuiKey_UpArrow, true)) {
+            ImGui::SetScrollY(ImGui::GetScrollY() - dy);
+        }
+    }
+}
+
 inline bool button_with_shortcut(const char* label, ImGuiKey shortcut = ImGuiKey_None, const ImVec2& size = {}) {
     bool ret = ImGui::Button(label, size);
     if (shortcut != ImGuiKey_None && !imgui_TestItemFlag(ImGuiItemFlags_Disabled)) {
@@ -322,7 +332,8 @@ public:
         if (enable_lock) {
             ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
             // (wontfix) Will append to the same window if there are to be multiple instances (won't happen).
-            auto window = imgui_Window("Lock & capture (experimental)", &enable_lock_next, ImGuiWindowFlags_AlwaysAutoResize);
+            auto window =
+                imgui_Window("Lock & capture (experimental)", &enable_lock_next, ImGuiWindowFlags_AlwaysAutoResize);
             append(window.visible);
         }
     }

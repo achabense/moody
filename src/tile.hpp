@@ -211,7 +211,7 @@ namespace aniso {
         }
 
         // This is relying on codeT::bpos_q = 0, bpos_w = 1, ... bpos_c = 8.
-        void apply_v2(const rule_like auto& rule, tileT& dest) {
+        void apply_v2(const rule_like auto& rule, tileT& dest) const {
             assert(this != &dest);
             dest.resize(m_size);
 

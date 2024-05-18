@@ -573,7 +573,7 @@ public:
             if (m_sel && m_sel->active && !r_down) {
                 m_sel->active = false;
                 // Allow a single right-click to unselect the area.
-                // (Shrinking (`bounding_box`) has no size check like this. This is intentional.)
+                // (`bounding_box` has no size check like this. This is intentional.)
                 if (m_sel->width() * m_sel->height() <= 2) {
                     m_sel.reset();
                 }
@@ -693,7 +693,7 @@ public:
 
             if (other_op) {
                 ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
-                ImGui::Begin("Range operations", &other_op, ImGuiWindowFlags_AlwaysAutoResize);
+                auto window = imgui_Window("Range operations", &other_op, ImGuiWindowFlags_AlwaysAutoResize);
 
                 ImGui::AlignTextToFramePadding();
                 imgui_Str("Background =");
@@ -709,7 +709,7 @@ public:
                 imgui_StrTooltip("(?)", "Treat 0 (black) or 1 (white) as background value. "
                                         "This affects the behavior of clearing, shrinking and pasting mode.\n\n"
                                         "'Clear inside/outside' will fill the range with (background).\n"
-                                        "'Shrink' will get the bounding-box for !(background).\n"
+                                        "'Bound' will get the bounding-box for !(background).\n"
                                         "'Paste' will use different pasting modes based on (background). "
                                         "(When pasting into the white background you need to set this to 1.)");
 
@@ -746,7 +746,7 @@ public:
                         m_sel.reset();
                     }
                 });
-                term("Shrink", "S", ImGuiKey_S, true, [&] {
+                term("Bound", "B", ImGuiKey_B, true, [&] {
                     assert(m_sel);
                     const auto [begin, end] = aniso::bounding_box(m_torus.tile(), m_sel->to_range(), background);
                     if (begin != end) {
@@ -791,8 +791,6 @@ public:
                         }
                     }
                 });
-
-                ImGui::End();
             }
         }
 

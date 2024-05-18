@@ -486,7 +486,9 @@ public:
             ImGui::SetNextWindowScroll({0, 0});
         }
         ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(24, 24, 24, 255));
-        if (auto child = imgui_ChildWindow("Child")) {
+        if (auto child = imgui_ChildWindow("Content")) {
+            set_scroll_by_up_down(ImGui::GetTextLineHeight() * 2); // TODO: document the behavior.
+
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
             for (int l = 0; const auto& [text, id] : m_lines) {
                 const int this_l = l++;
