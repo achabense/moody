@@ -486,7 +486,7 @@ public:
             ImGui::Checkbox("Preview mode", &b);
             ImGui::EndDisabled();
             ImGui::SameLine();
-            config.set("Settings", "Restart");
+            config.set("Settings");
             // Guarantee the child is at least as wide as the previous line.
             ImGui::SetNextWindowSizeConstraints(
                 ImVec2(ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x - ImGui::GetStyle().WindowPadding.x, 0),
@@ -846,7 +846,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
         quick_info("^ Try this!");
         if (preview_mode) {
             ImGui::SameLine();
-            config.set("Settings", "Restart");
+            config.set("Settings");
         }
 
         if (contained) {

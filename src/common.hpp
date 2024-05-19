@@ -244,25 +244,21 @@ public:
         int pace;
         void _set();
 
-        // (Workaround: managed by configT for convenience.)
-        bool restart = false;
-
     public:
         /*implicit*/ configT(sizeE size) : size(size), seed(0), pace(1) { assert(size != Count); }
 
         int width() const { return size_w[size]; }
         int height() const { return size_h[size]; }
 
-        void set(const char* label, const char* label_restart) {
+        void set(const char* label) {
             ImGui::Button(label);
             if (ImGui::BeginPopupContextItem(nullptr, ImGuiPopupFlags_MouseButtonLeft)) {
                 _set();
                 ImGui::EndPopup();
             }
             ImGui::SameLine();
-            restart = ImGui::Button(label_restart);
-            imgui_ItemTooltip("For individual preview windows:\n"
-                              "Left-press to pause; right-click to restart.");
+            imgui_StrTooltip("(!)", "Press 'T' to restart all preview windows.\n"
+                                    "For individual windows: right-click to restart, left-press to pause.");
         }
     };
 

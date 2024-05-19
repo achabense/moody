@@ -238,7 +238,6 @@ class runnerT {
 public:
     // TODO: redesign pause logics...
     // TODO: better control logics... (`display` is horribly written due to unorganized control logics...)
-    // TODO: more sensible keyboard controls...
     // TODO: (wontfix?) there cannot actually be multiple instances in the program.
     // For example, there are a lot of static variables in `display`, and the keyboard controls are not designed
     // for per-object use.
@@ -442,6 +441,7 @@ public:
         static bool lock_mouse = false; // Lock scrolling control and window moving.
         ImGui::AlignTextToFramePadding();
         imgui_StrTooltip(lock_mouse ? "[...]" : "(...)", [] {
+            // TODO: is "window" ambiguous here?
             imgui_Str(
                 "Mouse operations:\n"
                 "1. Scroll in the window to change the zoom.\n"
@@ -869,8 +869,8 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
     }
     term.active = true;
 
-    if (config.restart || (interactive && ImGui::IsItemClicked(ImGuiMouseButton_Right)) || term.tile.width() != width ||
-        term.tile.height() != height || term.seed != config.seed || term.rule != rule) {
+    if (imgui_KeyPressed(ImGuiKey_T, false) || (interactive && ImGui::IsItemClicked(ImGuiMouseButton_Right)) ||
+        term.tile.width() != width || term.tile.height() != height || term.seed != config.seed || term.rule != rule) {
         term.tile.resize({.width = width, .height = height});
         term.seed = config.seed;
         term.rule = rule;

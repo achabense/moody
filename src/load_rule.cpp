@@ -460,8 +460,8 @@ private:
             const float w = [&] {
                 float w = ImGui::GetFrameHeight() + imgui_ItemInnerSpacingX() + ImGui::CalcTextSize("Preview mode").x;
                 if (preview_mode) {
-                    w += 2 * imgui_ItemSpacingX() + 4 * ImGui::GetStyle().FramePadding.x +
-                         ImGui::CalcTextSize("SettingsRestart").x;
+                    w += 2 * imgui_ItemSpacingX() + 2 * ImGui::GetStyle().FramePadding.x +
+                         ImGui::CalcTextSize("Settings(!)").x;
                 }
                 return w;
             }();
@@ -471,7 +471,7 @@ private:
             ImGui::Checkbox("Preview mode", &preview_mode);
             if (preview_mode) {
                 ImGui::SameLine();
-                config.set("Settings", "Restart");
+                config.set("Settings");
             }
         } else {
             ImGui::Text("(No rules)");
