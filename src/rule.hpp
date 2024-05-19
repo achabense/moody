@@ -16,6 +16,8 @@
 
 static_assert(INT_MAX >= INT32_MAX);
 
+#define assert_implies(a, b) assert(!(a) || (b))
+
 namespace aniso {
 
 #ifdef ENABLE_TESTS

@@ -371,8 +371,8 @@ class textT {
     };
     std::optional<selT> m_sel = std::nullopt;
 
-    bool preview_mode = true;
-    previewer::configT config{previewer::configT::_220_160};
+    mutable bool preview_mode = true;
+    mutable previewer::configT config{previewer::configT::_220_160};
 
 public:
     textT() {}
@@ -403,7 +403,6 @@ public:
         }
     }
 
-    // TODO: refactor... the logics have been a mess...
     // (Workaround: using `rewind` tag to reset the scroll after opening new files.)
     void display(sync_point& out, bool rewind = false) {
         if (m_sel && ImGui::IsMouseReleased(ImGuiMouseButton_Right) /* From anywhere */) {
@@ -415,26 +414,27 @@ public:
                 }
                 str += m_lines[i].text;
             }
-
-            // The problem (see the "Workaround" part below) can happen as long as wrap-pos is enabled.
-            // For example, push-wrap-pos -> ImGui::Text will result in the same issue.
             ImGui::SetClipboardText(str.c_str());
             m_sel.reset();
-#if 0
-            // TODO: whether to silently call `ImGui::SetClipboardText`?
-            messenger::add_msg(str);
-            m_sel.reset();
-            // (wontfix) The message popup will appear at next frame, so it's still possible that an extra click
-            // is made (and begin selection) at this frame. As a result, when entering the popup the right-button
-            // may still be held down, and if released it will bring anther string to the popup.
-#endif
         }
 
-        bool ret = false;
+        std::optional<int> n_pos = std::nullopt;
+        std::optional<selT> n_sel = std::nullopt;
+
+        display_const(n_pos, n_sel, out.enable_lock, rewind);
+        if (n_sel) {
+            m_sel = *n_sel;
+        } else if (n_pos) {
+            out.set_val(m_rules[*n_pos]);
+            m_pos = *n_pos;
+        }
+    }
+
+private:
+    void display_const(std::optional<int>& n_pos, std::optional<selT>& n_sel, bool show_lock, bool rewind) const {
         const int total = m_rules.size();
 
         if (total != 0) {
-            std::optional<int> n_pos = std::nullopt;
             if (ImGui::Button("Focus")) {
                 n_pos = m_pos.value_or(0);
             }
@@ -452,10 +452,8 @@ public:
                 ImGui::Text("Total:%d At:N/A", total);
             }
 
-            if (!m_sel && n_pos) {
-                assert(*n_pos >= 0 && *n_pos < total);
-                m_pos = *n_pos;
-                ret = true;
+            if (m_sel) {
+                n_pos.reset();
             }
 
             // I feel uncomfortable about this...
@@ -479,7 +477,8 @@ public:
             ImGui::Text("(No rules)");
         }
 
-        const bool locate = ret;
+        const std::optional<int> locate = n_pos;
+        assert_implies(m_sel, !locate);
         ImGui::Separator();
 
         if (rewind) {
@@ -497,55 +496,32 @@ public:
                 if (preview_mode && id.has_value()) {
                     ImGui::BeginGroup();
                 }
-                {
-                    // (Workaround: `ImGui::TextWrapped` cannot smartly render long single-lines.)
-                    // (Related: https://github.com/ocornut/imgui/issues/5720)
-                    if (text.size() < 2000) {
-                        imgui_StrWrapped(text, item_width);
-                    } else {
-                        ImGui::BeginGroup();
-                        const char* begin = text.data();
-                        const char* const end = text.data() + text.size();
-                        while (end - begin > 1000) {
-                            const char* seg_end = begin + 1000; // seg_end < end
-                            // Find a meaningful (utf8) code-point end nearby.
-                            for (int i = 0; i < 4; ++i) {
-                                if ((*seg_end & 0b11'000000) != 0b10'000000) {
-                                    break;
-                                }
-                                --seg_end;
-                            }
-                            imgui_StrWrapped(std::string_view(begin, seg_end), item_width);
-                            begin = seg_end;
-                        }
-                        if (begin != end) {
-                            imgui_StrWrapped(std::string_view(begin, end), item_width);
-                        }
-                        ImGui::EndGroup();
-                    }
-                }
+                // (`ImGui::TextWrapped` has no problem rendering long single-lines now.)
+                // (Related: https://github.com/ocornut/imgui/issues/7496)
+                imgui_StrWrapped(text, item_width);
 
-                if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
-                    m_sel = {this_l, this_l};
-                } else if (m_sel && ImGui::IsItemHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-                    m_sel->end = this_l;
+                if (!locate) {
+                    if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+                        n_sel = {this_l, this_l};
+                    } else if (m_sel && ImGui::IsItemHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+                        n_sel = {m_sel->beg, this_l};
+                    }
                 }
                 if (m_sel && m_sel->contains(this_l)) {
                     imgui_ItemRectFilled(IM_COL32(255, 255, 255, 90));
                 }
 
                 if (id.has_value()) {
-                    // Pretend there is no lock if `!enable_lock`.
-                    const bool has_lock = out.enable_lock && m_rules[*id].lock.has_value();
+                    // Pretend there is no lock if `!show_lock`.
+                    const bool has_lock = show_lock && m_rules[*id].lock.has_value();
 
                     if (*id == m_pos) {
                         imgui_ItemRectFilled(IM_COL32(has_lock ? 196 : 0, 255, 0, 60));
                     }
-                    if (!m_sel && ImGui::IsItemHovered()) {
+                    if (!m_sel && !n_sel && ImGui::IsItemHovered()) {
                         imgui_ItemRectFilled(IM_COL32(has_lock ? 196 : 0, 255, 0, 30));
                         if (!locate && ImGui::IsItemClicked()) {
-                            m_pos = *id;
-                            ret = true;
+                            n_pos = *id;
                         }
                     }
 
@@ -561,7 +537,7 @@ public:
                     }
 
                     // It's ok to test fully-visible even if the region is not large enough.
-                    if (locate && *id == m_pos && !imgui_ItemFullyVisible()) {
+                    if (*id == locate && !imgui_ItemFullyVisible()) {
                         ImGui::SetScrollHereY();
                     }
                 }
@@ -570,11 +546,12 @@ public:
         }
         ImGui::PopStyleColor();
 
-        if (ret) {
-            assert(m_pos && *m_pos >= 0 && *m_pos < total);
+        assert_implies(m_sel, !n_pos);
+        assert(!(n_sel.has_value() && n_pos.has_value()));
+        if (n_pos) {
+            assert(*n_pos >= 0 && *n_pos < total);
             // (Relying on `sequence::seq` to be in the same level in the id-stack.)
             sequence::bind_to(ImGui::GetID("Next"));
-            out.set_val(m_rules[*m_pos]);
         }
     }
 };

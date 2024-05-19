@@ -3,9 +3,6 @@
 #include "rule.hpp"
 
 // TODO: add summary about this header, especially subsetT.
-
-#define assert_implies(a, b) assert(!(a) || (b))
-
 namespace aniso {
     // TODO: defining `maskT` to emphasis which rule serves as the mask; it might be more
     // convenient to use `ruleT` directly.
