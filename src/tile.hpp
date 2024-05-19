@@ -368,31 +368,22 @@ namespace aniso {
     }
 
     inline tileT::rangeT bounding_box(const tileT& tile, const tileT::rangeT& range /* Required */, const bool v = 0) {
-        // About the usage of std::string:
-        // 1. I hate std::vector<bool>.
-        // 2. There is no std::find_last in C++20. (https://en.cppreference.com/w/cpp/algorithm/ranges/find_last)
-        std::string has_nv_x(range.width(), false);
-        std::string has_nv_y(range.height(), false);
-
+        int min_x = range.width(), max_x = -1;
+        int min_y = range.width(), max_y = -1;
         tile.for_each_line(range, [&](int y, std::span<const bool> line) {
             for (int x = 0; const bool b : line) {
                 if (b != v) {
-                    has_nv_x[x] = true;
-                    has_nv_y[y] = true;
+                    min_x = std::min(min_x, x);
+                    max_x = std::max(max_x, x);
+                    min_y = std::min(min_y, y);
+                    max_y = std::max(max_y, y);
                 }
                 ++x;
             }
         });
-
-        const auto first_nv_x = has_nv_x.find_first_of(true);
-        const auto npos = std::string::npos;
-        if (first_nv_x != npos) {
-            const auto first_nv_y = has_nv_y.find_first_of(true);
-            const auto last_nv_x = has_nv_x.find_last_of(true);
-            const auto last_nv_y = has_nv_y.find_last_of(true);
-            assert(first_nv_y != npos && last_nv_x != npos && last_nv_y != npos);
-            return {.begin{.x = int(range.begin.x + first_nv_x), .y = int(range.begin.y + first_nv_y)},
-                    .end{.x = int(range.begin.x + last_nv_x + 1), .y = int(range.begin.y + last_nv_y + 1)}};
+        if (max_x != -1) {
+            return {.begin{.x = range.begin.x + min_x, .y = range.begin.y + min_y},
+                    .end{.x = range.begin.x + max_x + 1, .y = range.begin.y + max_y + 1}};
         } else {
             return {};
         }
