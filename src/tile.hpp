@@ -369,7 +369,7 @@ namespace aniso {
 
     inline tileT::rangeT bounding_box(const tileT& tile, const tileT::rangeT& range /* Required */, const bool v = 0) {
         int min_x = range.width(), max_x = -1;
-        int min_y = range.width(), max_y = -1;
+        int min_y = range.height(), max_y = -1;
         tile.for_each_line(range, [&](int y, std::span<const bool> line) {
             for (int x = 0; const bool b : line) {
                 if (b != v) {
