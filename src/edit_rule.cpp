@@ -290,6 +290,7 @@ public:
             imgui_ItemTooltip(term.description);
         };
 
+        bool enter_tooltip = false;
         {
             ImGui::AlignTextToFramePadding();
             imgui_StrTooltip("(...)", [&] {
@@ -343,34 +344,46 @@ public:
                      : aniso::compatible(current, mold) ? Compatible
                                                         : Incompatible,
                      None, nullptr, false);
-            imgui_ItemTooltip("The working set. (See '(...)' for explanation.)");
+            imgui_ItemTooltip("The working set. See '(...)' for explanation.");
 
             // TODO: `static` for convenience. This must be refactored when there are to be multiple instances.
             static bool hide_details = false;
-            if (!hide_details) {
-                ImGui::SameLine();
-                if (ImGui::Button("Clear")) {
-                    for_each_term([&](termT& t) { t.disabled = t.selected = false; });
-                    update_current();
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("Recognize")) {
-                    for_each_term([&](termT& t) {
-                        t.disabled = false; // Will be updated by `update_current`.
-                        t.selected = t.set->contains(mold.rule);
-                    });
-                    update_current();
-                }
+            const bool hide_details_this_frame = hide_details;
+            enter_tooltip = hide_details_this_frame && ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip);
+            if (hide_details_this_frame) {
+                ImGui::BeginDisabled();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Clear")) {
+                for_each_term([&](termT& t) { t.disabled = t.selected = false; });
+                update_current();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Match")) {
+                for_each_term([&](termT& t) {
+                    t.disabled = false; // Will be updated by `update_current`.
+                    t.selected = t.set->contains(mold.rule);
+                });
+                update_current();
+            }
+            if (!hide_details_this_frame) {
                 imgui_ItemTooltip("Select every subset that the current rule belongs to.");
+            } else {
+                ImGui::EndDisabled();
             }
             ImGui::SameLine();
             ImGui::Checkbox("Hide details", &hide_details);
-            if (hide_details) {
+
+            assert_implies(enter_tooltip, hide_details_this_frame);
+            if (hide_details_this_frame && !enter_tooltip) {
                 return current;
             }
         }
 
-        ImGui::Separator();
+        if (enter_tooltip) {
+            ImGui::BeginTooltip();
+        }
+        ImGui::Separator(); // Needed in both cases (`!enter_tooltip` or `enter_tooltip`).
         if (ImGui::BeginTable("Checklists", 2, ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit)) {
             auto put_row = [](const char* l_str, const auto& r_logic) {
                 ImGui::TableNextRow();
@@ -418,6 +431,9 @@ public:
                     [&] { checklist(terms_hex); });
 
             ImGui::EndTable();
+        }
+        if (enter_tooltip) {
+            ImGui::EndTooltip();
         }
 
         assert(!current.empty());
@@ -591,7 +607,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
              'o', 'i'},
 
             {"Custom",
-             "Custom rule; you can click '<< Cur' to set this to the current rule.\n"
+             "Custom rule. You can click '<< Cur' to set this to the current rule.\n"
              "Different:'i', same:'o'. This is a useful tool to help find interesting rules based on existing ones. "
              "For example, the smaller the distance is, the more likely that the rule behaves similar to the masking "
              "rule.",

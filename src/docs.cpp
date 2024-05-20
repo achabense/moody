@@ -116,8 +116,8 @@ Sometimes you may also want to jump outside of the predefined subsets. This can 
 )";
 
 const char* const doc_rules =
-    R"(The following rules are selected from different subsets. You can click a rule and then 'Recognize' to select all the subsets the rule belongs to.
-(Notice that 'Recognize' cannot reflect the relations between different subsets.)
+    R"(The following rules are selected from different subsets. You can click a rule and then 'Match' to select all the subsets the rule belongs to.
+(Notice that 'Match' cannot reflect the relations between different subsets.)
 
 
 ---- Rules with native symmetry
@@ -297,7 +297,7 @@ And the following rules have only a single case different from the C6 rule (dist
 MAPEUQRVSLdM4gRRBFVIt0ziCK7IswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHIRIiqIpnMEQ
 MAPEUQRVSLdM4gRRBFVMt0ziCK7IswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHMRIiqIpnMEQ
 Just like the symmetric rules, in these rules, the state will converge to irregular-shaped spaceships. However, these complex spaceships do not exist in any symmetric rules.
-After all, the subsets supported in the program take up only an extremely small part of all MAP rules - the largest subset in this program is the native-C2 set, which has 272 groups, meaning it takes up only 2^(272-512) ~ 2^-240 of all possible MAP rules.
+After all, the subsets supported in the program take up only an extremely small part of all MAP rules - the largest subset in this program is '|' (or '-, \, /'), which has 288 groups, meaning it takes up only 2^(288-512) ~ 2^-224 of all possible MAP rules.
 )";
 
 #if 0
