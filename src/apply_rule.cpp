@@ -254,11 +254,12 @@ public:
             temp_pause = true;
         }
 
-        // (Shadowing `::imgui_KeyPressed`)
-        // TODO: or use ImGui::SetNextFrameWantCaptureKeyboard when the Canvas button is active?
-        const bool canvas_active = GImGui->ActiveId == ImGui::GetID("Canvas");
-        auto imgui_KeyPressed = [canvas_active](ImGuiKey key, bool repeat) {
-            return (canvas_active || !ImGui::GetIO().WantCaptureKeyboard) && ImGui::IsKeyPressed(key, repeat);
+        const char* const canvas_name = "Canvas";
+        const bool enable_shortcuts =
+            !ImGui::GetIO().WantCaptureKeyboard || (GImGui->ActiveId == ImGui::GetID(canvas_name));
+        // Shadowing `::test_key`.
+        auto test_key = [enable_shortcuts](ImGuiKey key, bool repeat) {
+            return enable_shortcuts && ImGui::IsKeyPressed(key, repeat);
         };
         static bool background = 0; // TODO: move elsewhere...
 
@@ -335,22 +336,22 @@ public:
                              "bad visual effect.\n"
                              "In these cases, you can try the '+1' button to change the parity of generation.");
 
-            if (imgui_KeyPressed(ImGuiKey_R, false)) {
+            if (test_key(ImGuiKey_R, false)) {
                 restart();
-            } else if (imgui_KeyPressed(ImGuiKey_1, true)) {
+            } else if (test_key(ImGuiKey_1, true)) {
                 m_ctrl.pace = std::max(m_ctrl.pace_min, m_ctrl.pace - 1);
-            } else if (imgui_KeyPressed(ImGuiKey_2, true)) {
+            } else if (test_key(ImGuiKey_2, true)) {
                 m_ctrl.pace = std::min(m_ctrl.pace_max, m_ctrl.pace + 1);
-            } else if (imgui_KeyPressed(ImGuiKey_3, true)) {
+            } else if (test_key(ImGuiKey_3, true)) {
                 m_ctrl.gap = std::max(m_ctrl.gap_min, m_ctrl.gap - 1);
-            } else if (imgui_KeyPressed(ImGuiKey_4, true)) {
+            } else if (test_key(ImGuiKey_4, true)) {
                 m_ctrl.gap = std::min(m_ctrl.gap_max, m_ctrl.gap + 1);
-            } else if (imgui_KeyPressed(ImGuiKey_Space, false)) {
+            } else if (test_key(ImGuiKey_Space, false)) {
                 m_ctrl.pause = !m_ctrl.pause;
-            } else if (imgui_KeyPressed(ImGuiKey_N, true)) {
+            } else if (test_key(ImGuiKey_N, true)) {
                 extra_step = m_ctrl.pause ? m_ctrl.actual_pace() : 0;
                 m_ctrl.pause = true;
-            } else if (imgui_KeyPressed(ImGuiKey_M, true)) {
+            } else if (test_key(ImGuiKey_M, true)) {
                 extra_step = 1;
             }
         }
@@ -456,7 +457,7 @@ public:
             bool enabled = !lock_mouse;
             ImGui::Checkbox("Enabling scrolling and window moving", &enabled);
         });
-        quick_info("< Mouse operations.");
+        quick_info("v Mouse operations.");
         if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
             lock_mouse = !lock_mouse;
         }
@@ -473,30 +474,35 @@ public:
             screen_off.y = floor(screen_off.y / screen_zoom) * screen_zoom;
         }
         ImGui::SameLine();
-        static bool other_op = true;
-        ImGui::Checkbox("Range operations", &other_op);
-        ImGui::SameLine();
-        imgui_StrTooltip("(!)", "The keyboard shortcuts are available only when this tag is set on. (It does "
-                                "not matter whether the window is collapsed.)"); // TODO: not reasonable...
+        static bool show_range_window = false;
+        ImGui::Checkbox("Range operations", &show_range_window);
+        quick_info("^ Copy, paste, etc.\nv Drag with right button to select area.");
 
+        ImGui::SameLine();
         if (m_sel) {
-            ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
-            if (ImGui::Button(
-                    std::format("Drop selection (w:{} h:{})###drop_sel", m_sel->width(), m_sel->height()).c_str())) {
-                m_sel.reset();
+            ImGui::Text("  Selected:%d*%d", m_sel->width(), m_sel->height());
+            if (!m_sel->active) {
+                ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                if (ImGui::SmallButton("Drop##S")) {
+                    m_sel.reset();
+                }
             }
+        } else {
+            imgui_Str("  Selected:N/A");
         }
+
         if (paste) {
-            ImGui::SameLine(), imgui_Str("|"), ImGui::SameLine();
-            if (ImGui::Button(
-                    std::format("Drop paste (w:{} h:{})###drop_paste", paste->width(), paste->height()).c_str())) {
+            ImGui::SameLine();
+            ImGui::Text("  Paste:%d*%d", paste->width(), paste->height());
+            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+            if (ImGui::SmallButton("Drop##P")) {
                 paste.reset();
             }
         }
 
         {
             // (Values of GetContentRegionAvail() can be negative...)
-            ImGui::InvisibleButton("Canvas", ImMax(min_canvas_size, ImGui::GetContentRegionAvail()),
+            ImGui::InvisibleButton(canvas_name, ImMax(min_canvas_size, ImGui::GetContentRegionAvail()),
                                    ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
             const ImVec2 canvas_min = ImGui::GetItemRectMin();
             const ImVec2 canvas_max = ImGui::GetItemRectMax();
@@ -627,117 +633,180 @@ public:
                 }
             }
 
-            auto term = [&, any_called = false](const char* label, const char* shortcut, ImGuiKey key, bool use_sel,
-                                                const auto& op) mutable {
-                const bool enabled = !use_sel || m_sel.has_value();
-                if (ImGui::MenuItem(label, shortcut, nullptr, enabled) || (enabled && imgui_KeyPressed(key, false))) {
-                    if (!any_called) {
-                        any_called = true;
-                        op();
+            // Range operations.
+            {
+                enum operationE {
+                    _none,
+                    _capture_closed,
+                    _capture_open,
+                    _random_fill,
+                    _clear_inside,
+                    _clear_outside,
+                    _select_all,
+                    _bounding_box,
+                    _copy,
+                    _cut,
+                    _paste
+                };
+
+                static bool replace = true;     // Closed-capture.
+                static densityT fill_den = 0.5; // Random-fill.
+                static bool add_rule = true;
+                static bool copy_silently = false; // Copy / cut.
+                auto copy_sel = [&] {
+                    if (m_sel) {
+                        std::string rle_str =
+                            aniso::to_RLE_str(add_rule ? &m_ctrl.rule : nullptr, m_torus.tile(), m_sel->to_range());
+                        if (copy_silently) {
+                            ImGui::SetClipboardText(rle_str.c_str());
+                        } else {
+                            messenger::add_msg(std::move(rle_str));
+                        }
                     }
-                }
-                if (!enabled) {
-                    imgui_ItemTooltip("There is no selected area.");
-                }
-            };
+                };
 
-            auto set_tag = [](bool& tag, const char* label, const char* message) {
-                ImGui::Checkbox(label, &tag);
-                ImGui::SameLine();
-                imgui_StrTooltip("(?)", message);
-            };
+                operationE op = _none;
 
-            // Pattern capturing.
-            sync.display_if_enable_lock([&](bool /* visible */) {
-                ImGui::Separator();
+                auto term = [&](const char* label, const char* shortcut, ImGuiKey key, bool use_sel, operationE op2) {
+                    const bool enabled = !use_sel || m_sel.has_value();
+                    if (ImGui::MenuItem(label, shortcut, nullptr, enabled) || (enabled && test_key(key, false))) {
+                        op = op2;
+                    }
+                    if (!enabled) {
+                        imgui_ItemTooltip("There is no selected area.");
+                    }
+                };
 
-                ImGui::AlignTextToFramePadding();
-                imgui_StrTooltip(
-                    "(...)", "Open-capture: Record what there exists in the selected area (in the current frame, and "
-                             "not including the border). The result will always be appended to the current lock.\n\n"
-                             "Closed-capture: Run the selected area as torus space (with the current rule) and "
-                             "record all mappings. Depending on the setting, the result will replace the current lock "
-                             "directly, or will be appended to the current lock like open-capture.");
-                ImGui::SameLine();
-                static bool replace = true;
-                if (ImGui::RadioButton("Replace", replace)) {
-                    replace = true;
-                }
-                ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                if (ImGui::RadioButton("Append", !replace)) {
-                    replace = false;
-                }
-                ImGui::SameLine();
-                imgui_StrTooltip("(?)", "This affects only closed-capture. See '(...)' for explanation.");
-                term("Capture (open)", "O (repeatable)", ImGuiKey_None, true, [&] {
-                    assert(m_sel);
-                    auto lock = sync.current.lock;
-                    capture_open(m_torus.tile(), m_sel->to_range(), lock);
-                    sync.set_lock(lock);
+                // Pattern capturing.
+                sync.display_if_enable_lock([&](bool /* visible */) {
+                    ImGui::Separator();
+
+                    ImGui::AlignTextToFramePadding();
+                    imgui_StrTooltip(
+                        "(...)",
+                        "Open-capture: Record what there exists in the selected area (in the current frame, and "
+                        "not including the border). The result will always be appended to the current lock.\n\n"
+                        "Closed-capture: Run the selected area as torus space (with the current rule) and "
+                        "record all mappings. Depending on the setting, the result will replace the current lock "
+                        "directly, or will be appended to the current lock like open-capture.");
+                    ImGui::SameLine();
+                    if (ImGui::RadioButton("Replace", replace)) {
+                        replace = true;
+                    }
+                    ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                    if (ImGui::RadioButton("Append", !replace)) {
+                        replace = false;
+                    }
+                    ImGui::SameLine();
+                    imgui_StrTooltip("(?)", "This affects only closed-capture. See '(...)' for explanation.");
+                    term("Capture (open)", "O (repeatable)", ImGuiKey_None, true, _capture_open);
+                    // (`ImGui::IsKeyPressed(..., repeat = true)` does not return true in every frame.)
+                    if (m_sel && enable_shortcuts && ImGui::IsKeyDown(ImGuiKey_O)) {
+                        op = _capture_open;
+                    }
+                    term("Capture (closed)", "P", ImGuiKey_P, true, _capture_closed);
                 });
-                // (`ImGui::IsKeyPressed(..., repeat = true)` does not return true in every frame.)
-                if (m_sel && (canvas_active || !ImGui::GetIO().WantCaptureKeyboard) && ImGui::IsKeyDown(ImGuiKey_O)) {
-                    auto lock = sync.current.lock;
-                    capture_open(m_torus.tile(), m_sel->to_range(), lock);
-                    sync.set_lock(lock);
+
+                auto range_window = [&](const bool shortcut_only) {
+                    static auto set_tag = [](bool& tag, const char* label, const char* message) {
+                        ImGui::Checkbox(label, &tag);
+                        ImGui::SameLine();
+                        imgui_StrTooltip("(?)", message);
+                    };
+
+                    if (!shortcut_only) {
+                        ImGui::AlignTextToFramePadding();
+                        imgui_Str("Background =");
+                        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                        if (ImGui::RadioButton("0", background == 0)) {
+                            background = 0;
+                        }
+                        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                        if (ImGui::RadioButton("1", background == 1)) {
+                            background = 1;
+                        }
+                        ImGui::SameLine();
+                        imgui_StrTooltip("(?)", "Treat 0 (black) or 1 (white) as background value. "
+                                                "This affects the behavior of clearing, shrinking and pasting mode.\n\n"
+                                                "'Clear inside/outside' will fill the range with (background).\n"
+                                                "'Bound' will get the bounding-box for !(background).\n"
+                                                "'Paste' will use different pasting modes based on (background). "
+                                                "(When pasting into the white background you need to set this to 1.)");
+
+                        // Filling.
+                        ImGui::Separator();
+                        fill_den.step_slide("Fill density");
+                        term("Random fill", "+/=", ImGuiKey_Equal, true, _random_fill);
+                        term("Clear inside", "Backspace", ImGuiKey_Backspace, true, _clear_inside);
+                        term("Clear outside", "0 (zero)", ImGuiKey_0, true, _clear_outside);
+
+                        ImGui::Separator();
+                        term("Select all", "A", ImGuiKey_A, false, _select_all);
+                        term("Bound", "B", ImGuiKey_B, true, _bounding_box);
+
+                        // Copy/Cut/Paste.
+                        ImGui::Separator();
+                        set_tag(add_rule, "Add rule", "Whether to add the 'rule = ...' part when copying patterns.");
+                        ImGui::SameLine();
+                        set_tag(copy_silently, "Copy silently", "Whether to directly copy to the clipboard.");
+                        term("Copy", "C", ImGuiKey_C, true, _copy);
+                        term("Cut", "X", ImGuiKey_X, true, _cut);
+                        term("Paste", "V", ImGuiKey_V, false, _paste);
+                    } else {
+                        auto term2 = [&](ImGuiKey key, bool use_sel, operationE op2) {
+                            const bool enabled = !use_sel || m_sel.has_value();
+                            if (enabled && test_key(key, false)) {
+                                op = op2;
+                            }
+                        };
+
+                        term2(ImGuiKey_Equal, true, _random_fill);
+                        term2(ImGuiKey_Backspace, true, _clear_inside);
+                        term2(ImGuiKey_0, true, _clear_outside);
+                        term2(ImGuiKey_A, false, _select_all);
+                        term2(ImGuiKey_B, true, _bounding_box);
+                        term2(ImGuiKey_C, true, _copy);
+                        term2(ImGuiKey_X, true, _cut);
+                        term2(ImGuiKey_V, false, _paste);
+                    }
+                };
+
+                if (show_range_window) {
+                    ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
+                    if (ImGui::IsMousePosValid()) {
+                        const ImVec2 mouse_pos = ImGui::GetIO().MousePos;
+                        ImGui::SetNextWindowPos(ImVec2(mouse_pos.x + 2, mouse_pos.y + 2), ImGuiCond_Appearing);
+                    }
+                    auto window =
+                        imgui_Window("Range operations", &show_range_window, ImGuiWindowFlags_AlwaysAutoResize);
+                    range_window(false /* !shortcut_only */);
+                } else {
+                    range_window(true /* shortcut_only */);
                 }
-                term("Capture (closed)", "P", ImGuiKey_P, true, [&] {
-                    assert(m_sel);
+
+                if (op == _capture_closed && m_sel) {
                     auto lock = capture_closed(m_torus.tile(), m_sel->to_range(), m_ctrl.rule);
                     if (!replace) {
                         aniso::for_each_code([&](aniso::codeT c) { lock[c] = lock[c] || sync.current.lock[c]; });
                     }
                     sync.set_lock(lock);
-                });
-            });
-
-            if (other_op) {
-                ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
-                auto window = imgui_Window("Range operations", &other_op, ImGuiWindowFlags_AlwaysAutoResize);
-
-                ImGui::AlignTextToFramePadding();
-                imgui_Str("Background =");
-                ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                if (ImGui::RadioButton("0", background == 0)) {
-                    background = 0;
-                }
-                ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                if (ImGui::RadioButton("1", background == 1)) {
-                    background = 1;
-                }
-                ImGui::SameLine();
-                imgui_StrTooltip("(?)", "Treat 0 (black) or 1 (white) as background value. "
-                                        "This affects the behavior of clearing, shrinking and pasting mode.\n\n"
-                                        "'Clear inside/outside' will fill the range with (background).\n"
-                                        "'Bound' will get the bounding-box for !(background).\n"
-                                        "'Paste' will use different pasting modes based on (background). "
-                                        "(When pasting into the white background you need to set this to 1.)");
-
-                // Filling.
-                ImGui::Separator();
-                static densityT fill_den = 0.5;
-                fill_den.step_slide("Fill density");
-                term("Random fill", "+/=", ImGuiKey_Equal, true, [&] {
-                    assert(m_sel);
+                } else if (op == _capture_open && m_sel) {
+                    auto lock = sync.current.lock;
+                    capture_open(m_torus.tile(), m_sel->to_range(), lock);
+                    sync.set_lock(lock);
+                } else if (op == _random_fill && m_sel) {
                     aniso::random_fill(m_torus.tile(), global_mt19937(), fill_den.get(), m_sel->to_range());
                     m_ctrl.mark_written();
                     temp_pause = true;
-                });
-                term("Clear inside", "Backspace", ImGuiKey_Backspace, true, [&] {
-                    assert(m_sel);
+                } else if (op == _clear_inside && m_sel) {
                     aniso::clear_inside(m_torus.tile(), m_sel->to_range(), background);
                     m_ctrl.mark_written();
                     temp_pause = true;
-                });
-                term("Clear outside", "0 (zero)", ImGuiKey_0, true, [&] {
-                    assert(m_sel);
+                } else if (op == _clear_outside && m_sel) {
                     aniso::clear_outside(m_torus.tile(), m_sel->to_range(), background);
                     m_ctrl.mark_written();
                     temp_pause = true;
-                });
-
-                ImGui::Separator();
-                term("Select all", "A", ImGuiKey_A, false, [&] {
+                } else if (op == _select_all) {
                     if (!m_sel || m_sel->width() != tile_size.width || m_sel->height() != tile_size.height) {
                         m_sel = {.active = false,
                                  .beg = {0, 0},
@@ -745,43 +814,21 @@ public:
                     } else {
                         m_sel.reset();
                     }
-                });
-                term("Bound", "B", ImGuiKey_B, true, [&] {
-                    assert(m_sel);
+                } else if (op == _bounding_box && m_sel) {
                     const auto [begin, end] = aniso::bounding_box(m_torus.tile(), m_sel->to_range(), background);
                     if (begin != end) {
                         m_sel = {.active = false, .beg = begin, .end = {.x = end.x - 1, .y = end.y - 1}};
                     } else {
                         m_sel.reset();
                     }
-                });
-
-                // Copy/Cut/Paste.
-                static bool add_rule = true;
-                static bool copy_silently = false;
-                auto copy_sel = [&] {
-                    assert(m_sel);
-                    std::string rle_str =
-                        aniso::to_RLE_str(add_rule ? &m_ctrl.rule : nullptr, m_torus.tile(), m_sel->to_range());
-                    if (copy_silently) {
-                        ImGui::SetClipboardText(rle_str.c_str());
-                    } else {
-                        messenger::add_msg(std::move(rle_str));
-                    }
-                };
-
-                ImGui::Separator();
-                set_tag(add_rule, "Add rule", "Whether to add the 'rule = ...' part when copying patterns.");
-                ImGui::SameLine();
-                set_tag(copy_silently, "Copy silently", "Whether to directly copy to the clipboard.");
-                term("Copy", "C", ImGuiKey_C, true, [&] { copy_sel(); });
-                term("Cut", "X", ImGuiKey_X, true, [&] {
+                } else if (op == _copy && m_sel) {
+                    copy_sel();
+                } else if (op == _cut && m_sel) {
                     copy_sel();
                     aniso::clear_inside(m_torus.tile(), m_sel->to_range());
                     m_ctrl.mark_written();
                     temp_pause = true;
-                });
-                term("Paste", "V", ImGuiKey_V, false, [&] {
+                } else if (op == _paste) {
                     if (const char* text = ImGui::GetClipboardText()) {
                         // TODO: better handling/message...
                         try {
@@ -789,8 +836,11 @@ public:
                         } catch (const std::exception& err) {
                             messenger::add_msg(err.what());
                         }
+                        if (m_sel) {
+                            m_sel->active = false;
+                        }
                     }
-                });
+                }
             }
         }
 
@@ -869,7 +919,7 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
     }
     term.active = true;
 
-    if (imgui_KeyPressed(ImGuiKey_T, false) || (interactive && ImGui::IsItemClicked(ImGuiMouseButton_Right)) ||
+    if (test_key(ImGuiKey_T, false) || (interactive && ImGui::IsItemClicked(ImGuiMouseButton_Right)) ||
         term.tile.width() != width || term.tile.height() != height || term.seed != config.seed || term.rule != rule) {
         term.tile.resize({.width = width, .height = height});
         term.seed = config.seed;

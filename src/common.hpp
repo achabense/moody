@@ -72,6 +72,10 @@ inline float wrap_len() {
     return ImGui::GetFontSize() * 35.0f;
 }
 
+inline bool test_key(ImGuiKey key, bool repeat) {
+    return !ImGui::GetIO().WantCaptureKeyboard && ImGui::IsKeyPressed(key, repeat);
+};
+
 inline void quick_info(const char* msg) {
     if (!ImGui::GetIO().WantTextInput && ImGui::IsKeyDown(ImGuiKey_H) && ImGui::IsItemVisible()) {
         imgui_ItemRect(IM_COL32_WHITE);
@@ -98,9 +102,9 @@ inline void quick_info(const char* msg) {
 
 inline void set_scroll_by_up_down(float dy) {
     if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) {
-        if (imgui_KeyPressed(ImGuiKey_DownArrow, true)) {
+        if (test_key(ImGuiKey_DownArrow, true)) {
             ImGui::SetScrollY(ImGui::GetScrollY() + dy);
-        } else if (imgui_KeyPressed(ImGuiKey_UpArrow, true)) {
+        } else if (test_key(ImGuiKey_UpArrow, true)) {
             ImGui::SetScrollY(ImGui::GetScrollY() - dy);
         }
     }
@@ -109,7 +113,7 @@ inline void set_scroll_by_up_down(float dy) {
 inline bool button_with_shortcut(const char* label, ImGuiKey shortcut = ImGuiKey_None, const ImVec2& size = {}) {
     bool ret = ImGui::Button(label, size);
     if (shortcut != ImGuiKey_None && !imgui_TestItemFlag(ImGuiItemFlags_Disabled)) {
-        const bool pressed = imgui_KeyPressed(shortcut, imgui_TestItemFlag(ImGuiItemFlags_ButtonRepeat));
+        const bool pressed = test_key(shortcut, imgui_TestItemFlag(ImGuiItemFlags_ButtonRepeat));
         imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_ButtonActive, pressed ? 0.3f : 1.0f));
         ret = ret || pressed;
     }
@@ -169,6 +173,8 @@ class sequence {
     }
 
 public:
+    sequence() = delete;
+
     // `id` should be the same as one of prev/next button.
     static void bind_to(ImGuiID id) { bound_id = id; }
 
@@ -229,6 +235,8 @@ public:
 // Preview rules.
 class previewer {
 public:
+    previewer() = delete;
+
     class configT {
     public:
         enum sizeE : int { _160_160 = 0, _220_160, _220_220, _280_220, Count };

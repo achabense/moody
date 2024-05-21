@@ -128,11 +128,6 @@ inline float imgui_ItemSpacingX() { return ImGui::GetStyle().ItemSpacing.x; }
 
 inline float imgui_ItemInnerSpacingX() { return ImGui::GetStyle().ItemInnerSpacing.x; }
 
-// TODO: many controls in the program are relying on these functions (which are not well-designed)...
-inline bool imgui_KeyPressed(ImGuiKey key, bool repeat) {
-    return !ImGui::GetIO().WantCaptureKeyboard && ImGui::IsKeyPressed(key, repeat);
-};
-
 inline bool imgui_MouseScrolling() { return ImGui::GetIO().MouseWheel != 0; }
 
 inline bool imgui_MouseScrollingDown() { return ImGui::GetIO().MouseWheel < 0; }
