@@ -391,44 +391,7 @@ namespace aniso {
 
     namespace _misc {
         //  https://conwaylife.com/wiki/Run_Length_Encoded
-        // (The "wontfix" things are allowed by the specification.)
         inline void to_RLE(std::string& str, const tileT& tile, const tileT::rangeT& range) {
-            // (wontfix) Consecutive '$'s are not combined.
-            size_t last_nl = str.size();
-            tile.for_each_line(range, [&str, &last_nl](int y, std::span<const bool> line) {
-                if (y != 0) {
-                    str += '$';
-                }
-
-                int c = 0;
-                bool v = 0;
-                auto flush = [&] {
-                    if (c != 0) {
-                        // (58 is an arbitrary value that satisfies the line-length limit.)
-                        if (str.size() > last_nl + 58) {
-                            str += '\n';
-                            last_nl = str.size();
-                        }
-
-                        if (c != 1) {
-                            str += std::to_string(c);
-                        }
-                        str += "bo"[v];
-                        c = 0;
-                    }
-                };
-                for (const bool b : line) {
-                    if (v != b) {
-                        flush();
-                        v = b;
-                    }
-                    ++c;
-                }
-                flush(); // (wontfix) Trailing 0s are not omitted.
-            });
-        }
-
-        inline void to_RLE_v2(std::string& str, const tileT& tile, const tileT::rangeT& range) {
             class putT {
                 std::string& str;
                 size_t last_nl;
@@ -491,7 +454,7 @@ namespace aniso {
         std::string str =
             rule ? std::format("x = {}, y = {}, rule = {}\n", range.width(), range.height(), to_MAP_str(*rule))
                  : std::format("x = {}, y = {}\n", range.width(), range.height());
-        _misc::to_RLE_v2(str, tile, range);
+        _misc::to_RLE(str, tile, range);
         str += '!';
         return str;
     }
