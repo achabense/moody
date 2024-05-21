@@ -427,6 +427,63 @@ namespace aniso {
                 flush(); // (wontfix) Trailing 0s are not omitted.
             });
         }
+
+        inline void to_RLE_v2(std::string& str, const tileT& tile, const tileT::rangeT& range) {
+            class putT {
+                std::string& str;
+                size_t last_nl;
+                int n = 0;
+                char ch = 'b'; // 'b', 'o', '$'.
+            public:
+                putT(std::string& str) : str(str), last_nl(str.size()) { assert(str.empty() || str.back() == '\n'); }
+                void flush() {
+                    if (n != 0) {
+                        // (58 is an arbitrary value that satisfies the line-length limit.)
+                        if (str.size() > last_nl + 58) {
+                            str += '\n';
+                            last_nl = str.size();
+                        }
+
+                        if (n != 1) {
+                            str += std::to_string(n);
+                        }
+                        str += ch;
+                        n = 0;
+                    }
+                }
+                void append(int n2, char ch2) {
+                    assert(ch2 == 'b' || ch2 == 'o' || ch2 == '$');
+                    if (ch == ch2) {
+                        n += n2;
+                    } else {
+                        flush();
+                        n = n2;
+                        ch = ch2;
+                    }
+                }
+            };
+
+            putT put{str};
+            tile.for_each_line(range, [&put, h = range.height()](int y, std::span<const bool> line) {
+                if (y != 0) {
+                    put.append(1, '$');
+                }
+                const bool *begin = line.data(), *const end = line.data() + line.size();
+                while (begin != end) {
+                    const bool b = *begin++;
+                    int n = 1;
+                    while (begin != end && *begin == b) {
+                        ++n;
+                        ++begin;
+                    }
+                    const bool omit = y != 0 && y != h - 1 && begin == end && b == 0;
+                    if (!omit) {
+                        put.append(n, b ? 'o' : 'b');
+                    }
+                }
+            });
+            put.flush();
+        }
     } // namespace _misc
 
     inline std::string to_RLE_str(const ruleT* rule, const tileT& tile, const rangeT_opt& range_ = {}) {
@@ -434,7 +491,7 @@ namespace aniso {
         std::string str =
             rule ? std::format("x = {}, y = {}, rule = {}\n", range.width(), range.height(), to_MAP_str(*rule))
                  : std::format("x = {}, y = {}\n", range.width(), range.height());
-        _misc::to_RLE(str, tile, range);
+        _misc::to_RLE_v2(str, tile, range);
         str += '!';
         return str;
     }

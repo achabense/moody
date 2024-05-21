@@ -482,7 +482,7 @@ public:
         if (m_sel) {
             ImGui::Text("  Selected:%d*%d", m_sel->width(), m_sel->height());
             if (!m_sel->active) {
-                ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                ImGui::SameLine();
                 if (ImGui::SmallButton("Drop##S")) {
                     m_sel.reset();
                 }
@@ -494,7 +494,7 @@ public:
         if (paste) {
             ImGui::SameLine();
             ImGui::Text("  Paste:%d*%d", paste->width(), paste->height());
-            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+            ImGui::SameLine();
             if (ImGui::SmallButton("Drop##P")) {
                 paste.reset();
             }
