@@ -155,16 +155,51 @@ public:
     }
 };
 
+// TODO: ideally the texture should be rendered in linear-mode (instead of nearest-mode) when zoom < 1.
+// (Related: https://github.com/ocornut/imgui/issues/7616)
+class zoomT {
+    struct termT {
+        float val;
+        const char* str;
+    };
+    static constexpr termT terms[]{{0.5, "0.5"}, {1, "1"}, {2, "2"}, {3, "3"}, {4, "4"}};
+
+    static constexpr int index_1 = 1;
+    static constexpr int index_max = std::size(terms) - 1; // ]
+    int m_index = index_1;
+
+public:
+    void set_1() {
+        static_assert(terms[index_1].val == 1);
+        m_index = index_1;
+    }
+    void slide(int di) { m_index = std::clamp(m_index + di, 0, index_max); }
+    void select(const std::invocable<bool, float, const char*> auto& fn) {
+        for (int i = 0; const auto [z, s] : terms) {
+            const int this_i = i++;
+            if (fn(m_index == this_i, z, s)) {
+                m_index = this_i;
+            }
+        }
+    }
+
+    static constexpr float min() { return terms[0].val; }
+    static constexpr float max() { return terms[index_max].val; }
+    operator float() const {
+        assert(m_index >= 0 && m_index <= index_max);
+        return terms[m_index].val;
+    }
+};
+
 class runnerT {
-    static constexpr aniso::tileT::sizeT min_size{.width = 20, .height = 10};
+    static constexpr aniso::tileT::sizeT min_size{.width = 20, .height = 15};
     static constexpr aniso::tileT::sizeT max_size{.width = 1600, .height = 1200};
     static aniso::tileT::sizeT size_clamped(aniso::tileT::sizeT size) {
         return {.width = std::clamp(size.width, min_size.width, max_size.width),
                 .height = std::clamp(size.height, min_size.height, max_size.height)};
     }
 
-    static constexpr int max_zoom = 8;
-    static constexpr ImVec2 min_canvas_size{min_size.width * max_zoom, min_size.height* max_zoom};
+    static constexpr ImVec2 min_canvas_size{min_size.width * zoomT::max(), min_size.height* zoomT::max()};
 
     struct ctrlT {
         aniso::ruleT rule{};
@@ -210,7 +245,7 @@ class runnerT {
     ctrlT m_ctrl{.rule{}, .pace = 1, .anti_strobing = true, .gap = 0, .pause = false};
 
     ImVec2 screen_off = {0, 0};
-    int screen_zoom = 1;
+    zoomT screen_zoom{};
 
     // (Workaround: it's hard to get canvas-size in this frame when it's needed; this looks horrible but
     // will work well in all cases)
@@ -395,7 +430,7 @@ public:
                     // ~ the value is unmodified if `from_chars` fails.
                     if (has_w || has_h) {
                         screen_off = {0, 0};
-                        screen_zoom = 1;
+                        screen_zoom.set_1();
                         init.size = size_clamped({.width = width, .height = height});
                     }
                     input_width[0] = '\0';
@@ -407,21 +442,28 @@ public:
             }
 
             ImGui::AlignTextToFramePadding();
-            imgui_Str("Full-screen with zoom =");
-            ImGui::SameLine();
-            assert(max_zoom == 8);
-            for (const ImVec2 size = square_size(); const int z : {1, 2, 4, 8}) {
-                if (z != 1) {
-                    ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+            imgui_Str("Zoom =");
+            screen_zoom.select([&](bool is_cur, float z, const char* s) {
+                ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                if (z < 1) {
+                    ImGui::BeginDisabled();
                 }
-                if (ImGui::Button(std::to_string(z).c_str(), size)) {
-                    screen_zoom = z;
+                const bool sel = ImGui::RadioButton(s, is_cur);
+                if (z < 1) {
+                    ImGui::EndDisabled();
+                }
+
+                if (sel) {
                     screen_off = {0, 0};
 
-                    init.size = size_clamped({.width = (int)last_known_canvas_size.x / screen_zoom,
-                                              .height = (int)last_known_canvas_size.y / screen_zoom});
+                    init.size = size_clamped(
+                        {.width = (int)(last_known_canvas_size.x / z), .height = (int)(last_known_canvas_size.y / z)});
                 }
-            }
+                return sel;
+            });
+            ImGui::SameLine();
+            imgui_StrTooltip("(?)", "Click to resize to full-screen.");
+
             if (init != m_init) {
                 if (init.size != m_init.size) {
                     m_sel.reset();
@@ -470,8 +512,8 @@ public:
         if (ImGui::Button("Center")) {
             // "Center" will have the same effect as "Corner" (screen_off == {0, 0}) if fullscreen-resized.
             screen_off = last_known_canvas_size / 2 - screen_size / 2;
-            screen_off.x = floor(screen_off.x / screen_zoom) * screen_zoom;
-            screen_off.y = floor(screen_off.y / screen_zoom) * screen_zoom;
+            screen_off.x = floor(floor(screen_off.x / screen_zoom) * screen_zoom);
+            screen_off.y = floor(floor(screen_off.y / screen_zoom) * screen_zoom);
         }
         ImGui::SameLine();
         static bool show_range_window = false;
@@ -593,7 +635,7 @@ public:
                 const int celx = floor(cell_pos_raw.x);
                 const int cely = floor(cell_pos_raw.y);
 
-                if (screen_zoom == 1 && !paste && !active) {
+                if (screen_zoom <= 1 && !paste && !active) {
                     if (celx >= -10 && celx < tile_size.width + 10 && cely >= -10 && cely < tile_size.height + 10) {
                         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
                         if (ImGui::BeginItemTooltip()) {
@@ -621,11 +663,10 @@ public:
                 }
 
                 if (!lock_mouse && imgui_MouseScrolling()) {
-                    if (imgui_MouseScrollingDown() && screen_zoom != 1) {
-                        screen_zoom /= 2;
-                    }
-                    if (imgui_MouseScrollingUp() && screen_zoom != max_zoom) {
-                        screen_zoom *= 2;
+                    if (imgui_MouseScrollingDown()) {
+                        screen_zoom.slide(-1);
+                    } else if (imgui_MouseScrollingUp()) {
+                        screen_zoom.slide(1);
                     }
                     screen_off = (mouse_pos - cell_pos_raw * screen_zoom) - canvas_min;
                     screen_off.x = round(screen_off.x);
