@@ -177,7 +177,7 @@ int main(int, char**) {
     // Create window with SDL_Renderer graphics context
     const SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     window =
-        SDL_CreateWindow("Astral v 0.9.2", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
+        SDL_CreateWindow("Astral v 0.9.3", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
     if (!window) {
         resource_failure();
     }

@@ -613,7 +613,7 @@ void load_file(sync_point& out) {
         ImGui::SameLine();
         ImGui::SmallButton("...");
         // `BeginPopupContextItem` will consume the settings, even if it is not opened.
-        ImGui::SetNextWindowSize({0, 200}, ImGuiCond_Always);
+        ImGui::SetNextWindowSize({300, 200}, ImGuiCond_Always);
         if (ImGui::BeginPopupContextItem(nullptr, ImGuiPopupFlags_MouseButtonLeft)) {
             nav.select_history();
             ImGui::EndPopup();
@@ -634,7 +634,7 @@ void load_file(sync_point& out) {
         }
         ImGui::SameLine();
         ImGui::SmallButton("...");
-        ImGui::SetNextWindowSize({0, 200}, ImGuiCond_Always);
+        ImGui::SetNextWindowSize({300, 200}, ImGuiCond_Always);
         if (ImGui::BeginPopupContextItem(nullptr, ImGuiPopupFlags_MouseButtonLeft)) {
             // TODO: the popup may be closed unexpectedly by messenger's popup if the load fails.
             // (I haven't figured out how to make the two popups display together...)
