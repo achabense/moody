@@ -87,8 +87,14 @@ public:
     }
 };
 
-[[nodiscard]] ImTextureID make_screen(int w, int h, std::function<const bool*(int)> getline) {
+[[nodiscard]] ImTextureID make_screen(int w, int h, scaleE scale, std::function<const bool*(int)> getline) {
     SDL_Texture* texture = screen_textures::get(w, h);
+    if (scale == scaleE::Nearest) {
+        SDL_SetTextureScaleMode(texture, SDL_ScaleModeNearest);
+    } else {
+        assert(scale == scaleE::Linear);
+        SDL_SetTextureScaleMode(texture, SDL_ScaleModeLinear);
+    }
 
     void* pixels = nullptr;
     int pitch = 0;

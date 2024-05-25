@@ -12,16 +12,37 @@
 
 using clockT = std::chrono::steady_clock;
 
-[[nodiscard]] static ImTextureID make_screen(const aniso::tileT& tile) {
-    return make_screen(tile.width(), tile.height(), [&tile](int y) { return tile.line(y); });
+[[nodiscard]] static ImTextureID make_screen(const aniso::tileT& tile, scaleE scale) {
+    return make_screen(tile.width(), tile.height(), scale, [&tile](int y) { return tile.line(y); });
 }
 
-static void zoom_image(ImTextureID texture, ImVec2 texture_size, ImVec2 region_center, ImVec2 region_size, int zoom) {
+[[nodiscard]] static ImTextureID make_screen(const aniso::tileT& tile, const aniso::tileT::rangeT& range,
+                                             scaleE scale) {
+    assert(tile.has_range(range));
+    return make_screen(range.width(), range.height(), scale,
+                       [&tile, &range](int y) { return tile.line(y + range.begin.y) + range.begin.x; });
+}
+
+static void zoom_image(ImTextureID texture /* Using `scaleE::Nearest` */, ImVec2 texture_size, ImVec2 region_center,
+                       ImVec2 region_size, int zoom) {
     region_size = ImMin(texture_size, region_size);
     const ImVec2 min_pos = ImClamp(region_center - ImFloor(region_size / 2), ImVec2(0, 0), texture_size - region_size);
     const ImVec2 max_pos = min_pos + region_size;
 
     ImGui::Image(texture, region_size * zoom, min_pos / texture_size, max_pos / texture_size);
+}
+
+// Always use `scaleE::Nearest`.
+static void zoom_image(const aniso::tileT& tile, aniso::tileT::posT region_center, aniso::tileT::sizeT region_size,
+                       int zoom) {
+    region_size.width = std::min(tile.width(), region_size.width);
+    region_size.height = std::min(tile.height(), region_size.height);
+    const aniso::tileT::posT begin{
+        .x = std::clamp(region_center.x - region_size.width / 2, 0, tile.width() - region_size.width),
+        .y = std::clamp(region_center.y - region_size.height / 2, 0, tile.height() - region_size.height)};
+
+    ImGui::Image(make_screen(tile, {begin, begin + region_size}, scaleE::Nearest),
+                 ImVec2(region_size.width * zoom, region_size.height * zoom));
 }
 
 static bool strobing(const aniso::ruleT& rule) {
@@ -155,8 +176,6 @@ public:
     }
 };
 
-// TODO: ideally the texture should be rendered in linear-mode (instead of nearest-mode) when zoom < 1.
-// (Related: https://github.com/ocornut/imgui/issues/7616)
 class zoomT {
     struct termT {
         float val;
@@ -637,15 +656,22 @@ public:
                 drawlist->PushClipRect(canvas_min, canvas_max);
                 drawlist->AddRectFilled(canvas_min, canvas_max, IM_COL32(32, 32, 32, 255));
 
+                const scaleE scale_mode = screen_zoom < 1 ? scaleE::Linear : scaleE::Nearest;
                 if (!paste) {
-                    const ImTextureID texture = make_screen(m_torus.tile());
+                    const ImTextureID texture = make_screen(m_torus.tile(), scale_mode);
 
                     drawlist->AddImage(texture, screen_min, screen_max);
                     if (zoom_center.has_value()) {
                         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
                         if (ImGui::BeginTooltip()) {
-                            zoom_image(texture, ImVec2(tile_size.width, tile_size.height),
-                                       ImVec2(zoom_center->x, zoom_center->y), ImVec2(60, 60), 3);
+                            if (scale_mode == scaleE::Nearest) {
+                                zoom_image(texture, ImVec2(tile_size.width, tile_size.height),
+                                           ImVec2(zoom_center->x, zoom_center->y), ImVec2(60, 60), 3);
+                            } else {
+                                // TODO: Is it possible to reuse the texture in a different scale mode?
+                                // (Related: https://github.com/ocornut/imgui/issues/7616)
+                                zoom_image(m_torus.tile(), *zoom_center, {60, 60}, 3);
+                            }
                             ImGui::EndTooltip();
                         }
                         ImGui::PopStyleVar();
@@ -661,7 +687,7 @@ public:
                     aniso::tileT temp = aniso::copy(m_torus.tile(), {{paste_beg, paste_end}});
                     (background == 0 ? aniso::blit<aniso::blitE::Or>
                                      : aniso::blit<aniso::blitE::And>)(m_torus.tile(), paste_beg, *paste, std::nullopt);
-                    const ImTextureID texture = make_screen(m_torus.tile());
+                    const ImTextureID texture = make_screen(m_torus.tile(), scale_mode);
                     if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
                         m_ctrl.mark_written();
                         temp_pause = true;
@@ -670,7 +696,7 @@ public:
                         aniso::blit<aniso::blitE::Copy>(m_torus.tile(), paste_beg, temp);
                     }
 
-                    // (`paste_beg, paste_end` remains valid even if `paste` has been consumed.)
+                    // (`paste_beg` and `paste_end` remain valid even if `paste` has been consumed.)
                     drawlist->AddImage(texture, screen_min, screen_max);
                     const ImVec2 paste_min = screen_min + ImVec2(paste_beg.x, paste_beg.y) * screen_zoom;
                     const ImVec2 paste_max = screen_min + ImVec2(paste_end.x, paste_end.y) * screen_zoom;
@@ -992,7 +1018,7 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
     }
 
     // Intentionally display after running for better visual effect (the initial state of the tile won't be displayed).
-    const ImTextureID texture = make_screen(term.tile);
+    const ImTextureID texture = make_screen(term.tile, scaleE::Nearest);
     ImGui::GetWindowDrawList()->AddImage(texture, ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
     if (interactive && ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
         assert(ImGui::IsMousePosValid());
