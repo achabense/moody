@@ -3,11 +3,13 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <climits>
 #include <optional>
 #include <random>
 #include <regex>
 #include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 #ifndef NDEBUG
