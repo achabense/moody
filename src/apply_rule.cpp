@@ -479,7 +479,6 @@ public:
         ImGui::Separator();
 
         const aniso::tileT::sizeT tile_size = m_torus.tile().size();
-        const ImVec2 screen_size(tile_size.width * screen_zoom, tile_size.height * screen_zoom);
 
         static bool lock_mouse = false; // Lock scrolling control and window moving.
         ImGui::AlignTextToFramePadding();
@@ -511,6 +510,7 @@ public:
         ImGui::SameLine();
         if (ImGui::Button("Center")) {
             // "Center" will have the same effect as "Corner" (screen_off == {0, 0}) if fullscreen-resized.
+            const ImVec2 screen_size(tile_size.width * screen_zoom, tile_size.height * screen_zoom);
             screen_off = last_known_canvas_size / 2 - screen_size / 2;
             screen_off.x = floor(floor(screen_off.x / screen_zoom) * screen_zoom);
             screen_off.y = floor(floor(screen_off.y / screen_zoom) * screen_zoom);
@@ -555,70 +555,10 @@ public:
             const bool hovered = ImGui::IsItemHovered();
             const bool l_down = ImGui::IsMouseDown(ImGuiMouseButton_Left);
             const bool r_down = ImGui::IsMouseDown(ImGuiMouseButton_Right);
-
             if (active) {
                 temp_pause = true;
             }
-            if (active && hovered && (l_down || (paste && r_down))) {
-                // Some logics rely on this to be done before rendering.
-                const ImGuiIO& io = ImGui::GetIO();
-                if (!r_down && io.KeyCtrl) {
-                    if (screen_zoom == 1) {
-                        // (This does not need `mark_written`.)
-                        m_torus.rotate(io.MouseDelta.x, io.MouseDelta.y);
-                    }
-                } else if (!lock_mouse) {
-                    screen_off += io.MouseDelta;
-                }
-            }
-
-            const ImVec2 screen_min = canvas_min + screen_off;
-            const ImVec2 screen_max = screen_min + screen_size;
-
-            ImDrawList* const drawlist = ImGui::GetWindowDrawList();
-            drawlist->PushClipRect(canvas_min, canvas_max);
-            drawlist->AddRectFilled(canvas_min, canvas_max, IM_COL32(32, 32, 32, 255));
-
-            ImTextureID texture = nullptr;
-            if (!paste) {
-                texture = make_screen(m_torus.tile());
-
-                drawlist->AddImage(texture, screen_min, screen_max);
-            } else {
-                assert(paste->width() <= tile_size.width && paste->height() <= tile_size.height);
-                paste_beg.x = std::clamp(paste_beg.x, 0, tile_size.width - paste->width());
-                paste_beg.y = std::clamp(paste_beg.y, 0, tile_size.height - paste->height());
-                const aniso::tileT::posT paste_end = paste_beg + paste->size();
-
-                // (wontfix) Wasteful, but after all this works...
-                aniso::tileT temp = aniso::copy(m_torus.tile(), {{paste_beg, paste_end}});
-                (background == 0 ? aniso::blit<aniso::blitE::Or>
-                                 : aniso::blit<aniso::blitE::And>)(m_torus.tile(), paste_beg, *paste, std::nullopt);
-                texture = make_screen(m_torus.tile());
-                if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
-                    m_ctrl.mark_written();
-                    temp_pause = true;
-                    paste.reset();
-                } else { // Restore.
-                    aniso::blit<aniso::blitE::Copy>(m_torus.tile(), paste_beg, temp);
-                }
-
-                drawlist->AddImage(texture, screen_min, screen_max);
-                const ImVec2 paste_min = screen_min + ImVec2(paste_beg.x, paste_beg.y) * screen_zoom;
-                const ImVec2 paste_max = screen_min + ImVec2(paste_end.x, paste_end.y) * screen_zoom;
-                drawlist->AddRectFilled(paste_min, paste_max, IM_COL32(255, 0, 0, 60));
-            }
-
-            if (m_sel) {
-                const auto range = m_sel->to_range();
-                const ImVec2 sel_min = screen_min + ImVec2(range.begin.x, range.begin.y) * screen_zoom;
-                const ImVec2 sel_max = screen_min + ImVec2(range.end.x, range.end.y) * screen_zoom;
-                drawlist->AddRectFilled(sel_min, sel_max, IM_COL32(0, 255, 0, 40));
-                drawlist->AddRect(sel_min, sel_max, IM_COL32(0, 255, 0, 160));
-            }
-            drawlist->PopClipRect();
-
-            if (m_sel && m_sel->active && !r_down) {
+            if (m_sel && m_sel->active && (!r_down || paste || ImGui::IsItemDeactivated())) {
                 m_sel->active = false;
                 // Allow a single right-click to unselect the area.
                 // (`bounding_box` has no size check like this. This is intentional.)
@@ -627,23 +567,47 @@ public:
                 }
             }
 
+            std::optional<aniso::tileT::posT> zoom_center = std::nullopt; // Not clamped.
             if (hovered) {
-                assert(ImGui::IsMousePosValid());
-                // This will work well even if outside of the image.
-                const ImVec2 mouse_pos = ImGui::GetIO().MousePos;
+                const ImGuiIO& io = ImGui::GetIO();
+                assert(ImGui::IsMousePosValid(&io.MousePos));
+                const ImVec2 mouse_pos = io.MousePos;
+
+                // TODO: this looks messy...
+                if (active && (l_down || (paste && r_down))) {
+                    if (!r_down && io.KeyCtrl) {
+                        if (screen_zoom == 1) {
+                            // (This does not need `mark_written`.)
+                            m_torus.rotate(io.MouseDelta.x, io.MouseDelta.y);
+                        }
+                    } else if (!lock_mouse) {
+                        screen_off += io.MouseDelta;
+                    }
+                }
+
+                if (!lock_mouse && imgui_MouseScrolling()) {
+                    const ImVec2 screen_min = canvas_min + screen_off;
+                    const ImVec2 cell_pos_raw = (mouse_pos - screen_min) / screen_zoom;
+                    if (imgui_MouseScrollingDown()) {
+                        screen_zoom.slide(-1);
+                    } else if (imgui_MouseScrollingUp()) {
+                        screen_zoom.slide(1);
+                    }
+                    screen_off = (mouse_pos - cell_pos_raw * screen_zoom) - canvas_min;
+                    screen_off.x = round(screen_off.x);
+                    screen_off.y = round(screen_off.y);
+                }
+
+                const ImVec2 screen_min = canvas_min + screen_off;
                 const ImVec2 cell_pos_raw = (mouse_pos - screen_min) / screen_zoom;
                 const int celx = floor(cell_pos_raw.x);
                 const int cely = floor(cell_pos_raw.y);
 
                 if (screen_zoom <= 1 && !paste && !active) {
                     if (celx >= -10 && celx < tile_size.width + 10 && cely >= -10 && cely < tile_size.height + 10) {
-                        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
-                        if (ImGui::BeginItemTooltip()) {
-                            zoom_image(texture, ImVec2(tile_size.width, tile_size.height), ImVec2(celx, cely),
-                                       ImVec2(60, 60), 3);
-                            ImGui::EndTooltip();
+                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
+                            zoom_center = {{.x = celx, .y = cely}};
                         }
-                        ImGui::PopStyleVar();
                     }
                 }
 
@@ -661,17 +625,66 @@ public:
                         m_sel->end.y = std::clamp(cely, 0, tile_size.height - 1);
                     }
                 }
+            }
 
-                if (!lock_mouse && imgui_MouseScrolling()) {
-                    if (imgui_MouseScrollingDown()) {
-                        screen_zoom.slide(-1);
-                    } else if (imgui_MouseScrollingUp()) {
-                        screen_zoom.slide(1);
+            // Render.
+            {
+                const ImVec2 screen_size(tile_size.width * screen_zoom, tile_size.height * screen_zoom);
+                const ImVec2 screen_min = canvas_min + screen_off;
+                const ImVec2 screen_max = screen_min + screen_size;
+
+                ImDrawList* const drawlist = ImGui::GetWindowDrawList();
+                drawlist->PushClipRect(canvas_min, canvas_max);
+                drawlist->AddRectFilled(canvas_min, canvas_max, IM_COL32(32, 32, 32, 255));
+
+                if (!paste) {
+                    const ImTextureID texture = make_screen(m_torus.tile());
+
+                    drawlist->AddImage(texture, screen_min, screen_max);
+                    if (zoom_center.has_value()) {
+                        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
+                        if (ImGui::BeginTooltip()) {
+                            zoom_image(texture, ImVec2(tile_size.width, tile_size.height),
+                                       ImVec2(zoom_center->x, zoom_center->y), ImVec2(60, 60), 3);
+                            ImGui::EndTooltip();
+                        }
+                        ImGui::PopStyleVar();
                     }
-                    screen_off = (mouse_pos - cell_pos_raw * screen_zoom) - canvas_min;
-                    screen_off.x = round(screen_off.x);
-                    screen_off.y = round(screen_off.y);
+                } else {
+                    assert(!zoom_center);
+                    assert(paste->width() <= tile_size.width && paste->height() <= tile_size.height);
+                    paste_beg.x = std::clamp(paste_beg.x, 0, tile_size.width - paste->width());
+                    paste_beg.y = std::clamp(paste_beg.y, 0, tile_size.height - paste->height());
+                    const aniso::tileT::posT paste_end = paste_beg + paste->size();
+
+                    // (wontfix) Wasteful, but after all this works...
+                    aniso::tileT temp = aniso::copy(m_torus.tile(), {{paste_beg, paste_end}});
+                    (background == 0 ? aniso::blit<aniso::blitE::Or>
+                                     : aniso::blit<aniso::blitE::And>)(m_torus.tile(), paste_beg, *paste, std::nullopt);
+                    const ImTextureID texture = make_screen(m_torus.tile());
+                    if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
+                        m_ctrl.mark_written();
+                        temp_pause = true;
+                        paste.reset();
+                    } else { // Restore.
+                        aniso::blit<aniso::blitE::Copy>(m_torus.tile(), paste_beg, temp);
+                    }
+
+                    // (`paste_beg, paste_end` remains valid even if `paste` has been consumed.)
+                    drawlist->AddImage(texture, screen_min, screen_max);
+                    const ImVec2 paste_min = screen_min + ImVec2(paste_beg.x, paste_beg.y) * screen_zoom;
+                    const ImVec2 paste_max = screen_min + ImVec2(paste_end.x, paste_end.y) * screen_zoom;
+                    drawlist->AddRectFilled(paste_min, paste_max, IM_COL32(255, 0, 0, 60));
                 }
+
+                if (m_sel) {
+                    const auto [sel_beg, sel_end] = m_sel->to_range();
+                    const ImVec2 sel_min = screen_min + ImVec2(sel_beg.x, sel_beg.y) * screen_zoom;
+                    const ImVec2 sel_max = screen_min + ImVec2(sel_end.x, sel_end.y) * screen_zoom;
+                    drawlist->AddRectFilled(sel_min, sel_max, IM_COL32(0, 255, 0, 40));
+                    drawlist->AddRect(sel_min, sel_max, IM_COL32(0, 255, 0, 160));
+                }
+                drawlist->PopClipRect();
             }
 
             // Range operations.
