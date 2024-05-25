@@ -89,6 +89,7 @@ public:
 
 [[nodiscard]] ImTextureID make_screen(int w, int h, scaleE scale, std::function<const bool*(int)> getline) {
     SDL_Texture* texture = screen_textures::get(w, h);
+    SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_NONE);
     if (scale == scaleE::Nearest) {
         SDL_SetTextureScaleMode(texture, SDL_ScaleModeNearest);
     } else {
@@ -123,6 +124,9 @@ public:
 
         const int width = 3, height = 3 * 512;
         texture = create_texture(SDL_TEXTUREACCESS_STATIC, width, height);
+        SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_NONE);
+        SDL_SetTextureScaleMode(texture, SDL_ScaleModeNearest);
+
         // Using heap allocation to avoid "Function uses XXX bytes of stack" warning.
         std::unique_ptr<Uint32[][3][3]> pixels(new Uint32[512][3][3]);
         aniso::for_each_code([&](aniso::codeT code) {

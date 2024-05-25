@@ -181,7 +181,7 @@ class zoomT {
         float val;
         const char* str;
     };
-    static constexpr termT terms[]{{0.5, "0.5"}, {1, "1"}, {2, "2"}, {3, "3"}, {4, "4"}};
+    static constexpr termT terms[]{{0.5, "0.5"}, {1, "1"}, {2, "2"}, {3, "3"}, {4, "4"}, {6, "6"}};
 
     static constexpr int index_1 = 1;
     static constexpr int index_max = std::size(terms) - 1; // ]
@@ -668,7 +668,7 @@ public:
                                 zoom_image(texture, ImVec2(tile_size.width, tile_size.height),
                                            ImVec2(zoom_center->x, zoom_center->y), ImVec2(60, 60), 3);
                             } else {
-                                // TODO: Is it possible to reuse the texture in a different scale mode?
+                                // TODO: is it possible to reuse the texture in a different scale mode?
                                 // (Related: https://github.com/ocornut/imgui/issues/7616)
                                 zoom_image(m_torus.tile(), *zoom_center, {60, 60}, 3);
                             }
@@ -910,14 +910,21 @@ public:
                     temp_pause = true;
                 } else if (op == _paste) {
                     if (const char* text = ImGui::GetClipboardText()) {
-                        // TODO: better handling/message...
-                        try {
-                            paste.emplace(aniso::from_RLE_str(text, tile_size));
-                        } catch (const std::exception& err) {
-                            messenger::add_msg(err.what());
-                        }
+                        paste.reset();
                         if (m_sel) {
                             m_sel->active = false;
+                        }
+
+                        auto result = aniso::from_RLE_str(text, tile_size);
+                        if (result.succ) {
+                            paste.emplace(std::move(result.tile));
+                        } else if (result.width == 0 || result.height == 0) {
+                            messenger::add_msg("Found no pattern.");
+                        } else {
+                            messenger::add_msg("The space is not large enough for the pattern.\n"
+                                               "Space size: x = {}, y = {}\n"
+                                               "Pattern size: x = {}, y = {}",
+                                               tile_size.width, tile_size.height, result.width, result.height);
                         }
                     }
                 }
