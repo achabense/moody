@@ -77,27 +77,32 @@ inline bool test_key(ImGuiKey key, bool repeat) {
     return !ImGui::GetIO().WantCaptureKeyboard && ImGui::IsKeyPressed(key, repeat);
 };
 
-inline void quick_info(const char* msg) {
+// TODO: apply `IMGUI_DEFINE_MATH_OPERATORS` everywhere?
+inline void quick_info(std::string_view msg) {
     if (!ImGui::GetIO().WantTextInput && ImGui::IsKeyDown(ImGuiKey_H) && ImGui::IsItemVisible()) {
         imgui_ItemRect(IM_COL32_WHITE);
-        const ImVec2 size = ImGui::CalcTextSize(msg);
+
+        const ImVec2 padding = ImGui::GetStyle().FramePadding;
+        const ImVec2 text_size = ImGui::CalcTextSize(msg.data(), msg.data() + msg.size());
+        const ImVec2 msg_size(text_size.x + padding.x * 2, text_size.y + padding.y * 2);
         const ImVec2 msg_min = [&]() -> ImVec2 {
             const ImVec2 min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax();
             if (msg[0] == '<') {
-                return ImVec2(max.x + ImGui::GetStyle().ItemSpacing.x, min.y);
+                return ImVec2(max.x + ImGui::GetStyle().ItemInnerSpacing.x, min.y);
             } else if (msg[0] == '^') {
                 return ImVec2(min.x, max.y + ImGui::GetStyle().ItemSpacing.y);
             } else {
                 assert(msg[0] == 'v');
-                return ImVec2(min.x, min.y - ImGui::GetStyle().ItemSpacing.y - size.y);
+                return ImVec2(min.x, min.y - ImGui::GetStyle().ItemSpacing.y - msg_size.y);
             }
         }();
-        const ImVec2 msg_max(msg_min.x + size.x, msg_min.y + size.y);
+        const ImVec2 msg_max(msg_min.x + msg_size.x, msg_min.y + msg_size.y);
         // TODO: ideally, the message should be rendered on the foreground of individual windows...
         ImDrawList* const drawlist = ImGui::GetForegroundDrawList();
-        drawlist->AddRectFilled(msg_min, msg_max, IM_COL32(60, 60, 60, 255));
+        drawlist->AddRectFilled(msg_min, msg_max, IM_COL32(48, 48, 48, 255));
         drawlist->AddRect(msg_min, msg_max, IM_COL32_WHITE);
-        drawlist->AddText(msg_min, IM_COL32_WHITE, msg);
+        drawlist->AddText(ImVec2(msg_min.x + padding.x, msg_min.y + padding.y), IM_COL32_WHITE, msg.data(),
+                          msg.data() + msg.size());
     }
 }
 
