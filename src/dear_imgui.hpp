@@ -9,15 +9,13 @@
 inline void imgui_ItemRect(ImU32 col, ImVec2 off_min = {0, 0}) {
     const ImVec2 pos_min = ImGui::GetItemRectMin();
     const ImVec2 pos_max = ImGui::GetItemRectMax();
-    ImGui::GetWindowDrawList()->AddRect(ImVec2(pos_min.x + off_min.x, pos_min.y + off_min.y),
-                                        ImVec2(pos_max.x - off_min.x, pos_max.y - off_min.y), col);
+    ImGui::GetWindowDrawList()->AddRect(pos_min + off_min, pos_max - off_min, col);
 }
 
 inline void imgui_ItemRectFilled(ImU32 col, ImVec2 off_min = {0, 0}) {
     const ImVec2 pos_min = ImGui::GetItemRectMin();
     const ImVec2 pos_max = ImGui::GetItemRectMax();
-    ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(pos_min.x + off_min.x, pos_min.y + off_min.y),
-                                              ImVec2(pos_max.x - off_min.x, pos_max.y - off_min.y), col);
+    ImGui::GetWindowDrawList()->AddRectFilled(pos_min + off_min, pos_max - off_min, col);
 }
 
 // (Referring to ImGui::IsRectVisible() and ImGui::GetItemRectMin().)

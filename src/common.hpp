@@ -4,8 +4,9 @@
 #include <format>
 #include <functional>
 
-#include "dear_imgui.hpp"
 #include "rule.hpp"
+
+#include "dear_imgui.hpp"
 
 /* Not inline */ static const bool check_version = IMGUI_CHECKVERSION();
 
@@ -77,14 +78,14 @@ inline bool test_key(ImGuiKey key, bool repeat) {
     return !ImGui::GetIO().WantCaptureKeyboard && ImGui::IsKeyPressed(key, repeat);
 };
 
-// TODO: apply `IMGUI_DEFINE_MATH_OPERATORS` everywhere?
 inline void quick_info(std::string_view msg) {
     if (!ImGui::GetIO().WantTextInput && ImGui::IsKeyDown(ImGuiKey_H) && ImGui::IsItemVisible()) {
         imgui_ItemRect(IM_COL32_WHITE);
 
+        assert(!msg.empty());
+        const char *const text_beg = msg.data(), *const text_end = msg.data() + msg.size();
         const ImVec2 padding = ImGui::GetStyle().FramePadding;
-        const ImVec2 text_size = ImGui::CalcTextSize(msg.data(), msg.data() + msg.size());
-        const ImVec2 msg_size(text_size.x + padding.x * 2, text_size.y + padding.y * 2);
+        const ImVec2 msg_size = ImGui::CalcTextSize(text_beg, text_end) + padding * 2;
         const ImVec2 msg_min = [&]() -> ImVec2 {
             const ImVec2 min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax();
             if (msg[0] == '<') {
@@ -96,13 +97,12 @@ inline void quick_info(std::string_view msg) {
                 return ImVec2(min.x, min.y - ImGui::GetStyle().ItemSpacing.y - msg_size.y);
             }
         }();
-        const ImVec2 msg_max(msg_min.x + msg_size.x, msg_min.y + msg_size.y);
+        const ImVec2 msg_max = msg_min + msg_size;
         // TODO: ideally, the message should be rendered on the foreground of individual windows...
         ImDrawList* const drawlist = ImGui::GetForegroundDrawList();
         drawlist->AddRectFilled(msg_min, msg_max, IM_COL32(48, 48, 48, 255));
         drawlist->AddRect(msg_min, msg_max, IM_COL32_WHITE);
-        drawlist->AddText(ImVec2(msg_min.x + padding.x, msg_min.y + padding.y), IM_COL32_WHITE, msg.data(),
-                          msg.data() + msg.size());
+        drawlist->AddText(msg_min + padding, IM_COL32_WHITE, text_beg, text_end);
     }
 }
 
