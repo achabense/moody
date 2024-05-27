@@ -187,7 +187,7 @@ class file_nav {
             m_files.swap(p_files);
             return true;
         } catch (const std::exception& /* not used; the encoding is a mystery */) {
-            messenger::add_msg("Cannot open folder:\n{}", cpp17_u8string(path));
+            messenger::set_msg("Cannot open folder:\n{}", cpp17_u8string(path));
         }
         return false;
     }
@@ -198,7 +198,7 @@ public:
             try {
                 collect(m_current, m_dirs, m_files);
             } catch (const std::exception& /* not used; the encoding is a mystery */) {
-                messenger::add_msg("Cannot refresh folder:\n{}", cpp17_u8string(m_current));
+                messenger::set_msg("Cannot refresh folder:\n{}", cpp17_u8string(m_current));
                 m_current.clear();
                 m_dirs.clear();
                 m_files.clear();
@@ -300,7 +300,7 @@ public:
                         return false;
                     }();
                     if (!succ) {
-                        messenger::add_msg("Cannot open path:\n{}", buf_path);
+                        messenger::set_msg("Cannot open path:\n{}", buf_path);
                     }
 
                     buf_path[0] = '\0';
@@ -581,9 +581,9 @@ static std::string too_long(uintmax_t size, int max_size) {
     }
 
     if (!ec && size > max_size) {
-        messenger::add_msg("File too large: {}\n{}", too_long(size, max_size), cpp17_u8string(path));
+        messenger::set_msg("File too large: {}\n{}", too_long(size, max_size), cpp17_u8string(path));
     } else {
-        messenger::add_msg("Failed to load file:\n{}", cpp17_u8string(path));
+        messenger::set_msg("Failed to load file:\n{}", cpp17_u8string(path));
     }
     return false;
 }
@@ -636,8 +636,6 @@ void load_file(sync_point& out) {
         ImGui::SmallButton("...");
         ImGui::SetNextWindowSize({300, 200}, ImGuiCond_Always);
         if (ImGui::BeginPopupContextItem(nullptr, ImGuiPopupFlags_MouseButtonLeft)) {
-            // TODO: the popup may be closed unexpectedly by messenger's popup if the load fails.
-            // (I haven't figured out how to make the two popups display together...)
             std::optional<pathT> sel = std::nullopt;
             nav.select_file(&*path, sel);
             if (sel && try_load(*sel)) {
@@ -665,7 +663,7 @@ void load_clipboard(sync_point& out) {
         if (const char* str = ImGui::GetClipboardText()) {
             std::string_view str_view(str);
             if (str_view.size() > max_size) {
-                messenger::add_msg("Text too long: {}", too_long(str_view.size(), max_size));
+                messenger::set_msg("Text too long: {}", too_long(str_view.size(), max_size));
             } else {
                 text.clear();
                 text.append(str_view);

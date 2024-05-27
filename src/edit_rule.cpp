@@ -758,8 +758,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                 show_rand = true;
                 ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
                 if (ImGui::IsMousePosValid()) {
-                    const ImVec2 mouse_pos = ImGui::GetIO().MousePos;
-                    ImGui::SetNextWindowPos(ImVec2(mouse_pos.x + 2, mouse_pos.y + 2), ImGuiCond_Always);
+                    ImGui::SetNextWindowPos(ImGui::GetIO().MousePos + ImVec2(2, 2), ImGuiCond_Always);
                 }
             }
             // TODO: ideally, !compatible should only disable generation ('>>>' at last page.).

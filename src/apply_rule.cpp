@@ -728,15 +728,15 @@ public:
                 static bool replace = true;     // Closed-capture.
                 static densityT fill_den = 0.5; // Random-fill.
                 static bool add_rule = true;
-                static bool copy_silently = false; // Copy / cut.
+                static bool show_result = true; // Copy / cut.
                 auto copy_sel = [&] {
                     if (m_sel) {
                         std::string rle_str =
                             aniso::to_RLE_str(add_rule ? &m_ctrl.rule : nullptr, m_torus.tile(), m_sel->to_range());
-                        if (copy_silently) {
-                            ImGui::SetClipboardText(rle_str.c_str());
-                        } else {
-                            messenger::add_msg(std::move(rle_str));
+                        ImGui::SetClipboardText(rle_str.c_str());
+
+                        if (show_result) {
+                            messenger::set_msg(std::move(rle_str));
                         }
                     }
                 };
@@ -822,9 +822,10 @@ public:
 
                         // Copy/Cut/Paste.
                         ImGui::Separator();
-                        set_tag(add_rule, "Add rule", "Whether to add the 'rule = ...' part when copying patterns.");
+                        set_tag(add_rule, "Add rule",
+                                "Whether to add rule info ('rule = ...') to the header when copying patterns.");
                         ImGui::SameLine();
-                        set_tag(copy_silently, "Copy silently", "Whether to directly copy to the clipboard.");
+                        set_tag(show_result, "Show result", "Whether to display the result when copying patterns.");
                         term("Copy", "C", ImGuiKey_C, true, _copy);
                         term("Cut", "X", ImGuiKey_X, true, _cut);
                         term("Paste", "V", ImGuiKey_V, false, _paste);
@@ -850,8 +851,7 @@ public:
                 if (show_range_window) {
                     ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
                     if (ImGui::IsMousePosValid()) {
-                        const ImVec2 mouse_pos = ImGui::GetIO().MousePos;
-                        ImGui::SetNextWindowPos(ImVec2(mouse_pos.x + 2, mouse_pos.y + 2), ImGuiCond_Appearing);
+                        ImGui::SetNextWindowPos(ImGui::GetIO().MousePos + ImVec2(2, 2), ImGuiCond_Appearing);
                     }
                     auto window =
                         imgui_Window("Range operations", &show_range_window, ImGuiWindowFlags_AlwaysAutoResize);
@@ -915,9 +915,11 @@ public:
                         if (result.succ) {
                             paste.emplace(std::move(result.tile));
                         } else if (result.width == 0 || result.height == 0) {
-                            messenger::add_msg("Found no pattern.");
+                            messenger::set_msg("Found no pattern.\n\n"
+                                               "('V' is for pasting patterns. If you want to read rules from the "
+                                               "clipboard, use the 'Clipboard' window instead.)");
                         } else {
-                            messenger::add_msg("The space is not large enough for the pattern.\n"
+                            messenger::set_msg("The space is not large enough for the pattern.\n"
                                                "Space size: x = {}, y = {}\n"
                                                "Pattern size: x = {}, y = {}",
                                                tile_size.width, tile_size.height, result.width, result.height);

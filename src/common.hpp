@@ -197,6 +197,7 @@ public:
     }
 };
 
+#if 0
 class messenger {
     inline static std::vector<std::string> m_strs{};
 
@@ -237,6 +238,93 @@ public:
         }
     }
 };
+#else
+class messenger {
+    class messageT {
+        std::string m_str{};
+        std::optional<ImVec2> m_min{};
+        int m_count{};
+
+    public:
+        void set(std::string&& str) {
+            m_min.reset();
+            m_count = 10;
+
+            size_t subsize = 0;
+            for (int line = 0; line < 20; ++line) {
+                subsize = str.find_first_of('\n', subsize);
+                if (subsize == str.npos) {
+                    break;
+                } else {
+                    ++subsize; // Include the '\n'.
+                }
+            }
+
+            if (subsize >= str.size()) {
+                m_str = std::move(str);
+            } else {
+                m_str = str.substr(0, subsize) + ".....";
+            }
+        }
+
+        // Won't interfere with normal tooltips or popups.
+        void display() {
+            if (m_str.empty()) {
+                return;
+            } else {
+                assert(m_count > 0);
+                const ImVec2 delta = ImGui::GetIO().MouseDelta;
+                if ((delta.x || delta.y) && --m_count == 0) {
+                    m_str.clear();
+                    return;
+                }
+            }
+
+            assert(!m_str.empty());
+            const float text_wrap = wrap_len();
+            const char *const text_beg = m_str.c_str(), *const text_end = m_str.c_str() + m_str.size();
+            const ImVec2 padding = ImGui::GetStyle().WindowPadding;
+            const ImVec2 window_size = ImGui::CalcTextSize(text_beg, text_end, false, text_wrap) + padding * 2;
+
+            if (!m_min) {
+                const ImVec2 main_size = ImGui::GetMainViewport()->Size;
+                if (ImGui::IsMousePosValid()) {
+                    const ImVec2 pos = ImClamp(ImGui::GetIO().MousePos, ImVec2{0, 0}, main_size);
+                    ImGuiDir dir = ImGuiDir_None;
+                    m_min = ImGui::FindBestWindowPosForPopupEx(pos, window_size, &dir, {padding, main_size - padding},
+                                                               {pos - padding, pos + padding},
+                                                               ImGuiPopupPositionPolicy_Default);
+                } else {
+                    m_min = ImFloor(main_size / 2 - window_size / 2);
+                }
+            }
+
+            const ImVec2 window_min = *m_min;
+            const ImVec2 window_max = window_min + window_size;
+            ImDrawList* const drawlist = ImGui::GetForegroundDrawList();
+            drawlist->AddRectFilled(window_min, window_max, ImGui::GetColorU32(ImGuiCol_PopupBg));
+            drawlist->AddRect(window_min, window_max, ImGui::GetColorU32(ImGuiCol_Border));
+            drawlist->AddText(nullptr, 0.0f, window_min + padding, ImGui::GetColorU32(ImGuiCol_Text), text_beg,
+                              text_end, text_wrap);
+        }
+    };
+
+    inline static messageT m_msg;
+
+public:
+    messenger() = delete;
+
+    static void set_msg(std::string str) { m_msg.set(std::move(str)); }
+
+    template <class... U>
+    static void set_msg(std::format_string<const U&...> fmt, const U&... args) {
+        m_msg.set(std::format(fmt, args...));
+    }
+
+    // Managed by `frame_main`.
+    static void display() { m_msg.display(); }
+};
+#endif
 
 // Preview rules.
 class previewer {
