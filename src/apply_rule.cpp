@@ -306,7 +306,8 @@ public:
 
         const char* const canvas_name = "Canvas";
         const bool enable_shortcuts =
-            !ImGui::GetIO().WantCaptureKeyboard || (GImGui->ActiveId == ImGui::GetID(canvas_name));
+            (!ImGui::GetIO().WantCaptureKeyboard && !ImGui::IsPopupOpen(ImGuiID(0), ImGuiPopupFlags_AnyPopupId)) ||
+            (GImGui->ActiveId == ImGui::GetID(canvas_name));
         // Shadowing `::test_key`.
         auto test_key = [enable_shortcuts](ImGuiKey key, bool repeat) {
             return enable_shortcuts && ImGui::IsKeyPressed(key, repeat);

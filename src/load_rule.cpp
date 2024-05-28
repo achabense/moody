@@ -611,10 +611,10 @@ void load_file(sync_point& out) {
             nav.refresh_if_valid();
         }
         ImGui::SameLine();
-        ImGui::SmallButton("...");
-        // `BeginPopupContextItem` will consume the settings, even if it is not opened.
+        const bool clicked = ImGui::SmallButton("...");
+        // `BeginPopup` will consume the settings, even if not opened.
         ImGui::SetNextWindowSize({300, 200}, ImGuiCond_Always);
-        if (ImGui::BeginPopupContextItem(nullptr, ImGuiPopupFlags_MouseButtonLeft)) {
+        if (begin_popup_for_item(clicked)) {
             nav.select_history();
             ImGui::EndPopup();
         }
@@ -633,9 +633,9 @@ void load_file(sync_point& out) {
             // Don't rewind.
         }
         ImGui::SameLine();
-        ImGui::SmallButton("...");
+        const bool clicked = ImGui::SmallButton("...");
         ImGui::SetNextWindowSize({300, 200}, ImGuiCond_Always);
-        if (ImGui::BeginPopupContextItem(nullptr, ImGuiPopupFlags_MouseButtonLeft)) {
+        if (begin_popup_for_item(clicked)) {
             std::optional<pathT> sel = std::nullopt;
             nav.select_file(&*path, sel);
             if (sel && try_load(*sel)) {
@@ -710,8 +710,8 @@ void load_doc(sync_point& out) {
     } else {
         const bool close = ImGui::SmallButton("Close");
         ImGui::SameLine();
-        ImGui::SmallButton("...");
-        if (ImGui::BeginPopupContextItem(nullptr, ImGuiPopupFlags_MouseButtonLeft)) {
+        const bool clicked = ImGui::SmallButton("...");
+        if (begin_popup_for_item(clicked)) {
             select();
             ImGui::EndPopup();
         }

@@ -116,6 +116,20 @@ inline void set_scroll_by_up_down(float dy) {
     }
 }
 
+// (Referring to ImGui::BeginPopupContextItem().)
+inline bool begin_popup_for_item(bool open, const char* str_id = nullptr) {
+    if (GImGui->CurrentWindow->SkipItems) {
+        return false;
+    }
+    const ImGuiID id = str_id ? ImGui::GetID(str_id) : ImGui::GetItemID();
+    assert(id != 0);
+    if (open) { // Instead of MouseReleased && ItemHovered
+        ImGui::OpenPopupEx(id);
+    }
+    return ImGui::BeginPopupEx(id, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar |
+                                       ImGuiWindowFlags_NoSavedSettings);
+}
+
 inline bool button_with_shortcut(const char* label, ImGuiKey shortcut = ImGuiKey_None, const ImVec2& size = {}) {
     bool ret = ImGui::Button(label, size);
     if (shortcut != ImGuiKey_None && !imgui_TestItemFlag(ImGuiItemFlags_Disabled)) {
@@ -353,8 +367,8 @@ public:
         int height() const { return size_h[size]; }
 
         void set(const char* label) {
-            ImGui::Button(label);
-            if (ImGui::BeginPopupContextItem(nullptr, ImGuiPopupFlags_MouseButtonLeft)) {
+            const bool clicked = ImGui::Button(label);
+            if (begin_popup_for_item(clicked)) {
                 _set();
                 ImGui::EndPopup();
             }

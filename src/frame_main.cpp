@@ -143,7 +143,7 @@ void frame_main() {
         ImGui::SameLine();
         ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1 /* [1, size()] */);
         quick_info("< Right-click to clear.");
-        if (ImGui::BeginPopupContextItem("", ImGuiPopupFlags_MouseButtonRight)) {
+        if (begin_popup_for_item(ImGui::IsItemClicked(ImGuiMouseButton_Right), "")) {
             if (ImGui::Selectable("Clear")) {
                 freeze = true, recorder.clear();
             }

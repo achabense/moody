@@ -490,7 +490,7 @@ public:
         quick_info("^ Right-click to clear.");
         // (Using the same style as in `frame_main`.)
         bool clear = false; // Put off for more stable visual.
-        if (ImGui::BeginPopupContextItem("", ImGuiPopupFlags_MouseButtonRight)) {
+        if (begin_popup_for_item(ImGui::IsItemClicked(ImGuiMouseButton_Right), "")) {
             clear = ImGui::Selectable("Clear");
             ImGui::EndPopup();
         }
@@ -750,12 +750,11 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                 rate = double(free_dist) / c_free;
                 assert(round(rate * c_free) == free_dist);
             }
-            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+            ImGui::SameLine();
             static bool show_rand = false;
-            const bool clicked = ImGui::Button("Randomize");
-            if (clicked) {
-                assert(compatible); // Otherwise, the button should be disabled.
-                show_rand = true;
+            const bool clicked = ImGui::Checkbox("Randomize", &show_rand);
+            if (clicked && show_rand) {
+                assert(compatible); // Otherwise, the checkbox should be disabled.
                 ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
                 if (ImGui::IsMousePosValid()) {
                     ImGui::SetNextWindowPos(ImGui::GetIO().MousePos + ImVec2(2, 2), ImGuiCond_Always);
