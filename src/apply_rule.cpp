@@ -776,7 +776,7 @@ public:
                     }
                     ImGui::SameLine();
                     imgui_StrTooltip("(?)", "This affects only closed-capture. See '(...)' for explanation.");
-                    term("Capture (open)", "O (repeatable)", ImGuiKey_None, true, _capture_open);
+                    term("Capture (open)", "O (repeatable)", ImGuiKey_O, true, _capture_open);
                     // (`ImGui::IsKeyPressed(..., repeat = true)` does not return true in every frame.)
                     if (m_sel && enable_shortcuts && ImGui::IsKeyDown(ImGuiKey_O)) {
                         op = _capture_open;
