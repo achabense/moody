@@ -46,15 +46,9 @@ static bool strobing(const aniso::ruleT& rule) {
     return rule[all_0] == 1 && rule[all_1] == 0;
 }
 
-// `tileT` is able to serve as the building block for boundless space (`tileT::gather` was
-// initially designed to enable this extension) but that's complicated, and torus space is enough to
-// show the effect of the rules.
-static void run_torus(aniso::tileT& tile, aniso::tileT& temp, const aniso::rule_like auto& rule) {
-    assert(&tile != &temp);
-
+static void run_torus(aniso::tileT& tile, const aniso::rule_like auto& rule) {
     tile.gather_torus();
-    tile.apply_v2(rule, temp);
-    tile.swap(temp);
+    tile.apply_v3(rule);
 }
 
 // Copy the subrange and run as a torus space, recording all invoked mappings.
@@ -62,8 +56,6 @@ static void run_torus(aniso::tileT& tile, aniso::tileT& temp, const aniso::rule_
 static aniso::moldT::lockT capture_closed(const aniso::tileT& source, const aniso::tileT::rangeT& range,
                                           const aniso::ruleT& rule) {
     aniso::tileT tile = aniso::copy(source, range);
-    aniso::tileT temp(tile.size());
-
     aniso::moldT::lockT lock{};
 
     // (wontfix) It's possible that the loop fails to catch all invocations in very rare cases,
@@ -72,7 +64,7 @@ static aniso::moldT::lockT capture_closed(const aniso::tileT& source, const anis
     // Loop until there has been `limit` generations without newly invoked mappings.
     const int limit = 120;
     for (int g = limit; g > 0; --g) {
-        run_torus(tile, temp, [&](aniso::codeT code) {
+        run_torus(tile, [&](aniso::codeT code) {
             if (!lock[code]) {
                 g = limit;
                 lock[code] = true;
@@ -112,7 +104,7 @@ public:
 };
 
 class torusT {
-    aniso::tileT m_tile, m_temp;
+    aniso::tileT m_tile;
     int m_gen;
 
 public:
@@ -124,7 +116,7 @@ public:
         friend bool operator==(const initT&, const initT&) = default;
     };
 
-    explicit torusT(const initT& init) : m_tile(init.size), m_temp(init.size), m_gen(0) { restart(init); }
+    explicit torusT(const initT& init) : m_tile(init.size), m_gen(0) { restart(init); }
 
     aniso::tileT& tile() { return m_tile; }
     const aniso::tileT& tile() const { return m_tile; }
@@ -132,7 +124,6 @@ public:
 
     void restart(const initT& init) {
         m_tile.resize(init.size);
-        m_temp.resize(init.size);
 
         std::mt19937 rand(init.seed);
         aniso::random_fill(m_tile, rand, init.density.get());
@@ -142,7 +133,7 @@ public:
 
     void run(const aniso::ruleT& rule, int count = 1) {
         for (int c = 0; c < count; ++c) {
-            run_torus(m_tile, m_temp, rule);
+            run_torus(m_tile, rule);
             ++m_gen;
         }
     }
@@ -160,14 +151,14 @@ public:
         }
 
         [[maybe_unused]] const bool test = m_tile.line(0)[0];
-        m_temp.resize(m_tile.size());
+        aniso::tileT temp(m_tile.size());
         for (int y = 0; y < height; ++y) {
             const bool* source = m_tile.line(y);
-            bool* dest = m_temp.line((y + dy) % height);
+            bool* dest = temp.line((y + dy) % height);
             std::copy_n(source, width - dx, dest + dx);
             std::copy_n(source + width - dx, dx, dest);
         }
-        m_tile.swap(m_temp);
+        m_tile.swap(temp);
         assert(test == m_tile.line(dy)[dx]);
     }
 };
@@ -972,7 +963,6 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
         aniso::tileT tile = {};
     };
     static std::unordered_map<uint64_t, termT> terms;
-    static aniso::tileT temps[configT::Count];
 
     static unsigned latest = ImGui::GetFrameCount();
     if (const unsigned frame = ImGui::GetFrameCount(); frame != latest) {
@@ -1019,7 +1009,7 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
     if (!pause) {
         const int p = config.pace + ((config.pace % 2 == 1) && strobing(rule));
         for (int i = 0; i < p; ++i) {
-            run_torus(term.tile, temps[config.size], rule);
+            run_torus(term.tile, rule);
         }
     }
 

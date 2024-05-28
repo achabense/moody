@@ -211,14 +211,15 @@ namespace aniso {
         }
 
         // This is relying on codeT::bpos_q = 0, bpos_w = 1, ... bpos_c = 8.
-        void apply_v2(const rule_like auto& rule, tileT& dest) const {
-            assert(this != &dest);
-            dest.resize(m_size);
+        void apply_v3(const rule_like auto& rule, tileT& dest) const {
+            if (&dest != this) {
+                dest.resize(m_size);
+            }
 
             const int width = m_size.width, height = m_size.height;
-            std::vector<char> _vec_a(width + 1), _vec_b(width + 1); // [0, width]
+            std::vector<char> _vec(width + 1); // [0, width]
 
-            char *_vec_up = _vec_a.data(), *_vec_cn = _vec_b.data();
+            char* const _vec_p6 = _vec.data();
             {
                 const bool *_up = _line(0), *_cn = _line(1);
                 int p3_up = (_up[0] << 1) | (_up[1] << 2);
@@ -226,8 +227,10 @@ namespace aniso {
                 for (int _x = 1; _x <= width; ++_x) {
                     p3_up = (p3_up >> 1) | (_up[_x + 1] << 2);
                     p3_cn = (p3_cn >> 1) | (_cn[_x + 1] << 2);
-                    _vec_up[_x] = p3_up; // _up[_x - 1] | (_up[_x] << 1) | (_up[_x + 1] << 2)
-                    _vec_cn[_x] = p3_cn; // _cn[_x - 1] | (_cn[_x] << 1) | (_cn[_x + 1] << 2)
+                    _vec_p6[_x] = p3_up | (p3_cn << 3);
+                    // _vec_p6[_x] =
+                    // (_up[_x - 1] << 0) | (_up[_x] << 1) | (_up[_x + 1] << 2)
+                    // (_cn[_x - 1] << 3) | (_cn[_x] << 4) | (_cn[_x + 1] << 5)
                 }
             }
             for (int _y = 1; _y <= height; ++_y) {
@@ -236,12 +239,15 @@ namespace aniso {
                 int p3_dw = (_dw[0] << 1) | (_dw[1] << 2);
                 for (int _x = 1; _x <= width; ++_x) {
                     p3_dw = (p3_dw >> 1) | (_dw[_x + 1] << 2);
-                    _dest[_x] = rule(codeT{_vec_up[_x] | (_vec_cn[_x] << 3) | (p3_dw << 6)});
-                    _vec_up[_x] = p3_dw; // _dw[_x - 1] | (_dw[_x] << 1) | (_dw[_x + 1] << 2)
+                    // p3_dw = _dw[_x - 1] | (_dw[_x] << 1) | (_dw[_x + 1] << 2)
+                    const int code = _vec_p6[_x] | (p3_dw << 6);
+                    _dest[_x] = rule(codeT{code});
+                    _vec_p6[_x] = code >> 3;
                 }
-                std::swap(_vec_up, _vec_cn);
             }
         }
+
+        void apply_v3(const rule_like auto& rule) { apply_v3(rule, *this); }
 
         friend bool operator==(const tileT& l, const tileT& r) {
             if (l.m_size != r.m_size) {
@@ -281,18 +287,22 @@ namespace aniso {
             });
         };
 
-        inline const testT test_tileT_apply_v2 = [] {
+        inline const testT test_tileT_apply_v3 = [] {
             const tileT::sizeT size{32, 32};
-            tileT source(size), dest(size), dest_v2(size);
+            tileT source(size), dest(size), dest_v3(size);
             source.for_each_line(source.entire_range(), [&](std::span<bool> line) { //
                 std::ranges::generate(line, [&] { return testT::rand() & 1; });
             });
 
             const ruleT rule = make_rule([](codeT) { return testT::rand() & 1; });
             source.gather_torus();
+
             source.apply(rule, dest);
-            source.apply(rule, dest_v2);
-            assert(dest == dest_v2);
+            source.apply_v3(rule, dest_v3);
+            assert(dest == dest_v3);
+
+            source.apply_v3(rule);
+            assert(dest == source);
         };
     }  // namespace _tests
 #endif // ENABLE_TESTS

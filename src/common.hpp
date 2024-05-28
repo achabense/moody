@@ -361,7 +361,7 @@ public:
         void _set();
 
     public:
-        /*implicit*/ configT(sizeE size) : size(size), seed(0), pace(1) { assert(size != Count); }
+        /*implicit*/ configT(sizeE size) : size(size), seed(0), pace(1) { assert(size >= 0 && size < Count); }
 
         int width() const { return size_w[size]; }
         int height() const { return size_h[size]; }
