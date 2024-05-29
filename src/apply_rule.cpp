@@ -90,6 +90,30 @@ static void capture_open(const aniso::tileT& source, aniso::tileT::rangeT range,
     source.collect(range, lock);
 }
 
+// (0, 0) is mapped to (wrap(dx), wrap(dy)).
+static void rotate(aniso::tileT& tile, int dx, int dy) {
+    const int width = tile.width(), height = tile.height();
+
+    const auto wrap = [](int v, int r) { return ((v % r) + r) % r; };
+    dx = wrap(dx, width);
+    dy = wrap(dy, height);
+    assert(dx >= 0 && dx < width && dy >= 0 && dy < height);
+    if (dx == 0 && dy == 0) {
+        return;
+    }
+
+    [[maybe_unused]] const bool test = tile.line(0)[0];
+    aniso::tileT temp(tile.size());
+    for (int y = 0; y < height; ++y) {
+        const bool* source = tile.line(y);
+        bool* dest = temp.line((y + dy) % height);
+        std::copy_n(source, width - dx, dest + dx);
+        std::copy_n(source + width - dx, dx, dest);
+    }
+    tile.swap(temp);
+    assert(test == tile.line(dy)[dx]);
+}
+
 class densityT {
     int m_dens; // ∈ [0, 100], /= 100 to serve as density.
 public:
@@ -103,19 +127,20 @@ public:
     friend bool operator==(const densityT&, const densityT&) = default;
 };
 
+// TODO: support setting patterns as init state?
+struct initT {
+    aniso::tileT::sizeT size;
+    uint32_t seed;
+    densityT density;
+
+    friend bool operator==(const initT&, const initT&) = default;
+};
+
 class torusT {
     aniso::tileT m_tile;
     int m_gen;
 
 public:
-    struct initT {
-        aniso::tileT::sizeT size;
-        uint32_t seed;
-        densityT density;
-
-        friend bool operator==(const initT&, const initT&) = default;
-    };
-
     explicit torusT(const initT& init) : m_tile(init.size), m_gen(0) { restart(init); }
 
     aniso::tileT& tile() { return m_tile; }
@@ -136,30 +161,6 @@ public:
             run_torus(m_tile, rule);
             ++m_gen;
         }
-    }
-
-    // (0, 0) is mapped to (wrap(dx), wrap(dy)).
-    void rotate(int dx, int dy) {
-        const int width = m_tile.width(), height = m_tile.height();
-
-        const auto wrap = [](int v, int r) { return ((v % r) + r) % r; };
-        dx = wrap(dx, width);
-        dy = wrap(dy, height);
-        assert(dx >= 0 && dx < width && dy >= 0 && dy < height);
-        if (dx == 0 && dy == 0) {
-            return;
-        }
-
-        [[maybe_unused]] const bool test = m_tile.line(0)[0];
-        aniso::tileT temp(m_tile.size());
-        for (int y = 0; y < height; ++y) {
-            const bool* source = m_tile.line(y);
-            bool* dest = temp.line((y + dy) % height);
-            std::copy_n(source, width - dx, dest + dx);
-            std::copy_n(source + width - dx, dx, dest);
-        }
-        m_tile.swap(temp);
-        assert(test == m_tile.line(dy)[dx]);
     }
 };
 
@@ -245,8 +246,7 @@ class runnerT {
         }
     };
 
-    // TODO: support setting patterns as init state?
-    torusT::initT m_init{.size{.width = 500, .height = 400}, .seed = 0, .density = 0.5};
+    initT m_init{.size{.width = 500, .height = 400}, .seed = 0, .density = 0.5};
     torusT m_torus{m_init};
     ctrlT m_ctrl{.rule{}, .pace = 1, .anti_strobing = true, .gap = 0, .pause = false};
 
@@ -401,7 +401,7 @@ public:
         ImGui::SameLine(0, imgui_ItemSpacingX() + ImGui::CalcTextSize("  ").x);
         ImGui::BeginGroup();
         {
-            torusT::initT init = m_init;
+            initT init = m_init;
             int seed = init.seed;
             imgui_StepSliderInt("Init seed", &seed, 0, 29);
             if (ImGui::IsItemActive()) {
@@ -585,7 +585,7 @@ public:
                     if (!r_down && io.KeyCtrl) {
                         if (screen_zoom == 1) {
                             // (This does not need `mark_written`.)
-                            m_torus.rotate(io.MouseDelta.x, io.MouseDelta.y);
+                            rotate(m_torus.tile(), io.MouseDelta.x, io.MouseDelta.y);
                         }
                     } else if (!lock_mouse) {
                         screen_off += io.MouseDelta;
