@@ -129,8 +129,15 @@ public:
 
 // TODO: support setting patterns as init state?
 struct initT {
+    static constexpr aniso::tileT::sizeT size_min{.width = 20, .height = 15};
+    static constexpr aniso::tileT::sizeT size_max{.width = 1600, .height = 1200};
+    static aniso::tileT::sizeT size_clamped(aniso::tileT::sizeT size) {
+        return {.width = std::clamp(size.width, size_min.width, size_max.width),
+                .height = std::clamp(size.height, size_min.height, size_max.height)};
+    }
+
     aniso::tileT::sizeT size;
-    uint32_t seed;
+    int seed;
     densityT density;
 
     friend bool operator==(const initT&, const initT&) = default;
@@ -150,7 +157,7 @@ public:
     void restart(const initT& init) {
         m_tile.resize(init.size);
 
-        std::mt19937 rand(init.seed);
+        std::mt19937 rand(uint32_t(init.seed));
         aniso::random_fill(m_tile, rand, init.density.get());
 
         m_gen = 0;
@@ -199,15 +206,6 @@ public:
 };
 
 class runnerT {
-    static constexpr aniso::tileT::sizeT min_size{.width = 20, .height = 15};
-    static constexpr aniso::tileT::sizeT max_size{.width = 1600, .height = 1200};
-    static aniso::tileT::sizeT size_clamped(aniso::tileT::sizeT size) {
-        return {.width = std::clamp(size.width, min_size.width, max_size.width),
-                .height = std::clamp(size.height, min_size.height, max_size.height)};
-    }
-
-    static constexpr ImVec2 min_canvas_size{min_size.width * zoomT::max(), min_size.height* zoomT::max()};
-
     struct ctrlT {
         aniso::ruleT rule{};
 
@@ -227,34 +225,97 @@ class runnerT {
 
         bool pause = false;
 
-        // TODO: pause for some fixed time for user-editions?
-        clockT::time_point last_written = {};
-        void mark_written() { last_written = clockT::now(); }
+        int extra_step = 0;
 
-        void run(torusT& torus, int extra_step, bool extra_pause) {
-            if (extra_step == 0) {
-                if (!pause && !extra_pause &&
-                    (last_written + std::chrono::milliseconds{gap * gap_unit} <= clockT::now())) {
-                    extra_step = actual_pace();
+        clockT::time_point last_time = {};
+        int calc_step() {
+            int step = std::exchange(extra_step, 0);
+            if (step == 0) {
+                if (!pause && (last_time + std::chrono::milliseconds{gap * gap_unit} <= clockT::now())) {
+                    step = actual_pace();
                 }
             }
 
-            if (extra_step != 0) {
+            if (step != 0) {
+                last_time = clockT::now();
+            }
+            return step;
+        }
+    };
+
+    class torusT_ex {
+        initT m_init{.size{.width = 500, .height = 400}, .seed = 0, .density = 0.5};
+        torusT m_torus{m_init};
+        ctrlT m_ctrl{.rule{}, .pace = 1, .anti_strobing = true, .gap = 0, .pause = false};
+
+        bool extra_pause = false;
+        void mark_written() {
+            extra_pause = true;
+            m_ctrl.last_time = clockT::now();
+        }
+
+    public:
+        void begin_frame(const aniso::ruleT& rule) {
+            extra_pause = false;
+            m_ctrl.extra_step = 0;
+
+            if (m_ctrl.rule != rule) {
+                m_ctrl.rule = rule;
+                m_ctrl.anti_strobing = true;
+                m_ctrl.pause = false;
+
+                restart();
+            }
+        }
+        void restart() {
+            m_torus.restart(m_init);
+            mark_written();
+        }
+        void pause_for_this_frame() { extra_pause = true; }
+
+        const aniso::tileT& get_tile_read() const { return m_torus.tile(); }
+        // (Should not resize the returned tile.)
+        aniso::tileT& get_tile_write() {
+            mark_written();
+            return m_torus.tile();
+        }
+        void get_tile_maybe_write(const auto& fn) {
+            if (fn(m_torus.tile())) {
                 mark_written();
-                torus.run(rule, extra_step);
+            }
+        }
+
+        int gen() const { return m_torus.gen(); }
+        aniso::tileT::sizeT size() const {
+            assert(m_init.size == m_torus.tile().size());
+            assert(m_init.size == m_init.size_clamped(m_init.size));
+            return m_init.size;
+        }
+
+        void set_ctrl(const auto& fn) { fn(m_ctrl); }
+        void set_init(const auto& fn) {
+            initT init = m_init;
+            fn(init);
+            if (init != m_init) {
+                m_init = init;
+                restart();
+            }
+        }
+
+        void end_frame() {
+            if (!extra_pause) {
+                m_torus.run(m_ctrl.rule, m_ctrl.calc_step());
             }
         }
     };
 
-    initT m_init{.size{.width = 500, .height = 400}, .seed = 0, .density = 0.5};
-    torusT m_torus{m_init};
-    ctrlT m_ctrl{.rule{}, .pace = 1, .anti_strobing = true, .gap = 0, .pause = false};
-
+    torusT_ex m_torus{};
     ImVec2 screen_off = {0, 0};
     zoomT screen_zoom{};
 
     // (Workaround: it's hard to get canvas-size in this frame when it's needed; this looks horrible but
     // will work well in all cases)
+    static constexpr ImVec2 min_canvas_size{initT::size_min.width * zoomT::max(), initT::size_min.height* zoomT::max()};
     ImVec2 last_known_canvas_size = min_canvas_size;
 
     std::optional<aniso::tileT> paste = std::nullopt;
@@ -277,23 +338,11 @@ class runnerT {
     std::optional<selectT> m_sel = std::nullopt;
 
 public:
-    // TODO: redesign pause logics...
-    // TODO: better control logics... (`display` is horribly written due to unorganized control logics...)
     // TODO: (wontfix?) there cannot actually be multiple instances in the program.
     // For example, there are a lot of static variables in `display`, and the keyboard controls are not designed
     // for per-object use.
-
     void display(sync_point& sync) {
-        bool temp_pause = false;
-        if (m_ctrl.rule != sync.current.rule) {
-            m_ctrl.rule = sync.current.rule;
-            m_ctrl.anti_strobing = true;
-            m_ctrl.pause = false;
-            m_torus.restart(m_init);
-            m_ctrl.mark_written();
-
-            temp_pause = true;
-        }
+        m_torus.begin_frame(sync.current.rule);
 
         const char* const canvas_name = "Canvas";
         const bool enable_shortcuts =
@@ -305,47 +354,38 @@ public:
         };
         static bool background = 0; // TODO: move elsewhere...
 
-        assert(m_init.size == m_torus.tile().size());
-        assert(m_init.size == size_clamped(m_init.size));
         assert(screen_off.x == int(screen_off.x) && screen_off.y == int(screen_off.y));
-
-        int extra_step = 0;
-        auto restart = [&] {
-            m_torus.restart(m_init);
-            m_ctrl.mark_written();
-            temp_pause = true;
-        };
 
         {
             // (Keeping in line with edit-rule's.)
             if (ImGui::Button("Restart")) {
-                restart();
+                m_torus.restart();
             }
             ImGui::SameLine();
             ImGui::Text("Generation:%d, density:%.4f", m_torus.gen(),
-                        float(aniso::count(m_torus.tile())) / m_torus.tile().area());
+                        float(aniso::count(m_torus.get_tile_read())) / m_torus.get_tile_read().area());
             ImGui::Separator();
         }
 
         ImGui::PushItemWidth(item_width);
         ImGui::BeginGroup();
-        {
+        m_torus.set_ctrl([&](ctrlT& ctrl) {
             ImGui::AlignTextToFramePadding();
             imgui_StrTooltip("(...)", "Keyboard shortcuts:\n"
                                       "R: Restart    Space: Pause\nN/M (repeatable): +p/+1\n"
                                       "1/2 (repeatable): -/+ Pace\n3/4 (repeatable): -/+ Gap time\n");
             quick_info("< Keyboard shortcuts.");
             ImGui::SameLine();
-            ImGui::Checkbox("Pause", &m_ctrl.pause);
+            ImGui::Checkbox("Pause", &ctrl.pause);
             ImGui::PushButtonRepeat(true);
             ImGui::SameLine();
-            if (ImGui::Button(std::format("+p({})###+p", m_ctrl.actual_pace()).c_str())) {
-                extra_step = m_ctrl.pause ? m_ctrl.actual_pace() : 0;
-                m_ctrl.pause = true;
+            if (ImGui::Button(std::format("+p({})###+p", ctrl.actual_pace()).c_str())) {
+                ctrl.extra_step = ctrl.pause ? ctrl.actual_pace() : 0;
+                ctrl.pause = true;
             }
             ImGui::SameLine();
             if (ImGui::Button("+1")) {
-                extra_step = 1;
+                ctrl.extra_step = 1;
             }
             ImGui::PopButtonRepeat();
             ImGui::SameLine();
@@ -359,18 +399,18 @@ public:
                           "of generation when actual-pace != 1.");
             });
 
-            imgui_StepSliderInt("Pace", &m_ctrl.pace, m_ctrl.pace_min, m_ctrl.pace_max);
+            imgui_StepSliderInt("Pace", &ctrl.pace, ctrl.pace_min, ctrl.pace_max);
 
-            imgui_StepSliderInt("Gap time", &m_ctrl.gap, m_ctrl.gap_min, m_ctrl.gap_max,
-                                std::format("{} ms", m_ctrl.gap * m_ctrl.gap_unit).c_str());
+            imgui_StepSliderInt("Gap time", &ctrl.gap, ctrl.gap_min, ctrl.gap_max,
+                                std::format("{} ms", ctrl.gap * ctrl.gap_unit).c_str());
 
             // TODO: this would better be explained with examples.
             // How to make interactive tooltips?
-            assert(m_ctrl.anti_strobing);
+            assert(ctrl.anti_strobing);
             ImGui::BeginDisabled();
-            ImGui::Checkbox("Anti-strobing", &m_ctrl.anti_strobing);
+            ImGui::Checkbox("Anti-strobing", &ctrl.anti_strobing);
             ImGui::SameLine();
-            ImGui::Text("(Actual pace: %d)", m_ctrl.actual_pace());
+            ImGui::Text("(Actual pace: %d)", ctrl.actual_pace());
             ImGui::EndDisabled();
             ImGui::SameLine();
             imgui_StrTooltip("(?)",
@@ -379,38 +419,37 @@ public:
                              "In these cases, you can try the '+1' button to change the parity of generation.");
 
             if (test_key(ImGuiKey_R, false)) {
-                restart();
+                m_torus.restart();
             } else if (test_key(ImGuiKey_1, true)) {
-                m_ctrl.pace = std::max(m_ctrl.pace_min, m_ctrl.pace - 1);
+                ctrl.pace = std::max(ctrl.pace_min, ctrl.pace - 1);
             } else if (test_key(ImGuiKey_2, true)) {
-                m_ctrl.pace = std::min(m_ctrl.pace_max, m_ctrl.pace + 1);
+                ctrl.pace = std::min(ctrl.pace_max, ctrl.pace + 1);
             } else if (test_key(ImGuiKey_3, true)) {
-                m_ctrl.gap = std::max(m_ctrl.gap_min, m_ctrl.gap - 1);
+                ctrl.gap = std::max(ctrl.gap_min, ctrl.gap - 1);
             } else if (test_key(ImGuiKey_4, true)) {
-                m_ctrl.gap = std::min(m_ctrl.gap_max, m_ctrl.gap + 1);
+                ctrl.gap = std::min(ctrl.gap_max, ctrl.gap + 1);
             } else if (test_key(ImGuiKey_Space, false)) {
-                m_ctrl.pause = !m_ctrl.pause;
+                ctrl.pause = !ctrl.pause;
             } else if (test_key(ImGuiKey_N, true)) {
-                extra_step = m_ctrl.pause ? m_ctrl.actual_pace() : 0;
-                m_ctrl.pause = true;
+                ctrl.extra_step = ctrl.pause ? ctrl.actual_pace() : 0;
+                ctrl.pause = true;
             } else if (test_key(ImGuiKey_M, true)) {
-                extra_step = 1;
+                ctrl.extra_step = 1;
             }
-        }
+        });
         ImGui::EndGroup();
         ImGui::SameLine(0, imgui_ItemSpacingX() + ImGui::CalcTextSize("  ").x);
         ImGui::BeginGroup();
-        {
-            initT init = m_init;
-            int seed = init.seed;
-            imgui_StepSliderInt("Init seed", &seed, 0, 29);
+        m_torus.set_init([&](initT& init) {
+            const auto old_size = init.size;
+
+            imgui_StepSliderInt("Init seed", &init.seed, 0, 29);
             if (ImGui::IsItemActive()) {
-                temp_pause = true;
+                m_torus.pause_for_this_frame();
             }
-            init.seed = seed;
             init.density.step_slide("Init density");
             if (ImGui::IsItemActive()) {
-                temp_pause = true;
+                m_torus.pause_for_this_frame();
             }
 
             {
@@ -438,19 +477,19 @@ public:
                     if (has_w || has_h) {
                         screen_off = {0, 0};
                         screen_zoom.set_1();
-                        init.size = size_clamped({.width = width, .height = height});
+                        init.size = init.size_clamped({.width = width, .height = height});
                     }
                     input_width[0] = '\0';
                     input_height[0] = '\0';
                 }
 
                 ImGui::SameLine(0, s);
-                ImGui::Text("Size = %d*%d", m_torus.tile().width(), m_torus.tile().height());
+                ImGui::Text("Size = %d*%d", init.size.width, init.size.height);
             }
 
             ImGui::AlignTextToFramePadding();
             imgui_Str("Zoom =");
-            screen_zoom.select([&](bool is_cur, float z, const char* s) {
+            screen_zoom.select([&](const bool is_cur, const float z, const char* const s) {
                 ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                 if (z < 1) {
                     ImGui::BeginDisabled();
@@ -463,7 +502,7 @@ public:
                 if (sel) {
                     screen_off = {0, 0};
 
-                    init.size = size_clamped(
+                    init.size = init.size_clamped(
                         {.width = (int)(last_known_canvas_size.x / z), .height = (int)(last_known_canvas_size.y / z)});
                 }
                 return sel;
@@ -471,21 +510,17 @@ public:
             ImGui::SameLine();
             imgui_StrTooltip("(?)", "Click to resize to full-screen.");
 
-            if (init != m_init) {
-                if (init.size != m_init.size) {
-                    m_sel.reset();
-                    paste.reset();
-                }
-                m_init = init;
-                restart();
+            if (old_size != init.size) {
+                m_sel.reset();
+                paste.reset();
             }
-        }
+        });
         ImGui::EndGroup();
         ImGui::PopItemWidth();
 
         ImGui::Separator();
 
-        const aniso::tileT::sizeT tile_size = m_torus.tile().size();
+        const aniso::tileT::sizeT tile_size = m_torus.size();
 
         static bool lock_mouse = false; // Lock scrolling control and window moving.
         ImGui::AlignTextToFramePadding();
@@ -563,7 +598,7 @@ public:
             const bool l_down = ImGui::IsMouseDown(ImGuiMouseButton_Left);
             const bool r_down = ImGui::IsMouseDown(ImGuiMouseButton_Right);
             if (active) {
-                temp_pause = true;
+                m_torus.pause_for_this_frame();
             }
             if (m_sel && m_sel->active && (!r_down || paste || ImGui::IsItemDeactivated())) {
                 m_sel->active = false;
@@ -584,8 +619,11 @@ public:
                 if (active && (l_down || (paste && r_down))) {
                     if (!r_down && io.KeyCtrl) {
                         if (screen_zoom == 1) {
-                            // (This does not need `mark_written`.)
-                            rotate(m_torus.tile(), io.MouseDelta.x, io.MouseDelta.y);
+                            // (This does not need `get_tile_write`.)
+                            m_torus.get_tile_maybe_write([&](aniso::tileT& tile) {
+                                rotate(tile, io.MouseDelta.x, io.MouseDelta.y);
+                                return false;
+                            });
                         }
                     } else if (!lock_mouse) {
                         screen_off += io.MouseDelta;
@@ -646,7 +684,7 @@ public:
 
                 const scaleE scale_mode = screen_zoom < 1 ? scaleE::Linear : scaleE::Nearest;
                 if (!paste) {
-                    const ImTextureID texture = make_screen(m_torus.tile(), scale_mode);
+                    const ImTextureID texture = make_screen(m_torus.get_tile_read(), scale_mode);
 
                     drawlist->AddImage(texture, screen_min, screen_max);
                     if (zoom_center.has_value()) {
@@ -658,7 +696,7 @@ public:
                             } else {
                                 // TODO: is it possible to reuse the texture in a different scale mode?
                                 // (Related: https://github.com/ocornut/imgui/issues/7616)
-                                zoom_image(m_torus.tile(), *zoom_center, {60, 60}, 3);
+                                zoom_image(m_torus.get_tile_read(), *zoom_center, {60, 60}, 3);
                             }
                             ImGui::EndTooltip();
                         }
@@ -671,18 +709,21 @@ public:
                     paste_beg.y = std::clamp(paste_beg.y, 0, tile_size.height - paste->height());
                     const aniso::tileT::posT paste_end = paste_beg + paste->size();
 
+                    ImTextureID texture = nullptr;
                     // (wontfix) Wasteful, but after all this works...
-                    aniso::tileT temp = aniso::copy(m_torus.tile(), {{paste_beg, paste_end}});
-                    (background == 0 ? aniso::blit<aniso::blitE::Or>
-                                     : aniso::blit<aniso::blitE::And>)(m_torus.tile(), paste_beg, *paste, std::nullopt);
-                    const ImTextureID texture = make_screen(m_torus.tile(), scale_mode);
-                    if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
-                        m_ctrl.mark_written();
-                        temp_pause = true;
-                        paste.reset();
-                    } else { // Restore.
-                        aniso::blit<aniso::blitE::Copy>(m_torus.tile(), paste_beg, temp);
-                    }
+                    m_torus.get_tile_maybe_write([&](aniso::tileT& tile) {
+                        aniso::tileT temp = aniso::copy(tile, {{paste_beg, paste_end}});
+                        (background == 0 ? aniso::blit<aniso::blitE::Or>
+                                         : aniso::blit<aniso::blitE::And>)(tile, paste_beg, *paste, std::nullopt);
+                        texture = make_screen(tile, scale_mode);
+                        if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
+                            paste.reset();
+                            return true;
+                        } else { // Restore.
+                            aniso::blit<aniso::blitE::Copy>(tile, paste_beg, temp);
+                            return false;
+                        }
+                    });
 
                     // (`paste_beg` and `paste_end` remain valid even if `paste` has been consumed.)
                     drawlist->AddImage(texture, screen_min, screen_max);
@@ -723,8 +764,8 @@ public:
                 static bool show_result = true; // Copy / cut.
                 auto copy_sel = [&] {
                     if (m_sel) {
-                        std::string rle_str =
-                            aniso::to_RLE_str(add_rule ? &m_ctrl.rule : nullptr, m_torus.tile(), m_sel->to_range());
+                        std::string rle_str = aniso::to_RLE_str(add_rule ? &sync.current.rule : nullptr,
+                                                                m_torus.get_tile_read(), m_sel->to_range());
                         ImGui::SetClipboardText(rle_str.c_str());
 
                         if (show_result) {
@@ -853,27 +894,21 @@ public:
                 }
 
                 if (op == _capture_closed && m_sel) {
-                    auto lock = capture_closed(m_torus.tile(), m_sel->to_range(), m_ctrl.rule);
+                    auto lock = capture_closed(m_torus.get_tile_read(), m_sel->to_range(), sync.current.rule);
                     if (!replace) {
                         aniso::for_each_code([&](aniso::codeT c) { lock[c] = lock[c] || sync.current.lock[c]; });
                     }
                     sync.set_lock(lock);
                 } else if (op == _capture_open && m_sel) {
                     auto lock = sync.current.lock;
-                    capture_open(m_torus.tile(), m_sel->to_range(), lock);
+                    capture_open(m_torus.get_tile_read(), m_sel->to_range(), lock);
                     sync.set_lock(lock);
                 } else if (op == _random_fill && m_sel) {
-                    aniso::random_fill(m_torus.tile(), global_mt19937(), fill_den.get(), m_sel->to_range());
-                    m_ctrl.mark_written();
-                    temp_pause = true;
+                    aniso::random_fill(m_torus.get_tile_write(), global_mt19937(), fill_den.get(), m_sel->to_range());
                 } else if (op == _clear_inside && m_sel) {
-                    aniso::clear_inside(m_torus.tile(), m_sel->to_range(), background);
-                    m_ctrl.mark_written();
-                    temp_pause = true;
+                    aniso::clear_inside(m_torus.get_tile_write(), m_sel->to_range(), background);
                 } else if (op == _clear_outside && m_sel) {
-                    aniso::clear_outside(m_torus.tile(), m_sel->to_range(), background);
-                    m_ctrl.mark_written();
-                    temp_pause = true;
+                    aniso::clear_outside(m_torus.get_tile_write(), m_sel->to_range(), background);
                 } else if (op == _select_all) {
                     if (!m_sel || m_sel->width() != tile_size.width || m_sel->height() != tile_size.height) {
                         m_sel = {.active = false,
@@ -883,7 +918,8 @@ public:
                         m_sel.reset();
                     }
                 } else if (op == _bounding_box && m_sel) {
-                    const auto [begin, end] = aniso::bounding_box(m_torus.tile(), m_sel->to_range(), background);
+                    const auto [begin, end] =
+                        aniso::bounding_box(m_torus.get_tile_read(), m_sel->to_range(), background);
                     if (begin != end) {
                         m_sel = {.active = false, .beg = begin, .end = {.x = end.x - 1, .y = end.y - 1}};
                     } else {
@@ -893,9 +929,7 @@ public:
                     copy_sel();
                 } else if (op == _cut && m_sel) {
                     copy_sel();
-                    aniso::clear_inside(m_torus.tile(), m_sel->to_range());
-                    m_ctrl.mark_written();
-                    temp_pause = true;
+                    aniso::clear_inside(m_torus.get_tile_write(), m_sel->to_range());
                 } else if (op == _paste) {
                     if (const char* text = ImGui::GetClipboardText()) {
                         paste.reset();
@@ -922,10 +956,10 @@ public:
         }
 
         if (paste) {
-            temp_pause = true;
+            m_torus.pause_for_this_frame();
         }
 
-        m_ctrl.run(m_torus, extra_step, temp_pause);
+        m_torus.end_frame();
     }
 };
 
