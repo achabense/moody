@@ -575,8 +575,8 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
             "natural interpretations.\n"
             "If a rule belongs to the working set, its distance to the masking rule can be defined as the number "
             "of groups where they have different values.\n\n"
-            "(The exact workings are more complex than explained here. For details see the \"Subset, mask ...\" "
-            "section in \"Documents\".)";
+            "(The exact workings are more complex than explained here. For details see the 'Subset, mask ...' "
+            "section in 'Documents'.)";
 
         static aniso::maskT mask_custom{{}};
 
@@ -781,13 +781,14 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
             imgui_ItemTooltip("Incompatible.");
         }
         ImGui::SameLine();
-        imgui_StrTooltip("(?)", "Generate random rules with intended distance to the mask. A window with "
-                                "'Generate' will appear after you click 'Randomize'.\n\n"
-                                "For example, if you are using the 'Zero' mask and distance = 51, 'Generate' "
-                                "will generate rules with 51 groups having '1'.\n"
-                                "Also, suppose the current rule belongs to the working set, you can set it to "
-                                "the custom mask, and 'Generate' with low distance to generate rules that "
-                                "are \"close\" to it.");
+        imgui_StrTooltip("(?)",
+                         "Generate random rules with intended distance around/exactly to the mask, as specified "
+                         "by the button and slider.\n\n"
+                         "For example, if you are using the 'Zero' mask and distance = 'Around' 51, 'Generate' "
+                         "(in the 'Randomize' window) will generate rules with around 51 groups having '1'.\n\n"
+                         "(Also, suppose the current rule belongs to the working set, you can set it to "
+                         "the custom mask, and 'Generate' in a low distance to get random rules that are \"close\" "
+                         "to it.)");
 
         guarded_block(compatible, [&] {
             sequence::seq(

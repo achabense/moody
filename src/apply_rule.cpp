@@ -692,11 +692,11 @@ public:
                         if (ImGui::BeginTooltip()) {
                             if (scale_mode == scaleE::Nearest) {
                                 zoom_image(texture, ImVec2(tile_size.width, tile_size.height),
-                                           ImVec2(zoom_center->x, zoom_center->y), ImVec2(60, 60), 3);
+                                           ImVec2(zoom_center->x, zoom_center->y), ImVec2(80, 60), 3);
                             } else {
                                 // TODO: is it possible to reuse the texture in a different scale mode?
                                 // (Related: https://github.com/ocornut/imgui/issues/7616)
-                                zoom_image(m_torus.get_tile_read(), *zoom_center, {60, 60}, 3);
+                                zoom_image(m_torus.get_tile_read(), *zoom_center, {80, 60}, 3);
                             }
                             ImGui::EndTooltip();
                         }
@@ -1049,7 +1049,7 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
         const ImVec2 pos = ImGui::GetIO().MousePos - ImGui::GetItemRectMin();
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
         if (ImGui::BeginTooltip()) {
-            zoom_image(texture, ImVec2(width, height), pos, ImVec2(60, 60), 3);
+            zoom_image(texture, ImVec2(width, height), pos, ImVec2(64, 48), 3);
             ImGui::EndTooltip();
         }
         ImGui::PopStyleVar();

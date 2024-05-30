@@ -26,7 +26,7 @@ x = 7, y = 14, rule = MAPARYBFxZoF34WaBd+aIF+6RZoF35ogX7paIF+6YEX6ZcWaBd+aIF+6Wi
 3bo3b$2b3o2b$b5ob$ob3obo$2b3o2b$2b3o2b$ob3obo$ob3obo$b5ob$b
 5ob$3bo3b$7b$2b3o2b$2bobo2b!
 
-The left plane provides ways to analyze and modify the current rule based on a series of subsets. For detailed descriptions see the next section ("Subset, mask and rule operations"). In short:
+The left plane provides ways to analyze and modify the current rule based on a series of subsets. For detailed descriptions see the next section ('Subset, mask and rule operations'). In short:
 The subsets that the current rule belongs to will be marked with light-green borders.
 You need to firstly specify a "working set", which is the set you are going to explore. You can select multiple subsets - the program will calculate the intersection of them as the working set. For example, if you select 'All' (isotropic rules; selected by default) and 'S.c.' (self-complementary rules), you are going to explore the rules that are both isotropic and self-complementary.
 Then you need to select a "mask" (masking rule) to guide how to observe the current rule and generate new rules.
@@ -38,11 +38,11 @@ In the random-access section, the values of the current rule are viewed through 
 
 The program also has a way to generate rules ensuring certain value constraints (allowing for certain patterns). For example, in this program it's easy to find rules like this:
 MAPARYSZhYAPEgSaBCgCAAAgABAEsAIAIgASIDgAIAAgAASQAIAaACggACAAICAAIAASICogIAAAACAAAAAAAAAAA
-See the "Lock and capture" section for details.
+See the 'Lock and capture' section for details.
 )";
 
 const char* const doc_workings =
-    R"(This section describes the exact workings of subsets, masks and major rule operations. If you are not familiar with this program, I'd recommend firstly checking the "Rules in different subsets" section to get some sense about what can be found with this program.
+    R"(This section describes the exact workings of subsets, masks and major rule operations. If you are not familiar with this program, I'd recommend firstly checking the 'Rules in different subsets' section to get some sense about what can be found with this program.
 
 The program works with a series of subsets, each representing certain properties. For example, a rule is isotropic iff it belongs to the isotropic subset ('Native symmetry/All').
 These subsets can uniformly be composed in the form of:
@@ -99,7 +99,7 @@ If the working set is large, then it's infeasible to test all rules. In these ca
 2. (After '<< Cur') 'Next' still works - the iteration will start from the nearest rules (those with distance = 1).
 3. (Random-access) 'Preview mode' provides a direct view of all rules with distance = 1 to the current rule.
 
-For example, here is the same rule in the "About this program" section:
+For example, here is the same rule in the 'About this program' section:
 MAP+sQSUIzICkiQgAiAEKBAhrIGFgAUbAAA4AChgnAAAw6CAkAIgKCAlASgIACgIQBbqCqhEQAAkFQAARIDAQQRBA
 It turns out that there exist a lot of amazing rules close to it (in the isotropic set). As a lot of rules involve large oscillators or spaceships, I'd recommend using the 'Next' approach to avoid missing important discoveries. Below is one of the rules with distance = 1 to it.
 MAP+sASUIjICkiAgAiAEKBAhrIGFgAUbAAAoAChgnAAAw6AAkAIgKCAlAQgIAAgIQBboCqhEQAAkFQAARIDAQQRBA
@@ -112,7 +112,7 @@ x = 5, y = 27, rule = MAP+sASUIjICmiAgAiAEKBAhrIGFiAUbCCAoAChgnAAAw6AAkAIgKCAlAQ
 By "wandering" in the working set in this way, you can collect a series of rules that are close from each other.
 
 
-Sometimes you may also want to jump outside of the predefined subsets. This can be done via random-access editing, and may lead to surprising discoveries. See the "More about random-access editing" section for more info.
+Sometimes you may also want to jump outside of the predefined subsets. This can be done via random-access editing, and may lead to surprising discoveries. See the 'More about random-access editing' section for more info.
 )";
 
 const char* const doc_rules =
@@ -264,11 +264,11 @@ MAPACEAIYCBgIFVVVVVX3dfdxGdEZ0BVQFVd313fUN/Q38BPQE9QRFBEVV/VX9Gd0Z3EQURBVVVVVV+/
 MAPEgASAAEJAQk1bzVvHVYdVlVFVUUZERkR9hH2EX1/fX8BQQFBd5B3kHdnd2ddVV1VlUeVRwlTCVNvf29//7f/tw
 
 
-Finally, it's possible to get non-trivial rules that do not belong to any well-defined subsets (no symmetries, no independencies). See the next section ("More about random-access editing") for details.
+Finally, it's possible to get non-trivial rules that do not belong to any well-defined subsets (no symmetries, no independencies). See the next section ('More about random-access editing') for details.
 )";
 
 const char* const doc_random_access =
-    R"(This section covers more aspects about random-access editing (as explained in "Subset, mask and rule operations"). To recap, for the current rule C and working set W = (M, P), the operation flips all the values in a group in W.P, and therefore, the result belongs to S' = (C, W.P), which is W itself if C already belongs to W.
+    R"(This section covers more aspects about random-access editing (as explained in 'Subset, mask and rule operations'). To recap, for the current rule C and working set W = (M, P), the operation flips all the values in a group in W.P, and therefore, the result belongs to S' = (C, W.P), which is W itself if C already belongs to W.
 
 For the sets in the form of (M, P), if a set S1 is a subset of another set S2, its partition must be strictly "coarser" than that of S2. In other words, each group in S1.P must fully cover one or several groups in S2.P. For example, the isotropic set is a subset of '-', '|', ..., 'C4' etc, so its partition is strictly coarser than theirs.
 (In the program, the working set is a subset of the ones that turn dull-blue, and any set is a subset of the whole MAP set.)
@@ -285,7 +285,7 @@ The result may not belong to W (as the current rule may not belong to W), but mu
 
 Case 1 is especially useful.
 
-Here is the same hex-C6 rule shown in the "Rules in different subsets" section. Hex-C6 is a subset of hex-C2, which is a subset of native-C2, which is further a subset of the whole MAP set.
+Here is the same hex-C6 rule shown in the 'Rules in different subsets' section. Hex-C6 is a subset of hex-C2, which is a subset of native-C2, which is further a subset of the whole MAP set.
 The later rules are all "refined" from this rule. (You can easily find such rules with the help of preview mode.) Before moving on, I'd recommend setting it as the masking rule ('<< Cur'), and setting a large pace for the preview windows (in 'Settings') as well as the main window (as the dynamics of these rules are complex and relatively slow).
 MAPEUQRVSLdM4gRRBFVIt0ziCK7IswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHMRIiqIpnMEQ
 
