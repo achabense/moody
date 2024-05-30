@@ -310,8 +310,10 @@ class runnerT {
     };
 
     torusT_ex m_torus{};
+
     ImVec2 screen_off = {0, 0};
     zoomT screen_zoom{};
+    ImVec2 screen_rotate = {0, 0};
 
     // (Workaround: it's hard to get canvas-size in this frame when it's needed; this looks horrible but
     // will work well in all cases)
@@ -476,6 +478,7 @@ public:
                     // ~ the value is unmodified if `from_chars` fails.
                     if (has_w || has_h) {
                         screen_off = {0, 0};
+                        screen_rotate = {0, 0};
                         screen_zoom.set_1();
                         init.size = init.size_clamped({.width = width, .height = height});
                     }
@@ -501,6 +504,7 @@ public:
 
                 if (sel) {
                     screen_off = {0, 0};
+                    screen_rotate = {0, 0};
 
                     init.size = init.size_clamped(
                         {.width = (int)(last_known_canvas_size.x / z), .height = (int)(last_known_canvas_size.y / z)});
@@ -528,14 +532,13 @@ public:
             // TODO: is "window" ambiguous here?
             imgui_Str(
                 "Mouse operations:\n"
-                "1. Scroll in the window to change the zoom.\n"
-                "2. When there is nothing to paste, you can drag with left button to move the window, or drag with "
-                "right button to select area (for range operations). When zoom = 1, you can also 'Ctrl + left-drag' "
-                "to \"rotate\" the space.\n"
+                "1. Scroll in the window to zoom in/out.\n"
+                "2. When there is nothing to paste, you can drag with left button to move the window, or 'Ctrl + "
+                "left-drag' to \"rotate\" the space, or drag with right button to select area (to copy, clear, etc.).\n"
                 "3. Otherwise, left-click to decide where to paste. In this case, to move the window you can drag with "
-                "right button. (Range-selection and rotation is disabled when there are patterns to paste.)");
+                "right button. (Rotating and selecting are not available when there are patterns to paste.)");
             ImGui::Separator();
-            ImGui::Text("(You can right-click this '%s' to enable/disable scrolling control and window moving.)",
+            ImGui::Text("(You can right-click this '%s' to enable/disable scrolling and window moving.)",
                         lock_mouse ? "[...]" : "(...)");
             bool enabled = !lock_mouse;
             ImGui::Checkbox("Enabling scrolling and window moving", &enabled);
@@ -548,6 +551,7 @@ public:
         ImGui::SameLine();
         if (ImGui::Button("Corner")) {
             screen_off = {0, 0};
+            screen_rotate = {0, 0};
         }
         ImGui::SameLine();
         if (ImGui::Button("Center")) {
@@ -556,11 +560,12 @@ public:
             screen_off = last_known_canvas_size / 2 - screen_size / 2;
             screen_off.x = floor(floor(screen_off.x / screen_zoom) * screen_zoom);
             screen_off.y = floor(floor(screen_off.y / screen_zoom) * screen_zoom);
+            screen_rotate = {0, 0};
         }
         ImGui::SameLine();
         static bool show_range_window = false;
         ImGui::Checkbox("Range operations", &show_range_window);
-        quick_info("^ Copy, paste, etc.\nv Drag with right button to select area.");
+        quick_info("^ Copy, paste, clear, etc.\nv Drag with right button to select area.");
 
         ImGui::SameLine();
         if (m_sel) {
@@ -618,10 +623,13 @@ public:
                 // TODO: this looks messy...
                 if (active && (l_down || (m_paste && r_down))) {
                     if (!r_down && io.KeyCtrl) {
-                        if (screen_zoom == 1) {
+                        screen_rotate += io.MouseDelta / screen_zoom;
+                        const int dx = screen_rotate.x, dy = screen_rotate.y; // Truncate.
+                        if (dx || dy) {
+                            screen_rotate -= ImVec2(dx, dy);
                             // (This does not need `get_tile_write`.)
                             m_torus.get_tile_maybe_write([&](aniso::tileT& tile) {
-                                rotate(tile, io.MouseDelta.x, io.MouseDelta.y);
+                                rotate(tile, dx, dy);
                                 return false;
                             });
                         }
@@ -641,6 +649,7 @@ public:
                     screen_off = (mouse_pos - cell_pos_raw * screen_zoom) - canvas_min;
                     screen_off.x = round(screen_off.x);
                     screen_off.y = round(screen_off.y);
+                    screen_rotate = {0, 0};
                 }
 
                 const ImVec2 screen_min = canvas_min + screen_off;
