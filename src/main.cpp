@@ -75,6 +75,8 @@ public:
     static void begin_frame() {
         assert(window && renderer);
 
+        // According to https://en.cppreference.com/w/cpp/container/vector/erase2
+        // std::erase_if doesn't apply, as for vector the predicate is required not to modify the values.
         auto pos = blobs.begin();
         for (blobT& blob : blobs) {
             if (++blob.c > 100) { // Expired.

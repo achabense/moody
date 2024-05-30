@@ -1003,17 +1003,11 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
         if (latest + 1 != frame) {
             terms.clear();
         } else {
-            auto pos = terms.begin();
-            const auto end = terms.end();
-            while (pos != end) {
-                if (pos->second.active) {
-                    pos->second.active = false;
-                    ++pos;
-                } else {
-                    // ~ won't invalidate `end`.
-                    pos = terms.erase(pos);
-                }
-            }
+            // According to https://en.cppreference.com/w/cpp/container/unordered_map/erase_if
+            // There is no requirement on the predicate.
+            std::erase_if(terms, [](std::pair<const uint64_t, termT>& pair) {
+                return !std::exchange(pair.second.active, false);
+            });
         }
         latest = frame;
     }
