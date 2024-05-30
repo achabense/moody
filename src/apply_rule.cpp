@@ -318,7 +318,7 @@ class runnerT {
     static constexpr ImVec2 min_canvas_size{initT::size_min.width * zoomT::max(), initT::size_min.height* zoomT::max()};
     ImVec2 last_known_canvas_size = min_canvas_size;
 
-    std::optional<aniso::tileT> paste = std::nullopt;
+    std::optional<aniso::tileT> m_paste = std::nullopt;
     aniso::tileT::posT paste_beg{0, 0}; // Valid if paste.has_value().
 
     struct selectT {
@@ -512,7 +512,7 @@ public:
 
             if (old_size != init.size) {
                 m_sel.reset();
-                paste.reset();
+                m_paste.reset();
             }
         });
         ImGui::EndGroup();
@@ -575,12 +575,12 @@ public:
             imgui_Str("  Selected:N/A");
         }
 
-        if (paste) {
+        if (m_paste) {
             ImGui::SameLine();
-            ImGui::Text("  Paste:%d*%d", paste->width(), paste->height());
+            ImGui::Text("  Paste:%d*%d", m_paste->width(), m_paste->height());
             ImGui::SameLine();
             if (ImGui::SmallButton("Drop##P")) {
-                paste.reset();
+                m_paste.reset();
             }
         }
 
@@ -600,7 +600,7 @@ public:
             if (active) {
                 m_torus.pause_for_this_frame();
             }
-            if (m_sel && m_sel->active && (!r_down || paste || ImGui::IsItemDeactivated())) {
+            if (m_sel && m_sel->active && (!r_down || m_paste || ImGui::IsItemDeactivated())) {
                 m_sel->active = false;
                 // Allow a single right-click to unselect the area.
                 // (`bounding_box` has no size check like this. This is intentional.)
@@ -616,7 +616,7 @@ public:
                 const ImVec2 mouse_pos = io.MousePos;
 
                 // TODO: this looks messy...
-                if (active && (l_down || (paste && r_down))) {
+                if (active && (l_down || (m_paste && r_down))) {
                     if (!r_down && io.KeyCtrl) {
                         if (screen_zoom == 1) {
                             // (This does not need `get_tile_write`.)
@@ -648,7 +648,7 @@ public:
                 const int celx = floor(cell_pos_raw.x);
                 const int cely = floor(cell_pos_raw.y);
 
-                if (screen_zoom <= 1 && !paste && !active) {
+                if (screen_zoom <= 1 && !m_paste && !active) {
                     if (celx >= -10 && celx < tile_size.width + 10 && cely >= -10 && cely < tile_size.height + 10) {
                         if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
                             zoom_center = {{.x = celx, .y = cely}};
@@ -656,10 +656,10 @@ public:
                     }
                 }
 
-                if (paste) {
-                    assert(paste->width() <= tile_size.width && paste->height() <= tile_size.height);
-                    paste_beg.x = std::clamp(celx - paste->width() / 2, 0, tile_size.width - paste->width());
-                    paste_beg.y = std::clamp(cely - paste->height() / 2, 0, tile_size.height - paste->height());
+                if (m_paste) {
+                    assert(m_paste->width() <= tile_size.width && m_paste->height() <= tile_size.height);
+                    paste_beg.x = std::clamp(celx - m_paste->width() / 2, 0, tile_size.width - m_paste->width());
+                    paste_beg.y = std::clamp(cely - m_paste->height() / 2, 0, tile_size.height - m_paste->height());
                 } else {
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
                         const aniso::tileT::posT pos{.x = std::clamp(celx, 0, tile_size.width - 1),
@@ -683,7 +683,7 @@ public:
                 drawlist->AddRectFilled(canvas_min, canvas_max, IM_COL32(32, 32, 32, 255));
 
                 const scaleE scale_mode = screen_zoom < 1 ? scaleE::Linear : scaleE::Nearest;
-                if (!paste) {
+                if (!m_paste) {
                     const ImTextureID texture = make_screen(m_torus.get_tile_read(), scale_mode);
 
                     drawlist->AddImage(texture, screen_min, screen_max);
@@ -704,20 +704,20 @@ public:
                     }
                 } else {
                     assert(!zoom_center);
-                    assert(paste->width() <= tile_size.width && paste->height() <= tile_size.height);
-                    paste_beg.x = std::clamp(paste_beg.x, 0, tile_size.width - paste->width());
-                    paste_beg.y = std::clamp(paste_beg.y, 0, tile_size.height - paste->height());
-                    const aniso::tileT::posT paste_end = paste_beg + paste->size();
+                    assert(m_paste->width() <= tile_size.width && m_paste->height() <= tile_size.height);
+                    paste_beg.x = std::clamp(paste_beg.x, 0, tile_size.width - m_paste->width());
+                    paste_beg.y = std::clamp(paste_beg.y, 0, tile_size.height - m_paste->height());
+                    const aniso::tileT::posT paste_end = paste_beg + m_paste->size();
 
                     ImTextureID texture = nullptr;
                     // (wontfix) Wasteful, but after all this works...
                     m_torus.get_tile_maybe_write([&](aniso::tileT& tile) {
                         aniso::tileT temp = aniso::copy(tile, {{paste_beg, paste_end}});
                         (background == 0 ? aniso::blit<aniso::blitE::Or>
-                                         : aniso::blit<aniso::blitE::And>)(tile, paste_beg, *paste, std::nullopt);
+                                         : aniso::blit<aniso::blitE::And>)(tile, paste_beg, *m_paste, std::nullopt);
                         texture = make_screen(tile, scale_mode);
                         if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
-                            paste.reset();
+                            m_paste.reset();
                             return true;
                         } else { // Restore.
                             aniso::blit<aniso::blitE::Copy>(tile, paste_beg, temp);
@@ -932,14 +932,14 @@ public:
                     aniso::clear_inside(m_torus.get_tile_write(), m_sel->to_range());
                 } else if (op == _paste) {
                     if (const char* text = ImGui::GetClipboardText()) {
-                        paste.reset();
+                        m_paste.reset();
                         if (m_sel) {
                             m_sel->active = false;
                         }
 
                         auto result = aniso::from_RLE_str(text, tile_size);
                         if (result.succ) {
-                            paste.emplace(std::move(result.tile));
+                            m_paste.emplace(std::move(result.tile));
                         } else if (result.width == 0 || result.height == 0) {
                             messenger::set_msg("Found no pattern.\n\n"
                                                "('V' is for pasting patterns. If you want to read rules from the "
@@ -955,7 +955,7 @@ public:
             }
         }
 
-        if (paste) {
+        if (m_paste) {
             m_torus.pause_for_this_frame();
         }
 
