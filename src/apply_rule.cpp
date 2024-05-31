@@ -825,7 +825,7 @@ public:
                     term("Capture (closed)", "P", ImGuiKey_P, true, _capture_closed);
                 });
 
-                auto range_window = [&](const bool shortcut_only) {
+                auto range_operations = [&](const bool shortcut_only) {
                     static auto set_tag = [](bool& tag, const char* label, const char* message) {
                         ImGui::Checkbox(label, &tag);
                         ImGui::SameLine();
@@ -895,11 +895,11 @@ public:
                     if (ImGui::IsMousePosValid()) {
                         ImGui::SetNextWindowPos(ImGui::GetIO().MousePos + ImVec2(2, 2), ImGuiCond_Appearing);
                     }
-                    auto window =
-                        imgui_Window("Range operations", &show_range_window, ImGuiWindowFlags_AlwaysAutoResize);
-                    range_window(false /* !shortcut_only */);
+                    auto window = imgui_Window("Range operations", &show_range_window,
+                                               ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings);
+                    range_operations(!window.visible /* shortcut-only if !visible */);
                 } else {
-                    range_window(true /* shortcut_only */);
+                    range_operations(true /* shortcut-only */);
                 }
 
                 if (op == _capture_closed && m_sel) {

@@ -40,7 +40,7 @@ static Uint32 color_for(bool b) {
 // Manage textures for `make_screen`.
 class screen_textures {
     struct blobT {
-        int c; // 0: lent out at this frame.
+        bool used;
         int w, h;
         SDL_Texture* texture;
     };
@@ -62,13 +62,13 @@ public:
         assert(window && renderer);
 
         for (blobT& blob : blobs) {
-            if (blob.c != 0 && blob.w == w && blob.h == h) {
-                blob.c = 0;
+            if (!blob.used && blob.w == w && blob.h == h) {
+                blob.used = true;
                 return blob.texture;
             }
         }
         SDL_Texture* texture = create_texture(SDL_TEXTUREACCESS_STREAMING, w, h);
-        blobs.push_back({.c = 0, .w = w, .h = h, .texture = texture});
+        blobs.push_back({.used = true, .w = w, .h = h, .texture = texture});
         return texture;
     }
 
@@ -79,7 +79,7 @@ public:
         // std::erase_if doesn't apply, as for vector the predicate is required not to modify the values.
         auto pos = blobs.begin();
         for (blobT& blob : blobs) {
-            if (++blob.c > 100) { // Expired.
+            if (!std::exchange(blob.used, false)) { // Not used in the last frame.
                 SDL_DestroyTexture(blob.texture);
             } else {
                 *pos++ = blob;
@@ -188,8 +188,8 @@ int main(int, char**) {
 
     // Create window with SDL_Renderer graphics context
     const SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-    window =
-        SDL_CreateWindow("Astral v 0.9.5 (WIP)", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
+    window = SDL_CreateWindow("Astral v 0.9.5 (WIP)", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720,
+                              window_flags);
     if (!window) {
         resource_failure();
     }
