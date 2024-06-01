@@ -8,6 +8,9 @@
 
 using clockT = std::chrono::steady_clock;
 
+static ImVec2 to_vec2(const aniso::tileT::posT& pos) { return ImVec2(pos.x, pos.y); }
+static ImVec2 to_vec2(const aniso::tileT::sizeT& size) { return ImVec2(size.width, size.height); }
+
 [[nodiscard]] static ImTextureID make_screen(const aniso::tileT& tile, scaleE scale) {
     return make_screen(tile.width(), tile.height(), scale, [&tile](int y) { return tile.line(y); });
 }
@@ -244,7 +247,7 @@ class runnerT {
     };
 
     class torusT_ex {
-        initT m_init{.size{.width = 500, .height = 400}, .seed = 0, .density = 0.5};
+        initT m_init{.size{.width = 600, .height = 400}, .seed = 0, .density = 0.5};
         torusT m_torus{m_init};
         ctrlT m_ctrl{.rule{}, .pace = 1, .anti_strobing = true, .gap = 0, .pause = false};
 
@@ -309,11 +312,19 @@ class runnerT {
         }
     };
 
-    torusT_ex m_torus{};
+    torusT_ex m_torus{}; // Space.
 
-    ImVec2 screen_off = {0, 0};
-    zoomT screen_zoom{};
-    ImVec2 screen_rotate = {0, 0};
+    // space-pos == corner-pos + canvas-pos / zoom
+    struct coordT {
+        zoomT zoom{};
+        ImVec2 corner_pos = {0, 0}; // Space.
+        ImVec2 to_space(ImVec2 canvas_pos) const { return corner_pos + canvas_pos / zoom; }
+        ImVec2 to_canvas(ImVec2 space_pos) const { return (space_pos - corner_pos) * zoom; }
+        void bind(const ImVec2 space_pos, const ImVec2 canvas_pos) { corner_pos = space_pos - canvas_pos / zoom; }
+    };
+
+    coordT m_coord{};
+    ImVec2 to_rotate = {0, 0};
 
     // (Workaround: it's hard to get canvas-size in this frame when it's needed; this looks horrible but
     // will work well in all cases)
@@ -355,8 +366,7 @@ public:
             return enable_shortcuts && ImGui::IsKeyPressed(key, repeat);
         };
         static bool background = 0; // TODO: move elsewhere...
-
-        assert(screen_off.x == int(screen_off.x) && screen_off.y == int(screen_off.y));
+        static bool locate_center = true;
 
         {
             // (Keeping in line with edit-rule's.)
@@ -477,10 +487,9 @@ public:
                     const bool has_h = std::from_chars(input_height, std::end(input_height), height).ec == std::errc{};
                     // ~ the value is unmodified if `from_chars` fails.
                     if (has_w || has_h) {
-                        screen_off = {0, 0};
-                        screen_rotate = {0, 0};
-                        screen_zoom.set_1();
+                        m_coord.zoom.set_1();
                         init.size = init.size_clamped({.width = width, .height = height});
+                        locate_center = true;
                     }
                     input_width[0] = '\0';
                     input_height[0] = '\0';
@@ -492,7 +501,7 @@ public:
 
             ImGui::AlignTextToFramePadding();
             imgui_Str("Zoom =");
-            screen_zoom.select([&](const bool is_cur, const float z, const char* const s) {
+            m_coord.zoom.select([&](const bool is_cur, const float z, const char* const s) {
                 ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                 if (z < 1) {
                     ImGui::BeginDisabled();
@@ -503,11 +512,9 @@ public:
                 }
 
                 if (sel) {
-                    screen_off = {0, 0};
-                    screen_rotate = {0, 0};
-
                     init.size = init.size_clamped(
                         {.width = (int)(last_known_canvas_size.x / z), .height = (int)(last_known_canvas_size.y / z)});
+                    locate_center = true;
                 }
                 return sel;
             });
@@ -550,17 +557,12 @@ public:
 
         ImGui::SameLine();
         if (ImGui::Button("Corner")) {
-            screen_off = {0, 0};
-            screen_rotate = {0, 0};
+            m_coord.bind({0, 0}, {0, 0});
+            to_rotate = {0, 0};
         }
         ImGui::SameLine();
         if (ImGui::Button("Center")) {
-            // "Center" will have the same effect as "Corner" (screen_off == {0, 0}) if fullscreen-resized.
-            const ImVec2 screen_size(tile_size.width * screen_zoom, tile_size.height * screen_zoom);
-            screen_off = last_known_canvas_size / 2 - screen_size / 2;
-            screen_off.x = floor(floor(screen_off.x / screen_zoom) * screen_zoom);
-            screen_off.y = floor(floor(screen_off.y / screen_zoom) * screen_zoom);
-            screen_rotate = {0, 0};
+            locate_center = true;
         }
         ImGui::SameLine();
         static bool show_range_window = false;
@@ -597,6 +599,10 @@ public:
             const ImVec2 canvas_max = ImGui::GetItemRectMax();
             const ImVec2 canvas_size = ImGui::GetItemRectSize();
             last_known_canvas_size = canvas_size;
+            if (std::exchange(locate_center, false)) {
+                m_coord.bind(to_vec2(tile_size) / 2, canvas_size / 2);
+                to_rotate = {0, 0};
+            }
 
             const bool active = ImGui::IsItemActive();
             const bool hovered = ImGui::IsItemHovered();
@@ -618,15 +624,15 @@ public:
             if (hovered) {
                 const ImGuiIO& io = ImGui::GetIO();
                 assert(ImGui::IsMousePosValid(&io.MousePos));
-                const ImVec2 mouse_pos = io.MousePos;
+                const ImVec2 mouse_pos = io.MousePos - canvas_min;
 
                 // TODO: this looks messy...
                 if (active && (l_down || (m_paste && r_down))) {
                     if (!r_down && io.KeyCtrl) {
-                        screen_rotate += io.MouseDelta / screen_zoom;
-                        const int dx = screen_rotate.x, dy = screen_rotate.y; // Truncate.
+                        to_rotate += io.MouseDelta / m_coord.zoom;
+                        const int dx = to_rotate.x, dy = to_rotate.y; // Truncate.
                         if (dx || dy) {
-                            screen_rotate -= ImVec2(dx, dy);
+                            to_rotate -= ImVec2(dx, dy);
                             // (This does not need `get_tile_write`.)
                             m_torus.get_tile_maybe_write([&](aniso::tileT& tile) {
                                 rotate(tile, dx, dy);
@@ -634,30 +640,29 @@ public:
                             });
                         }
                     } else if (!lock_mouse) {
-                        screen_off += io.MouseDelta;
+                        m_coord.corner_pos -= io.MouseDelta / m_coord.zoom;
                     }
                 }
 
                 if (!lock_mouse && imgui_MouseScrolling()) {
-                    const ImVec2 screen_min = canvas_min + screen_off;
-                    const ImVec2 cell_pos_raw = (mouse_pos - screen_min) / screen_zoom;
+                    to_rotate = {0, 0};
+
+                    const ImVec2 space_pos = m_coord.to_space(mouse_pos);
+                    const ImVec2 space_pos_clamped = ImClamp(space_pos, {0, 0}, to_vec2(tile_size));
+                    const ImVec2 mouse_pos_clamped = m_coord.to_canvas(space_pos_clamped); // Nearest point.
                     if (imgui_MouseScrollingDown()) {
-                        screen_zoom.slide(-1);
+                        m_coord.zoom.slide(-1);
                     } else if (imgui_MouseScrollingUp()) {
-                        screen_zoom.slide(1);
+                        m_coord.zoom.slide(1);
                     }
-                    screen_off = (mouse_pos - cell_pos_raw * screen_zoom) - canvas_min;
-                    screen_off.x = round(screen_off.x);
-                    screen_off.y = round(screen_off.y);
-                    screen_rotate = {0, 0};
+                    m_coord.bind(space_pos_clamped, mouse_pos_clamped);
                 }
 
-                const ImVec2 screen_min = canvas_min + screen_off;
-                const ImVec2 cell_pos_raw = (mouse_pos - screen_min) / screen_zoom;
-                const int celx = floor(cell_pos_raw.x);
-                const int cely = floor(cell_pos_raw.y);
+                const ImVec2 space_pos = m_coord.to_space(mouse_pos);
+                const int celx = floor(space_pos.x);
+                const int cely = floor(space_pos.y);
 
-                if (screen_zoom <= 1 && !m_paste && !active) {
+                if (m_coord.zoom <= 1 && !m_paste && !active) {
                     if (celx >= -10 && celx < tile_size.width + 10 && cely >= -10 && cely < tile_size.height + 10) {
                         if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
                             zoom_center = {{.x = celx, .y = cely}};
@@ -683,15 +688,14 @@ public:
 
             // Render.
             {
-                const ImVec2 screen_size(tile_size.width * screen_zoom, tile_size.height * screen_zoom);
-                const ImVec2 screen_min = canvas_min + screen_off;
-                const ImVec2 screen_max = screen_min + screen_size;
+                const ImVec2 screen_min = ImFloor(canvas_min + m_coord.to_canvas({0, 0}));
+                const ImVec2 screen_max = screen_min + to_vec2(tile_size) * m_coord.zoom;
 
                 ImDrawList* const drawlist = ImGui::GetWindowDrawList();
                 drawlist->PushClipRect(canvas_min, canvas_max);
                 drawlist->AddRectFilled(canvas_min, canvas_max, IM_COL32(32, 32, 32, 255));
 
-                const scaleE scale_mode = screen_zoom < 1 ? scaleE::Linear : scaleE::Nearest;
+                const scaleE scale_mode = m_coord.zoom < 1 ? scaleE::Linear : scaleE::Nearest;
                 if (!m_paste) {
                     const ImTextureID texture = make_screen(m_torus.get_tile_read(), scale_mode);
 
@@ -700,8 +704,7 @@ public:
                         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
                         if (ImGui::BeginTooltip()) {
                             if (scale_mode == scaleE::Nearest) {
-                                zoom_image(texture, ImVec2(tile_size.width, tile_size.height),
-                                           ImVec2(zoom_center->x, zoom_center->y), ImVec2(80, 60), 3);
+                                zoom_image(texture, to_vec2(tile_size), to_vec2(*zoom_center), ImVec2(80, 60), 3);
                             } else {
                                 // TODO: is it possible to reuse the texture in a different scale mode?
                                 // (Related: https://github.com/ocornut/imgui/issues/7616)
@@ -736,15 +739,15 @@ public:
 
                     // (`paste_beg` and `paste_end` remain valid even if `paste` has been consumed.)
                     drawlist->AddImage(texture, screen_min, screen_max);
-                    const ImVec2 paste_min = screen_min + ImVec2(paste_beg.x, paste_beg.y) * screen_zoom;
-                    const ImVec2 paste_max = screen_min + ImVec2(paste_end.x, paste_end.y) * screen_zoom;
+                    const ImVec2 paste_min = screen_min + to_vec2(paste_beg) * m_coord.zoom;
+                    const ImVec2 paste_max = screen_min + to_vec2(paste_end) * m_coord.zoom;
                     drawlist->AddRectFilled(paste_min, paste_max, IM_COL32(255, 0, 0, 60));
                 }
 
                 if (m_sel) {
                     const auto [sel_beg, sel_end] = m_sel->to_range();
-                    const ImVec2 sel_min = screen_min + ImVec2(sel_beg.x, sel_beg.y) * screen_zoom;
-                    const ImVec2 sel_max = screen_min + ImVec2(sel_end.x, sel_end.y) * screen_zoom;
+                    const ImVec2 sel_min = screen_min + to_vec2(sel_beg) * m_coord.zoom;
+                    const ImVec2 sel_max = screen_min + to_vec2(sel_end) * m_coord.zoom;
                     drawlist->AddRectFilled(sel_min, sel_max, IM_COL32(0, 255, 0, 40));
                     drawlist->AddRect(sel_min, sel_max, IM_COL32(0, 255, 0, 160));
                 }
