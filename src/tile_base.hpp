@@ -39,6 +39,7 @@ namespace aniso {
     };
 
     namespace _misc {
+        // Should be non-empty.
         template <class T>
         struct tile_ref_ {
             vecT size;
@@ -105,6 +106,8 @@ namespace aniso {
                     fn(this_data, that_data, size.x);
                 }
             }
+
+            // TODO: add operator==?
         };
     } // namespace _misc
 

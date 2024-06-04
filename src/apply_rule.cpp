@@ -354,7 +354,7 @@ public:
             }
             ImGui::SameLine();
             ImGui::Text("Generation:%d, density:%.4f", m_torus.gen(),
-                        float(aniso::count(m_torus.read_only())) / m_torus.area());
+                        double(aniso::count(m_torus.read_only())) / m_torus.area());
             ImGui::Separator();
         }
 
@@ -899,10 +899,9 @@ public:
                         m_sel.reset();
                     }
                 } else if (op == _bounding_box && m_sel) {
-                    const aniso::rangeT sel = m_sel->to_range();
-                    const auto [begin, end] = aniso::bounding_box(m_torus.read_only(sel), background);
+                    const auto [begin, end] = aniso::bounding_box(m_torus.read_only(), m_sel->to_range(), background);
                     if (begin != end) {
-                        m_sel = {.active = false, .beg = sel.begin + begin, .end = sel.begin + end.plus(-1, -1)};
+                        m_sel = {.active = false, .beg = begin, .end = end.plus(-1, -1)};
                     } else {
                         m_sel.reset();
                     }
@@ -918,19 +917,23 @@ public:
                             m_sel->active = false;
                         }
 
-                        auto result = aniso::from_RLE_str(text, tile_size);
-                        if (result.succ) {
-                            m_paste.emplace(std::move(result.tile));
-                        } else if (result.width == 0 || result.height == 0) {
-                            messenger::set_msg("Found no pattern.\n\n"
-                                               "('V' is for pasting patterns. If you want to read rules from the "
-                                               "clipboard, use the 'Clipboard' window instead.)");
-                        } else {
-                            messenger::set_msg("The space is not large enough for the pattern.\n"
-                                               "Space size: x = {}, y = {}\n"
-                                               "Pattern size: x = {}, y = {}",
-                                               tile_size.x, tile_size.y, result.width, result.height);
-                        }
+                        aniso::from_RLE_str(text, [&](long long w, long long h) -> std::optional<aniso::tile_ref> {
+                            if (w == 0 || h == 0) {
+                                messenger::set_msg("Found no pattern.\n\n"
+                                                   "('V' is for pasting patterns. If you want to read rules from the "
+                                                   "clipboard, use the 'Clipboard' window instead.)");
+                                return std::nullopt;
+                            } else if (w > tile_size.x || h > tile_size.y) {
+                                messenger::set_msg("The space is not large enough for the pattern.\n"
+                                                   "Space size: x = {}, y = {}\n"
+                                                   "Pattern size: x = {}, y = {}",
+                                                   tile_size.x, tile_size.y, w, h);
+                                return std::nullopt;
+                            } else {
+                                m_paste.emplace(aniso::vecT{.x = (int)w, .y = (int)h});
+                                return m_paste->data();
+                            }
+                        });
                     }
                 }
             }
