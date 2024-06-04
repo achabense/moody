@@ -20,6 +20,7 @@ add_executable(${PROJECT_NAME} WIN32
     ${imgui_src}
 
     src/rule.hpp
+    src/tile_base.hpp
     src/tile.hpp
     src/rule_algo.hpp
     src/dear_imgui.hpp

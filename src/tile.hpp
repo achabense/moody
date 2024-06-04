@@ -4,40 +4,12 @@
 #include <format>
 
 #include "rule.hpp"
+#include "tile_base.hpp"
 
 namespace aniso {
     // Building block for torus space etc.
     class tileT {
-    public:
-        struct posT {
-            int x, y;
-            friend bool operator==(const posT&, const posT&) = default;
-        };
-
-        struct sizeT {
-            int width, height;
-            friend bool operator==(const sizeT&, const sizeT&) = default;
-        };
-
-        friend posT operator+(const posT& pos, const sizeT& size) {
-            return {.x = pos.x + size.width, .y = pos.y + size.height};
-        }
-
-        struct rangeT {
-            posT begin, end; // [)
-            int width() const {
-                assert(begin.x <= end.x);
-                return end.x - begin.x;
-            }
-            int height() const {
-                assert(begin.y <= end.y);
-                return end.y - begin.y;
-            }
-            sizeT size() const { return {.width = width(), .height = height()}; }
-        };
-
-    private:
-        sizeT m_size; // Observable width and height.
+        vecT m_size;  // Observable width and height.
         bool* m_data; // Layout: [height+2][width+2].
 
     public:
@@ -52,16 +24,16 @@ namespace aniso {
             return *this;
         }
 
-        explicit tileT(sizeT size) : tileT() {
-            if (size.width > 0 && size.height > 0) {
+        explicit tileT(vecT size) : tileT() {
+            if (size.x > 0 && size.y > 0) {
                 m_size = size;
-                m_data = new bool[(m_size.width + 2) * (m_size.height + 2)]{};
+                m_data = new bool[(m_size.x + 2) * (m_size.y + 2)]{};
             }
         }
         ~tileT() { delete[] m_data; }
 
         // The line data is conceptually write-only after `resize`.
-        void resize(sizeT size) {
+        void resize(vecT size) {
             if (m_size != size) {
                 tileT resized(size);
                 swap(resized);
@@ -70,74 +42,46 @@ namespace aniso {
 
         tileT(const tileT& other) : tileT(other.m_size) {
             if (other.m_data) {
-                std::copy_n(other.m_data, (m_size.width + 2) * (m_size.height + 2), m_data);
+                std::copy_n(other.m_data, (m_size.x + 2) * (m_size.y + 2), m_data);
             }
         }
         tileT& operator=(const tileT& other) {
             if (this != &other) {
                 resize(other.m_size);
                 if (other.m_data) {
-                    std::copy_n(other.m_data, (m_size.width + 2) * (m_size.height + 2), m_data);
+                    std::copy_n(other.m_data, (m_size.x + 2) * (m_size.y + 2), m_data);
                 }
             }
             return *this;
         }
 
-    public:
-        sizeT size() const { return m_size; }
-
-        int width() const { return m_size.width; }
-        int height() const { return m_size.height; }
-        int area() const { return m_size.width * m_size.height; }
-
-        rangeT entire_range() const { return {{0, 0}, {.x = m_size.width, .y = m_size.height}}; }
-        bool has_range(const rangeT& range) const {
-            const auto& [begin, end] = range;
-            return 0 <= begin.x && begin.x <= end.x && end.x <= m_size.width && //
-                   0 <= begin.y && begin.y <= end.y && end.y <= m_size.height;
-        }
+        vecT size() const { return m_size; }
+        int width() const { return m_size.x; }
+        int height() const { return m_size.y; }
+        int area() const { return m_size.x * m_size.y; }
 
     private:
         bool* _line(int _y) {
-            assert(m_data && _y >= 0 && _y < m_size.height + 2);
-            return m_data + _y * (m_size.width + 2);
+            assert(m_data && _y >= 0 && _y < m_size.y + 2);
+            return m_data + _y * (m_size.x + 2);
         }
         const bool* _line(int _y) const {
-            assert(m_data && _y >= 0 && _y < m_size.height + 2);
-            return m_data + _y * (m_size.width + 2);
+            assert(m_data && _y >= 0 && _y < m_size.y + 2);
+            return m_data + _y * (m_size.x + 2);
         }
 
     public:
         bool* line(int y) {
-            assert(y >= 0 && y < m_size.height);
+            assert(y >= 0 && y < m_size.y);
             return _line(y + 1) + 1;
         }
         const bool* line(int y) const {
-            assert(y >= 0 && y < m_size.height);
+            assert(y >= 0 && y < m_size.y);
             return _line(y + 1) + 1;
         }
 
-        void for_each_line(const rangeT& range, const auto& fn) { //
-            _for_each_line(*this, range, fn);
-        }
-
-        void for_each_line(const rangeT& range, const auto& fn) const { //
-            _for_each_line(*this, range, fn);
-        }
-
-    private:
-        static void _for_each_line(auto& this_, const rangeT& range, const auto& fn) {
-            assert(this_.has_range(range));
-            const auto& [begin, end] = range;
-            for (int y = begin.y; y < end.y; ++y) {
-                auto line = this_.line(y); // bool* or const bool*
-                if constexpr (requires { fn(std::span{line + begin.x, line + end.x}); }) {
-                    fn(std::span{line + begin.x, line + end.x});
-                } else {
-                    fn(y - begin.y, std::span{line + begin.x, line + end.x});
-                }
-            }
-        }
+        tile_ref data() { return {.size = m_size, .stride = m_size.x + 2, .data = line(0)}; }
+        tile_const_ref data() const { return {.size = m_size, .stride = m_size.x + 2, .data = line(0)}; }
 
     public:
         // (`q`, `w`, ... may refer to `*this`, see below.)
@@ -146,7 +90,7 @@ namespace aniso {
                     const tileT& z, const tileT& x, const tileT& c) {
             // assert m_size == *.m_size.
 
-            const int width = m_size.width, height = m_size.height;
+            const int width = m_size.x, height = m_size.y;
 
             auto _set_lr = [width](bool* _line, bool l, bool r) {
                 _line[0] = l;
@@ -173,39 +117,18 @@ namespace aniso {
             assert(this != &dest);
             dest.resize(m_size);
 
-            for (int _y = 1; _y <= m_size.height; ++_y) {
+            for (int _y = 1; _y <= m_size.y; ++_y) {
                 const bool* _up = _line(_y - 1);
                 const bool* _cn = _line(_y);
                 const bool* _dw = _line(_y + 1);
                 bool* _dest = dest._line(_y);
 
-                for (int _x = 1; _x <= m_size.width; ++_x) {
+                for (int _x = 1; _x <= m_size.x; ++_x) {
                     _dest[_x] = rule(encode({
                         _up[_x - 1], _up[_x], _up[_x + 1], //
                         _cn[_x - 1], _cn[_x], _cn[_x + 1], //
                         _dw[_x - 1], _dw[_x], _dw[_x + 1], //
                     }));
-                }
-            }
-        }
-
-        // (For `capture_open`.)
-        void collect(const rangeT& range, moldT::lockT& lock) const {
-            // There is supposed to be a call to `gather` before calling `record`
-            // if `range` is allowed to be adjacent to the boundary.
-            assert(has_range(range));
-
-            for (int _y = range.begin.y + 1; _y <= range.end.y; ++_y) {
-                const bool* _up = _line(_y - 1);
-                const bool* _cn = _line(_y);
-                const bool* _dw = _line(_y + 1);
-
-                for (int _x = range.begin.x + 1; _x <= range.end.x; ++_x) {
-                    lock[encode({
-                        _up[_x - 1], _up[_x], _up[_x + 1], //
-                        _cn[_x - 1], _cn[_x], _cn[_x + 1], //
-                        _dw[_x - 1], _dw[_x], _dw[_x + 1], //
-                    })] = true;
                 }
             }
         }
@@ -216,7 +139,7 @@ namespace aniso {
                 dest.resize(m_size);
             }
 
-            const int width = m_size.width, height = m_size.height;
+            const int width = m_size.x, height = m_size.y;
             std::vector<char> _vec(width + 1); // [0, width]
 
             char* const _vec_p6 = _vec.data();
@@ -253,10 +176,10 @@ namespace aniso {
             if (l.m_size != r.m_size) {
                 return false;
             }
-            for (int y = 0; y < l.m_size.height; ++y) {
+            for (int y = 0; y < l.m_size.y; ++y) {
                 const bool* l_line = l.line(y);
                 const bool* r_line = r.line(y);
-                if (!std::equal(l_line, l_line + l.m_size.width, r_line)) {
+                if (!std::equal(l_line, l_line + l.m_size.x, r_line)) {
                     return false;
                 }
             }
@@ -267,7 +190,7 @@ namespace aniso {
 #ifdef ENABLE_TESTS
     namespace _tests {
         inline const testT test_tileT_apply = [] {
-            const tileT::sizeT size{1, 1};
+            const vecT size{1, 1};
 
             tileT t_q(size), t_w(size), t_e(size);
             tileT t_a(size), t_s(size), t_d(size);
@@ -288,9 +211,9 @@ namespace aniso {
         };
 
         inline const testT test_tileT_apply_v3 = [] {
-            const tileT::sizeT size{32, 32};
+            const vecT size{32, 32};
             tileT source(size), dest(size), dest_v3(size);
-            source.for_each_line(source.entire_range(), [&](std::span<bool> line) { //
+            source.data().for_all_data([&](std::span<bool> line) { //
                 std::ranges::generate(line, [&] { return testT::rand() & 1; });
             });
 
@@ -307,11 +230,29 @@ namespace aniso {
     }  // namespace _tests
 #endif // ENABLE_TESTS
 
-    using rangeT_opt = std::optional<tileT::rangeT>;
+    // (For `capture_open`.)
+    inline void collect_cases(const tile_const_ref tile, moldT::lockT& lock) {
+        if (tile.size.x <= 2 || tile.size.y <= 2) {
+            return;
+        }
 
-    inline int count(const tileT& tile, const rangeT_opt& range = {}) {
+        for (int y = 1; y < tile.size.y - 1; ++y) {
+            const bool* const up = tile.line(y - 1);
+            const bool* const cn = tile.line(y);
+            const bool* const dw = tile.line(y + 1);
+            for (int x = 1; x < tile.size.x - 1; ++x) {
+                lock[encode({
+                    up[x - 1], up[x], up[x + 1], //
+                    cn[x - 1], cn[x], cn[x + 1], //
+                    dw[x - 1], dw[x], dw[x + 1], //
+                })] = true;
+            }
+        }
+    }
+
+    inline int count(const tile_const_ref tile) {
         int c = 0;
-        tile.for_each_line(range.value_or(tile.entire_range()), [&c](std::span<const bool> line) {
+        tile.for_all_data([&c](std::span<const bool> line) {
             for (bool v : line) {
                 c += v;
             }
@@ -319,55 +260,61 @@ namespace aniso {
         return c;
     }
 
+    inline int count_diff(const tile_const_ref a, const tile_const_ref b) {
+        int c = 0;
+        a.for_all_data_vs(b, [&c](const bool* a, const bool* b, int w) {
+            for (int x = 0; x < w; ++x) {
+                c += a[x] != b[x];
+            }
+        });
+        return c;
+    }
+
     enum class blitE { Copy, Or, And, Xor };
     template <blitE mode>
-    inline void blit(tileT& dest, tileT::posT d_begin, const tileT& source, const rangeT_opt& s_range_ = {}) {
-        assert(&source != &dest);
+    inline void blit(const tile_ref dest, const tile_const_ref source) {
+        // (`dest` and `source` should not overlap.)
 
-        const tileT::rangeT s_range = s_range_.value_or(source.entire_range());
-        assert(dest.has_range({d_begin, d_begin + s_range.size()}));
-
-        source.for_each_line(s_range, [&dest, &d_begin](int y, std::span<const bool> line) {
-            bool* d = dest.line(d_begin.y + y) + d_begin.x;
-            for (bool v : line) {
+        dest.for_all_data_vs(source, [](bool* d, const bool* s, int w) {
+            for (int x = 0; x < w; ++x) {
                 if constexpr (mode == blitE::Copy) {
-                    *d++ = v;
+                    d[x] = s[x];
                 } else if constexpr (mode == blitE::Or) {
-                    *d++ |= v;
+                    d[x] |= s[x];
                 } else if constexpr (mode == blitE::And) {
-                    *d++ &= v;
+                    d[x] &= s[x];
                 } else {
                     static_assert(mode == blitE::Xor);
-                    *d++ ^= v;
+                    d[x] ^= s[x];
                 }
             }
         });
     }
 
-    inline tileT copy(const tileT& source, const rangeT_opt& range_ = {}) {
-        const tileT::rangeT range = range_.value_or(source.entire_range());
-
-        tileT tile(range.size());
-        blit<blitE::Copy>(tile, {0, 0}, source, range);
+    inline tileT copy(const tile_const_ref source) {
+        tileT tile(source.size);
+        blit<blitE::Copy>(tile.data(), source);
         return tile;
     }
 
     // The result will be completely dependent on the state of `rand` and `density`; `bernoulli_distribution`
     // cannot guarantee this.
-    inline void random_fill(tileT& tile, std::mt19937& rand, double density, const rangeT_opt& range = {}) {
+    inline void random_fill(const tile_ref tile, std::mt19937& rand, double density) {
         const uint32_t c = std::mt19937::max() * std::clamp(density, 0.0, 1.0);
-        tile.for_each_line(range.value_or(tile.entire_range()), [&](std::span<bool> line) { //
+        tile.for_all_data([&](std::span<bool> line) { //
             std::ranges::generate(line, [&] { return rand() < c; });
         });
     }
 
-    inline void clear_inside(tileT& tile, const tileT::rangeT& range /* Required */, const bool v = 0) {
-        tile.for_each_line(range, [v](std::span<bool> line) { std::ranges::fill(line, v); });
+    inline void clear(const tile_ref tile, const bool v = 0) {
+        tile.for_all_data([v](std::span<bool> line) { //
+            std::ranges::fill(line, v);
+        });
     }
 
-    inline void clear_outside(tileT& tile, const tileT::rangeT& range /* Required */, const bool v = 0) {
+    inline void clear_outside(const tile_ref tile, const rangeT& range, const bool v = 0) {
         assert(tile.has_range(range));
-        tile.for_each_line(tile.entire_range(), [&](int y, std::span<bool> line) {
+        tile.for_each_line([&](int y, std::span<bool> line) {
             if (y < range.begin.y || y >= range.end.y) {
                 std::ranges::fill(line, v);
             } else {
@@ -377,10 +324,10 @@ namespace aniso {
         });
     }
 
-    inline tileT::rangeT bounding_box(const tileT& tile, const tileT::rangeT& range /* Required */, const bool v = 0) {
-        int min_x = range.width(), max_x = -1;
-        int min_y = range.height(), max_y = -1;
-        tile.for_each_line(range, [&](int y, std::span<const bool> line) {
+    inline rangeT bounding_box(const tile_const_ref tile, const bool v = 0) {
+        int min_x = INT_MAX, max_x = INT_MIN;
+        int min_y = INT_MAX, max_y = INT_MIN;
+        tile.for_each_line([&](int y, std::span<const bool> line) {
             for (int x = 0; const bool b : line) {
                 if (b != v) {
                     min_x = std::min(min_x, x);
@@ -391,9 +338,8 @@ namespace aniso {
                 ++x;
             }
         });
-        if (max_x != -1) {
-            return {.begin{.x = range.begin.x + min_x, .y = range.begin.y + min_y},
-                    .end{.x = range.begin.x + max_x + 1, .y = range.begin.y + max_y + 1}};
+        if (max_x != INT_MIN) {
+            return {.begin{.x = min_x, .y = min_y}, .end{.x = max_x + 1, .y = max_y + 1}};
         } else {
             return {};
         }
@@ -401,7 +347,7 @@ namespace aniso {
 
     namespace _misc {
         //  https://conwaylife.com/wiki/Run_Length_Encoded
-        inline void to_RLE(std::string& str, const tileT& tile, const tileT::rangeT& range) {
+        inline void to_RLE(std::string& str, const tile_const_ref tile) {
             class putT {
                 std::string& str;
                 size_t last_nl;
@@ -437,7 +383,7 @@ namespace aniso {
             };
 
             putT put{str};
-            tile.for_each_line(range, [&put, h = range.height()](int y, std::span<const bool> line) {
+            tile.for_each_line([&put, h = tile.size.y](int y, std::span<const bool> line) {
                 if (y != 0) {
                     put.append(1, '$');
                 }
@@ -459,12 +405,10 @@ namespace aniso {
         }
     } // namespace _misc
 
-    inline std::string to_RLE_str(const ruleT* rule, const tileT& tile, const rangeT_opt& range_ = {}) {
-        const tileT::rangeT range = range_.value_or(tile.entire_range());
-        std::string str =
-            rule ? std::format("x = {}, y = {}, rule = {}\n", range.width(), range.height(), to_MAP_str(*rule))
-                 : std::format("x = {}, y = {}\n", range.width(), range.height());
-        _misc::to_RLE(str, tile, range);
+    inline std::string to_RLE_str(const tile_const_ref tile, const ruleT* rule = nullptr) {
+        std::string str = rule ? std::format("x = {}, y = {}, rule = {}\n", tile.size.x, tile.size.y, to_MAP_str(*rule))
+                               : std::format("x = {}, y = {}\n", tile.size.x, tile.size.y);
+        _misc::to_RLE(str, tile);
         str += '!';
         return str;
     }
@@ -479,7 +423,7 @@ namespace aniso {
 
     // TODO: whether to deal with the header line? ("x = ..., y = ...(, rule = ...)")
     // (This does not matter as long as the patterns are generated by `to_RLE_str`.)
-    inline from_RLE_str_result from_RLE_str(std::string_view text, const tileT::sizeT max_size) {
+    inline from_RLE_str_result from_RLE_str(std::string_view text, const vecT max_size) {
         if (text.starts_with('x')) {
             text.remove_prefix(std::min(text.size(), text.find('\n')));
         }
@@ -538,14 +482,14 @@ namespace aniso {
         if (width == 0 || height == 0) {
             result.width = 0;
             result.height = 0;
-        } else if (width > max_size.width || height > max_size.height) {
+        } else if (width > max_size.x || height > max_size.y) {
             result.width = width;
             result.height = height;
         } else {
             result.succ = true;
             result.height = width;
             result.height = height;
-            result.tile.resize({.width = (int)width, .height = (int)height});
+            result.tile.resize({.x = (int)width, .y = (int)height});
             int x = 0, y = 0;
             for (takerT taker(text);;) {
                 const auto [n, c] = taker.take();
@@ -567,15 +511,12 @@ namespace aniso {
 #ifdef ENABLE_TESTS
     namespace _tests {
         inline const testT test_RLE_str = [] {
-            using listT = std::initializer_list<tileT::sizeT>;
-            for (const auto size : listT{{.width = 1, .height = 1},
-                                         {.width = 3, .height = 1},
-                                         {.width = 1, .height = 3},
-                                         {.width = 32, .height = 60}}) {
+            using listT = std::initializer_list<vecT>;
+            for (const auto size : listT{{.x = 1, .y = 1}, {.x = 3, .y = 1}, {.x = 1, .y = 3}, {.x = 32, .y = 60}}) {
                 tileT tile(size);
-                random_fill(tile, testT::rand, 0.5);
+                random_fill(tile.data(), testT::rand, 0.5);
                 // It's ok to compare directly, as `...).tile` will be empty if not successful.
-                assert(tile == from_RLE_str(to_RLE_str(nullptr, tile), tile.size()).tile);
+                assert(tile == from_RLE_str(to_RLE_str(tile.data(), nullptr), tile.size()).tile);
             }
         };
     }  // namespace _tests

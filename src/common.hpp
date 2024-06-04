@@ -50,11 +50,15 @@ void edit_rule(sync_point&, bool& bind_undo);
 void static_constraints(sync_point&);
 void apply_rule(sync_point&);
 
-// Returns a texture with width/height exactly = w/h, for the (cell) data represented by `getline`.
-// There must be: getline(0...h-1) -> bool[w].
+// "tile_base.hpp"
+namespace aniso::_misc {
+    template <class>
+    struct tile_ref_;
+} // namespace aniso::_misc
+
 // The texture is only valid for the current frame.
 enum class scaleE { Nearest, Linear };
-[[nodiscard]] ImTextureID make_screen(int w, int h, scaleE scale, std::function<const bool*(int)> getline);
+[[nodiscard]] ImTextureID make_screen(aniso::_misc::tile_ref_<const bool> tile, scaleE scale);
 
 // ImGui::Image and ImGui::ImageButton for `codeT`.
 void code_image(aniso::codeT code, int zoom, const ImVec4& tint_col = ImVec4(1, 1, 1, 1),

@@ -8,19 +8,7 @@
 
 using clockT = std::chrono::steady_clock;
 
-static ImVec2 to_vec2(const aniso::tileT::posT& pos) { return ImVec2(pos.x, pos.y); }
-static ImVec2 to_vec2(const aniso::tileT::sizeT& size) { return ImVec2(size.width, size.height); }
-
-[[nodiscard]] static ImTextureID make_screen(const aniso::tileT& tile, scaleE scale) {
-    return make_screen(tile.width(), tile.height(), scale, [&tile](int y) { return tile.line(y); });
-}
-
-[[nodiscard]] static ImTextureID make_screen(const aniso::tileT& tile, const aniso::tileT::rangeT& range,
-                                             scaleE scale) {
-    assert(tile.has_range(range));
-    return make_screen(range.width(), range.height(), scale,
-                       [&tile, &range](int y) { return tile.line(y + range.begin.y) + range.begin.x; });
-}
+static ImVec2 to_imvec(const aniso::vecT& vec) { return ImVec2(vec.x, vec.y); }
 
 static void zoom_image(ImTextureID texture /* Using `scaleE::Nearest` */, ImVec2 texture_size, ImVec2 region_center,
                        ImVec2 region_size, int zoom) {
@@ -32,16 +20,12 @@ static void zoom_image(ImTextureID texture /* Using `scaleE::Nearest` */, ImVec2
 }
 
 // Always use `scaleE::Nearest`.
-static void zoom_image(const aniso::tileT& tile, aniso::tileT::posT region_center, aniso::tileT::sizeT region_size,
-                       int zoom) {
-    region_size.width = std::min(tile.width(), region_size.width);
-    region_size.height = std::min(tile.height(), region_size.height);
-    const aniso::tileT::posT begin{
-        .x = std::clamp(region_center.x - region_size.width / 2, 0, tile.width() - region_size.width),
-        .y = std::clamp(region_center.y - region_size.height / 2, 0, tile.height() - region_size.height)};
+static void zoom_image(const aniso::tile_const_ref tile, aniso::vecT region_center, aniso::vecT region_size, int zoom) {
+    region_size.x = std::min(tile.size.x, region_size.x);
+    region_size.y = std::min(tile.size.y, region_size.y);
+    const aniso::vecT begin = aniso::clamp(region_center - region_size / 2, {0, 0}, tile.size - region_size);
 
-    ImGui::Image(make_screen(tile, {begin, begin + region_size}, scaleE::Nearest),
-                 ImVec2(region_size.width * zoom, region_size.height * zoom));
+    ImGui::Image(make_screen(tile.clip({begin, begin + region_size}), scaleE::Nearest), to_imvec(region_size * zoom));
 }
 
 static bool strobing(const aniso::ruleT& rule) {
@@ -56,9 +40,7 @@ static void run_torus(aniso::tileT& tile, const aniso::rule_like auto& rule) {
 
 // Copy the subrange and run as a torus space, recording all invoked mappings.
 // This is good at capturing "self-contained" patterns (oscillators/spaceships).
-static aniso::moldT::lockT capture_closed(const aniso::tileT& source, const aniso::tileT::rangeT& range,
-                                          const aniso::ruleT& rule) {
-    aniso::tileT tile = aniso::copy(source, range);
+static aniso::moldT::lockT capture_closed(aniso::tileT tile /* owning */, const aniso::ruleT& rule) {
     aniso::moldT::lockT lock{};
 
     // (wontfix) It's possible that the loop fails to catch all invocations in very rare cases,
@@ -82,20 +64,13 @@ static aniso::moldT::lockT capture_closed(const aniso::tileT& source, const anis
 // `capture_closed` is not suitable for capturing patterns that are not self-contained (what happens in the
 // copied subrange (treated as torus space) is not exactly what we see in the source space)
 // In these cases we need a way to record what actually happened in the range.
-static void capture_open(const aniso::tileT& source, aniso::tileT::rangeT range, aniso::moldT::lockT& lock) {
-    if (range.width() <= 2 || range.height() <= 2) {
-        return;
-    }
-    range.begin.x += 1;
-    range.begin.y += 1;
-    range.end.x -= 1;
-    range.end.y -= 1;
-    source.collect(range, lock);
+static void capture_open(const aniso::tile_const_ref tile, aniso::moldT::lockT& lock) { //
+    aniso::collect_cases(tile, lock);
 }
 
 // (0, 0) is mapped to (wrap(dx), wrap(dy)).
-static void rotate(aniso::tileT& tile, int dx, int dy) {
-    const int width = tile.width(), height = tile.height();
+static void rotate(const aniso::tile_ref tile, int dx, int dy) {
+    const int width = tile.size.x, height = tile.size.y;
 
     const auto wrap = [](int v, int r) { return ((v % r) + r) % r; };
     dx = wrap(dx, width);
@@ -105,16 +80,16 @@ static void rotate(aniso::tileT& tile, int dx, int dy) {
         return;
     }
 
-    [[maybe_unused]] const bool test = tile.line(0)[0];
-    aniso::tileT temp(tile.size());
-    for (int y = 0; y < height; ++y) {
-        const bool* source = tile.line(y);
+    // TODO: optimize...
+    [[maybe_unused]] const bool test = *tile.data; // .at({0, 0})
+    aniso::tileT temp(tile.size);
+    tile.for_each_line([&](int y, std::span<const bool> line) {
         bool* dest = temp.line((y + dy) % height);
-        std::copy_n(source, width - dx, dest + dx);
-        std::copy_n(source + width - dx, dx, dest);
-    }
-    tile.swap(temp);
-    assert(test == tile.line(dy)[dx]);
+        std::copy_n(line.data(), width - dx, dest + dx);
+        std::copy_n(line.data() + width - dx, dx, dest);
+    });
+    aniso::blit<aniso::blitE::Copy>(tile, temp.data());
+    assert(test == tile.at({.x = dx, .y = dy}));
 }
 
 class densityT {
@@ -132,14 +107,11 @@ public:
 
 // TODO: support setting patterns as init state?
 struct initT {
-    static constexpr aniso::tileT::sizeT size_min{.width = 20, .height = 15};
-    static constexpr aniso::tileT::sizeT size_max{.width = 1600, .height = 1200};
-    static aniso::tileT::sizeT size_clamped(aniso::tileT::sizeT size) {
-        return {.width = std::clamp(size.width, size_min.width, size_max.width),
-                .height = std::clamp(size.height, size_min.height, size_max.height)};
-    }
+    static constexpr aniso::vecT size_min{.x = 20, .y = 15};
+    static constexpr aniso::vecT size_max{.x = 1600, .y = 1200};
+    static aniso::vecT size_clamped(aniso::vecT size) { return aniso::clamp(size, size_min, size_max); }
 
-    aniso::tileT::sizeT size;
+    aniso::vecT size;
     int seed;
     densityT density;
 
@@ -161,7 +133,7 @@ public:
         m_tile.resize(init.size);
 
         std::mt19937 rand(uint32_t(init.seed));
-        aniso::random_fill(m_tile, rand, init.density.get());
+        aniso::random_fill(m_tile.data(), rand, init.density.get());
 
         m_gen = 0;
     }
@@ -247,7 +219,7 @@ class runnerT {
     };
 
     class torusT_ex {
-        initT m_init{.size{.width = 600, .height = 400}, .seed = 0, .density = 0.5};
+        initT m_init{.size{.x = 600, .y = 400}, .seed = 0, .density = 0.5};
         torusT m_torus{m_init};
         ctrlT m_ctrl{.rule{}, .pace = 1, .anti_strobing = true, .gap = 0, .pause = false};
 
@@ -276,20 +248,27 @@ class runnerT {
         }
         void pause_for_this_frame() { extra_pause = true; }
 
-        const aniso::tileT& get_tile_read() const { return m_torus.tile(); }
-        // (Should not resize the returned tile.)
-        aniso::tileT& get_tile_write() {
+        aniso::tile_const_ref read_only() const { return m_torus.tile().data(); }
+        aniso::tile_const_ref read_only(const aniso::rangeT& range) const { return m_torus.tile().data().clip(range); }
+
+        aniso::tile_ref write_only() {
             mark_written();
-            return m_torus.tile();
+            return m_torus.tile().data();
         }
-        void get_tile_maybe_write(const auto& fn) {
-            if (fn(m_torus.tile())) {
+        aniso::tile_ref write_only(const aniso::rangeT& range) {
+            mark_written();
+            return m_torus.tile().data().clip(range);
+        }
+
+        void read_and_maybe_write(const std::invocable<aniso::tile_ref> auto& fn) {
+            if (fn(m_torus.tile().data())) {
                 mark_written();
             }
         }
 
+        int area() const { return m_torus.tile().area(); }
         int gen() const { return m_torus.gen(); }
-        aniso::tileT::sizeT size() const {
+        aniso::vecT size() const {
             assert(m_init.size == m_torus.tile().size());
             assert(m_init.size == m_init.size_clamped(m_init.size));
             return m_init.size;
@@ -328,17 +307,17 @@ class runnerT {
 
     // (Workaround: it's hard to get canvas-size in this frame when it's needed; this looks horrible but
     // will work well in all cases)
-    static constexpr ImVec2 min_canvas_size{initT::size_min.width * zoomT::max(), initT::size_min.height* zoomT::max()};
+    static constexpr ImVec2 min_canvas_size{initT::size_min.x * zoomT::max(), initT::size_min.y* zoomT::max()};
     ImVec2 last_known_canvas_size = min_canvas_size;
 
     std::optional<aniso::tileT> m_paste = std::nullopt;
-    aniso::tileT::posT paste_beg{0, 0}; // Valid if paste.has_value().
+    aniso::vecT paste_beg{0, 0}; // Valid if paste.has_value().
 
     struct selectT {
         bool active = true;
-        aniso::tileT::posT beg{0, 0}, end{0, 0}; // [] instead of [).
+        aniso::vecT beg{0, 0}, end{0, 0}; // [] instead of [).
 
-        aniso::tileT::rangeT to_range() const {
+        aniso::rangeT to_range() const {
             const auto [xmin, xmax] = std::minmax(beg.x, end.x);
             const auto [ymin, ymax] = std::minmax(beg.y, end.y);
 
@@ -375,7 +354,7 @@ public:
             }
             ImGui::SameLine();
             ImGui::Text("Generation:%d, density:%.4f", m_torus.gen(),
-                        float(aniso::count(m_torus.get_tile_read())) / m_torus.get_tile_read().area());
+                        float(aniso::count(m_torus.read_only())) / m_torus.area());
             ImGui::Separator();
         }
 
@@ -482,13 +461,13 @@ public:
                                          ImGuiInputTextFlags_CallbackCharFilter, filter);
                 ImGui::SameLine(0, s);
                 if (ImGui::Button("Resize")) {
-                    int width = init.size.width, height = init.size.height;
+                    int width = init.size.x, height = init.size.y;
                     const bool has_w = std::from_chars(input_width, std::end(input_width), width).ec == std::errc{};
                     const bool has_h = std::from_chars(input_height, std::end(input_height), height).ec == std::errc{};
                     // ~ the value is unmodified if `from_chars` fails.
                     if (has_w || has_h) {
                         m_coord.zoom.set_1();
-                        init.size = init.size_clamped({.width = width, .height = height});
+                        init.size = init.size_clamped({.x = width, .y = height});
                         locate_center = true;
                     }
                     input_width[0] = '\0';
@@ -496,7 +475,7 @@ public:
                 }
 
                 ImGui::SameLine(0, s);
-                ImGui::Text("Size = %d*%d", init.size.width, init.size.height);
+                ImGui::Text("Size = %d*%d", init.size.x, init.size.y);
             }
 
             ImGui::AlignTextToFramePadding();
@@ -513,7 +492,7 @@ public:
 
                 if (sel) {
                     init.size = init.size_clamped(
-                        {.width = (int)(last_known_canvas_size.x / z), .height = (int)(last_known_canvas_size.y / z)});
+                        {.x = (int)(last_known_canvas_size.x / z), .y = (int)(last_known_canvas_size.y / z)});
                     locate_center = true;
                 }
                 return sel;
@@ -531,7 +510,7 @@ public:
 
         ImGui::Separator();
 
-        const aniso::tileT::sizeT tile_size = m_torus.size();
+        const aniso::vecT tile_size = m_torus.size();
 
         static bool lock_mouse = false; // Lock scrolling control and window moving.
         ImGui::AlignTextToFramePadding();
@@ -600,7 +579,7 @@ public:
             const ImVec2 canvas_size = ImGui::GetItemRectSize();
             last_known_canvas_size = canvas_size;
             if (std::exchange(locate_center, false)) {
-                m_coord.bind(to_vec2(tile_size) / 2, canvas_size / 2);
+                m_coord.bind(to_imvec(tile_size) / 2, canvas_size / 2);
                 to_rotate = {0, 0};
             }
 
@@ -620,7 +599,7 @@ public:
                 }
             }
 
-            std::optional<aniso::tileT::posT> zoom_center = std::nullopt; // Not clamped.
+            std::optional<aniso::vecT> zoom_center = std::nullopt; // Not clamped.
             if (hovered) {
                 const ImGuiIO& io = ImGui::GetIO();
                 assert(ImGui::IsMousePosValid(&io.MousePos));
@@ -633,11 +612,7 @@ public:
                         const int dx = to_rotate.x, dy = to_rotate.y; // Truncate.
                         if (dx || dy) {
                             to_rotate -= ImVec2(dx, dy);
-                            // (This does not need `get_tile_write`.)
-                            m_torus.get_tile_maybe_write([&](aniso::tileT& tile) {
-                                rotate(tile, dx, dy);
-                                return false;
-                            });
+                            rotate(m_torus.write_only(), dx, dy);
                         }
                     } else if (!lock_mouse) {
                         m_coord.corner_pos -= io.MouseDelta / m_coord.zoom;
@@ -648,7 +623,7 @@ public:
                     to_rotate = {0, 0};
 
                     const ImVec2 space_pos = m_coord.to_space(mouse_pos);
-                    const ImVec2 space_pos_clamped = ImClamp(space_pos, {0, 0}, to_vec2(tile_size));
+                    const ImVec2 space_pos_clamped = ImClamp(space_pos, {0, 0}, to_imvec(tile_size));
                     const ImVec2 mouse_pos_clamped = m_coord.to_canvas(space_pos_clamped); // Nearest point.
                     if (imgui_MouseScrollingDown()) {
                         m_coord.zoom.slide(-1);
@@ -659,29 +634,25 @@ public:
                 }
 
                 const ImVec2 space_pos = m_coord.to_space(mouse_pos);
-                const int celx = floor(space_pos.x);
-                const int cely = floor(space_pos.y);
+                const aniso::vecT cel_pos{.x = (int)floor(space_pos.x), .y = (int)floor(space_pos.y)};
 
                 if (m_coord.zoom <= 1 && !m_paste && !active) {
-                    if (celx >= -10 && celx < tile_size.width + 10 && cely >= -10 && cely < tile_size.height + 10) {
+                    if (cel_pos.both_gteq({-10, -10}) && cel_pos.both_lt(tile_size.plus(10, 10))) {
                         if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
-                            zoom_center = {{.x = celx, .y = cely}};
+                            zoom_center = cel_pos;
                         }
                     }
                 }
 
                 if (m_paste) {
-                    assert(m_paste->width() <= tile_size.width && m_paste->height() <= tile_size.height);
-                    paste_beg.x = std::clamp(celx - m_paste->width() / 2, 0, tile_size.width - m_paste->width());
-                    paste_beg.y = std::clamp(cely - m_paste->height() / 2, 0, tile_size.height - m_paste->height());
+                    assert(m_paste->size().both_lteq(tile_size));
+                    paste_beg = aniso::clamp(cel_pos - m_paste->size() / 2, {0, 0}, tile_size - m_paste->size());
                 } else {
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-                        const aniso::tileT::posT pos{.x = std::clamp(celx, 0, tile_size.width - 1),
-                                                     .y = std::clamp(cely, 0, tile_size.height - 1)};
+                        const aniso::vecT pos = aniso::clamp(cel_pos, {0, 0}, tile_size.plus(-1, -1));
                         m_sel = {.active = true, .beg = pos, .end = pos};
                     } else if (m_sel && m_sel->active && r_down) {
-                        m_sel->end.x = std::clamp(celx, 0, tile_size.width - 1);
-                        m_sel->end.y = std::clamp(cely, 0, tile_size.height - 1);
+                        m_sel->end = aniso::clamp(cel_pos, {0, 0}, tile_size.plus(-1, -1));
                     }
                 }
             }
@@ -689,7 +660,7 @@ public:
             // Render.
             {
                 const ImVec2 screen_min = ImFloor(canvas_min + m_coord.to_canvas({0, 0}));
-                const ImVec2 screen_max = screen_min + to_vec2(tile_size) * m_coord.zoom;
+                const ImVec2 screen_max = screen_min + to_imvec(tile_size) * m_coord.zoom;
 
                 ImDrawList* const drawlist = ImGui::GetWindowDrawList();
                 drawlist->PushClipRect(canvas_min, canvas_max);
@@ -697,18 +668,18 @@ public:
 
                 const scaleE scale_mode = m_coord.zoom < 1 ? scaleE::Linear : scaleE::Nearest;
                 if (!m_paste) {
-                    const ImTextureID texture = make_screen(m_torus.get_tile_read(), scale_mode);
+                    const ImTextureID texture = make_screen(m_torus.read_only(), scale_mode);
 
                     drawlist->AddImage(texture, screen_min, screen_max);
                     if (zoom_center.has_value()) {
                         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
                         if (ImGui::BeginTooltip()) {
                             if (scale_mode == scaleE::Nearest) {
-                                zoom_image(texture, to_vec2(tile_size), to_vec2(*zoom_center), ImVec2(80, 60), 3);
+                                zoom_image(texture, to_imvec(tile_size), to_imvec(*zoom_center), ImVec2(80, 60), 3);
                             } else {
                                 // TODO: is it possible to reuse the texture in a different scale mode?
                                 // (Related: https://github.com/ocornut/imgui/issues/7616)
-                                zoom_image(m_torus.get_tile_read(), *zoom_center, {80, 60}, 3);
+                                zoom_image(m_torus.read_only(), *zoom_center, {80, 60}, 3);
                             }
                             ImGui::EndTooltip();
                         }
@@ -716,38 +687,38 @@ public:
                     }
                 } else {
                     assert(!zoom_center);
-                    assert(m_paste->width() <= tile_size.width && m_paste->height() <= tile_size.height);
-                    paste_beg.x = std::clamp(paste_beg.x, 0, tile_size.width - m_paste->width());
-                    paste_beg.y = std::clamp(paste_beg.y, 0, tile_size.height - m_paste->height());
-                    const aniso::tileT::posT paste_end = paste_beg + m_paste->size();
+                    assert(m_paste->size().both_lteq(tile_size));
+                    paste_beg = aniso::clamp(paste_beg, {0, 0}, tile_size - m_paste->size());
+                    const aniso::vecT paste_end = paste_beg + m_paste->size();
 
                     ImTextureID texture = nullptr;
                     // (wontfix) Wasteful, but after all this works...
-                    m_torus.get_tile_maybe_write([&](aniso::tileT& tile) {
-                        aniso::tileT temp = aniso::copy(tile, {{paste_beg, paste_end}});
+                    m_torus.read_and_maybe_write([&](const aniso::tile_ref tile) {
+                        const aniso::tile_ref paste_area = tile.clip({paste_beg, paste_end});
+                        aniso::tileT temp = aniso::copy(paste_area);
                         (background == 0 ? aniso::blit<aniso::blitE::Or>
-                                         : aniso::blit<aniso::blitE::And>)(tile, paste_beg, *m_paste, std::nullopt);
+                                         : aniso::blit<aniso::blitE::And>)(paste_area, m_paste->data());
                         texture = make_screen(tile, scale_mode);
                         if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
                             m_paste.reset();
                             return true;
                         } else { // Restore.
-                            aniso::blit<aniso::blitE::Copy>(tile, paste_beg, temp);
+                            aniso::blit<aniso::blitE::Copy>(paste_area, temp.data());
                             return false;
                         }
                     });
 
                     // (`paste_beg` and `paste_end` remain valid even if `paste` has been consumed.)
                     drawlist->AddImage(texture, screen_min, screen_max);
-                    const ImVec2 paste_min = screen_min + to_vec2(paste_beg) * m_coord.zoom;
-                    const ImVec2 paste_max = screen_min + to_vec2(paste_end) * m_coord.zoom;
+                    const ImVec2 paste_min = screen_min + to_imvec(paste_beg) * m_coord.zoom;
+                    const ImVec2 paste_max = screen_min + to_imvec(paste_end) * m_coord.zoom;
                     drawlist->AddRectFilled(paste_min, paste_max, IM_COL32(255, 0, 0, 60));
                 }
 
                 if (m_sel) {
                     const auto [sel_beg, sel_end] = m_sel->to_range();
-                    const ImVec2 sel_min = screen_min + to_vec2(sel_beg) * m_coord.zoom;
-                    const ImVec2 sel_max = screen_min + to_vec2(sel_end) * m_coord.zoom;
+                    const ImVec2 sel_min = screen_min + to_imvec(sel_beg) * m_coord.zoom;
+                    const ImVec2 sel_max = screen_min + to_imvec(sel_end) * m_coord.zoom;
                     drawlist->AddRectFilled(sel_min, sel_max, IM_COL32(0, 255, 0, 40));
                     drawlist->AddRect(sel_min, sel_max, IM_COL32(0, 255, 0, 160));
                 }
@@ -776,8 +747,8 @@ public:
                 static bool show_result = true; // Copy / cut.
                 auto copy_sel = [&] {
                     if (m_sel) {
-                        std::string rle_str = aniso::to_RLE_str(add_rule ? &sync.current.rule : nullptr,
-                                                                m_torus.get_tile_read(), m_sel->to_range());
+                        std::string rle_str = aniso::to_RLE_str(m_torus.read_only(m_sel->to_range()),
+                                                                add_rule ? &sync.current.rule : nullptr);
                         ImGui::SetClipboardText(rle_str.c_str());
 
                         if (show_result) {
@@ -906,34 +877,32 @@ public:
                 }
 
                 if (op == _capture_closed && m_sel) {
-                    auto lock = capture_closed(m_torus.get_tile_read(), m_sel->to_range(), sync.current.rule);
+                    auto lock = capture_closed(aniso::copy(m_torus.read_only(m_sel->to_range())), sync.current.rule);
                     if (!replace) {
                         aniso::for_each_code([&](aniso::codeT c) { lock[c] = lock[c] || sync.current.lock[c]; });
                     }
                     sync.set_lock(lock);
                 } else if (op == _capture_open && m_sel) {
                     auto lock = sync.current.lock;
-                    capture_open(m_torus.get_tile_read(), m_sel->to_range(), lock);
+                    capture_open(m_torus.read_only(m_sel->to_range()), lock);
                     sync.set_lock(lock);
                 } else if (op == _random_fill && m_sel) {
-                    aniso::random_fill(m_torus.get_tile_write(), global_mt19937(), fill_den.get(), m_sel->to_range());
+                    aniso::random_fill(m_torus.write_only(m_sel->to_range()), global_mt19937(), fill_den.get());
                 } else if (op == _clear_inside && m_sel) {
-                    aniso::clear_inside(m_torus.get_tile_write(), m_sel->to_range(), background);
+                    aniso::clear(m_torus.write_only(m_sel->to_range()), background);
                 } else if (op == _clear_outside && m_sel) {
-                    aniso::clear_outside(m_torus.get_tile_write(), m_sel->to_range(), background);
+                    aniso::clear_outside(m_torus.write_only(), m_sel->to_range(), background);
                 } else if (op == _select_all) {
-                    if (!m_sel || m_sel->width() != tile_size.width || m_sel->height() != tile_size.height) {
-                        m_sel = {.active = false,
-                                 .beg = {0, 0},
-                                 .end = {.x = tile_size.width - 1, .y = tile_size.height - 1}};
+                    if (!m_sel || m_sel->width() != tile_size.x || m_sel->height() != tile_size.y) {
+                        m_sel = {.active = false, .beg = {0, 0}, .end = tile_size.plus(-1, -1)};
                     } else {
                         m_sel.reset();
                     }
                 } else if (op == _bounding_box && m_sel) {
-                    const auto [begin, end] =
-                        aniso::bounding_box(m_torus.get_tile_read(), m_sel->to_range(), background);
+                    const aniso::rangeT sel = m_sel->to_range();
+                    const auto [begin, end] = aniso::bounding_box(m_torus.read_only(sel), background);
                     if (begin != end) {
-                        m_sel = {.active = false, .beg = begin, .end = {.x = end.x - 1, .y = end.y - 1}};
+                        m_sel = {.active = false, .beg = sel.begin + begin, .end = sel.begin + end.plus(-1, -1)};
                     } else {
                         m_sel.reset();
                     }
@@ -941,7 +910,7 @@ public:
                     copy_sel();
                 } else if (op == _cut && m_sel) {
                     copy_sel();
-                    aniso::clear_inside(m_torus.get_tile_write(), m_sel->to_range());
+                    aniso::clear(m_torus.write_only(m_sel->to_range()));
                 } else if (op == _paste) {
                     if (const char* text = ImGui::GetClipboardText()) {
                         m_paste.reset();
@@ -960,7 +929,7 @@ public:
                             messenger::set_msg("The space is not large enough for the pattern.\n"
                                                "Space size: x = {}, y = {}\n"
                                                "Pattern size: x = {}, y = {}",
-                                               tile_size.width, tile_size.height, result.width, result.height);
+                                               tile_size.x, tile_size.y, result.width, result.height);
                         }
                     }
                 }
@@ -1025,6 +994,7 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
     }
 
     const int width = config.width(), height = config.height();
+    const aniso::vecT size{.x = config.width(), .y = config.height()};
     assert(ImGui::GetItemRectSize() == ImVec2(width, height));
     assert(ImGui::IsItemVisible());
 
@@ -1036,12 +1006,12 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
     term.active = true;
 
     if (test_key(ImGuiKey_T, false) || (interactive && ImGui::IsItemClicked(ImGuiMouseButton_Right)) ||
-        term.tile.width() != width || term.tile.height() != height || term.seed != config.seed || term.rule != rule) {
-        term.tile.resize({.width = width, .height = height});
+        term.tile.size() != size || term.seed != config.seed || term.rule != rule) {
+        term.tile.resize(size);
         term.seed = config.seed;
         term.rule = rule;
         std::mt19937 rand(config.seed);
-        aniso::random_fill(term.tile, rand, 0.5);
+        aniso::random_fill(term.tile.data(), rand, 0.5);
     }
 
     // (`IsItemActive` does not work as preview-window is based on `Dummy`.)
@@ -1054,7 +1024,7 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
     }
 
     // Intentionally display after running for better visual effect (the initial state of the tile won't be displayed).
-    const ImTextureID texture = make_screen(term.tile, scaleE::Nearest);
+    const ImTextureID texture = make_screen(term.tile.data(), scaleE::Nearest);
     ImGui::GetWindowDrawList()->AddImage(texture, ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
     if (interactive && ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
         assert(ImGui::IsMousePosValid());

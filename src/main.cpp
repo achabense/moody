@@ -10,6 +10,7 @@
 #include "imgui_impl_sdlrenderer2.h"
 
 #include "common.hpp"
+#include "tile_base.hpp"
 
 // #define DISABLE_FRAMETATE_CAPPING
 
@@ -32,10 +33,13 @@ static SDL_Texture* create_texture(SDL_TextureAccess access, int w, int h) {
     return texture;
 }
 
-static Uint32 color_for(bool b) {
-    // Guaranteed to work under SDL_PIXELFORMAT_XXXX8888.
-    return b ? -1 /* White */ : 0 /* Black*/;
-}
+// (Using macro in case the function is not inlined in debug mode.)
+#define color_for(b) Uint32(bool(b) ? -1 : 0)
+
+// static Uint32 color_for(bool b) {
+//     // Guaranteed to work under SDL_PIXELFORMAT_XXXX8888.
+//     return b ? -1 /* White */ : 0 /* Black*/;
+// }
 
 // Manage textures for `make_screen`.
 class screen_textures {
@@ -89,8 +93,8 @@ public:
     }
 };
 
-[[nodiscard]] ImTextureID make_screen(int w, int h, scaleE scale, std::function<const bool*(int)> getline) {
-    SDL_Texture* texture = screen_textures::get(w, h);
+[[nodiscard]] ImTextureID make_screen(const aniso::tile_const_ref tile, const scaleE scale) {
+    SDL_Texture* texture = screen_textures::get(tile.size.x, tile.size.y);
     SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_NONE);
     if (scale == scaleE::Nearest) {
         SDL_SetTextureScaleMode(texture, SDL_ScaleModeNearest);
@@ -105,12 +109,12 @@ public:
         resource_failure();
     }
 
-    for (int y = 0; y < h; ++y) {
+    tile.for_each_line([&](int y, std::span<const bool> line) {
         Uint32* p = (Uint32*)((char*)pixels + pitch * y);
-        for (bool v : std::span(getline(y), w)) {
+        for (bool v : line) {
             *p++ = color_for(v);
         }
-    }
+    });
 
     SDL_UnlockTexture(texture);
     return texture;
