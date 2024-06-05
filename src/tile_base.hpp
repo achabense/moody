@@ -38,6 +38,16 @@ namespace aniso {
         }
     };
 
+    inline rangeT common(const rangeT& a, const rangeT& b) {
+        const vecT begin = clamp(a.begin, b.begin, b.end);
+        const vecT end = clamp(a.end, b.begin, b.end);
+        if (begin.both_lt(end)) {
+            return {begin, end};
+        } else {
+            return {};
+        }
+    }
+
     namespace _misc {
         // Should be non-empty.
         template <class T>

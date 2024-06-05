@@ -10,22 +10,11 @@ using clockT = std::chrono::steady_clock;
 
 static ImVec2 to_imvec(const aniso::vecT& vec) { return ImVec2(vec.x, vec.y); }
 
-static void zoom_image(ImTextureID texture /* Using `scaleE::Nearest` */, ImVec2 texture_size, ImVec2 region_center,
-                       ImVec2 region_size, int zoom) {
-    region_size = ImMin(texture_size, region_size);
-    const ImVec2 min_pos = ImClamp(region_center - ImFloor(region_size / 2), ImVec2(0, 0), texture_size - region_size);
-    const ImVec2 max_pos = min_pos + region_size;
-
-    ImGui::Image(texture, region_size * zoom, min_pos / texture_size, max_pos / texture_size);
-}
-
-// Always use `scaleE::Nearest`.
-static void zoom_image(const aniso::tile_const_ref tile, aniso::vecT region_center, aniso::vecT region_size, int zoom) {
-    region_size.x = std::min(tile.size.x, region_size.x);
-    region_size.y = std::min(tile.size.y, region_size.y);
-    const aniso::vecT begin = aniso::clamp(region_center - region_size / 2, {0, 0}, tile.size - region_size);
-
-    ImGui::Image(make_screen(tile.clip({begin, begin + region_size}), scaleE::Nearest), to_imvec(region_size * zoom));
+static aniso::rangeT clamp_window(aniso::vecT size, aniso::vecT region_center, aniso::vecT region_size) {
+    region_size.x = std::min(size.x, region_size.x);
+    region_size.y = std::min(size.y, region_size.y);
+    aniso::vecT begin = aniso::clamp(region_center - region_size / 2, {0, 0}, size - region_size);
+    return {.begin = begin, .end = begin + region_size};
 }
 
 static bool strobing(const aniso::ruleT& rule) {
@@ -81,7 +70,9 @@ static void rotate(const aniso::tile_ref tile, int dx, int dy) {
     }
 
     // TODO: optimize...
-    [[maybe_unused]] const bool test = *tile.data; // .at({0, 0})
+#ifndef NDEBUG
+    const bool test = tile.at({0, 0});
+#endif // !NDEBUG
     aniso::tileT temp(tile.size);
     tile.for_each_line([&](int y, std::span<const bool> line) {
         bool* dest = temp.line((y + dy) % height);
@@ -636,7 +627,7 @@ public:
                 const ImVec2 space_pos = m_coord.to_space(mouse_pos);
                 const aniso::vecT cel_pos{.x = (int)floor(space_pos.x), .y = (int)floor(space_pos.y)};
 
-                if (m_coord.zoom <= 1 && !m_paste && !active) {
+                if (m_coord.zoom <= 1 && !m_paste && (!active || false /* for testing */)) {
                     if (cel_pos.both_gteq({-10, -10}) && cel_pos.both_lt(tile_size.plus(10, 10))) {
                         if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
                             zoom_center = cel_pos;
@@ -672,14 +663,30 @@ public:
 
                     drawlist->AddImage(texture, screen_min, screen_max);
                     if (zoom_center.has_value()) {
+                        const auto clamped = clamp_window(tile_size, *zoom_center, {80, 60});
+                        assert(!clamped.empty());
+
                         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
                         if (ImGui::BeginTooltip()) {
                             if (scale_mode == scaleE::Nearest) {
-                                zoom_image(texture, to_imvec(tile_size), to_imvec(*zoom_center), ImVec2(80, 60), 3);
+                                ImGui::Image(texture, to_imvec(clamped.size() * 3),
+                                             to_imvec(clamped.begin) / to_imvec(tile_size),
+                                             to_imvec(clamped.end) / to_imvec(tile_size));
                             } else {
                                 // TODO: is it possible to reuse the texture in a different scale mode?
                                 // (Related: https://github.com/ocornut/imgui/issues/7616)
-                                zoom_image(m_torus.read_only(), *zoom_center, {80, 60}, 3);
+                                ImGui::Image(make_screen(m_torus.read_only(clamped), scaleE::Nearest),
+                                             to_imvec(clamped.size() * 3));
+                            }
+
+                            if (m_sel) {
+                                const aniso::rangeT sel = aniso::common(clamped, m_sel->to_range());
+                                if (!sel.empty()) {
+                                    const ImVec2 zoom_min = ImGui::GetItemRectMin();
+                                    ImGui::GetWindowDrawList()->AddRectFilled(
+                                        zoom_min + to_imvec((sel.begin - clamped.begin) * 3),
+                                        zoom_min + to_imvec((sel.end - clamped.begin) * 3), IM_COL32(0, 255, 0, 40));
+                                }
                             }
                             ImGui::EndTooltip();
                         }
@@ -720,7 +727,7 @@ public:
                     const ImVec2 sel_min = screen_min + to_imvec(sel_beg) * m_coord.zoom;
                     const ImVec2 sel_max = screen_min + to_imvec(sel_end) * m_coord.zoom;
                     drawlist->AddRectFilled(sel_min, sel_max, IM_COL32(0, 255, 0, 40));
-                    drawlist->AddRect(sel_min, sel_max, IM_COL32(0, 255, 0, 160));
+                    // drawlist->AddRect(sel_min, sel_max, IM_COL32(0, 255, 0, 160));
                 }
                 drawlist->PopClipRect();
             }
@@ -957,7 +964,7 @@ void previewer::configT::_set() {
     imgui_Str("Size =");
     for (int i = 0; i < Count; ++i) {
         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-        if (ImGui::RadioButton(size_labels[i], size == i)) {
+        if (ImGui::RadioButton(size_terms[i].str, size == i)) {
             size = sizeE{i};
         }
     }
@@ -1034,7 +1041,10 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
         const ImVec2 pos = ImGui::GetIO().MousePos - ImGui::GetItemRectMin();
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
         if (ImGui::BeginTooltip()) {
-            zoom_image(texture, ImVec2(width, height), pos, ImVec2(64, 48), 3);
+            const aniso::rangeT clamped = clamp_window(size, {.x = int(pos.x), .y = int(pos.y)}, {64, 48});
+            assert(!clamped.empty());
+            ImGui::Image(texture, to_imvec(clamped.size() * 3), to_imvec(clamped.begin) / to_imvec(size),
+                         to_imvec(clamped.end) / to_imvec(size));
             ImGui::EndTooltip();
         }
         ImGui::PopStyleVar();

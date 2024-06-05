@@ -354,9 +354,12 @@ public:
         enum sizeE : int { _160_160 = 0, _220_160, _220_220, _280_220, Count };
 
     private:
-        static constexpr const char* size_labels[Count]{"160*160", "220*160", "220*220", "280*220"};
-        static constexpr int size_w[Count]{160, 220, 220, 280};
-        static constexpr int size_h[Count]{160, 160, 220, 220};
+        struct termT {
+            int w, h;
+            const char* str;
+        };
+        static constexpr termT size_terms[Count]{
+            {160, 160, "160*160"}, {220, 160, "220*160"}, {220, 220, "220*220"}, {280, 220, "280*220"}};
 
         friend previewer;
         sizeE size; // Cannot be `Count`.
@@ -367,8 +370,8 @@ public:
     public:
         /*implicit*/ configT(sizeE size) : size(size), seed(0), pace(1) { assert(size >= 0 && size < Count); }
 
-        int width() const { return size_w[size]; }
-        int height() const { return size_h[size]; }
+        int width() const { return size_terms[size].w; }
+        int height() const { return size_terms[size].h; }
 
         void set(const char* label) {
             const bool clicked = ImGui::Button(label);
