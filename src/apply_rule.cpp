@@ -57,32 +57,6 @@ static void capture_open(const aniso::tile_const_ref tile, aniso::moldT::lockT& 
     aniso::collect_cases(tile, lock);
 }
 
-// (0, 0) is mapped to (wrap(dx), wrap(dy)).
-static void rotate(const aniso::tile_ref tile, int dx, int dy) {
-    const int width = tile.size.x, height = tile.size.y;
-
-    const auto wrap = [](int v, int r) { return ((v % r) + r) % r; };
-    dx = wrap(dx, width);
-    dy = wrap(dy, height);
-    assert(dx >= 0 && dx < width && dy >= 0 && dy < height);
-    if (dx == 0 && dy == 0) {
-        return;
-    }
-
-    // TODO: optimize...
-#ifndef NDEBUG
-    const bool test = tile.at({0, 0});
-#endif // !NDEBUG
-    aniso::tileT temp(tile.size);
-    tile.for_each_line([&](int y, std::span<const bool> line) {
-        bool* dest = temp.line((y + dy) % height);
-        std::copy_n(line.data(), width - dx, dest + dx);
-        std::copy_n(line.data() + width - dx, dx, dest);
-    });
-    aniso::blit<aniso::blitE::Copy>(tile, temp.data());
-    assert(test == tile.at({.x = dx, .y = dy}));
-}
-
 class densityT {
     int m_dens; // ∈ [0, 100], /= 100 to serve as density.
 public:
@@ -254,6 +228,15 @@ class runnerT {
         void read_and_maybe_write(const std::invocable<aniso::tile_ref> auto& fn) {
             if (fn(m_torus.tile().data())) {
                 mark_written();
+            }
+        }
+
+        void rotate(int dx, int dy) {
+            if (dx != 0 || dy != 0) {
+                aniso::tileT& tile = m_torus.tile();
+                aniso::tileT temp(tile.size());
+                aniso::rotate_copy(temp.data(), tile.data(), {.x = dx, .y = dy});
+                tile.swap(temp);
             }
         }
 
@@ -603,7 +586,7 @@ public:
                         const int dx = to_rotate.x, dy = to_rotate.y; // Truncate.
                         if (dx || dy) {
                             to_rotate -= ImVec2(dx, dy);
-                            rotate(m_torus.write_only(), dx, dy);
+                            m_torus.rotate(dx, dy);
                         }
                     } else if (!lock_mouse) {
                         m_coord.corner_pos -= io.MouseDelta / m_coord.zoom;

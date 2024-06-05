@@ -355,6 +355,33 @@ namespace aniso {
         }
     }
 
+    // Map (0, 0) to (wrap(d.x), wrap(d.y)).
+    inline void rotate_copy(const tile_ref dest, const tile_const_ref source, vecT d) {
+        // (`dest` and `source` should not overlap.)
+        assert(dest.size == source.size);
+        const vecT size = dest.size;
+
+        const auto wrap = [](int v, int r) { return ((v % r) + r) % r; };
+        d.x = wrap(d.x, size.x);
+        d.y = wrap(d.y, size.y);
+        assert(d.both_gteq({0, 0}) && d.both_lt(size));
+
+        if (d.x == 0 && d.y == 0) [[unlikely]] {
+            blit<blitE::Copy>(dest, source);
+            return;
+        }
+
+#ifndef NDEBUG
+        const bool test = source.at({0, 0});
+#endif // !NDEBUG
+        source.for_each_line([&](int y, std::span<const bool> line) {
+            bool* const dest_ = dest.line((y + d.y) % size.y);
+            std::copy_n(line.data(), size.x - d.x, dest_ + d.x);
+            std::copy_n(line.data() + size.x - d.x, d.x, dest_);
+        });
+        assert(test == dest.at(d));
+    }
+
     namespace _misc {
         //  https://conwaylife.com/wiki/Run_Length_Encoded
         inline void to_RLE(std::string& str, const tile_const_ref tile) {
