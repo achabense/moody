@@ -264,6 +264,10 @@ class messenger {
         int m_count{};
 
     public:
+        // (Defined as a workaround for gcc building.)
+        // (Related: https://stackoverflow.com/questions/53408962)
+        messageT() : m_str{}, m_min{}, m_count{} {}
+
         void set(std::string&& str) {
             m_min.reset();
             m_count = 10;
