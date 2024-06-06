@@ -109,13 +109,23 @@ public:
         resource_failure();
     }
 
-    tile.for_each_line([&](int y, std::span<const bool> line) {
-        Uint32* p = (Uint32*)((char*)pixels + pitch * y);
-        for (bool v : line) {
-            *p++ = color_for(v);
-        }
-    });
-
+    if (const int pixel_size = sizeof(Uint32); pitch % pixel_size != 0) [[unlikely]] {
+        assert(false); // Is this really possible?
+        tile.for_each_line([&](int y, std::span<const bool> line) {
+            Uint32* p = (Uint32*)((char*)pixels + pitch * y);
+            for (bool v : line) {
+                *p++ = color_for(v);
+            }
+        });
+    } else {
+        const aniso::_misc::tile_ref_<Uint32> texture_data{
+            .size = tile.size, .stride = pitch / pixel_size, .data = (Uint32*)pixels};
+        tile.for_all_data_vs(texture_data, [](const bool* s, Uint32* p, int len) {
+            for (int i = 0; i < len; ++i) {
+                p[i] = color_for(s[i]);
+            }
+        });
+    }
     SDL_UnlockTexture(texture);
     return texture;
 }
