@@ -65,13 +65,13 @@ namespace aniso {
         });
     }
 
-    inline void clear(const tile_ref tile, const bool v = 0) {
+    inline void clear(const tile_ref tile, const bool v) {
         tile.for_all_data([v](std::span<bool> line) { //
             std::ranges::fill(line, v);
         });
     }
 
-    inline void clear_outside(const tile_ref tile, const rangeT& range, const bool v = 0) {
+    inline void clear_outside(const tile_ref tile, const rangeT& range, const bool v) {
         assert(tile.has_range(range));
         tile.for_each_line([&](int y, std::span<bool> line) {
             if (y < range.begin.y || y >= range.end.y) {
@@ -83,7 +83,7 @@ namespace aniso {
         });
     }
 
-    inline rangeT bounding_box(const tile_const_ref tile, const bool v = 0) {
+    inline rangeT bounding_box(const tile_const_ref tile, const bool v) {
         int min_x = INT_MAX, max_x = INT_MIN;
         int min_y = INT_MAX, max_y = INT_MIN;
         tile.for_each_line([&](int y, std::span<const bool> line) {
@@ -104,7 +104,7 @@ namespace aniso {
         }
     }
 
-    inline rangeT bounding_box(const tile_const_ref tile, const rangeT& range, const bool v = 0) {
+    inline rangeT bounding_box(const tile_const_ref tile, const rangeT& range, const bool v) {
         assert(tile.has_range(range));
         const rangeT box = bounding_box(tile.clip(range), v);
         if (!box.empty()) {

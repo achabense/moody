@@ -882,7 +882,7 @@ public:
                     copy_sel();
                 } else if (op == _cut && m_sel) {
                     copy_sel();
-                    aniso::clear(m_torus.write_only(m_sel->to_range()));
+                    aniso::clear(m_torus.write_only(m_sel->to_range()), background);
                 } else if (op == _paste) {
                     if (const char* text = ImGui::GetClipboardText()) {
                         m_paste.reset();
