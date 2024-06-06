@@ -7,249 +7,6 @@
 #include "tile_base.hpp"
 
 namespace aniso {
-    // Building block for torus space etc.
-    class tileT {
-        vecT m_size;  // Observable width and height.
-        bool* m_data; // Layout: [height+2][width+2].
-
-    public:
-        void swap(tileT& other) noexcept {
-            std::swap(m_size, other.m_size);
-            std::swap(m_data, other.m_data);
-        }
-        tileT() noexcept : m_size{0, 0}, m_data{nullptr} {}
-        tileT(tileT&& other) noexcept : tileT() { swap(other); }
-        tileT& operator=(tileT&& other) noexcept {
-            swap(other);
-            return *this;
-        }
-
-        explicit tileT(vecT size) : tileT() {
-            if (size.x > 0 && size.y > 0) {
-                m_size = size;
-                m_data = new bool[(m_size.x + 2) * (m_size.y + 2)]{};
-            }
-        }
-        ~tileT() { delete[] m_data; }
-
-        // The line data is conceptually write-only after `resize`.
-        void resize(vecT size) {
-            if (m_size != size) {
-                tileT resized(size);
-                swap(resized);
-            }
-        }
-
-        tileT(const tileT& other) : tileT(other.m_size) {
-            if (other.m_data) {
-                std::copy_n(other.m_data, (m_size.x + 2) * (m_size.y + 2), m_data);
-            }
-        }
-        tileT& operator=(const tileT& other) {
-            if (this != &other) {
-                resize(other.m_size);
-                if (other.m_data) {
-                    std::copy_n(other.m_data, (m_size.x + 2) * (m_size.y + 2), m_data);
-                }
-            }
-            return *this;
-        }
-
-        vecT size() const { return m_size; }
-        int width() const { return m_size.x; }
-        int height() const { return m_size.y; }
-        int area() const { return m_size.x * m_size.y; }
-
-    private:
-        bool* _line(int _y) {
-            assert(m_data && _y >= 0 && _y < m_size.y + 2);
-            return m_data + _y * (m_size.x + 2);
-        }
-        const bool* _line(int _y) const {
-            assert(m_data && _y >= 0 && _y < m_size.y + 2);
-            return m_data + _y * (m_size.x + 2);
-        }
-
-    public:
-        bool* line(int y) {
-            assert(y >= 0 && y < m_size.y);
-            return _line(y + 1) + 1;
-        }
-        const bool* line(int y) const {
-            assert(y >= 0 && y < m_size.y);
-            return _line(y + 1) + 1;
-        }
-
-        tile_ref data() { return {.size = m_size, .stride = m_size.x + 2, .data = line(0)}; }
-        tile_const_ref data() const { return {.size = m_size, .stride = m_size.x + 2, .data = line(0)}; }
-
-    public:
-        // (`q`, `w`, ... may refer to `*this`, see below.)
-        void gather(const tileT& q, const tileT& w, const tileT& e, //
-                    const tileT& a, /*   *this   */ const tileT& d, //
-                    const tileT& z, const tileT& x, const tileT& c) {
-            // assert m_size == *.m_size.
-
-            const int width = m_size.x, height = m_size.y;
-
-            auto _set_lr = [width](bool* _line, bool l, bool r) {
-                _line[0] = l;
-                _line[width + 1] = r;
-            };
-
-            _set_lr(_line(0), q._line(height)[width], e._line(height)[1]);
-            std::copy_n(w._line(height) + 1, width, _line(0) + 1);
-
-            for (int _y = 1; _y <= height; ++_y) {
-                _set_lr(_line(_y), a._line(_y)[width], d._line(_y)[1]);
-            }
-
-            _set_lr(_line(height + 1), z._line(1)[width], c._line(1)[1]);
-            std::copy_n(x._line(1) + 1, width, _line(height + 1) + 1);
-        }
-
-        void gather_torus() { gather(*this, *this, *this, *this, *this, *this, *this, *this); }
-
-        void apply(const rule_like auto& rule, tileT& dest) const {
-            // There is supposed to be a call to `gather` before calling `apply`.
-            // (Which is untestable and must be guaranteed by the callers.)
-
-            assert(this != &dest);
-            dest.resize(m_size);
-
-            for (int _y = 1; _y <= m_size.y; ++_y) {
-                const bool* _up = _line(_y - 1);
-                const bool* _cn = _line(_y);
-                const bool* _dw = _line(_y + 1);
-                bool* _dest = dest._line(_y);
-
-                for (int _x = 1; _x <= m_size.x; ++_x) {
-                    _dest[_x] = rule(encode({
-                        _up[_x - 1], _up[_x], _up[_x + 1], //
-                        _cn[_x - 1], _cn[_x], _cn[_x + 1], //
-                        _dw[_x - 1], _dw[_x], _dw[_x + 1], //
-                    }));
-                }
-            }
-        }
-
-        // This is relying on codeT::bpos_q = 0, bpos_w = 1, ... bpos_c = 8.
-        void apply_v3(const rule_like auto& rule, tileT& dest) const {
-            if (&dest != this) {
-                dest.resize(m_size);
-            }
-
-            const int width = m_size.x, height = m_size.y;
-            std::vector<char> _vec(width + 1); // [0, width]
-
-            char* const _vec_p6 = _vec.data();
-            {
-                const bool *_up = _line(0), *_cn = _line(1);
-                int p3_up = (_up[0] << 1) | (_up[1] << 2);
-                int p3_cn = (_cn[0] << 1) | (_cn[1] << 2);
-                for (int _x = 1; _x <= width; ++_x) {
-                    p3_up = (p3_up >> 1) | (_up[_x + 1] << 2);
-                    p3_cn = (p3_cn >> 1) | (_cn[_x + 1] << 2);
-                    _vec_p6[_x] = p3_up | (p3_cn << 3);
-                    // _vec_p6[_x] =
-                    // (_up[_x - 1] << 0) | (_up[_x] << 1) | (_up[_x + 1] << 2)
-                    // (_cn[_x - 1] << 3) | (_cn[_x] << 4) | (_cn[_x + 1] << 5)
-                }
-            }
-            for (int _y = 1; _y <= height; ++_y) {
-                const bool* _dw = _line(_y + 1);
-                bool* _dest = dest._line(_y);
-                int p3_dw = (_dw[0] << 1) | (_dw[1] << 2);
-                for (int _x = 1; _x <= width; ++_x) {
-                    p3_dw = (p3_dw >> 1) | (_dw[_x + 1] << 2);
-                    // p3_dw = _dw[_x - 1] | (_dw[_x] << 1) | (_dw[_x + 1] << 2)
-                    const int code = _vec_p6[_x] | (p3_dw << 6);
-                    _dest[_x] = rule(codeT{code});
-                    _vec_p6[_x] = code >> 3;
-                }
-            }
-        }
-
-        void apply_v3(const rule_like auto& rule) { apply_v3(rule, *this); }
-
-        friend bool operator==(const tileT& l, const tileT& r) {
-            if (l.m_size != r.m_size) {
-                return false;
-            }
-            for (int y = 0; y < l.m_size.y; ++y) {
-                const bool* l_line = l.line(y);
-                const bool* r_line = r.line(y);
-                if (!std::equal(l_line, l_line + l.m_size.x, r_line)) {
-                    return false;
-                }
-            }
-            return true;
-        }
-    };
-
-#ifdef ENABLE_TESTS
-    namespace _tests {
-        inline const testT test_tileT_apply = [] {
-            const vecT size{1, 1};
-
-            tileT t_q(size), t_w(size), t_e(size);
-            tileT t_a(size), t_s(size), t_d(size);
-            tileT t_z(size), t_x(size), t_c(size);
-            tileT dest(size);
-
-            const ruleT rule = make_rule([](codeT) { return testT::rand() & 1; });
-            for_each_code([&](codeT code) {
-                const auto [q, w, e, a, s, d, z, x, c] = decode(code);
-                t_q.line(0)[0] = q, t_w.line(0)[0] = w, t_e.line(0)[0] = e;
-                t_a.line(0)[0] = a, t_s.line(0)[0] = s, t_d.line(0)[0] = d;
-                t_z.line(0)[0] = z, t_x.line(0)[0] = x, t_c.line(0)[0] = c;
-
-                t_s.gather(t_q, t_w, t_e, t_a, t_d, t_z, t_x, t_c);
-                t_s.apply(rule, dest);
-                assert(dest.line(0)[0] == rule(code));
-            });
-        };
-
-        inline const testT test_tileT_apply_v3 = [] {
-            const vecT size{32, 32};
-            tileT source(size), dest(size), dest_v3(size);
-            source.data().for_all_data([&](std::span<bool> line) { //
-                std::ranges::generate(line, [&] { return testT::rand() & 1; });
-            });
-
-            const ruleT rule = make_rule([](codeT) { return testT::rand() & 1; });
-            source.gather_torus();
-
-            source.apply(rule, dest);
-            source.apply_v3(rule, dest_v3);
-            assert(dest == dest_v3);
-
-            source.apply_v3(rule);
-            assert(dest == source);
-        };
-    }  // namespace _tests
-#endif // ENABLE_TESTS
-
-    // (For `capture_open`.)
-    inline void collect_cases(const tile_const_ref tile, moldT::lockT& lock) {
-        if (tile.size.x <= 2 || tile.size.y <= 2) {
-            return;
-        }
-
-        for (int y = 1; y < tile.size.y - 1; ++y) {
-            const bool* const up = tile.line(y - 1);
-            const bool* const cn = tile.line(y);
-            const bool* const dw = tile.line(y + 1);
-            for (int x = 1; x < tile.size.x - 1; ++x) {
-                lock[encode({
-                    up[x - 1], up[x], up[x + 1], //
-                    cn[x - 1], cn[x], cn[x + 1], //
-                    dw[x - 1], dw[x], dw[x + 1], //
-                })] = true;
-            }
-        }
-    }
-
     inline int count(const tile_const_ref tile) {
         int c = 0;
         tile.for_all_data([&c](std::span<const bool> line) {
@@ -270,35 +27,37 @@ namespace aniso {
         return c;
     }
 
-    enum class blitE { Copy, Or, And, Xor };
-    template <blitE mode>
-    inline void blit(const tile_ref dest, const tile_const_ref source) {
-        // (`dest` and `source` should not overlap.)
-
-        dest.for_all_data_vs(source, [](bool* d, const bool* s, int w) {
-            for (int x = 0; x < w; ++x) {
-                if constexpr (mode == blitE::Copy) {
-                    d[x] = s[x];
-                } else if constexpr (mode == blitE::Or) {
-                    d[x] |= s[x];
-                } else if constexpr (mode == blitE::And) {
-                    d[x] &= s[x];
-                } else {
-                    static_assert(mode == blitE::Xor);
-                    d[x] ^= s[x];
-                }
-            }
+    // (`dest` and `source` should not overlap.)
+    inline void copy(const tile_ref dest, const tile_const_ref source) {
+        dest.for_all_data_vs(source, [](bool* d, const bool* s, int len) { //
+            std::copy_n(s, len, d);
         });
     }
 
-    inline tileT copy(const tile_const_ref source) {
-        tileT tile(source.size);
-        blit<blitE::Copy>(tile.data(), source);
-        return tile;
+    // (`dest` and `source` should not overlap.)
+    enum class blitE { Copy, Or, And, Xor };
+    template <blitE mode>
+    inline void blit(const tile_ref dest, const tile_const_ref source) {
+        if constexpr (mode == blitE::Copy) {
+            copy(dest, source);
+        } else {
+            dest.for_all_data_vs(source, [](bool* d, const bool* s, int w) {
+                for (int x = 0; x < w; ++x) {
+                    if constexpr (mode == blitE::Or) {
+                        d[x] |= s[x];
+                    } else if constexpr (mode == blitE::And) {
+                        d[x] &= s[x];
+                    } else {
+                        static_assert(mode == blitE::Xor);
+                        d[x] ^= s[x];
+                    }
+                }
+            });
+        }
     }
 
-    // The result will be completely dependent on the state of `rand` and `density`; `bernoulli_distribution`
-    // cannot guarantee this.
+    // The result will be completely dependent on the state of `rand` and `density`.
+    // (`bernoulli_distribution` cannot guarantee this.)
     inline void random_fill(const tile_ref tile, std::mt19937& rand, double density) {
         const uint32_t c = std::mt19937::max() * std::clamp(density, 0.0, 1.0);
         tile.for_all_data([&](std::span<bool> line) { //
@@ -355,9 +114,9 @@ namespace aniso {
         }
     }
 
+    // (`dest` and `source` should not overlap.)
     // Map (0, 0) to (wrap(d.x), wrap(d.y)).
     inline void rotate_copy(const tile_ref dest, const tile_const_ref source, vecT d) {
-        // (`dest` and `source` should not overlap.)
         assert(dest.size == source.size);
         const vecT size = dest.size;
 
@@ -367,7 +126,7 @@ namespace aniso {
         assert(d.both_gteq({0, 0}) && d.both_lt(size));
 
         if (d.x == 0 && d.y == 0) [[unlikely]] {
-            blit<blitE::Copy>(dest, source);
+            copy(dest, source);
             return;
         }
 
@@ -517,6 +276,7 @@ namespace aniso {
             assert(width != 0 && height != 0);
             const tile_ref tile = *tile_opt;
             assert(tile.size.x == width && tile.size.y == height);
+            clear(tile, 0); // `tile` data might be dirty.
 
             int x = 0, y = 0;
             for (takerT taker(text);;) {
@@ -534,32 +294,272 @@ namespace aniso {
         }
     }
 
-    // Empty -> failure; the reason is not cared about.
-    inline tileT from_RLE_str_silent(std::string_view text, const vecT max_size) {
-        tileT tile{};
-        from_RLE_str(text, [&](long long w, long long h) -> std::optional<tile_ref> {
-            if (w == 0 || h == 0 || w > max_size.x || h > max_size.y) {
-                return std::nullopt;
-            } else {
-                tile.resize({.x = int(w), .y = int(h)});
-                return tile.data();
-            }
-        });
-        return tile;
-    }
-
 #ifdef ENABLE_TESTS
     namespace _tests {
         inline const testT test_RLE_str = [] {
-            using listT = std::initializer_list<vecT>;
-            for (const auto size : listT{{.x = 1, .y = 1}, {.x = 3, .y = 1}, {.x = 1, .y = 3}, {.x = 32, .y = 60}}) {
-                tileT tile(size);
-                random_fill(tile.data(), testT::rand, 0.5);
-                // It's ok to compare directly, as `...).tile` will be empty if not successful.
-                assert(tile == from_RLE_str_silent(to_RLE_str(tile.data(), nullptr), tile.size()));
+            const vecT sizes[]{{.x = 1, .y = 1}, {.x = 10, .y = 1}, {.x = 1, .y = 10}, {.x = 32, .y = 60}};
+            for (const vecT size : sizes) {
+                std::unique_ptr<bool[]> a_data(new bool[size.xy()] /* uninitialized */);
+                std::unique_ptr<bool[]> b_data(new bool[size.xy()] /* uninitialized */);
+                const tile_ref a{size, size.x, a_data.get()};
+                const tile_ref b{size, size.x, b_data.get()};
+                random_fill(a, testT::rand, 0.5);
+                from_RLE_str(to_RLE_str(a, nullptr), [&](long long w, long long h) {
+                    assert(w == size.x && h == size.y);
+                    return std::optional{b};
+                });
+                assert(std::equal(a_data.get(), a_data.get() + size.xy(), b_data.get()));
             }
         };
     }  // namespace _tests
 #endif // ENABLE_TESTS
+
+    inline constexpr int calc_border_size(const vecT size) { return 2 * (size.x + size.y) + 4; }
+
+    namespace _misc {
+        template <bool is_const>
+        struct border_ref_ {
+            using boolT = std::conditional_t<is_const, const bool, bool>;
+
+            vecT size;   // For this size.
+            boolT* data; // [x][2]*(y+2)[x]
+
+            operator border_ref_<true>() const
+                requires(!is_const)
+            {
+                return {size, data};
+            }
+
+            boolT* up_line() const { return data; }
+            boolT* down_line() const { return data + size.x + 2 * size.y + 4; }
+
+            void set_lr(int y, bool l, bool r) const
+                requires(!is_const)
+            {
+                assert(y >= -1 && y <= size.y);
+                bool* dest = data + size.x + 2 * (y + 1);
+                dest[0] = l, dest[1] = r;
+            }
+
+            std::pair<bool, bool> get_lr(int y) const {
+                assert(y >= -1 && y <= size.y);
+                const bool* dest = data + size.x + 2 * (y + 1);
+                return {dest[0], dest[1]};
+            }
+
+            void collect_from(const tile_const_ref q, const tile_const_ref w, const tile_const_ref e, //
+                              const tile_const_ref a, /*        s          */ const tile_const_ref d, //
+                              const tile_const_ref z, const tile_const_ref x, const tile_const_ref c) const
+                requires(!is_const)
+            {
+                std::copy_n(w.line(w.size.y - 1), size.x, up_line());
+                std::copy_n(x.line(0), size.x, down_line());
+                set_lr(-1, q.at({q.size.x - 1, q.size.y - 1}), e.at({0, e.size.y - 1}));
+                set_lr(size.y, z.at({z.size.x - 1, 0}), c.at({0, 0}));
+                for (int y = 0; y < size.y; ++y) {
+                    set_lr(y, a.at({a.size.x - 1, y}), d.at({0, y}));
+                }
+            }
+        };
+
+        // Workaround to avoid creating multiple static variables in `apply_rule` and `apply_rule_torus` (as
+        // they are templates). Ideally they should be invisible from anywhere else in the library.
+        inline static std::vector<char> helper_memory_for_apply{};
+
+        inline border_ref_<false /* !is_const */> temp_border_for(const vecT size) {
+            static std::unique_ptr<bool[]> data{};
+            static int len{};
+
+            if (const int required = calc_border_size(size); len < required) {
+                data.reset(new bool[required * 2]{});
+                len = required * 2;
+            }
+
+            return {.size = size, .data = data.get()};
+        }
+
+    } // namespace _misc
+
+    using border_ref = _misc::border_ref_<false /* !is_const */>;
+    using border_const_ref = _misc::border_ref_<true /* is_const */>;
+
+    // `dest` and `source` may either refer to the same area, or completely non-overlapping.
+    inline void apply_rule(const rule_like auto& rule, const tile_ref dest, const tile_const_ref source,
+                           const border_const_ref source_border) {
+        assert(source.size == dest.size);
+        assert(source.size == source_border.size);
+        const vecT size = source.size;
+
+        if (_misc::helper_memory_for_apply.size() < size.x) {
+            _misc::helper_memory_for_apply.resize(size.x * 2);
+        }
+
+        char* const vec_p6 = _misc::helper_memory_for_apply.data();
+        {
+            const bool *up = source_border.up_line(), *cn = source.line(0);
+            const auto [up_l, up_r] = source_border.get_lr(-1);
+            const auto [cn_l, cn_r] = source_border.get_lr(0);
+            int p3_up = (up_l << 1) | (up[0] << 2);
+            int p3_cn = (cn_l << 1) | (cn[0] << 2);
+            for (int x = 0; x < size.x - 1; ++x) {
+                p3_up = (p3_up >> 1) | (up[x + 1] << 2); // up[x - 1] | (up[x] << 1) | (up[x + 1] << 2)
+                p3_cn = (p3_cn >> 1) | (cn[x + 1] << 2); // cn[x - 1] | (cn[x] << 1) | (cn[x + 1] << 2)
+                vec_p6[x] = p3_up | (p3_cn << 3);
+            }
+            p3_up = (p3_up >> 1) | (up_r << 2);
+            p3_cn = (p3_cn >> 1) | (cn_r << 2);
+            vec_p6[size.x - 1] = p3_up | p3_cn << 3;
+        }
+
+        for (int y = 0; y < size.y; ++y) {
+            bool* dest_ = dest.line(y);
+            const bool* dw = y == size.y - 1 ? source_border.down_line() : source.line(y + 1);
+            const auto [dw_l, dw_r] = source_border.get_lr(y + 1);
+            int p3_dw = (dw_l << 1) | (dw[0] << 2);
+            for (int x = 0; x < size.x - 1; ++x) {
+                p3_dw = (p3_dw >> 1) | (dw[x + 1] << 2); // dw[x - 1] | (dw[x] << 1) | (dw[x + 1] << 2)
+                const int code = vec_p6[x] | (p3_dw << 6);
+                dest_[x] = rule(codeT{code});
+                vec_p6[x] = code >> 3;
+            }
+            p3_dw = (p3_dw >> 1) | (dw_r << 2);
+            const int code = vec_p6[size.x - 1] | p3_dw << 6;
+            dest_[size.x - 1] = rule(codeT{code});
+            vec_p6[size.x - 1] = code >> 3;
+        }
+    }
+
+    inline void apply_rule_torus(const rule_like auto& rule, const tile_ref dest, const tile_const_ref source) {
+        assert(source.size == dest.size);
+        const vecT size = source.size;
+
+        const border_ref border = _misc::temp_border_for(size);
+        border.collect_from(source, source, source, source, source, source, source, source);
+        apply_rule(rule, dest, source, border);
+    }
+
+    // (For `capture_open`.)
+    inline void fake_apply(const tile_const_ref tile, moldT::lockT& lock) {
+        if (tile.size.x <= 2 || tile.size.y <= 2) {
+            return;
+        }
+
+        for (int y = 1; y < tile.size.y - 1; ++y) {
+            const bool* const up = tile.line(y - 1);
+            const bool* const cn = tile.line(y);
+            const bool* const dw = tile.line(y + 1);
+            for (int x = 1; x < tile.size.x - 1; ++x) {
+                lock[encode({
+                    up[x - 1], up[x], up[x + 1], //
+                    cn[x - 1], cn[x], cn[x + 1], //
+                    dw[x - 1], dw[x], dw[x + 1], //
+                })] = true;
+            }
+        }
+    }
+
+#ifdef ENABLE_TESTS
+    namespace _tests {
+        inline const testT test_apply_1 = [] {
+            const ruleT rule = make_rule([](codeT) { return testT::rand() & 1; });
+
+            for_each_code([&](codeT code) {
+                const auto make_ref = [](bool& b) { return tile_ref{{1, 1}, 1, &b}; };
+                auto [q, w, e, a, s, d, z, x, c] = decode(code);
+
+                bool dest{}, border_data[calc_border_size({1, 1})]{};
+                const border_ref border{.size = {1, 1}, .data = border_data};
+                border.collect_from(make_ref(q), make_ref(w), make_ref(e), make_ref(a), make_ref(d), make_ref(z),
+                                    make_ref(x), make_ref(c));
+
+                apply_rule(rule, make_ref(dest), make_ref(s), border);
+                assert(dest == rule[code]);
+            });
+        };
+
+        inline const testT test_apply_2 = [] {
+            const ruleT copy_q = make_rule([](codeT c) { return c.get(codeT::bpos_q); });
+
+            std::array<bool, 120> data[2]{};
+            const tile_ref tile{.size{.x = 10, .y = 12}, .stride = 10, .data = &data[0][0]};
+            const tile_ref compare{.size{.x = 10, .y = 12}, .stride = 10, .data = &data[1][0]};
+            random_fill(tile, testT::rand, 0.5);
+
+            const border_ref border = _misc::temp_border_for({.x = 10, .y = 12});
+            for (int i = 0; i < 12; ++i) {
+                rotate_copy(compare, tile, {1, 1});
+                apply_rule_torus(copy_q, tile, tile);
+                assert(data[0] == data[1]);
+            }
+        };
+    }  // namespace _tests
+#endif // ENABLE_TESTS
+
+    struct tileT {
+        vecT m_size;
+        bool* m_data; // [x]*y
+
+        bool empty() const {
+            assert(m_size.x >= 0);
+            assert_implies(m_size.x > 0, m_size.y > 0 && m_data);
+            return m_size.x == 0;
+        }
+
+    public:
+        tileT() noexcept : m_size{}, m_data{} {}
+
+        void swap(tileT& other) noexcept {
+            std::swap(m_size, other.m_size);
+            std::swap(m_data, other.m_data);
+        }
+        tileT(tileT&& other) noexcept : tileT() { swap(other); }
+        tileT& operator=(tileT&& other) noexcept {
+            swap(other);
+            return *this;
+        }
+
+        explicit tileT(const vecT size) : m_size{size}, m_data{} {
+            assert(size.both_gteq({0, 0}));
+            if (m_size.x > 0) {
+                assert(m_size.y > 0);
+                m_data = new bool[m_size.xy()]{};
+            }
+        }
+
+        ~tileT() { delete[] m_data; }
+
+        explicit tileT(const tile_const_ref tile) : tileT(tile.size) {
+            assert(!empty());
+            copy(data(), tile);
+        }
+
+        tileT(const tileT& other) : m_size(other.m_size) {
+            if (!other.empty()) {
+                m_data = new bool[m_size.xy()];
+                std::copy_n(other.m_data, m_size.xy(), m_data);
+            }
+        }
+
+        void resize(const vecT size) {
+            if (m_size != size) {
+                tileT(size).swap(*this);
+            }
+        }
+
+        vecT size() const { return m_size; }
+
+        tile_ref data() {
+            assert(!empty());
+            return {.size = m_size, .stride = m_size.x /* continuous */, .data = m_data};
+        }
+        tile_const_ref data() const {
+            assert(!empty());
+            return {.size = m_size, .stride = m_size.x /* continuous */, .data = m_data};
+        }
+
+        void run_torus(const rule_like auto& rule) { //
+            apply_rule_torus(rule, data(), data());
+        }
+    };
 
 } // namespace aniso

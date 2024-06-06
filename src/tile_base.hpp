@@ -5,6 +5,8 @@ namespace aniso {
     struct vecT {
         int x, y;
 
+        int xy() const { return x * y; }
+
         friend bool operator==(const vecT&, const vecT&) = default;
         friend vecT operator+(const vecT& a, const vecT& b) { return {.x = a.x + b.x, .y = a.y + b.y}; }
         friend vecT operator-(const vecT& a, const vecT& b) { return {.x = a.x - b.x, .y = a.y - b.y}; }

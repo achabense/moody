@@ -22,15 +22,11 @@ static bool strobing(const aniso::ruleT& rule) {
     return rule[all_0] == 1 && rule[all_1] == 0;
 }
 
-static void run_torus(aniso::tileT& tile, const aniso::rule_like auto& rule) {
-    tile.gather_torus();
-    tile.apply_v3(rule);
-}
-
 // Copy the subrange and run as a torus space, recording all invoked mappings.
 // This is good at capturing "self-contained" patterns (oscillators/spaceships).
-static aniso::moldT::lockT capture_closed(aniso::tileT tile /* owning */, const aniso::ruleT& rule) {
+static aniso::moldT::lockT capture_closed(const aniso::tile_const_ref tile, const aniso::ruleT& rule) {
     aniso::moldT::lockT lock{};
+    aniso::tileT torus(tile);
 
     // (wontfix) It's possible that the loop fails to catch all invocations in very rare cases,
     // due to that `limit` is not large enough.
@@ -38,7 +34,7 @@ static aniso::moldT::lockT capture_closed(aniso::tileT tile /* owning */, const 
     // Loop until there has been `limit` generations without newly invoked mappings.
     const int limit = 120;
     for (int g = limit; g > 0; --g) {
-        run_torus(tile, [&](aniso::codeT code) {
+        torus.run_torus([&](const aniso::codeT code) {
             if (!lock[code]) {
                 g = limit;
                 lock[code] = true;
@@ -54,7 +50,7 @@ static aniso::moldT::lockT capture_closed(aniso::tileT tile /* owning */, const 
 // copied subrange (treated as torus space) is not exactly what we see in the source space)
 // In these cases we need a way to record what actually happened in the range.
 static void capture_open(const aniso::tile_const_ref tile, aniso::moldT::lockT& lock) { //
-    aniso::collect_cases(tile, lock);
+    aniso::fake_apply(tile, lock);
 }
 
 class densityT {
@@ -83,33 +79,12 @@ struct initT {
     friend bool operator==(const initT&, const initT&) = default;
 };
 
-class torusT {
-    aniso::tileT m_tile;
-    int m_gen;
+static void restart(aniso::tileT& tile, const initT& init) {
+    tile.resize(init.size);
 
-public:
-    explicit torusT(const initT& init) : m_tile(init.size), m_gen(0) { restart(init); }
-
-    aniso::tileT& tile() { return m_tile; }
-    const aniso::tileT& tile() const { return m_tile; }
-    int gen() const { return m_gen; }
-
-    void restart(const initT& init) {
-        m_tile.resize(init.size);
-
-        std::mt19937 rand(uint32_t(init.seed));
-        aniso::random_fill(m_tile.data(), rand, init.density.get());
-
-        m_gen = 0;
-    }
-
-    void run(const aniso::ruleT& rule, int count = 1) {
-        for (int c = 0; c < count; ++c) {
-            run_torus(m_tile, rule);
-            ++m_gen;
-        }
-    }
-};
+    std::mt19937 rand(uint32_t(init.seed));
+    aniso::random_fill(tile.data(), rand, init.density.get());
+}
 
 class zoomT {
     struct termT {
@@ -185,8 +160,9 @@ class runnerT {
 
     class torusT_ex {
         initT m_init{.size{.x = 600, .y = 400}, .seed = 0, .density = 0.5};
-        torusT m_torus{m_init};
+        aniso::tileT m_torus{};
         ctrlT m_ctrl{.rule{}, .pace = 1, .anti_strobing = true, .gap = 0, .pause = false};
+        int m_gen = 0;
 
         bool extra_pause = false;
         void mark_written() {
@@ -195,6 +171,8 @@ class runnerT {
         }
 
     public:
+        torusT_ex() { restart(); }
+
         void begin_frame(const aniso::ruleT& rule) {
             extra_pause = false;
             m_ctrl.extra_step = 0;
@@ -208,42 +186,42 @@ class runnerT {
             }
         }
         void restart() {
-            m_torus.restart(m_init);
+            ::restart(m_torus, m_init);
+            m_gen = 0;
             mark_written();
         }
         void pause_for_this_frame() { extra_pause = true; }
 
-        aniso::tile_const_ref read_only() const { return m_torus.tile().data(); }
-        aniso::tile_const_ref read_only(const aniso::rangeT& range) const { return m_torus.tile().data().clip(range); }
+        aniso::tile_const_ref read_only() const { return m_torus.data(); }
+        aniso::tile_const_ref read_only(const aniso::rangeT& range) const { return m_torus.data().clip(range); }
 
         aniso::tile_ref write_only() {
             mark_written();
-            return m_torus.tile().data();
+            return m_torus.data();
         }
         aniso::tile_ref write_only(const aniso::rangeT& range) {
             mark_written();
-            return m_torus.tile().data().clip(range);
+            return m_torus.data().clip(range);
         }
 
         void read_and_maybe_write(const std::invocable<aniso::tile_ref> auto& fn) {
-            if (fn(m_torus.tile().data())) {
+            if (fn(m_torus.data())) {
                 mark_written();
             }
         }
 
         void rotate(int dx, int dy) {
             if (dx != 0 || dy != 0) {
-                aniso::tileT& tile = m_torus.tile();
-                aniso::tileT temp(tile.size());
-                aniso::rotate_copy(temp.data(), tile.data(), {.x = dx, .y = dy});
-                tile.swap(temp);
+                aniso::tileT temp(m_torus.size());
+                aniso::rotate_copy(temp.data(), m_torus.data(), {.x = dx, .y = dy});
+                m_torus.swap(temp);
             }
         }
 
-        int area() const { return m_torus.tile().area(); }
-        int gen() const { return m_torus.gen(); }
+        int area() const { return m_torus.size().xy(); }
+        int gen() const { return m_gen; }
         aniso::vecT size() const {
-            assert(m_init.size == m_torus.tile().size());
+            assert(m_init.size == m_torus.size());
             assert(m_init.size == m_init.size_clamped(m_init.size));
             return m_init.size;
         }
@@ -260,7 +238,11 @@ class runnerT {
 
         void end_frame() {
             if (!extra_pause) {
-                m_torus.run(m_ctrl.rule, m_ctrl.calc_step());
+                const int count = m_ctrl.calc_step();
+                for (int c = 0; c < count; ++c) {
+                    m_torus.run_torus(m_ctrl.rule);
+                    ++m_gen;
+                }
             }
         }
     };
@@ -537,7 +519,8 @@ public:
 
         if (m_paste) {
             ImGui::SameLine();
-            ImGui::Text("  Paste:%d*%d", m_paste->width(), m_paste->height());
+            const aniso::vecT size = m_paste->size();
+            ImGui::Text("  Paste:%d*%d", size.x, size.y);
             ImGui::SameLine();
             if (ImGui::SmallButton("Drop##P")) {
                 m_paste.reset();
@@ -685,7 +668,7 @@ public:
                     // (wontfix) Wasteful, but after all this works...
                     m_torus.read_and_maybe_write([&](const aniso::tile_ref tile) {
                         const aniso::tile_ref paste_area = tile.clip({paste_beg, paste_end});
-                        aniso::tileT temp = aniso::copy(paste_area);
+                        aniso::tileT temp(paste_area);
                         (background == 0 ? aniso::blit<aniso::blitE::Or>
                                          : aniso::blit<aniso::blitE::And>)(paste_area, m_paste->data());
                         texture = make_screen(tile, scale_mode);
@@ -693,7 +676,7 @@ public:
                             m_paste.reset();
                             return true;
                         } else { // Restore.
-                            aniso::blit<aniso::blitE::Copy>(paste_area, temp.data());
+                            aniso::copy(paste_area, temp.data());
                             return false;
                         }
                     });
@@ -867,7 +850,7 @@ public:
                 }
 
                 if (op == _capture_closed && m_sel) {
-                    auto lock = capture_closed(aniso::copy(m_torus.read_only(m_sel->to_range())), sync.current.rule);
+                    auto lock = capture_closed(m_torus.read_only(m_sel->to_range()), sync.current.rule);
                     if (!replace) {
                         aniso::for_each_code([&](aniso::codeT c) { lock[c] = lock[c] || sync.current.lock[c]; });
                     }
@@ -1012,7 +995,7 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
     if (!pause) {
         const int p = config.pace + ((config.pace % 2 == 1) && strobing(rule));
         for (int i = 0; i < p; ++i) {
-            run_torus(term.tile, rule);
+            term.tile.run_torus(rule);
         }
     }
 
