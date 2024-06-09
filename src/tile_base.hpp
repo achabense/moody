@@ -1,4 +1,5 @@
 #pragma once
+
 #include "rule.hpp"
 
 namespace aniso {

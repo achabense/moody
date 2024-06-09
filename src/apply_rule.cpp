@@ -10,6 +10,8 @@ using clockT = std::chrono::steady_clock;
 
 static ImVec2 to_imvec(const aniso::vecT& vec) { return ImVec2(vec.x, vec.y); }
 
+static aniso::vecT from_imvec_floor(const ImVec2& vec) { return {.x = int(floor(vec.x)), .y = int(floor(vec.y))}; }
+
 static aniso::rangeT clamp_window(aniso::vecT size, aniso::vecT region_center, aniso::vecT region_size) {
     region_size.x = std::min(size.x, region_size.x);
     region_size.y = std::min(size.y, region_size.y);
@@ -53,45 +55,48 @@ static void capture_open(const aniso::tile_const_ref tile, aniso::moldT::lockT& 
     aniso::fake_apply(tile, lock);
 }
 
-class densityT {
-    int m_dens; // ∈ [0, 100], /= 100 to serve as density.
+class percentT {
+    int m_val; // ∈ [0, 100].
 public:
-    densityT(double density) { m_dens = std::clamp(density, 0.0, 1.0) * 100; }
+    percentT(double v) { m_val = std::clamp(v, 0.0, 1.0) * 100; }
 
-    double get() const { return m_dens / 100.0; }
+    double get() const { return m_val / 100.0; }
     void step_slide(const char* label) {
-        imgui_StepSliderInt(label, &m_dens, 0, 100, std::format("{:.2f}", m_dens / 100.0).c_str());
+        imgui_StepSliderInt(label, &m_val, 0, 100, std::format("{:.2f}", m_val / 100.0).c_str());
     }
 
-    friend bool operator==(const densityT&, const densityT&) = default;
+    friend bool operator==(const percentT&, const percentT&) = default;
 };
 
 // TODO: support setting patterns as init state?
 struct initT {
-    static constexpr aniso::vecT size_min{.x = 20, .y = 15};
-    static constexpr aniso::vecT size_max{.x = 1600, .y = 1200};
-    static aniso::vecT size_clamped(aniso::vecT size) { return aniso::clamp(size, size_min, size_max); }
-
-    aniso::vecT size;
     int seed;
-    densityT density;
+    percentT density;
+    percentT area; // TODO: support more strategies (separate x/y, and fixed size)?
 
     friend bool operator==(const initT&, const initT&) = default;
+
+    void initialize(aniso::tileT& tile) const {
+        const aniso::vecT tile_size = tile.size();
+        const auto range = clamp_window(tile_size, tile_size / 2, from_imvec_floor(to_imvec(tile_size) * area.get()));
+
+        if (!range.empty()) {
+            // TODO: support more backgrounds (white, or other periodic backgrounds)?
+            aniso::clear_outside(tile.data(), range, 0);
+            std::mt19937 rand{(uint32_t)seed};
+            aniso::random_fill(tile.data().clip(range), rand, density.get());
+        } else {
+            aniso::clear(tile.data(), 0);
+        }
+    }
 };
-
-static void restart(aniso::tileT& tile, const initT& init) {
-    tile.resize(init.size);
-
-    std::mt19937 rand(uint32_t(init.seed));
-    aniso::random_fill(tile.data(), rand, init.density.get());
-}
 
 class zoomT {
     struct termT {
         float val;
         const char* str;
     };
-    static constexpr termT terms[]{{0.5, "0.5"}, {1, "1"}, {2, "2"}, {3, "3"}, {4, "4"}, {6, "6"}};
+    static constexpr termT terms[]{{0.5, "0.5"}, {1, "1"}, {2, "2"}, {3, "3"}, {4, "4"}, {5, "5"}};
 
     static constexpr int index_1 = 1;
     static constexpr int index_max = std::size(terms) - 1; // ]
@@ -104,12 +109,14 @@ public:
     }
     void slide(int di) { m_index = std::clamp(m_index + di, 0, index_max); }
     void select(const std::invocable<bool, float, const char*> auto& fn) {
+        int n_index = m_index;
         for (int i = 0; const auto [z, s] : terms) {
             const int this_i = i++;
             if (fn(m_index == this_i, z, s)) {
-                m_index = this_i;
+                n_index = this_i;
             }
         }
+        m_index = n_index;
     }
 
     static constexpr float min() { return terms[0].val; }
@@ -121,6 +128,12 @@ public:
 };
 
 class runnerT {
+    static constexpr aniso::vecT size_min{.x = 20, .y = 15};
+    static constexpr aniso::vecT size_max{.x = 1600, .y = 1200};
+    static aniso::vecT size_clamped(const aniso::vecT size) { return aniso::clamp(size, size_min, size_max); }
+
+    static constexpr ImVec2 min_canvas_size{size_min.x * zoomT::max(), size_min.y* zoomT::max()};
+
     struct ctrlT {
         aniso::ruleT rule{};
 
@@ -158,9 +171,9 @@ class runnerT {
         }
     };
 
-    class torusT_ex {
-        initT m_init{.size{.x = 600, .y = 400}, .seed = 0, .density = 0.5};
-        aniso::tileT m_torus{};
+    class torusT {
+        initT m_init{.seed = 0, .density = 0.5, .area = 0.40};
+        aniso::tileT m_torus{{.x = 600, .y = 400}};
         ctrlT m_ctrl{.rule{}, .pace = 1, .anti_strobing = true, .gap = 0, .pause = false};
         int m_gen = 0;
 
@@ -171,7 +184,7 @@ class runnerT {
         }
 
     public:
-        torusT_ex() { restart(); }
+        torusT() { restart(); }
 
         void begin_frame(const aniso::ruleT& rule) {
             extra_pause = false;
@@ -186,8 +199,8 @@ class runnerT {
             }
         }
         void restart() {
-            ::restart(m_torus, m_init);
             m_gen = 0;
+            m_init.initialize(m_torus);
             mark_written();
         }
         void pause_for_this_frame() { extra_pause = true; }
@@ -221,16 +234,18 @@ class runnerT {
         int area() const { return m_torus.size().xy(); }
         int gen() const { return m_gen; }
         aniso::vecT size() const {
-            assert(m_init.size == m_torus.size());
-            assert(m_init.size == m_init.size_clamped(m_init.size));
-            return m_init.size;
+            assert(m_torus.size().both_gteq(size_min) && m_torus.size().both_lteq(size_max));
+            return m_torus.size();
         }
 
+        void resize(const aniso::vecT size) {
+            m_torus.resize(size_clamped(size));
+            restart();
+        }
         void set_ctrl(const auto& fn) { fn(m_ctrl); }
         void set_init(const auto& fn) {
             initT init = m_init;
-            fn(init);
-            if (init != m_init) {
+            if (fn(init) || init != m_init) {
                 m_init = init;
                 restart();
             }
@@ -247,7 +262,7 @@ class runnerT {
         }
     };
 
-    torusT_ex m_torus{}; // Space.
+    torusT m_torus{}; // Space.
 
     // space-pos == corner-pos + canvas-pos / zoom
     struct coordT {
@@ -260,11 +275,6 @@ class runnerT {
 
     coordT m_coord{};
     ImVec2 to_rotate = {0, 0};
-
-    // (Workaround: it's hard to get canvas-size in this frame when it's needed; this looks horrible but
-    // will work well in all cases)
-    static constexpr ImVec2 min_canvas_size{initT::size_min.x * zoomT::max(), initT::size_min.y* zoomT::max()};
-    ImVec2 last_known_canvas_size = min_canvas_size;
 
     std::optional<aniso::tileT> m_paste = std::nullopt;
     aniso::vecT paste_beg{0, 0}; // Valid if paste.has_value().
@@ -292,6 +302,11 @@ public:
     void display(sync_point& sync) {
         m_torus.begin_frame(sync.current.rule);
 
+        static bool background = 0;
+        static bool locate_center = true;
+        static bool auto_fit = false;
+        bool find_suitable_zoom = false;
+
         const char* const canvas_name = "Canvas";
         const bool enable_shortcuts =
             (!ImGui::GetIO().WantCaptureKeyboard && !ImGui::IsPopupOpen(ImGuiID(0), ImGuiPopupFlags_AnyPopupId)) ||
@@ -300,19 +315,86 @@ public:
         auto test_key = [enable_shortcuts](ImGuiKey key, bool repeat) {
             return enable_shortcuts && ImGui::IsKeyPressed(key, repeat);
         };
-        static bool background = 0; // TODO: move elsewhere...
-        static bool locate_center = true;
 
-        {
-            // (Keeping in line with edit-rule's.)
-            if (ImGui::Button("Restart")) {
-                m_torus.restart();
+        auto set_init_state = [&] {
+            m_torus.set_init([&](initT& init) {
+                ImGui::BeginGroup();
+                ImGui::PushItemWidth(item_width);
+                imgui_StepSliderInt("Seed", &init.seed, 0, 29);
+                init.density.step_slide("Density");
+                init.area.step_slide("Area");
+                ImGui::PopItemWidth();
+                ImGui::EndGroup();
+                if (ImGui::IsItemActive()) {
+                    m_torus.pause_for_this_frame();
+                }
+                return ImGui::IsItemActivated();
+            });
+        };
+
+        auto input_size = [&] {
+            static char input_w[6]{}, input_h[6]{};
+
+            const float inner_spacing = imgui_ItemInnerSpacingX();
+            const auto input_flags = ImGuiInputTextFlags_CallbackCharFilter | ImGuiInputTextFlags_EnterReturnsTrue;
+            const auto input_filter = [](ImGuiInputTextCallbackData* data) -> int {
+                return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
+            };
+
+            aniso::vecT size = m_torus.size();
+
+            // TODO: whether / how to add hint ('enter' to resize)?
+            bool resize = false;
+            ImGui::SetNextItemWidth(floor((item_width - inner_spacing) / 2));
+            if (ImGui::InputTextWithHint("##Width", std::format("Width:{}", size.x).c_str(), input_w,
+                                         std::size(input_w), input_flags, input_filter)) {
+                resize = true;
             }
-            ImGui::SameLine();
-            ImGui::Text("Generation:%d, density:%.4f", m_torus.gen(),
-                        double(aniso::count(m_torus.read_only())) / m_torus.area());
-            ImGui::Separator();
-        }
+            ImGui::SameLine(0, inner_spacing);
+            ImGui::SetNextItemWidth(ceil((item_width - inner_spacing) / 2));
+            if (ImGui::InputTextWithHint("##Height", std::format("Height:{}", size.y).c_str(), input_h,
+                                         std::size(input_h), input_flags, input_filter)) {
+                resize = true;
+            }
+            ImGui::SameLine(0, inner_spacing);
+            imgui_Str("Space size");
+
+            if (resize) {
+                const bool has_w = std::from_chars(input_w, std::end(input_w), size.x).ec == std::errc{};
+                const bool has_h = std::from_chars(input_h, std::end(input_h), size.y).ec == std::errc{};
+                // ~ the value is unmodified if `from_chars` fails.
+                if (has_w || has_h) {
+                    auto_fit = false;
+                    locate_center = true;
+                    find_suitable_zoom = true;
+
+                    m_torus.resize(size_clamped(size));
+                    m_sel.reset();
+                    m_paste.reset();
+                }
+                input_w[0] = '\0';
+                input_h[0] = '\0';
+            }
+        };
+
+        auto select_zoom = [&] {
+            ImGui::AlignTextToFramePadding();
+            imgui_Str("Zoom ~");
+            bool auto_fit_next = auto_fit;
+            m_coord.zoom.select([&](const bool is_cur, const float z, const char* const s) {
+                ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                if (ImGui::RadioButton((auto_fit && is_cur) ? std::format("[{0}]###{0}", s).c_str() : s, is_cur)) {
+                    auto_fit_next = is_cur ? !auto_fit : true;
+                    return true;
+                }
+                return false;
+            });
+            auto_fit = auto_fit_next;
+            ImGui::SameLine(); // TODO: clarify that rotating is still allowed?
+            imgui_StrTooltip("(?)",
+                             "Click to automatically resize to full-screen.\n\n"
+                             "(Click again to quit this mode; dragging and scrolling are not available in this mode.)");
+        };
 
         ImGui::PushItemWidth(item_width);
         ImGui::BeginGroup();
@@ -323,10 +405,14 @@ public:
                                       "1/2 (repeatable): -/+ Pace\n3/4 (repeatable): -/+ Gap time\n");
             quick_info("< Keyboard shortcuts.");
             ImGui::SameLine();
+            if (ImGui::Button("Restart")) {
+                m_torus.restart();
+            }
+            ImGui::SameLine();
             ImGui::Checkbox("Pause", &ctrl.pause);
             ImGui::PushButtonRepeat(true);
             ImGui::SameLine();
-            if (ImGui::Button(std::format("+p({})###+p", ctrl.actual_pace()).c_str())) {
+            if (ImGui::Button("+p")) {
                 ctrl.extra_step = ctrl.pause ? ctrl.actual_pace() : 0;
                 ctrl.pause = true;
             }
@@ -339,31 +425,31 @@ public:
             imgui_StrTooltip("(?)", [] {
                 imgui_Str("+p: ");
                 ImGui::SameLine(0, 0);
-                imgui_Str("Run manually (advance generation by actual-pace, controlled by the button/'N').");
+                imgui_Str("Run manually (advance generation by pace, controlled by the button/'N').");
                 imgui_Str("+1: ");
                 ImGui::SameLine(0, 0);
-                imgui_Str("Advance generation by 1 instead of actual-pace. This is useful for changing the parity "
-                          "of generation when actual-pace != 1.");
+                imgui_Str("Advance generation by 1 instead of pace. This is useful for changing the parity "
+                          "of generation when (actual) pace != 1.");
             });
 
-            imgui_StepSliderInt("Pace", &ctrl.pace, ctrl.pace_min, ctrl.pace_max);
+            assert(ctrl.anti_strobing);
+            const bool is_strobing = strobing(ctrl.rule);
+            std::string pace_str = std::to_string(ctrl.pace);
+            if (is_strobing) {
+                pace_str += std::format(" -> {}", ctrl.actual_pace());
+            }
+
+            imgui_StepSliderInt("Pace", &ctrl.pace, ctrl.pace_min, ctrl.pace_max, pace_str.c_str());
+            if (is_strobing) {
+                ImGui::SameLine();
+                imgui_StrTooltip("(?)",
+                                 "As the current rule has '000...->1' and '111...->0', the pace will be adjusted "
+                                 "to 2*n to avoid bad visual effect.\n\n"
+                                 "(You can change the parity of generation with the '+1' button.)");
+            }
 
             imgui_StepSliderInt("Gap time", &ctrl.gap, ctrl.gap_min, ctrl.gap_max,
                                 std::format("{} ms", ctrl.gap * ctrl.gap_unit).c_str());
-
-            // TODO: this would better be explained with examples.
-            // How to make interactive tooltips?
-            assert(ctrl.anti_strobing);
-            ImGui::BeginDisabled();
-            ImGui::Checkbox("Anti-strobing", &ctrl.anti_strobing);
-            ImGui::SameLine();
-            ImGui::Text("(Actual pace: %d)", ctrl.actual_pace());
-            ImGui::EndDisabled();
-            ImGui::SameLine();
-            imgui_StrTooltip("(?)",
-                             "When there are '000...->1' and '111...->0', the pace will be adjusted to 2*n to avoid "
-                             "bad visual effect.\n"
-                             "In these cases, you can try the '+1' button to change the parity of generation.");
 
             if (test_key(ImGuiKey_R, false)) {
                 m_torus.restart();
@@ -385,92 +471,26 @@ public:
             }
         });
         ImGui::EndGroup();
-        ImGui::SameLine(0, imgui_ItemSpacingX() + ImGui::CalcTextSize("  ").x);
+        ImGui::SameLine(floor(1.5 * item_width));
         ImGui::BeginGroup();
-        m_torus.set_init([&](initT& init) {
-            const auto old_size = init.size;
+        if (begin_popup_for_item(ImGui::Button("Init state"))) {
+            set_init_state();
+            ImGui::EndPopup();
+        }
+        quick_info("< Seed, density and area.");
+        ImGui::SameLine();
+        imgui_StrTooltip("(view)", set_init_state);
 
-            imgui_StepSliderInt("Init seed", &init.seed, 0, 29);
-            if (ImGui::IsItemActive()) {
-                m_torus.pause_for_this_frame();
-            }
-            init.density.step_slide("Init density");
-            if (ImGui::IsItemActive()) {
-                m_torus.pause_for_this_frame();
-            }
+        input_size();
+        select_zoom();
 
-            {
-                static char input_width[20]{}, input_height[20]{};
-                const auto filter = [](ImGuiInputTextCallbackData* data) -> int {
-                    return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
-                };
-                const float s = imgui_ItemInnerSpacingX();
-                const float w = (ImGui::CalcItemWidth() - s * 2 - ImGui::CalcTextSize("Resize").x -
-                                 ImGui::GetStyle().FramePadding.x * 2) /
-                                2;
-                ImGui::SetNextItemWidth(floor(w));
-                ImGui::InputTextWithHint("##Width", "Width", input_width, std::size(input_width),
-                                         ImGuiInputTextFlags_CallbackCharFilter, filter);
-                ImGui::SameLine(0, s);
-                ImGui::SetNextItemWidth(ceil(w));
-                ImGui::InputTextWithHint("##Height", "Height", input_height, std::size(input_height),
-                                         ImGuiInputTextFlags_CallbackCharFilter, filter);
-                ImGui::SameLine(0, s);
-                if (ImGui::Button("Resize")) {
-                    int width = init.size.x, height = init.size.y;
-                    const bool has_w = std::from_chars(input_width, std::end(input_width), width).ec == std::errc{};
-                    const bool has_h = std::from_chars(input_height, std::end(input_height), height).ec == std::errc{};
-                    // ~ the value is unmodified if `from_chars` fails.
-                    if (has_w || has_h) {
-                        m_coord.zoom.set_1();
-                        init.size = init.size_clamped({.x = width, .y = height});
-                        locate_center = true;
-                    }
-                    input_width[0] = '\0';
-                    input_height[0] = '\0';
-                }
-
-                ImGui::SameLine(0, s);
-                ImGui::Text("Size = %d*%d", init.size.x, init.size.y);
-            }
-
-            ImGui::AlignTextToFramePadding();
-            imgui_Str("Zoom =");
-            m_coord.zoom.select([&](const bool is_cur, const float z, const char* const s) {
-                ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                if (z < 1) {
-                    ImGui::BeginDisabled();
-                }
-                const bool sel = ImGui::RadioButton(s, is_cur);
-                if (z < 1) {
-                    ImGui::EndDisabled();
-                }
-
-                if (sel) {
-                    init.size = init.size_clamped(
-                        {.x = (int)(last_known_canvas_size.x / z), .y = (int)(last_known_canvas_size.y / z)});
-                    locate_center = true;
-                }
-                return sel;
-            });
-            ImGui::SameLine();
-            imgui_StrTooltip("(?)", "Click to resize to full-screen.");
-
-            if (old_size != init.size) {
-                m_sel.reset();
-                m_paste.reset();
-            }
-        });
         ImGui::EndGroup();
         ImGui::PopItemWidth();
 
         ImGui::Separator();
 
-        const aniso::vecT tile_size = m_torus.size();
-
-        static bool lock_mouse = false; // Lock scrolling control and window moving.
         ImGui::AlignTextToFramePadding();
-        imgui_StrTooltip(lock_mouse ? "[...]" : "(...)", [] {
+        imgui_StrTooltip("(...)", [] {
             // TODO: is "window" ambiguous here?
             imgui_Str(
                 "Mouse operations:\n"
@@ -479,37 +499,30 @@ public:
                 "left-drag' to \"rotate\" the space, or drag with right button to select area (to copy, clear, etc.).\n"
                 "3. Otherwise, left-click to decide where to paste. In this case, to move the window you can drag with "
                 "right button. (Rotating and selecting are not available when there are patterns to paste.)");
-            ImGui::Separator();
-            ImGui::Text("(You can right-click this '%s' to enable/disable scrolling and window moving.)",
-                        lock_mouse ? "[...]" : "(...)");
-            bool enabled = !lock_mouse;
-            ImGui::Checkbox("Enabling scrolling and window moving", &enabled);
         });
         quick_info("v Mouse operations.");
-        if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
-            lock_mouse = !lock_mouse;
-        }
 
-        ImGui::SameLine();
-        if (ImGui::Button("Corner")) {
-            m_coord.bind({0, 0}, {0, 0});
-            to_rotate = {0, 0};
-        }
         ImGui::SameLine();
         if (ImGui::Button("Center")) {
             locate_center = true;
         }
+
         ImGui::SameLine();
         static bool show_range_window = false;
         ImGui::Checkbox("Range operations", &show_range_window);
         quick_info("^ Copy, paste, clear, etc.\nv Drag with right button to select area.");
 
-        ImGui::SameLine();
+        ImGui::SameLine(0, 0);
+        // ImGui::Text("  Generation:%d, density:%.4f", m_torus.gen(),
+        //             double(aniso::count(m_torus.read_only())) / m_torus.area());
+        ImGui::Text("  Generation:%d", m_torus.gen());
+
+        ImGui::SameLine(0, 0);
         if (m_sel) {
             ImGui::Text("  Selected:%d*%d", m_sel->width(), m_sel->height());
             if (!m_sel->active) {
                 ImGui::SameLine();
-                if (ImGui::SmallButton("Drop##S")) {
+                if (ImGui::Button("Drop##S")) {
                     m_sel.reset();
                 }
             }
@@ -518,11 +531,11 @@ public:
         }
 
         if (m_paste) {
-            ImGui::SameLine();
+            ImGui::SameLine(0, 0);
             const aniso::vecT size = m_paste->size();
             ImGui::Text("  Paste:%d*%d", size.x, size.y);
             ImGui::SameLine();
-            if (ImGui::SmallButton("Drop##P")) {
+            if (ImGui::Button("Drop##P")) {
                 m_paste.reset();
             }
         }
@@ -534,11 +547,6 @@ public:
             const ImVec2 canvas_min = ImGui::GetItemRectMin();
             const ImVec2 canvas_max = ImGui::GetItemRectMax();
             const ImVec2 canvas_size = ImGui::GetItemRectSize();
-            last_known_canvas_size = canvas_size;
-            if (std::exchange(locate_center, false)) {
-                m_coord.bind(to_imvec(tile_size) / 2, canvas_size / 2);
-                to_rotate = {0, 0};
-            }
 
             const bool active = ImGui::IsItemActive();
             const bool hovered = ImGui::IsItemHovered();
@@ -547,6 +555,38 @@ public:
             if (active) {
                 m_torus.pause_for_this_frame();
             }
+
+            if (auto_fit) {
+                locate_center = true;
+                if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                    const aniso::vecT size =
+                        size_clamped(from_imvec_floor((canvas_size - ImVec2(20, 20)) / m_coord.zoom));
+                    if (size != m_torus.size()) {
+                        m_torus.resize(size);
+                        m_sel.reset();
+                        m_paste.reset();
+                    }
+                }
+            }
+
+            // `m_torus` won't resize now.
+            const aniso::vecT tile_size = m_torus.size();
+
+            if (find_suitable_zoom) {
+                // (wontfix) Poorly written, but works...
+                // Select the largest zoom that can hold the entire tile.
+                m_coord.zoom.slide(-100); // -> smallest.
+                m_coord.zoom.select([&](bool, float z, const char*) {
+                    const aniso::vecT size = size_clamped(from_imvec_floor((canvas_size - ImVec2(20, 20)) / z));
+                    return size.both_gteq(tile_size);
+                });
+            }
+
+            if (std::exchange(locate_center, false)) {
+                m_coord.bind(to_imvec(tile_size) / 2, canvas_size / 2);
+                to_rotate = {0, 0};
+            }
+
             if (m_sel && m_sel->active && (!r_down || m_paste || ImGui::IsItemDeactivated())) {
                 m_sel->active = false;
                 // Allow a single right-click to unselect the area.
@@ -571,12 +611,12 @@ public:
                             to_rotate -= ImVec2(dx, dy);
                             m_torus.rotate(dx, dy);
                         }
-                    } else if (!lock_mouse) {
+                    } else if (!auto_fit) {
                         m_coord.corner_pos -= io.MouseDelta / m_coord.zoom;
                     }
                 }
 
-                if (!lock_mouse && imgui_MouseScrolling()) {
+                if (!auto_fit && imgui_MouseScrolling()) {
                     to_rotate = {0, 0};
 
                     const ImVec2 space_pos = m_coord.to_space(mouse_pos);
@@ -590,8 +630,7 @@ public:
                     m_coord.bind(space_pos_clamped, mouse_pos_clamped);
                 }
 
-                const ImVec2 space_pos = m_coord.to_space(mouse_pos);
-                const aniso::vecT cel_pos{.x = (int)floor(space_pos.x), .y = (int)floor(space_pos.y)};
+                const aniso::vecT cel_pos = from_imvec_floor(m_coord.to_space(mouse_pos));
 
                 if (m_coord.zoom <= 1 && !m_paste && (!active || false /* for testing */)) {
                     if (cel_pos.both_gteq({-10, -10}) && cel_pos.both_lt(tile_size.plus(10, 10))) {
@@ -715,7 +754,7 @@ public:
                 };
 
                 static bool replace = true;     // Closed-capture.
-                static densityT fill_den = 0.5; // Random-fill.
+                static percentT fill_den = 0.5; // Random-fill.
                 static bool add_rule = true;
                 static bool show_result = true; // Copy / cut.
                 auto copy_sel = [&] {
@@ -781,7 +820,7 @@ public:
 
                     if (!shortcut_only) {
                         ImGui::AlignTextToFramePadding();
-                        imgui_Str("Background =");
+                        imgui_Str("Background ~");
                         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                         if (ImGui::RadioButton("0", background == 0)) {
                             background = 0;
@@ -910,6 +949,8 @@ public:
                     }
                 }
             }
+
+            assert(tile_size == m_torus.size());
         }
 
         if (m_paste) {
@@ -927,7 +968,7 @@ void apply_rule(sync_point& sync) {
 
 void previewer::configT::_set() {
     ImGui::AlignTextToFramePadding();
-    imgui_Str("Size =");
+    imgui_Str("Size ~");
     for (int i = 0; i < Count; ++i) {
         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
         if (ImGui::RadioButton(size_terms[i].str, size == i)) {
@@ -935,14 +976,14 @@ void previewer::configT::_set() {
         }
     }
     ImGui::SetNextItemWidth(item_width);
-    imgui_StepSliderInt("Init seed", &seed, 0, 9);
-    imgui_Str("Init density = 0.5");
+    imgui_StepSliderInt("Seed", &seed, 0, 9);
+    imgui_Str("Density ~ 0.5, area ~ 1.0");
 
     ImGui::Separator();
 
     ImGui::SetNextItemWidth(item_width);
     imgui_StepSliderInt("Pace (1~10)", &pace, 1, 10);
-    imgui_Str("Gap time = 0ms, anti-strobing = true");
+    imgui_Str("Gap time ~ 0ms, anti-strobing ~ true");
 }
 
 // TODO: support ctrl + drag to rotate?
@@ -1007,7 +1048,7 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
         const ImVec2 pos = ImGui::GetIO().MousePos - ImGui::GetItemRectMin();
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
         if (ImGui::BeginTooltip()) {
-            const aniso::rangeT clamped = clamp_window(size, {.x = int(pos.x), .y = int(pos.y)}, {64, 48});
+            const aniso::rangeT clamped = clamp_window(size, from_imvec_floor(pos), {64, 48});
             assert(!clamped.empty());
             ImGui::Image(texture, to_imvec(clamped.size() * 3), to_imvec(clamped.begin) / to_imvec(size),
                          to_imvec(clamped.end) / to_imvec(size));
