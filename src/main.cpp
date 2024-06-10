@@ -93,7 +93,7 @@ public:
     }
 };
 
-[[nodiscard]] ImTextureID make_screen(const aniso::tile_const_ref tile, const scaleE scale) {
+[[nodiscard]] ImTextureID make_screen(const aniso::_misc::tile_ref_<const bool> tile, const scaleE scale) {
     SDL_Texture* texture = screen_textures::get(tile.size.x, tile.size.y);
     SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_NONE);
     if (scale == scaleE::Nearest) {

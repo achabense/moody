@@ -137,6 +137,7 @@ bool set_home(const char* u8path) {
     return (u8path && try_set(u8path)) || try_set(nullptr);
 }
 
+// TODO: redesign error message...
 class file_nav {
     using entryT = std::filesystem::directory_entry;
 
@@ -581,9 +582,9 @@ static std::string too_long(uintmax_t size, int max_size) {
     }
 
     if (!ec && size > max_size) {
-        messenger::set_msg("File too large: {}\n{}", too_long(size, max_size), cpp17_u8string(path));
+        messenger::set_msg("File too large: {}", too_long(size, max_size));
     } else {
-        messenger::set_msg("Failed to load file:\n{}", cpp17_u8string(path));
+        messenger::set_msg("Failed to load file.");
     }
     return false;
 }

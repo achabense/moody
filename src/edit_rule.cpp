@@ -549,11 +549,6 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
             ImGui::EndDisabled();
         }
     };
-    auto itemtooltip_with_previewer = [](const auto& desc) {
-        ImGui::PushStyleColor(ImGuiCol_PopupBg, IM_COL32(24, 24, 24, 240));
-        imgui_ItemTooltip(desc);
-        ImGui::PopStyleColor();
-    };
 
     static subset_selector selector;
     const aniso::subsetT& subset = selector.select_subset(sync);
@@ -635,17 +630,14 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                 }
             });
 
-            itemtooltip_with_previewer([&] {
+            imgui_ItemTooltip([&] {
                 if (!m_avail) {
                     imgui_Str("This rule does not belong to the working set.");
                     ImGui::Separator();
                 }
 
                 imgui_Str(mask_terms[m].desc);
-                ImGui::Separator();
                 previewer::preview(-1, previewer::configT::_220_160, *mask_ptrs[m], false);
-                ImGui::SameLine();
-                imgui_Str(aniso::to_MAP_str(*mask_ptrs[m]));
             });
         }
 
@@ -819,7 +811,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                 sync.set_mold(aniso::trans_reverse(mold));
             }
         });
-        itemtooltip_with_previewer([&] {
+        imgui_ItemTooltip([&] {
             imgui_Str("Get the 0/1 reversal dual of the current rule.");
             ImGui::Separator();
             const aniso::ruleT rev = aniso::trans_reverse(mold).rule;
@@ -842,7 +834,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                 sync.set_rule(aniso::approximate(subset, mold));
             }
         });
-        itemtooltip_with_previewer([&] {
+        imgui_ItemTooltip([&] {
             // TODO: refine message; and approximation is not very useful in practice...
             imgui_Str("When the current rule does not belong to the working set (but the "
                       "constraints can be met), you can try this to get the closest rule in the set.");
@@ -921,10 +913,10 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
         int n = 0;
         assert(par.k() <= 512);
         std::array<bool, 512> shown{};
-        for (auto select : {+[](const aniso::scanT& c) { return !c.all_0() && !c.all_1(); }, //
-                            +[](const aniso::scanT& c) { return !c.any_locked(); },          //
-                            +[](const aniso::scanT& c) { return c.any_locked(); }}) {
-            par.for_each_group([&](int j, const aniso::groupT& group) {
+        for (const auto select : {+[](const aniso::scanT& c) { return !c.all_0() && !c.all_1(); }, //
+                                  +[](const aniso::scanT& c) { return !c.any_locked(); },          //
+                                  +[](const aniso::scanT& c) { return c.any_locked(); }}) {
+            par.for_each_group([&](const int j, const aniso::groupT& group) {
                 if (shown[j] || !select(scanlist[j])) {
                     return;
                 }

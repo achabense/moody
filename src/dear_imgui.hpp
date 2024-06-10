@@ -68,7 +68,7 @@ inline void imgui_StrColored(const ImVec4& col, std::string_view str) {
 }
 
 inline void imgui_StrDisabled(std::string_view str) {
-    imgui_StrColored(ImGui::GetStyle().Colors[ImGuiCol_TextDisabled], str);
+    imgui_StrColored(ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled), str);
 }
 
 // Using std::string as `SetClipboardText` requires C-style string.

@@ -215,48 +215,6 @@ public:
     }
 };
 
-#if 0
-class messenger {
-    inline static std::vector<std::string> m_strs{};
-
-public:
-    messenger() = delete;
-
-    static void add_msg(std::string str) { m_strs.push_back(std::move(str)); }
-
-    template <class... U>
-    static void add_msg(std::format_string<const U&...> fmt, const U&... args) {
-        m_strs.push_back(std::format(fmt, args...));
-    }
-
-    // Managed by `frame_main`.
-    static void display() {
-        static bool opened = false;
-
-        if (!opened && !m_strs.empty()) {
-            ImGui::OpenPopup("Message");
-            opened = true;
-        }
-
-        ImGui::SetNextWindowSizeConstraints({}, ImVec2(FLT_MAX, ImGui::GetTextLineHeight() * 30));
-        if (ImGui::BeginPopup("Message")) {
-            assert(opened && !m_strs.empty());
-            ImGui::PushTextWrapPos(wrap_len());
-            for (bool first = true; const std::string& str : m_strs) {
-                if (!std::exchange(first, false)) {
-                    ImGui::Separator();
-                }
-                imgui_StrCopyable(str, imgui_Str);
-            }
-            ImGui::PopTextWrapPos();
-            ImGui::EndPopup();
-        } else {
-            m_strs.clear();
-            opened = false;
-        }
-    }
-};
-#else
 class messenger {
     class messageT {
         std::string m_str{};
@@ -346,7 +304,6 @@ public:
     // Managed by `frame_main`.
     static void display() { m_msg.display(); }
 };
-#endif
 
 // Preview rules.
 class previewer {
@@ -393,6 +350,7 @@ public:
         ImGui::Dummy(ImVec2(config.width(), config.height()));
         if (ImGui::IsItemVisible()) {
             _preview((uint64_t(ImGui::GetID("")) << 32) | id, config, rule, interactive);
+            imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_TableBorderStrong)); // Instead of `ImGuiCol_Border`
         }
     }
 
@@ -401,6 +359,7 @@ public:
         ImGui::Dummy(ImVec2(config.width(), config.height()));
         if (ImGui::IsItemVisible()) {
             _preview((uint64_t(ImGui::GetID("")) << 32) | id, config, get_rule(), interactive);
+            imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_TableBorderStrong));
         }
     }
 
