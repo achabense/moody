@@ -10,11 +10,6 @@
 
 /* Not inline */ static const bool check_version = IMGUI_CHECKVERSION();
 
-inline std::mt19937& global_mt19937() {
-    static std::mt19937 rand{(uint32_t)time(0)};
-    return rand;
-}
-
 #if 0
 // Enforce that ordinary string literals are encoded with utf-8.
 // This requires certain compiler flags to be set (e.g. `/utf-8` in MSVC).
@@ -35,6 +30,11 @@ inline void assert_utf8_encoding() {
 // (Well, are there even guarantees that we can get a valid fs::path from main's argv?)
 // To make things easy the program does not try to deal with these strings.
 #endif
+
+inline std::mt19937& global_mt19937() {
+    static std::mt19937 rand{(uint32_t)time(0)};
+    return rand;
+}
 
 // Managed by `main`.
 bool set_home(const char* u8path = nullptr); // nullptr ~ filesystem::current_path.

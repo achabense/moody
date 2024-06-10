@@ -432,6 +432,8 @@ public:
                           "of generation when (actual) pace != 1.");
             });
 
+            ImGui::Separator(); // To align with the left plane.
+
             assert(ctrl.anti_strobing);
             const bool is_strobing = strobing(ctrl.rule);
             std::string pace_str = std::to_string(ctrl.pace);
@@ -480,6 +482,8 @@ public:
         quick_info("< Seed, density and area.");
         ImGui::SameLine();
         imgui_StrTooltip("(view)", set_init_state);
+
+        ImGui::Spacing(); // To align with the separator.
 
         input_size();
         select_zoom();
@@ -982,8 +986,8 @@ void previewer::configT::_set() {
     ImGui::Separator();
 
     ImGui::SetNextItemWidth(item_width);
-    imgui_StepSliderInt("Pace (1~10)", &pace, 1, 10);
-    imgui_Str("Gap time ~ 0ms, anti-strobing ~ true");
+    imgui_StepSliderInt("Pace", &pace, 1, 10);
+    imgui_Str("Gap time ~ 0ms");
 }
 
 // TODO: support ctrl + drag to rotate?

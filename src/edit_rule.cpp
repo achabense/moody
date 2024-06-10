@@ -536,20 +536,28 @@ public:
     }
 };
 
-void edit_rule(sync_point& sync, bool& bind_undo) {
-    // (A "reason" parameter would be convenient, but it works poorly with clang-format...)
-    auto guarded_block = [](const bool enable, const auto& fn /*, const char* reason = nullptr*/) {
-        if (!enable) {
-            ImGui::BeginDisabled();
-            ImGui::BeginGroup();
-        }
-        fn();
-        if (!enable) {
-            ImGui::EndGroup();
-            ImGui::EndDisabled();
-        }
-    };
+// (Not using trailing "reason" parameter, as the clang-format result will be very ugly...)
+static void guarded_block(const bool enable, const auto& fn /*, const char* reason = nullptr*/) {
+    if (!enable) {
+        ImGui::BeginDisabled();
+        ImGui::BeginGroup();
+    }
+    fn();
+    if (!enable) {
+        ImGui::EndGroup();
+        ImGui::EndDisabled();
+    }
+};
 
+static void guarded_block(const bool enable, const char* reason_disabled, const auto& fn) {
+    ::guarded_block(enable, fn);
+    if (!enable) {
+        imgui_ItemTooltip(reason_disabled);
+    }
+};
+
+void edit_rule(sync_point& sync, bool& bind_undo) {
+    // Select subsets.
     static subset_selector selector;
     const aniso::subsetT& subset = selector.select_subset(sync);
     assert(!subset.empty());
@@ -642,15 +650,12 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
         }
 
         ImGui::SameLine();
-        guarded_block(contained, [&] {
+        guarded_block(contained, "The current rule does not belong to the working set.", [&] {
             if (ImGui::Button("<< Cur")) {
                 mask_custom = {mold.rule};
                 mask_tag = Custom;
             }
         });
-        if (!contained) {
-            imgui_ItemTooltip("The current rule does not belong to the working set.");
-        }
 
         chr_0 = mask_terms[mask_tag].chr_0;
         chr_1 = mask_terms[mask_tag].chr_1;
@@ -723,7 +728,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
         assert(contained == (c_x == 0));
         assert(compatible == (c_locked_x == 0));
 
-        guarded_block(compatible, [&] {
+        guarded_block(compatible, "Incompatible.", [&] {
             // `dist`: The "distance" to the masking rule the randomization want to achieve.
             // (which does not make sense when !compatible)
             static double rate = 0.5;
@@ -769,9 +774,6 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                 }
             }
         });
-        if (!compatible) {
-            imgui_ItemTooltip("Incompatible.");
-        }
         ImGui::SameLine();
         imgui_StrTooltip("(?)",
                          "Generate random rules with intended distance around/exactly to the mask, as specified "
@@ -782,7 +784,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                          "the custom mask, and 'Generate' in a low distance to get random rules that are \"close\" "
                          "to it.)");
 
-        guarded_block(compatible, [&] {
+        guarded_block(compatible, "Incompatible.", [&] {
             sequence::seq(
                 "<00..", "Prev", "Next", "11..>", //
                 [&] { sync.set_rule(aniso::seq_mixed::first(subset, mask, mold)); },
@@ -791,9 +793,6 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                 [&] { sync.set_rule(aniso::seq_mixed::last(subset, mask, mold)); },
                 contained ? nullptr : "The current rule does not belong to the working set.");
         });
-        if (!compatible) {
-            imgui_ItemTooltip("Incompatible.");
-        }
         ImGui::SameLine();
         imgui_StrTooltip("(?)",
                          "Iterate through the whole working set, by firstly iterating through all rules that have "
@@ -806,11 +805,9 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
 
         // TODO: move this to the right plane (before 'Restart')?
         ImGui::SameLine();
-        guarded_block(true /* Unconditional */, [&] {
-            if (ImGui::Button("Rev")) {
-                sync.set_mold(aniso::trans_reverse(mold));
-            }
-        });
+        if (ImGui::Button("Rev")) {
+            sync.set_mold(aniso::trans_reverse(mold));
+        }
         imgui_ItemTooltip([&] {
             imgui_Str("Get the 0/1 reversal dual of the current rule.");
             ImGui::Separator();
@@ -820,7 +817,8 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                 ImGui::SameLine();
                 previewer::preview(-1, previewer::configT::_220_160, rev, false);
             } else {
-                imgui_Str("(The result will be the same as the current rule, as it is self-complementary.)");
+                imgui_Str(
+                    "(The result will be the same as the current rule, as the current rule is self-complementary.)");
             }
         });
 #if 0
