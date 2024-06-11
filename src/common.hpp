@@ -50,6 +50,8 @@ void edit_rule(sync_point&, bool& bind_undo);
 void static_constraints(sync_point&);
 void apply_rule(sync_point&);
 
+aniso::moldT aniso_trans_reverse(const aniso::moldT&);
+
 // "tile_base.hpp"
 namespace aniso::_misc {
     template <class>
@@ -341,8 +343,13 @@ public:
                 ImGui::EndPopup();
             }
             ImGui::SameLine();
-            imgui_StrTooltip("(!)", "Press 'T' to restart all preview windows.\n"
-                                    "For individual windows: right-click to restart, left-press to pause.");
+            imgui_StrTooltip("(?)", [&] {
+                imgui_Str("Press 'T' to restart all preview windows.\n"
+                          "For individual windows:\n"
+                          "Right-click to restart, left-press to pause.");
+                ImGui::Separator();
+                _set();
+            });
         }
     };
 
@@ -381,6 +388,9 @@ class sync_point {
     }
 
 public:
+    sync_point(const sync_point&) = delete;
+    sync_point& operator=(const sync_point&) = delete;
+
     const aniso::moldT current;
     const bool enable_lock;
 
@@ -413,9 +423,12 @@ public:
     void display_if_enable_lock(const std::invocable<bool> auto& append) {
         if (enable_lock) {
             ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
+            if (ImGui::IsMousePosValid()) {
+                ImGui::SetNextWindowPos(ImGui::GetIO().MousePos + ImVec2(2, 2), ImGuiCond_Appearing);
+            }
             // (wontfix) Will append to the same window if there are to be multiple instances (won't happen).
-            auto window =
-                imgui_Window("Lock & capture (experimental)", &enable_lock_next, ImGuiWindowFlags_AlwaysAutoResize);
+            auto window = imgui_Window("Lock & capture (experimental)", &enable_lock_next,
+                                       ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings);
             append(window.visible);
         }
     }

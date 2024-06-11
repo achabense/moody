@@ -481,7 +481,7 @@ public:
         }
         quick_info("< Seed, density and area.");
         ImGui::SameLine();
-        imgui_StrTooltip("(view)", set_init_state);
+        imgui_StrTooltip("(?)", set_init_state);
 
         ImGui::Spacing(); // To align with the separator.
 

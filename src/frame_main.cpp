@@ -129,8 +129,8 @@ void frame_main() {
             "with it. When you click the button the left/right arrow key will be bound to 'Prev/Next'.\n"
             "(If you want to clear the record, you can right-click the 'Total:.. At:..' text, and then click 'Clear' "
             "in the popup to confirm.)");
-        ImGui::SameLine();
 
+        ImGui::SameLine();
         const ImGuiID id_prev =
             ImGui::GetID("Prev"); // For `sequence::bind_to` (when the rule is gotten by randomization.)
         ImGui::BeginGroup();
@@ -140,6 +140,7 @@ void frame_main() {
             [&] { freeze = true, recorder.set_next(); }, [&] { freeze = true, recorder.set_last(); });
         ImGui::EndGroup();
         quick_info("v For undo/redo.");
+
         ImGui::SameLine();
         ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1 /* [1, size()] */);
         quick_info("< Right-click to clear.");
@@ -149,6 +150,24 @@ void frame_main() {
             }
             ImGui::EndPopup();
         }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Rev")) {
+            sync.set_mold(aniso_trans_reverse(sync.current));
+        }
+        imgui_ItemTooltip([&] {
+            imgui_Str("Get the 0/1 reversal dual of the current rule.");
+            ImGui::Separator();
+            const aniso::ruleT rev = aniso_trans_reverse(sync.current).rule;
+            if (rev != sync.current.rule) {
+                imgui_Str("Preview:");
+                ImGui::SameLine();
+                previewer::preview(-1, previewer::configT::_220_160, rev, false);
+            } else {
+                imgui_Str(
+                    "(The result will be the same as the current rule, as the current rule is self-complementary.)");
+            }
+        });
 
         {
             static bool hover_lock = false;

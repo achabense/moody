@@ -462,7 +462,7 @@ private:
                 float w = ImGui::GetFrameHeight() + imgui_ItemInnerSpacingX() + ImGui::CalcTextSize("Preview").x;
                 if (preview_mode) {
                     w += 2 * imgui_ItemSpacingX() + 2 * ImGui::GetStyle().FramePadding.x +
-                         ImGui::CalcTextSize("Settings(!)").x;
+                         ImGui::CalcTextSize("Settings(?)").x;
                 }
                 return w;
             }();

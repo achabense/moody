@@ -5,6 +5,12 @@
 // TODO: incorporate moldT into the subset system (let the working set be the intersection of subsetT and moldT)?
 // How to support an editable moldT that can be incompatible with the current rule?
 
+// This non-inline wrapper is necessary, as otherwise "the definition of an inline function must be reachable in the
+// translation unit where it is accessed".
+aniso::moldT aniso_trans_reverse(const aniso::moldT& mold) { //
+    return aniso::trans_reverse(mold);
+}
+
 namespace aniso {
     namespace _subsets {
         static const subsetT ignore_q = make_subset({mp_ignore_q});
@@ -349,7 +355,6 @@ public:
             // TODO: `static` for convenience. This must be refactored when there are to be multiple instances.
             static bool hide_details = false;
             const bool hide_details_this_frame = hide_details;
-            enter_tooltip = hide_details_this_frame && ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip);
             if (hide_details_this_frame) {
                 ImGui::BeginDisabled();
             }
@@ -373,6 +378,11 @@ public:
             }
             ImGui::SameLine();
             ImGui::Checkbox("Hide details", &hide_details);
+            if (hide_details_this_frame) {
+                ImGui::SameLine();
+                imgui_StrDisabled("(?)");
+                enter_tooltip = ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip);
+            }
 
             assert_implies(enter_tooltip, hide_details_this_frame);
             if (hide_details_this_frame && !enter_tooltip) {
@@ -484,7 +494,7 @@ public:
         quick_info("^ Right-click to clear.");
         // (Using the same style as in `frame_main`.)
         if (begin_popup_for_item(ImGui::IsItemClicked(ImGuiMouseButton_Right), "")) {
-            if (ImGui::Selectable("Clear") && !pages.empty()) {
+            if (ImGui::Selectable("Clear (including the current page)") && !pages.empty()) {
                 pages = std::vector<pageT>{};
                 page_no = 0;
             }
@@ -755,7 +765,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                 assert(compatible); // Otherwise, the checkbox should be disabled.
                 ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
                 if (ImGui::IsMousePosValid()) {
-                    ImGui::SetNextWindowPos(ImGui::GetIO().MousePos + ImVec2(2, -100), ImGuiCond_Always);
+                    ImGui::SetNextWindowPos(ImGui::GetIO().MousePos + ImVec2(2, -80), ImGuiCond_Always);
                 }
             }
 
@@ -811,24 +821,6 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
         });
 
 #if 0
-        // TODO: re-support this functionality elsewhere...
-        ImGui::SameLine();
-        if (ImGui::Button("Rev")) {
-            sync.set_mold(aniso::trans_reverse(mold));
-        }
-        imgui_ItemTooltip([&] {
-            imgui_Str("Get the 0/1 reversal dual of the current rule.");
-            ImGui::Separator();
-            const aniso::ruleT rev = aniso::trans_reverse(mold).rule;
-            if (rev != mold.rule) {
-                imgui_Str("Preview:");
-                ImGui::SameLine();
-                previewer::preview(-1, previewer::configT::_220_160, rev, false);
-            } else {
-                imgui_Str(
-                    "(The result will be the same as the current rule, as the current rule is self-complementary.)");
-            }
-        });
         // TODO: whether to expose this? This is conceptually well-defined, but very hard to explain and
         // the effect may not be as expected.
         // TODO: ... sometimes this is really useful...

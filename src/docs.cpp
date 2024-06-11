@@ -36,7 +36,7 @@ To modify the current rule:
 'Randomize' generates random rules in the working set with specified "distance" (number of groups where two rules have different values) to the masking rule.
 '<00.. Prev/Next 11..>' generates rules based on the mask and current rule, so that the current rule will iterate through the whole working set - firstly the masking rule, then all rules with distance = 1 to the masking rule, then 2, ..., until max distance.
 (The current rule should belong to the working set to enable 'Prev/Next'.)
-In the random-access section, the values of the current rule are viewed through the mask and grouped by the working set. By clicking a group you will flip all values of the current rule in that group. By turning on 'Preview mode' you are able to see the effect without replacing the current rule.
+In the random-access section, the values of the current rule are viewed through the mask and grouped by the working set. By clicking a group you will flip all values of the current rule in that group. By turning on 'Preview' you are able to see the effect without replacing the current rule.
 
 The program also has a way to generate rules ensuring certain value constraints (allowing for certain patterns). For example, in this program it's easy to find rules like this:
 MAPARYSZhYAPEgSaBCgCAAAgABAEsAIAIgASIDgAIAAgAASQAIAaACggACAAICAAIAASICogIAAAACAAAAAAAAAAA
@@ -86,7 +86,7 @@ For the current rule C:
 (The numbers of groups of W.P, and groups in W.P where the values of C are different(1)/same(0) than M', are shown in the form of 'Groups:k (1:x 0:y)'. 'x' has the same meaning as the distance.)
 6. By left-clicking a group you will get a rule with all values in that group flipped. Therefore, if C already belongs to W, the result will still belong to W. Otherwise, the operation actually gets rules in (C, W.P). In other words, the operation defines S' = (C, W.P), which is W itself if C already belongs to W.
 (The masking rule has no effect on the result of random-access editing.)
-(With 'Preview mode' turned on, the program is able to present a "slice" of all rules that have distance = 1 to C in S'.)
+(With 'Preview' turned on, the program is able to present a "slice" of all rules that have distance = 1 to C in S'.)
 
 
 Here are some use cases.
@@ -100,7 +100,7 @@ MAPgAAAAQABARcAAQEXARcXfwABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf
 If the working set is large, then it's infeasible to test all rules. In these cases, aside from getting random rules ('Randomize' with arbitrary distance), if there are interesting/promising rules known to belong to the set, you can try to inspect rules that are close to them. Based on the current rule, this can be done in three ways:
 1. (After '<< Cur') 'Randomize' with a small distance.
 2. (After '<< Cur') 'Next' still works - the iteration will start from the nearest rules (those with distance = 1).
-3. (Random-access) 'Preview mode' provides a direct view of all rules with distance = 1 to the current rule.
+3. (Random-access) 'Preview' provides a direct view of all rules with distance = 1 to the current rule.
 
 For example, here is the same rule in the 'About this program' section:
 MAP+sQSUIzICkiQgAiAEKBAhrIGFgAUbAAA4AChgnAAAw6CAkAIgKCAlASgIACgIQBbqCqhEQAAkFQAARIDAQQRBA
@@ -148,7 +148,7 @@ MAPAj6qGRYEbAUJCY78vDHdV3RZxOaGCikQ1abIFMMgJBp3BiKINUAoCWLoKJrShCqIYswRCaAJjzpKQ
 MAPAkMwkQDI20gEBSC4F/gYtzNEmgAVCB0ookwgwMEGAA0FExCAo8gCgFw4ACAqEgALNCnhuUQcmQlgahCx2ACRHg
 It's highly likely that there exist rules with interesting oscillators or spaceships nearby. For example, the following rule has (C4) distance = 1 to the above one, but has huge spaceships:
 MAPAkMwkwDo20gEBSC4F/gItzNkmkA1iBkookwgwMEGgA0FExCAo8gigFw4AAAqEgALNCnhsUQcmQlgahCx2ACRHg
-It will be very helpful for finding such rules if you turn on 'Preview mode' in the random-access plane.
+It will be very helpful for finding such rules if you turn on 'Preview' in the random-access plane.
 
 Another pair of examples:
 MAPA0wFMBFTd2EGdnFywDNkKEYRDqgbKPiJ6DIklgrKDhYnSAit2JIckGwBtsuJBFMGAPAc5TvYilLBtImEJIhUoA
