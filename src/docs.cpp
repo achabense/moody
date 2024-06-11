@@ -1,3 +1,5 @@
+// TODO: add a section to record all operations in the program?
+
 const char* const doc_about =
     R"(In these documents (as well as the ones opened in 'Load file' or 'Clipboard'), you can left-click the rules to load them, or right-click the lines to copy the text (drag to select multiple lines).
 
@@ -12,7 +14,7 @@ The project was then abandoned for many years. Last year I felt an urgency to br
 // TODO: about MAP rules...
 // TODO: about the lock & capture feature...
 const char* const doc_overview =
-    R"(At any time, the program has a rule shown in the right plane (which is an editable torus space; the operations are recorded in the tooltips (...)). This is later called the "current rule". As you see, it is the Game-of-Life rule initially.
+    R"(At any time, the program has a rule shown in the right plane (which is an editable torus space; the operations are recorded in the tooltips (...)). This is later called the "current rule". As you see, it is the Game of Life rule initially.
 
 The MAP-string for the current rule is shown at the top taking up a single line. You can right-click the text to save to the clipboard. The paths in the 'Load file' window can be copied in the same way.
 The program keeps the record for the current rule. You can undo/redo via '<| Prev/Next |>' (above the MAP-string). The program manages several sequences of rules in the form of 'First Prev/Next Last'. When a sequence is activated, the left/right arrow keys will be bound to its 'Prev/Next' for convenience.
@@ -59,12 +61,13 @@ As a consequence, taking non-empty S = (M, P), there are:
 1. If P has k groups, then there are 2^k rules in S.
 2. For any two rules in S, in each group in P, the values of the two rules must be either all-the-same or all-the-different from each other, just like their relation with M. As a result, from any rule in S (certainly including M), by flipping all values in some groups of P, you are able to get to any other rules in the set - in this sense, it does not matter which rule serves as M in S.
 3. It's natural to define the "distance" between the two rules (in S) as the number of groups where they have different values.
-For example, here are some rules that have distance = 1 (in the isotropic set) to the Game-of-Life rule. In this program it's fairly easy to find such rules.
+For example, here are some rules that have distance = 1 (in the isotropic set) to the Game of Life rule. In this program it's fairly easy to find such rules.
 MAPARYXbhZofOgWaH7oaIDogBZofuhogOiAaIDoAIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAAACAAIAAAAAAAA
+MAPARYXfhbofugWaH7oaIDogDZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA
 MAPARYXfhZofugWan7oaIDogBZofuhogOiAaIDogIgAgAAWaH7oeIDogGiA6ICAAIAAaMDogIAAgACAAIAAAAAAAA
 MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6YSAAIQAaIDogIAAgACAAIQAAAAAAA
 
-Obviously the whole MAP ruleset can be composed in the same way. And finally, it can be proven that, the intersection (&) of such subsets must be of the same structure (if not empty). Therefore, the above conclusions apply to any combinations of these sets, and in the program you can combine different subsets freely.
+Obviously the whole MAP ruleset can be composed in the same way. And finally, it can be proven that, the intersection (&) of such subsets must be of the same structure (if not empty). Therefore, the above conclusions apply to any combination of these sets, and in the program you can combine different subsets freely.
 
 
 With these backgrounds, it will be much clearer to explain what happens in the program:
@@ -275,7 +278,7 @@ For the sets in the form of (M, P), if a set S1 is a subset of another set S2, i
 
 Based on this, when performing random-access editing in W, suppose the current rule belongs to S != W:
 1. If S is a strict subset of W (for example, the current rule is totalistic, while W is the isotropic set):
-As the rule also belongs to W, the result of random-access editing will belong to W as well (but may no longer belong to S). In this case, the operation can be considered "refining" the rule in a broader context (set). There have been some examples in the previous sections. For example, when talking about "distance", the rules with distance = 1 to the Game-of-Life rule in the isotropic set are gotten this way.
+As the rule also belongs to W, the result of random-access editing will belong to W as well (but may no longer belong to S). In this case, the operation can be considered "refining" the rule in a broader context (set). There have been some examples in the previous sections. For example, when talking about "distance", the rules with distance = 1 to the Game of Life rule in the isotropic set are gotten this way.
 (This includes editing any rule in the MAP set (which the default one if you select no subset) - the random-access editing will always flip the value for a single case.)
 
 2. If conversely, W is a strict subset of S (for example, W is the isotropic set, while the current rule only belongs to 'C4'):

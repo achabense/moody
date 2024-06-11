@@ -471,12 +471,6 @@ public:
         if (bind) {
             sequence::bind_to(ImGui::GetID(">>>"));
         }
-        if (ImGui::Button("Generate")) {
-            make_page();
-            sequence::bind_to(ImGui::GetID(">>>"));
-        }
-        quick_info("v '>>>' has the same effect when you are at the last page.");
-        ImGui::SameLine();
         sequence::seq(
             "<|", "<<", ">>>", "|>", //
             [&] { set_page(0); }, [&] { set_page(page_no - 1); }, [&] { set_page(page_no + 1, true); },
@@ -489,50 +483,51 @@ public:
         }
         quick_info("^ Right-click to clear.");
         // (Using the same style as in `frame_main`.)
-        bool clear = false; // Put off for more stable visual.
         if (begin_popup_for_item(ImGui::IsItemClicked(ImGuiMouseButton_Right), "")) {
-            clear = ImGui::Selectable("Clear");
+            if (ImGui::Selectable("Clear") && !pages.empty()) {
+                pages = std::vector<pageT>{};
+                page_no = 0;
+            }
             ImGui::EndPopup();
         }
 
-        if (!pages.empty()) {
-            ImGui::SameLine(0, 16);
-            ImGui::BeginDisabled();
-            bool b = true;
-            ImGui::Checkbox("Preview mode", &b);
-            ImGui::EndDisabled();
-            ImGui::SameLine();
-            config.set("Settings");
-            // Guarantee the child is at least as wide as the previous line.
-            ImGui::SetNextWindowSizeConstraints(
-                ImVec2(ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x - ImGui::GetStyle().WindowPadding.x, 0),
-                ImVec2(FLT_MAX, FLT_MAX));
-            ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(32, 32, 32, 255));
-            if (auto child = imgui_ChildWindow("Page", {}, ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY)) {
-                for (int j = 0; const aniso::ruleT& rule : pages[page_no]) {
-                    if (j % perline != 0) {
-                        ImGui::SameLine(0, 16); // (The same value as in `edit_rule`.)
-                    } else {
-                        ImGui::Separator();
-                    }
-                    ++j;
-                    ImGui::BeginGroup();
+        ImGui::SameLine(0, 16);
+        config.set("Preview settings");
+
+        // Guarantee the child is at least as wide as the previous line (won't happen now).
+        // ImGui::SetNextWindowSizeConstraints(
+        //     ImVec2(ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x - ImGui::GetStyle().WindowPadding.x, 0),
+        //     ImVec2(FLT_MAX, FLT_MAX));
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(32, 32, 32, 255));
+        if (auto child = imgui_ChildWindow("Page", {}, ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY)) {
+            for (int j = 0; j < page_size; ++j) {
+                if (j % perline != 0) {
+                    ImGui::SameLine(0, 16); // (The same value as in `edit_rule`.)
+                } else {
+                    ImGui::Separator();
+                }
+
+                ImGui::BeginGroup();
+                if (pages.empty()) {
+                    ImGui::BeginDisabled();
+                    ImGui::Button(">> Cur");
+                    ImGui::EndDisabled();
+                    imgui_ItemTooltip("Empty. ('>>>' to generate rules.)");
+                    ImGui::Dummy(ImVec2(config.width(), config.height()));
+                    imgui_ItemRectFilled(IM_COL32_BLACK);
+                    imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_TableBorderStrong));
+                } else {
                     ImGui::PushID(j);
                     if (ImGui::Button(">> Cur")) {
-                        out.set_rule(rule);
+                        out.set_rule(pages[page_no][j]);
                     }
                     ImGui::PopID();
-                    previewer::preview(j, config, rule);
-                    ImGui::EndGroup();
+                    previewer::preview(j, config, pages[page_no][j]);
                 }
+                ImGui::EndGroup();
             }
-            ImGui::PopStyleColor();
         }
-
-        if (clear && !pages.empty()) {
-            pages = std::vector<pageT>{};
-            page_no = 0;
-        }
+        ImGui::PopStyleColor();
     }
 };
 
@@ -729,62 +724,6 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
         assert(compatible == (c_locked_x == 0));
 
         guarded_block(compatible, "Incompatible.", [&] {
-            // `dist`: The "distance" to the masking rule the randomization want to achieve.
-            // (which does not make sense when !compatible)
-            static double rate = 0.5;
-            int free_dist = round(rate * c_free);
-
-            static bool exact_mode = false;
-            if (ImGui::Button(exact_mode ? "Exactly###Mode" : "Around ###Mode")) {
-                exact_mode = !exact_mode;
-            }
-            quick_info("< Around / Exactly.");
-            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-            ImGui::SetNextItemWidth(item_width);
-            if (imgui_StepSliderInt("##Quantity", &free_dist, 0, c_free,
-                                    compatible ? (has_lock ? "(Free) %d" : "%d") : "N/A") &&
-                c_free != 0) {
-                rate = double(free_dist) / c_free;
-                assert(round(rate * c_free) == free_dist);
-            }
-            ImGui::SameLine();
-            static bool show_rand = false;
-            const bool clicked = ImGui::Checkbox("Randomize", &show_rand);
-            if (clicked && show_rand) {
-                assert(compatible); // Otherwise, the checkbox should be disabled.
-                ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
-                if (ImGui::IsMousePosValid()) {
-                    ImGui::SetNextWindowPos(ImGui::GetIO().MousePos + ImVec2(2, 2), ImGuiCond_Always);
-                }
-            }
-            // TODO: ideally, !compatible should only disable generation ('>>>' at last page.).
-            if (show_rand && compatible) {
-                if (auto window = imgui_Window("Randomize", &show_rand,
-                                               ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
-                    static batch_adapter batch;
-                    batch.display(
-                        [&]() -> aniso::ruleT {
-                            if (exact_mode) {
-                                return aniso::randomize_c(subset, mask, mold, global_mt19937(), free_dist);
-                            } else {
-                                return aniso::randomize_p(subset, mask, mold, global_mt19937(), rate);
-                            }
-                        },
-                        sync, clicked);
-                }
-            }
-        });
-        ImGui::SameLine();
-        imgui_StrTooltip("(?)",
-                         "Generate random rules with intended distance around/exactly to the mask, as specified "
-                         "by the button and slider.\n\n"
-                         "For example, if you are using the 'Zero' mask and distance = 'Around' 51, 'Generate' "
-                         "(in the 'Randomize' window) will generate rules with around 51 groups having '1'.\n\n"
-                         "(Also, suppose the current rule belongs to the working set, you can set it to "
-                         "the custom mask, and 'Generate' in a low distance to get random rules that are \"close\" "
-                         "to it.)");
-
-        guarded_block(compatible, "Incompatible.", [&] {
             sequence::seq(
                 "<00..", "Prev", "Next", "11..>", //
                 [&] { sync.set_rule(aniso::seq_mixed::first(subset, mask, mold)); },
@@ -803,7 +742,76 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                          "2. 'Next' to iterate. The left/right arrow key will be bound to 'Prev/Next' after you "
                          "click the button.");
 
-        // TODO: move this to the right plane (before 'Restart')?
+        ImGui::SameLine();
+
+        guarded_block(compatible, "Incompatible", [&] {
+            static bool show_rand = false;
+            if (!compatible) {
+                show_rand = false;
+            }
+
+            const bool clicked = ImGui::Checkbox("Randomize", &show_rand);
+            if (clicked && show_rand) {
+                assert(compatible); // Otherwise, the checkbox should be disabled.
+                ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
+                if (ImGui::IsMousePosValid()) {
+                    ImGui::SetNextWindowPos(ImGui::GetIO().MousePos + ImVec2(2, -100), ImGuiCond_Always);
+                }
+            }
+
+            // TODO: ideally, !compatible should only disable generation ('>>>' at last page).
+            if (show_rand) {
+                assert(compatible);
+                if (auto window = imgui_Window("Randomize", &show_rand,
+                                               ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
+                    // `dist`: The "distance" to the masking rule the randomization want to achieve.
+                    // (which does not make sense when !compatible)
+                    static double rate = 0.29;
+                    int free_dist = round(rate * c_free);
+
+                    static bool exact_mode = false;
+                    if (ImGui::Button(exact_mode ? "Exactly###Mode" : "Around ###Mode")) {
+                        exact_mode = !exact_mode;
+                    }
+                    quick_info("< Around / Exactly.");
+                    ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                    ImGui::SetNextItemWidth(item_width);
+                    if (imgui_StepSliderInt("##Dist", &free_dist, 0, c_free,
+                                            compatible ? (has_lock ? "(Free) %d" : "%d") : "N/A") &&
+                        c_free != 0) {
+                        rate = double(free_dist) / c_free;
+                        assert(round(rate * c_free) == free_dist);
+                    }
+                    ImGui::SameLine();
+                    imgui_StrTooltip(
+                        "(?)", "Generate random rules with intended distance around/exactly to the masking rule, "
+                               "as specified by the button and slider.\n\n"
+                               "For example, if you are using the 'Zero' mask and distance = 'Around' 30, (when at the "
+                               "last page) '>>>' will generate pages of rules with around 30 groups having '1'.\n\n"
+                               "(Also, suppose the current rule belongs to the working set, you can set it to "
+                               "the custom mask, and generate in a low distance to get random rules that are \"close\" "
+                               "to it.)");
+                    // TODO: whether (and where) to add these tips?
+                    // 1. left/right arrow key will be bound to '<</>>>' when the window is toggled open.
+                    // 2. further operations are supported via '>> Cur'. For example to save a rule the user needs
+                    // to firstly set it as the current rule.
+
+                    static batch_adapter batch;
+                    batch.display(
+                        [&]() -> aniso::ruleT {
+                            if (exact_mode) {
+                                return aniso::randomize_c(subset, mask, mold, global_mt19937(), free_dist);
+                            } else {
+                                return aniso::randomize_p(subset, mask, mold, global_mt19937(), rate);
+                            }
+                        },
+                        sync, clicked);
+                }
+            }
+        });
+
+#if 0
+        // TODO: re-support this functionality elsewhere...
         ImGui::SameLine();
         if (ImGui::Button("Rev")) {
             sync.set_mold(aniso::trans_reverse(mold));
@@ -821,7 +829,6 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                     "(The result will be the same as the current rule, as the current rule is self-complementary.)");
             }
         });
-#if 0
         // TODO: whether to expose this? This is conceptually well-defined, but very hard to explain and
         // the effect may not be as expected.
         // TODO: ... sometimes this is really useful...
@@ -847,7 +854,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
         });
 #endif
         ImGui::SameLine();
-        ImGui::Checkbox("Preview mode", &preview_mode);
+        ImGui::Checkbox("Preview", &preview_mode);
         quick_info("^ Try this!");
         if (preview_mode) {
             ImGui::SameLine();
