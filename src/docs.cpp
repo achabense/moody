@@ -14,12 +14,12 @@ The project was then abandoned for many years. Last year I felt an urgency to br
 // TODO: about MAP rules...
 // TODO: about the lock & capture feature...
 const char* const doc_overview =
-    R"(At any time, the program has a rule shown in the right plane (which is an editable torus space; the operations are recorded in the tooltips (...)). This is later called the "current rule". As you see, it is the Game of Life rule initially.
+    R"(At any time, the program has a rule shown in the right panel (which is an editable torus space; the operations are recorded in the tooltips (...)). This is later called the "current rule". As you see, it is the Game of Life rule initially.
 
 The MAP-string for the current rule is shown at the top taking up a single line. You can right-click the text to save to the clipboard. The paths in the 'Load file' window can be copied in the same way.
 The program keeps the record for the current rule. You can undo/redo via '<| Prev/Next |>' (above the MAP-string). The program manages several sequences of rules in the form of 'First Prev/Next Last'. When a sequence is activated, the left/right arrow keys will be bound to its 'Prev/Next' for convenience.
 
-In the right plane, you can right-click to select area and press 'C' (no need for 'Ctrl') to save the pattern as RLE-string to the clipboard, or press 'V' to paste the pattern from the clipboard (left-click to decide where to paste).
+In the right panel, you can right-click to select area and press 'C' (no need for 'Ctrl') to save the pattern as RLE-string to the clipboard, or press 'V' to paste the pattern from the clipboard (left-click to decide where to paste).
 (When pasting patterns to white background, you'd need to set 'Background' to 1 in the 'Range operations' window.)
 
 In these documents, as well as those opened in 'Load file' or 'Clipboard', you can left-click the rule-string to replace the current rule, or right-click to copy the lines to the clipboard (drag to select multiple lines).
@@ -28,7 +28,7 @@ x = 7, y = 14, rule = MAPARYBFxZoF34WaBd+aIF+6RZoF35ogX7paIF+6YEX6ZcWaBd+aIF+6Wi
 3bo3b$2b3o2b$b5ob$ob3obo$2b3o2b$2b3o2b$ob3obo$ob3obo$b5ob$b
 5ob$3bo3b$7b$2b3o2b$2bobo2b!
 
-The left plane provides ways to analyze and modify the current rule based on a series of subsets. For detailed descriptions see the next section ('Subset, mask and rule operations'). In short:
+The left panel provides ways to analyze and modify the current rule based on a series of subsets. For detailed descriptions see the next section ('Subset, mask and rule operations'). In short:
 The subsets that the current rule belongs to will be marked with light-green borders.
 You need to firstly specify a "working set", which is the set you are going to explore. You can select multiple subsets - the program will calculate the intersection of them as the working set. For example, if you select 'All' (isotropic rules; selected by default) and 'S.c.' (self-complementary rules), you are going to explore the rules that are both isotropic and self-complementary.
 Then you need to select a "mask" (masking rule) to guide how to observe the current rule and generate new rules.
@@ -148,7 +148,7 @@ MAPAj6qGRYEbAUJCY78vDHdV3RZxOaGCikQ1abIFMMgJBp3BiKINUAoCWLoKJrShCqIYswRCaAJjzpKQ
 MAPAkMwkQDI20gEBSC4F/gYtzNEmgAVCB0ookwgwMEGAA0FExCAo8gCgFw4ACAqEgALNCnhuUQcmQlgahCx2ACRHg
 It's highly likely that there exist rules with interesting oscillators or spaceships nearby. For example, the following rule has (C4) distance = 1 to the above one, but has huge spaceships:
 MAPAkMwkwDo20gEBSC4F/gItzNkmkA1iBkookwgwMEGgA0FExCAo8gigFw4AAAqEgALNCnhsUQcmQlgahCx2ACRHg
-It will be very helpful for finding such rules if you turn on 'Preview' in the random-access plane.
+It will be very helpful for finding such rules if you turn on 'Preview' for the random-access section.
 
 Another pair of examples:
 MAPA0wFMBFTd2EGdnFywDNkKEYRDqgbKPiJ6DIklgrKDhYnSAit2JIckGwBtsuJBFMGAPAc5TvYilLBtImEJIhUoA

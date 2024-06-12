@@ -432,7 +432,7 @@ public:
                           "of generation when (actual) pace != 1.");
             });
 
-            ImGui::Separator(); // To align with the left plane.
+            ImGui::Separator(); // To align with the left panel.
 
             assert(ctrl.anti_strobing);
             const bool is_strobing = strobing(ctrl.rule);

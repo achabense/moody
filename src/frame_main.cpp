@@ -122,13 +122,11 @@ void frame_main() {
         // Use icons? https://github.com/ocornut/imgui/blob/master/docs/FONTS.md#using-icon-fonts
         ImGui::AlignTextToFramePadding();
         imgui_StrTooltip(
-            "(...)",
-            "Below is the MAP-string for the current rule (as shown in the right plane). You can right-click the rule "
-            "to copy to the clipboard.\n\n"
-            "Here '<| Prev/Next |>' represents the record for the current rule. You can undo/redo the modifications "
-            "with it. When you click the button the left/right arrow key will be bound to 'Prev/Next'.\n"
-            "(If you want to clear the record, you can right-click the 'Total:.. At:..' text, and then click 'Clear' "
-            "in the popup to confirm.)");
+            "(...)", "'<| Prev/Next |>' represents the record for the current rule (as shown in the right panel). "
+                     "When clicked, the left/right arrow key will be bound to 'Prev/Next'.\n\n"
+                     "To clear the record, right-click 'Total:.. At:..' and then click 'Clear' in the "
+                     "popup to confirm.\n\n"
+                     "To save the current rule, right-click the MAP-string, and it will be copied to the clipboard.");
 
         ImGui::SameLine();
         const ImGuiID id_prev =
@@ -143,7 +141,7 @@ void frame_main() {
 
         ImGui::SameLine();
         ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1 /* [1, size()] */);
-        quick_info("< Right-click to clear.");
+        quick_info("^ Right-click to clear.");
         if (begin_popup_for_item(ImGui::IsItemClicked(ImGuiMouseButton_Right), "")) {
             if (ImGui::Selectable("Clear")) {
                 freeze = true, recorder.clear();
@@ -170,6 +168,10 @@ void frame_main() {
         });
 
         {
+            if (!sync.enable_lock) {
+                ImGui::SameLine();
+            }
+
             static bool hover_lock = false;
             if (sync.enable_lock && hover_lock) {
                 imgui_StrCopyable(aniso::to_MAP_str(sync.current), imgui_Str);

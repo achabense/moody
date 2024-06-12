@@ -619,6 +619,7 @@ void load_file(sync_point& out) {
             nav.select_history();
             ImGui::EndPopup();
         }
+        ImGui::SameLine();
         nav.show_current();
 
         ImGui::Separator();
