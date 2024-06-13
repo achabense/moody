@@ -494,7 +494,7 @@ public:
         quick_info("^ Right-click to clear.");
         // (Using the same style as in `frame_main`.)
         if (begin_popup_for_item(ImGui::IsItemClicked(ImGuiMouseButton_Right), "")) {
-            if (ImGui::Selectable("Clear (including the current page)") && !pages.empty()) {
+            if (ImGui::Selectable("Clear (including this page)") && !pages.empty()) {
                 pages = std::vector<pageT>{};
                 page_no = 0;
             }
@@ -508,7 +508,7 @@ public:
         // ImGui::SetNextWindowSizeConstraints(
         //     ImVec2(ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x - ImGui::GetStyle().WindowPadding.x, 0),
         //     ImVec2(FLT_MAX, FLT_MAX));
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(32, 32, 32, 255));
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(24, 24, 24, 255));
         if (auto child = imgui_ChildWindow("Page", {}, ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY)) {
             for (int j = 0; j < page_size; ++j) {
                 if (j % perline != 0) {
@@ -876,11 +876,10 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
         }
     }
 
-    if (preview_mode) {
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(32, 32, 32, 255));
-    }
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(24, 24, 24, 255));
     if (auto child = imgui_ChildWindow("Groups")) {
-        // set_scroll_by_up_down(ImGui::GetFrameHeight() * (preview_mode ? 2 : 1));
+        set_scroll_by_up_down(preview_mode ? floor(config.height() * 0.5) : ImGui::GetFrameHeight());
+
         const char labels_normal[2][3]{{'-', chr_0, '\0'}, {'-', chr_1, '\0'}};
         const char labels_preview[2][9]{{'-', chr_0, ' ', '-', '>', ' ', chr_1, ':', '\0'},
                                         {'-', chr_1, ' ', '-', '>', ' ', chr_0, ':', '\0'}};
@@ -1019,9 +1018,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
 
         ImGui::PopStyleVar(1);
     }
-    if (preview_mode) {
-        ImGui::PopStyleColor();
-    }
+    ImGui::PopStyleColor();
 }
 
 // TODO: move to "apply_rule.cpp"? (as this is a special type of capture...)

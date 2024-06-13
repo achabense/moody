@@ -197,7 +197,7 @@ void frame_main() {
         if (ImGui::BeginTable("Layout", 2, ImGuiTableFlags_Resizable)) {
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            if (auto child = imgui_ChildWindow("Edit", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
+            {
                 bool bind_undo = false;
                 edit_rule(sync, bind_undo);
                 if (bind_undo) {
@@ -205,9 +205,7 @@ void frame_main() {
                 }
             }
             ImGui::TableNextColumn();
-            if (auto child = imgui_ChildWindow("Apply", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
-                apply_rule(sync);
-            }
+            apply_rule(sync);
             ImGui::EndTable();
         }
 

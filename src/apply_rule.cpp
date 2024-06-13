@@ -664,7 +664,7 @@ public:
 
                 ImDrawList* const drawlist = ImGui::GetWindowDrawList();
                 drawlist->PushClipRect(canvas_min, canvas_max);
-                drawlist->AddRectFilled(canvas_min, canvas_max, IM_COL32(32, 32, 32, 255));
+                drawlist->AddRectFilled(canvas_min, canvas_max, IM_COL32(24, 24, 24, 255));
 
                 const scaleE scale_mode = m_coord.zoom < 1 ? scaleE::Linear : scaleE::Nearest;
                 if (!m_paste) {
@@ -738,6 +738,7 @@ public:
                     drawlist->AddRectFilled(sel_min, sel_max, IM_COL32(0, 255, 0, 40));
                     // drawlist->AddRect(sel_min, sel_max, IM_COL32(0, 255, 0, 160));
                 }
+                drawlist->AddRect(screen_min, screen_max, ImGui::GetColorU32(ImGuiCol_TableBorderStrong));
                 drawlist->PopClipRect();
             }
 
