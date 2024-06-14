@@ -310,14 +310,14 @@ public:
                 };
 
                 imgui_Str(
-                    "The following terms represent subsets of the MAP rules. You can select these terms freely - "
-                    "the program will calculate the intersection of the selected subsets (with the whole MAP set), and "
+                    "The following terms represent subsets of MAP rules. You can select these terms freely - "
+                    "the program will calculate the intersection of selected subsets (with the whole MAP set), and "
                     "help you explore rules in it.\n"
                     "This set is later called \"working set\". For example, \"the rule belongs to the working set\" "
                     "has the same meaning as \"the rule belongs to every selected subset\". If nothing is selected, "
                     "the working set will be the whole MAP set.");
                 ImGui::Separator();
-                imgui_Str("The ring color reflects the relation between the subset and the current rule-lock pair:");
+                imgui_Str("The ring color reflects the relation between the subset and the current rule:");
                 explain(Contained, None, "The rule belongs to this subset.");
                 if (!target.enable_lock) {
                     explain(Compatible, None, "The rule does not belong to this subset.");
@@ -372,7 +372,7 @@ public:
                 update_current();
             }
             if (!hide_details_this_frame) {
-                imgui_ItemTooltip("Select every subset that the current rule belongs to.");
+                imgui_ItemTooltip("Select every subset that contains the current rule.");
             } else {
                 ImGui::EndDisabled();
             }
@@ -615,7 +615,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
              'o', 'i'},
 
             {"Custom",
-             "Custom rule. You can click '<< Cur' to set this to the current rule.\n"
+             "Custom masking rule. You can click '<< Cur' to set this to the current rule.\n"
              "Different:'i', same:'o'. This is a useful tool to help find interesting rules based on existing ones. "
              "For example, the smaller the distance is, the more likely that the rule behaves similar to the masking "
              "rule.",
@@ -794,13 +794,14 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                     }
                     ImGui::SameLine();
                     imgui_StrTooltip(
-                        "(?)", "Generate random rules with intended distance around/exactly to the masking rule, "
-                               "as specified by the button and slider.\n\n"
-                               "For example, if you are using the 'Zero' mask and distance = 'Around' 30, (when at the "
-                               "last page) '>>>' will generate pages of rules with around 30 groups having '1'.\n\n"
-                               "(Also, suppose the current rule belongs to the working set, you can set it to "
-                               "the custom mask, and generate in a low distance to get random rules that are \"close\" "
-                               "to it.)");
+                        "(?)",
+                        "Generate random rules (in the working set) with intended distance around/exactly to the "
+                        "masking rule, as specified by the button and slider.\n\n"
+                        "For example, if you are using the 'Zero' mask and distance = 'Around' 30, (when at the "
+                        "last page) '>>>' will generate pages of rules with around 30 groups having '1'.\n\n"
+                        "(Also, suppose the current rule belongs to the working set, you can set it to "
+                        "the custom mask, and generate in a low distance to get random rules that are \"close\" "
+                        "to it.)");
                     // TODO: whether (and where) to add these tips?
                     // 1. left/right arrow key will be bound to '<</>>>' when the window is toggled open.
                     // 2. further operations are supported via '>> Cur'. For example to save a rule the user needs
@@ -867,7 +868,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
             imgui_StrTooltip(
                 "(?)",
                 "The current rule does not belong to the working set. (Check the dull-blue groups for details.)\n\n"
-                "(To get a rule in the working set you can try any of '<00..', '11..>', or 'Randomize'.)");
+                "(You can get rules in the working set with '<00..', '11..>', or 'Randomize'.)");
         } else {
             ImGui::Text("Groups:%d !compatible", c_group);
             ImGui::SameLine();
@@ -878,6 +879,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
 
     ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(24, 24, 24, 255));
     if (auto child = imgui_ChildWindow("Groups")) {
+        // TODO: document the behavior.
         set_scroll_by_up_down(preview_mode ? floor(config.height() * 0.5) : ImGui::GetFrameHeight());
 
         const char labels_normal[2][3]{{'-', chr_0, '\0'}, {'-', chr_1, '\0'}};

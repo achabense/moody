@@ -702,7 +702,7 @@ void load_doc(sync_point& out) {
     };
 
     if (!doc_id) {
-        imgui_Str("'Astral' by github user 'achabense'.");
+        imgui_Str("A toy for exploring MAP rules, by GitHub user 'achabense'.");
         imgui_Str("The latest version is available at: ");
         ImGui::SameLine(0, 0);
         imgui_StrCopyable("https://github.com/achabense/astral", imgui_Str);

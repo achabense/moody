@@ -1,3 +1,4 @@
+// TODO: rewrite some parts.
 // TODO: add a section to record all operations in the program?
 
 const char* const doc_about =
@@ -20,7 +21,7 @@ The MAP-string for the current rule is shown at the top taking up a single line.
 The program keeps the record for the current rule. You can undo/redo via '<| Prev/Next |>' (above the MAP-string). The program manages several sequences of rules in the form of 'First Prev/Next Last'. When a sequence is activated, the left/right arrow keys will be bound to its 'Prev/Next' for convenience.
 
 In the right panel, you can right-click to select area and press 'C' (no need for 'Ctrl') to save the pattern as RLE-string to the clipboard, or press 'V' to paste the pattern from the clipboard (left-click to decide where to paste).
-(When pasting patterns to white background, you'd need to set 'Background' to 1 in the 'Range operations' window.)
+(When pasting patterns to white background, you'd need to set 'Background' to 1 in the 'Range ops' window.)
 
 In these documents, as well as those opened in 'Load file' or 'Clipboard', you can left-click the rule-string to replace the current rule, or right-click to copy the lines to the clipboard (drag to select multiple lines).
 For example, here is an RLE blob (a "rocket" in the Day & Night rule) - you can firstly click the header line to load the rule, and then copy the following lines (from '3bo...' up to the '!' mark) to paste and see the effect.
@@ -110,7 +111,7 @@ Once you find another interesting rule, you can move on starting from it instead
 x = 5, y = 27, rule = MAP+sASUIjICmiAgAiAEKBAhrIGFiAUbCCAoAChgnAAAw6AAkAIgKCAlAQgIAAgIQBboCqhEQAAkFQAARIDAQQRBA
 2ob2o$obobo$b3ob$obobo$2ob2o$5o$5o$5o$5o$5o$5o$5o$5o$5o$5o$
 5o$5o$5o$5o$5o$5o$5o$2ob2o$obobo$b3ob$obobo$2ob2o!
-(The pattern is to be pasted into white background. To enable this, set 'Background' to 1 in the 'Range operations' window. The pattern will split into two huge spaceships.)
+(The pattern is to be pasted into white background. To enable this, set 'Background' to 1 in the 'Range ops' window. The pattern will split into two huge spaceships.)
 
 By "wandering" in the working set in this way, you can collect a series of rules that are close from each other.
 

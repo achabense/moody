@@ -137,7 +137,7 @@ class runnerT {
     struct ctrlT {
         aniso::ruleT rule{};
 
-        static constexpr int step_min = 1, step_max = 80;
+        static constexpr int step_min = 1, step_max = 100;
         int step = 1;
         bool anti_strobing = true;
         int actual_step() const {
@@ -173,7 +173,7 @@ class runnerT {
     };
 
     class torusT {
-        initT m_init{.seed = 0, .density = 0.5, .area = 0.40};
+        initT m_init{.seed = 0, .density = 0.5, .area = 0.5};
         aniso::tileT m_torus{{.x = 600, .y = 400}};
         ctrlT m_ctrl{.rule{}, .step = 1, .anti_strobing = true, .gap = 0, .pause = false};
         int m_gen = 0;
@@ -388,6 +388,9 @@ public:
                     auto_fit_next = is_cur ? !auto_fit : true;
                     return true;
                 }
+                if (z == 1) {
+                    quick_info("^ Auto full-screen.");
+                }
                 return false;
             });
             auto_fit = auto_fit_next;
@@ -496,14 +499,12 @@ public:
 
         ImGui::AlignTextToFramePadding();
         imgui_StrTooltip("(...)", [] {
-            // TODO: is "window" ambiguous here?
-            imgui_Str(
-                "Mouse operations:\n"
-                "1. Scroll in the window to zoom in/out.\n"
-                "2. When there is nothing to paste, you can drag with left button to move the window, or 'Ctrl + "
-                "left-drag' to \"rotate\" the space, or drag with right button to select area (to copy, clear, etc.).\n"
-                "3. Otherwise, left-click to decide where to paste. In this case, to move the window you can drag with "
-                "right button. (Rotating and selecting are not available when there are patterns to paste.)");
+            imgui_Str("Mouse operations:\n"
+                      "1. Scroll in the window to zoom in/out.\n"
+                      "2. When there is nothing to paste, you can drag with left button to move the window, or 'Ctrl + "
+                      "left-drag' to \"rotate\" the space, or drag with right button to select area.\n"
+                      "3. Otherwise, left-click to decide where to paste. To move the window you can drag with "
+                      "right button. Rotating and selecting are not available in this mode.");
         });
         quick_info("v Mouse operations.");
 
@@ -514,8 +515,11 @@ public:
 
         ImGui::SameLine();
         static bool show_range_window = false;
-        ImGui::Checkbox("Range operations", &show_range_window);
+        ImGui::Checkbox("Range ops", &show_range_window);
         quick_info("^ Copy, paste, clear, etc.\nv Drag with right button to select area.");
+        ImGui::SameLine();
+        imgui_StrDisabled("(?)");
+        const bool show_range_window_in_tooltip = ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip);
 
         ImGui::SameLine(0, 0);
         // ImGui::Text("  Generation:%d, density:%.4f", m_torus.gen(),
@@ -817,14 +821,14 @@ public:
                     term("Capture (closed)", "P", ImGuiKey_P, true, _capture_closed);
                 });
 
-                auto range_operations = [&](const bool shortcut_only) {
-                    static auto set_tag = [](bool& tag, const char* label, const char* message) {
-                        ImGui::Checkbox(label, &tag);
-                        ImGui::SameLine();
-                        imgui_StrTooltip("(?)", message);
-                    };
+                auto range_operations = [&](const bool display) {
+                    if (display) {
+                        const auto set_tag = [](bool& tag, const char* label, const char* message) {
+                            ImGui::Checkbox(label, &tag);
+                            ImGui::SameLine();
+                            imgui_StrTooltip("(?)", message);
+                        };
 
-                    if (!shortcut_only) {
                         ImGui::AlignTextToFramePadding();
                         imgui_Str("Background ~");
                         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
@@ -836,12 +840,11 @@ public:
                             background = 1;
                         }
                         ImGui::SameLine();
-                        imgui_StrTooltip("(?)", "Treat 0 (black) or 1 (white) as background value. "
-                                                "This affects the behavior of clearing, shrinking and pasting mode.\n\n"
-                                                "'Clear inside/outside' will fill the range with (background).\n"
-                                                "'Bound' will get the bounding-box for !(background).\n"
-                                                "'Paste' will use different pasting modes based on (background). "
-                                                "(When pasting into the white background you need to set this to 1.)");
+                        imgui_StrTooltip(
+                            "(?)", "'Clear inside/outside' and 'Cut' will clear the range with the value.\n"
+                                   "'Bound' will get the bounding-box for the pattern that consists of !(value).\n"
+                                   "'Paste' will use different pasting modes based on the value. "
+                                   "When pasting into white background you need to set this to 1.");
 
                         // Filling.
                         ImGui::Separator();
@@ -856,14 +859,14 @@ public:
 
                         // Copy/Cut/Paste.
                         ImGui::Separator();
-                        set_tag(add_rule, "Add rule",
-                                "Whether to add rule info ('rule = ...') to the header when copying patterns.");
+                        set_tag(add_rule, "Rule info",
+                                "Whether to include rule info ('rule = ...') in the header when copying patterns.");
                         ImGui::SameLine();
                         set_tag(show_result, "Show result", "Whether to display the result when copying patterns.");
                         term("Copy", "C", ImGuiKey_C, true, _copy);
                         term("Cut", "X", ImGuiKey_X, true, _cut);
                         term("Paste", "V", ImGuiKey_V, false, _paste);
-                    } else {
+                    } else { // Shortcut only.
                         auto term2 = [&](ImGuiKey key, bool use_sel, operationE op2) {
                             const bool enabled = !use_sel || m_sel.has_value();
                             if (enabled && test_key(key, false)) {
@@ -882,17 +885,27 @@ public:
                     }
                 };
 
-                if (show_range_window) {
-                    ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
-                    if (ImGui::IsMousePosValid()) {
-                        ImGui::SetNextWindowPos(ImGui::GetIO().MousePos + ImVec2(2, 2), ImGuiCond_Appearing);
+                [&] {
+                    if (show_range_window) {
+                        ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
+                        if (ImGui::IsMousePosValid()) {
+                            ImGui::SetNextWindowPos(ImGui::GetIO().MousePos + ImVec2(2, 2), ImGuiCond_Appearing);
+                        }
+                        auto window =
+                            imgui_Window("Range operations", &show_range_window,
+                                         ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings);
+                        if (window.visible) {
+                            range_operations(true /* display */);
+                            return; // Using lambda for this return.
+                        }
                     }
-                    auto window = imgui_Window("Range operations", &show_range_window,
-                                               ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings);
-                    range_operations(!window.visible /* shortcut-only if !visible */);
-                } else {
-                    range_operations(true /* shortcut-only */);
-                }
+                    if (show_range_window_in_tooltip && ImGui::BeginTooltip()) {
+                        range_operations(true /* display */);
+                        ImGui::EndTooltip();
+                    } else {
+                        range_operations(false /* shortcut only */);
+                    }
+                }();
 
                 if (op == _capture_closed && m_sel) {
                     auto lock = capture_closed(m_torus.read_only(m_sel->to_range()), sync.current.rule);

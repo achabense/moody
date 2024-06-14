@@ -312,6 +312,7 @@ class previewer {
 public:
     previewer() = delete;
 
+    // TODO: should be more flexible...
     class configT {
     public:
         enum sizeE : int { _160_160 = 0, _220_160, _220_220, _280_220, Count };
@@ -346,7 +347,7 @@ public:
             imgui_StrTooltip("(?)", [&] {
                 imgui_Str("Press 'T' to restart all preview windows.\n"
                           "For individual windows:\n"
-                          "Right-click to restart, left-press to pause.");
+                          "Right-click to restart, left-click and hold to pause.");
                 ImGui::Separator();
                 _set();
             });
