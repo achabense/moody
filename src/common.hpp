@@ -327,11 +327,11 @@ public:
         friend previewer;
         sizeE size; // Cannot be `Count`.
         int seed;
-        int pace;
+        int step;
         void _set();
 
     public:
-        /*implicit*/ configT(sizeE size) : size(size), seed(0), pace(1) { assert(size >= 0 && size < Count); }
+        /*implicit*/ configT(sizeE size) : size(size), seed(0), step(1) { assert(size >= 0 && size < Count); }
 
         int width() const { return size_terms[size].w; }
         int height() const { return size_terms[size].h; }

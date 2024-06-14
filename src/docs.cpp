@@ -289,7 +289,7 @@ The result may not belong to W (as the current rule may not belong to W), but mu
 Case 1 is especially useful.
 
 Here is the same hex-C6 rule shown in the 'Rules in different subsets' section. Hex-C6 is a subset of hex-C2, which is a subset of native-C2, which is further a subset of the whole MAP set.
-The later rules are all "refined" from this rule. (You can easily find such rules with the help of preview mode.) Before moving on, I'd recommend setting it as the masking rule ('<< Cur'), and setting a large pace for the preview windows (in 'Settings') as well as the main window (as the dynamics of these rules are complex and relatively slow).
+The later rules are all "refined" from this rule. (You can easily find such rules with the help of preview mode.) Before moving on, I'd recommend setting it as the masking rule ('<< Cur'), and setting a large step for the preview windows (in 'Settings') as well as the main window (as the dynamics of these rules are complex and relatively slow).
 MAPEUQRVSLdM4gRRBFVIt0ziCK7IswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHMRIiqIpnMEQ
 
 It turns out that, there are a lot of amazing rules with only native-C2 symmetry close to the C6 rule. Here are two rules that have distance = 1 to it in the native-C2 subset:

@@ -137,16 +137,17 @@ class runnerT {
     struct ctrlT {
         aniso::ruleT rule{};
 
-        static constexpr int pace_min = 1, pace_max = 80;
-        int pace = 1;
+        static constexpr int step_min = 1, step_max = 80;
+        int step = 1;
         bool anti_strobing = true;
-        int actual_pace() const {
-            if (anti_strobing && strobing(rule) && pace % 2) {
-                return pace + 1;
+        int actual_step() const {
+            if (anti_strobing && strobing(rule) && step % 2) {
+                return step + 1;
             }
-            return pace;
+            return step;
         }
 
+        // gap * gap_unit ~ interval.
         static constexpr int gap_unit = 25; // ms.
         static constexpr int gap_min = 0, gap_max = 20;
         int gap = 0;
@@ -156,11 +157,11 @@ class runnerT {
         int extra_step = 0;
 
         clockT::time_point last_time = {};
-        int calc_step() {
+        int calc_step_this_frame() {
             int step = std::exchange(extra_step, 0);
             if (step == 0) {
                 if (!pause && (last_time + std::chrono::milliseconds{gap * gap_unit} <= clockT::now())) {
-                    step = actual_pace();
+                    step = actual_step();
                 }
             }
 
@@ -174,7 +175,7 @@ class runnerT {
     class torusT {
         initT m_init{.seed = 0, .density = 0.5, .area = 0.40};
         aniso::tileT m_torus{{.x = 600, .y = 400}};
-        ctrlT m_ctrl{.rule{}, .pace = 1, .anti_strobing = true, .gap = 0, .pause = false};
+        ctrlT m_ctrl{.rule{}, .step = 1, .anti_strobing = true, .gap = 0, .pause = false};
         int m_gen = 0;
 
         bool extra_pause = false;
@@ -253,7 +254,7 @@ class runnerT {
 
         void end_frame() {
             if (!extra_pause) {
-                const int count = m_ctrl.calc_step();
+                const int count = m_ctrl.calc_step_this_frame();
                 for (int c = 0; c < count; ++c) {
                     m_torus.run_torus(m_ctrl.rule);
                     ++m_gen;
@@ -402,7 +403,7 @@ public:
             ImGui::AlignTextToFramePadding();
             imgui_StrTooltip("(...)", "Keyboard shortcuts:\n"
                                       "R: Restart    Space: Pause\nN/M (repeatable): +p/+1\n"
-                                      "1/2 (repeatable): -/+ Pace\n3/4 (repeatable): -/+ Gap time\n");
+                                      "1/2 (repeatable): -/+ Step\n3/4 (repeatable): -/+ Interval\n");
             quick_info("< Keyboard shortcuts.");
             ImGui::SameLine();
             if (ImGui::Button("Restart")) {
@@ -413,7 +414,7 @@ public:
             ImGui::PushButtonRepeat(true);
             ImGui::SameLine();
             if (ImGui::Button("+p")) {
-                ctrl.extra_step = ctrl.pause ? ctrl.actual_pace() : 0;
+                ctrl.extra_step = ctrl.pause ? ctrl.actual_step() : 0;
                 ctrl.pause = true;
             }
             ImGui::SameLine();
@@ -425,40 +426,40 @@ public:
             imgui_StrTooltip("(?)", [] {
                 imgui_Str("+p: ");
                 ImGui::SameLine(0, 0);
-                imgui_Str("Run manually (advance generation by pace, controlled by the button/'N').");
+                imgui_Str("Run manually (advance generation by step, controlled by the button/'N').");
                 imgui_Str("+1: ");
                 ImGui::SameLine(0, 0);
-                imgui_Str("Advance generation by 1 instead of pace. This is useful for changing the parity "
-                          "of generation when (actual) pace != 1.");
+                imgui_Str("Advance generation by 1 instead of step. This is useful for changing the parity "
+                          "of generation when (actual) step != 1.");
             });
 
             ImGui::Separator(); // To align with the left panel.
 
             assert(ctrl.anti_strobing);
             const bool is_strobing = strobing(ctrl.rule);
-            std::string pace_str = std::to_string(ctrl.pace);
+            std::string step_str = std::to_string(ctrl.step);
             if (is_strobing) {
-                pace_str += std::format(" -> {}", ctrl.actual_pace());
+                step_str += std::format(" -> {}", ctrl.actual_step());
             }
 
-            imgui_StepSliderInt("Pace", &ctrl.pace, ctrl.pace_min, ctrl.pace_max, pace_str.c_str());
+            imgui_StepSliderInt("Step", &ctrl.step, ctrl.step_min, ctrl.step_max, step_str.c_str());
             if (is_strobing) {
                 ImGui::SameLine();
                 imgui_StrTooltip("(?)",
-                                 "As the current rule has '000...->1' and '111...->0', the pace will be adjusted "
+                                 "As the current rule has '000...->1' and '111...->0', the step will be adjusted "
                                  "to 2*n to avoid bad visual effect.\n\n"
                                  "(You can change the parity of generation with the '+1' button.)");
             }
 
-            imgui_StepSliderInt("Gap time", &ctrl.gap, ctrl.gap_min, ctrl.gap_max,
+            imgui_StepSliderInt("Interval", &ctrl.gap, ctrl.gap_min, ctrl.gap_max,
                                 std::format("{} ms", ctrl.gap * ctrl.gap_unit).c_str());
 
             if (test_key(ImGuiKey_R, false)) {
                 m_torus.restart();
             } else if (test_key(ImGuiKey_1, true)) {
-                ctrl.pace = std::max(ctrl.pace_min, ctrl.pace - 1);
+                ctrl.step = std::max(ctrl.step_min, ctrl.step - 1);
             } else if (test_key(ImGuiKey_2, true)) {
-                ctrl.pace = std::min(ctrl.pace_max, ctrl.pace + 1);
+                ctrl.step = std::min(ctrl.step_max, ctrl.step + 1);
             } else if (test_key(ImGuiKey_3, true)) {
                 ctrl.gap = std::max(ctrl.gap_min, ctrl.gap - 1);
             } else if (test_key(ImGuiKey_4, true)) {
@@ -466,7 +467,7 @@ public:
             } else if (test_key(ImGuiKey_Space, false)) {
                 ctrl.pause = !ctrl.pause;
             } else if (test_key(ImGuiKey_N, true)) {
-                ctrl.extra_step = ctrl.pause ? ctrl.actual_pace() : 0;
+                ctrl.extra_step = ctrl.pause ? ctrl.actual_step() : 0;
                 ctrl.pause = true;
             } else if (test_key(ImGuiKey_M, true)) {
                 ctrl.extra_step = 1;
@@ -987,8 +988,8 @@ void previewer::configT::_set() {
     ImGui::Separator();
 
     ImGui::SetNextItemWidth(item_width);
-    imgui_StepSliderInt("Pace", &pace, 1, 10);
-    imgui_Str("Gap time ~ 0ms");
+    imgui_StepSliderInt("Step", &step, 1, 10);
+    imgui_Str("Interval ~ 0ms");
 }
 
 // TODO: support ctrl + drag to rotate?
@@ -1039,7 +1040,7 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
     // (`IsItemActive` does not work as preview-window is based on `Dummy`.)
     const bool pause = interactive && ImGui::IsItemHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Left);
     if (!pause) {
-        const int p = config.pace + ((config.pace % 2 == 1) && strobing(rule));
+        const int p = config.step + ((config.step % 2 == 1) && strobing(rule));
         for (int i = 0; i < p; ++i) {
             term.tile.run_torus(rule);
         }
