@@ -509,7 +509,7 @@ public:
         quick_info("v Mouse operations.");
 
         ImGui::SameLine();
-        if (ImGui::Button("Center")) {
+        if (ImGui::Button("Center")) { // TODO: select suitable zoom as well?
             locate_center = true;
         }
 

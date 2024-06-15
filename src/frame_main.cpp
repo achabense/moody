@@ -69,6 +69,7 @@ void frame_main() {
     bool freeze = false;
     sync_point sync(recorder.current(), lock, enable_lock);
 
+    // TODO: add a way to specify the contents for the left panel. These loading windows can fit well.
     static bool show_file = false;
     static bool show_clipboard = false;
     static bool show_doc = false;
@@ -97,6 +98,8 @@ void frame_main() {
         ImGui::SameLine();
         load_rule(show_doc, "Documents", load_doc);
         quick_info("< Concepts, example rules, etc.");
+        ImGui::SameLine();
+        ImGui::Text("  (%.1f FPS)", ImGui::GetIO().Framerate);
         ImGui::SameLine(), imgui_Str(" "), ImGui::SameLine();
         ImGui::Checkbox("Lock & capture", &sync.enable_lock_next);
 #ifndef NDEBUG
@@ -110,10 +113,7 @@ void frame_main() {
             ImGui::ShowDemoWindow(&show_demo);
         }
         ImGui::SameLine();
-        ImGui::Text("  (%.1f FPS) Frame:%d", ImGui::GetIO().Framerate, ImGui::GetFrameCount());
-#else
-        ImGui::SameLine();
-        ImGui::Text("  (%.1f FPS)", ImGui::GetIO().Framerate);
+        ImGui::Text("  Frame:%d", ImGui::GetFrameCount());
 #endif // !NDEBUG
 
         ImGui::Separator();

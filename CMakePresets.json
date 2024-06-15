@@ -19,8 +19,8 @@
       }
     },
     {
-      "name": "x64-debug",
-      "displayName": "x64 Debug",
+      "name": "x64-debug-msvc",
+      "displayName": "x64 Debug (msvc)",
       "description": "Target Windows (64-bit) with the Visual Studio development environment. (Debug)",
       "inherits": "windows-base",
       "architecture": {
@@ -30,11 +30,20 @@
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
     },
     {
-      "name": "x64-release",
-      "displayName": "x64 Release",
+      "name": "x64-release-msvc",
+      "displayName": "x64 Release (msvc)",
       "description": "Target Windows (64-bit) with the Visual Studio development environment. (RelWithDebInfo)",
-      "inherits": "x64-debug",
+      "inherits": "x64-debug-msvc",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "x64-debug-clang",
+      "displayName": "x64 Debug (clang)",
+      "inherits": "x64-debug-msvc",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang.exe",
+        "CMAKE_CXX_COMPILER": "clang.exe"
+      }
     }
   ]
 }

@@ -705,7 +705,7 @@ void load_doc(sync_point& out) {
         imgui_Str("A toy for exploring MAP rules, by GitHub user 'achabense'.");
         imgui_Str("The latest version is available at: ");
         ImGui::SameLine(0, 0);
-        imgui_StrCopyable("https://github.com/achabense/astral", imgui_Str);
+        imgui_StrCopyable("https://github.com/achabense/moody", imgui_Str);
 
         ImGui::Separator();
         select();
