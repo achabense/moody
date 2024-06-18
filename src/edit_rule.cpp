@@ -577,6 +577,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
     // Select mask.
     char chr_0 = '0', chr_1 = '1';
     const aniso::maskT& mask = [&]() -> const aniso::maskT& {
+        // TODO: rewrite these descriptions...
         const char* const about_mask =
             "A mask is an arbitrary rule (in the working set) to perform XOR masking for other rules.\n\n"
             "Some rules are special enough (for example, 'Zero/Identity'), so that the values masked by them have "

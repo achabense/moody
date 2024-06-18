@@ -99,8 +99,8 @@ void frame_main() {
         load_rule(show_doc, "Documents", load_doc);
         quick_info("< Concepts, example rules, etc.");
         ImGui::SameLine();
-        ImGui::Text("  (%.1f FPS)", ImGui::GetIO().Framerate);
-        ImGui::SameLine(), imgui_Str(" "), ImGui::SameLine();
+        ImGui::Text("  (%d FPS)  ", (int)round(ImGui::GetIO().Framerate));
+        ImGui::SameLine();
         ImGui::Checkbox("Lock & capture", &sync.enable_lock_next);
 #ifndef NDEBUG
         ImGui::SameLine();

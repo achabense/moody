@@ -12,8 +12,6 @@
 #include "common.hpp"
 #include "tile_base.hpp"
 
-// #define DISABLE_FRAMETATE_CAPPING
-
 [[noreturn]] static void resource_failure() {
     SDL_Log("Error: %s", SDL_GetError());
     exit(EXIT_FAILURE);
@@ -201,17 +199,17 @@ int main(int, char**) {
 #endif
 
     // Create window with SDL_Renderer graphics context
-    const SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-    window = SDL_CreateWindow("Moody v 0.9.5", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
+    {
+        const char* const window_title = "Moody v 0.9.6 (WIP)";
+        const SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+        window =
+            SDL_CreateWindow(window_title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
+    }
     if (!window) {
         resource_failure();
     }
 
-#ifndef DISABLE_FRAMETATE_CAPPING
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
-#else
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-#endif // !DISABLE_FRAMETATE_CAPPING
     if (!renderer) {
         resource_failure();
     }
@@ -219,7 +217,7 @@ int main(int, char**) {
     // Setup Dear ImGui context
     ImGui::CreateContext();
     {
-        char* base_path = SDL_GetBasePath();
+        char* const base_path = SDL_GetBasePath();
         if (!set_home(base_path)) {
             resource_failure();
         }
@@ -294,16 +292,17 @@ int main(int, char**) {
 
         end_frame();
 
-#ifndef DISABLE_FRAMETATE_CAPPING
-        // Added as an extra assurance for the framerate.
-        // (Normally `SDL_RENDERER_PRESENTVSYNC` should be enough to guarantee a moderate framerate.)
-        static Uint64 next = 0;
+        // Limit the framerate to be at most 100 fps.
+        // (Normally `SDL_RENDERER_PRESENTVSYNC` will further limit to a smaller framerate, like 60fps.)
+        static Uint64 last = 0;
         const Uint64 now = SDL_GetTicks64();
-        if (now < next) {
-            SDL_Delay(next - now);
+        const Uint64 until = last + 10;
+        if (now < until) {
+            SDL_Delay(until - now);
+            last = until; // Instead of another `SDL_GetTicks64()` call.
+        } else {
+            last = now;
         }
-        next = SDL_GetTicks64() + 10;
-#endif // !DISABLE_FRAMETATE_CAPPING
     }
     code_atlas::end();
     screen_textures::end();
