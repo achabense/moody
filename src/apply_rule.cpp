@@ -304,9 +304,17 @@ public:
         m_torus.begin_frame(sync.current.rule);
 
         static bool background = 0;
-        static bool locate_center = true;
         static bool auto_fit = false;
+        bool locate_center = false;
         bool find_suitable_zoom = false;
+        {
+            // Could be `ImGui::GetFrameCount() == 1`, but that looks unstable.
+            static bool first = true;
+            if (std::exchange(first, false)) {
+                locate_center = true;
+                find_suitable_zoom = true;
+            }
+        }
 
         const char* const canvas_name = "Canvas";
         const bool enable_shortcuts =
@@ -509,8 +517,9 @@ public:
         quick_info("v Mouse operations.");
 
         ImGui::SameLine();
-        if (ImGui::Button("Center")) { // TODO: select suitable zoom as well?
+        if (ImGui::Button("Center")) {
             locate_center = true;
+            // find_suitable_zoom = true;
         }
 
         ImGui::SameLine();
