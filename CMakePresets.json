@@ -44,6 +44,15 @@
         "CMAKE_C_COMPILER": "clang.exe",
         "CMAKE_CXX_COMPILER": "clang.exe"
       }
+    },
+    {
+      "name": "x64-debug-gcc",
+      "displayName": "x64 Debug (gcc)",
+      "inherits": "x64-debug-msvc",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "gcc.exe",
+        "CMAKE_CXX_COMPILER": "g++.exe"
+      }
     }
   ]
 }

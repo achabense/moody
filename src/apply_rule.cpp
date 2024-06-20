@@ -600,7 +600,7 @@ public:
                 });
             }
 
-            if (std::exchange(locate_center, false)) {
+            if (locate_center) {
                 m_coord.bind(to_imvec(tile_size) / 2, canvas_size / 2);
                 to_rotate = {0, 0};
             }
