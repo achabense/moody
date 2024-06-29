@@ -82,11 +82,11 @@ struct initT {
 
         if (!range.empty()) {
             // TODO: support more backgrounds (white, or other periodic backgrounds)?
-            aniso::clear_outside(tile.data(), range, 0);
+            aniso::fill_outside(tile.data(), range, 0);
             std::mt19937 rand{(uint32_t)seed};
             aniso::random_fill(tile.data().clip(range), rand, density.get());
         } else {
-            aniso::clear(tile.data(), 0);
+            aniso::fill(tile.data(), 0);
         }
     }
 };
@@ -224,10 +224,10 @@ class runnerT {
             }
         }
 
-        void rotate(int dx, int dy) {
+        void rotate_00_to(int dx, int dy) {
             if (dx != 0 || dy != 0) {
                 aniso::tileT temp(m_torus.size());
-                aniso::rotate_copy(temp.data(), m_torus.data(), {.x = dx, .y = dy});
+                aniso::rotate_copy_00_to(temp.data(), m_torus.data(), {.x = dx, .y = dy});
                 m_torus.swap(temp);
             }
         }
@@ -627,7 +627,7 @@ public:
                         const int dx = to_rotate.x, dy = to_rotate.y; // Truncate.
                         if (dx || dy) {
                             to_rotate -= ImVec2(dx, dy);
-                            m_torus.rotate(dx, dy);
+                            m_torus.rotate_00_to(dx, dy);
                         }
                     } else if (!auto_fit) {
                         m_coord.corner_pos -= io.MouseDelta / m_coord.zoom;
@@ -726,6 +726,8 @@ public:
                     m_torus.read_and_maybe_write([&](const aniso::tile_ref tile) {
                         const aniso::tile_ref paste_area = tile.clip({paste_beg, paste_end});
                         aniso::tileT temp(paste_area);
+                        // TODO: redesign pasting behavior. `blit` cannot work for periodic background.
+                        // aniso::copy(paste_area, m_paste->data());
                         (background == 0 ? aniso::blit<aniso::blitE::Or>
                                          : aniso::blit<aniso::blitE::And>)(paste_area, m_paste->data());
                         texture = make_screen(tile, scale_mode);
@@ -929,9 +931,9 @@ public:
                 } else if (op == _random_fill && m_sel) {
                     aniso::random_fill(m_torus.write_only(m_sel->to_range()), global_mt19937(), fill_den.get());
                 } else if (op == _clear_inside && m_sel) {
-                    aniso::clear(m_torus.write_only(m_sel->to_range()), background);
+                    aniso::fill(m_torus.write_only(m_sel->to_range()), background);
                 } else if (op == _clear_outside && m_sel) {
-                    aniso::clear_outside(m_torus.write_only(), m_sel->to_range(), background);
+                    aniso::fill_outside(m_torus.write_only(), m_sel->to_range(), background);
                 } else if (op == _select_all) {
                     if (!m_sel || m_sel->width() != tile_size.x || m_sel->height() != tile_size.y) {
                         m_sel = {.active = false, .beg = {0, 0}, .end = tile_size.plus(-1, -1)};
@@ -939,9 +941,12 @@ public:
                         m_sel.reset();
                     }
                 } else if (op == _bounding_box && m_sel) {
-                    const auto [begin, end] = aniso::bounding_box(m_torus.read_only(), m_sel->to_range(), background);
+                    const aniso::rangeT sel_range = m_sel->to_range();
+                    const auto [begin, end] = aniso::bounding_box(m_torus.read_only(sel_range), background);
                     if (begin != end) {
-                        m_sel = {.active = false, .beg = begin, .end = end.plus(-1, -1)};
+                        // (Should not be m_sel->beg here.)
+                        m_sel = {
+                            .active = false, .beg = sel_range.begin + begin, .end = sel_range.begin + end.plus(-1, -1)};
                     } else {
                         m_sel.reset();
                     }
@@ -949,8 +954,9 @@ public:
                     copy_sel();
                 } else if (op == _cut && m_sel) {
                     copy_sel();
-                    aniso::clear(m_torus.write_only(m_sel->to_range()), background);
+                    aniso::fill(m_torus.write_only(m_sel->to_range()), background);
                 } else if (op == _paste) {
+                    // TODO: support pasting rule as well?
                     if (const char* text = ImGui::GetClipboardText()) {
                         m_paste.reset();
                         if (m_sel) {

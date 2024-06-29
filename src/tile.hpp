@@ -7,6 +7,12 @@
 #include "tile_base.hpp"
 
 namespace aniso {
+    inline vecT divmul_floor(const vecT a, const vecT b) { return {.x = (a.x / b.x) * b.x, .y = (a.y / b.y) * b.y}; }
+    inline vecT divmul_ceil(const vecT a, const vecT b) {
+        const auto divmul_ceil = [](int a, int b) -> int { return ((a + b - 1) / b) * b; };
+        return {.x = divmul_ceil(a.x, b.x), .y = divmul_ceil(a.y, b.y)};
+    }
+
     inline int count(const tile_const_ref tile) {
         int c = 0;
         tile.for_all_data([&c](std::span<const bool> line) {
@@ -33,6 +39,8 @@ namespace aniso {
             std::copy_n(s, len, d);
         });
     }
+
+    // TODO: support copying patterns in the periodic background.
 
     // (`dest` and `source` should not overlap.)
     enum class blitE { Copy, Or, And, Xor };
@@ -65,13 +73,39 @@ namespace aniso {
         });
     }
 
-    inline void clear(const tile_ref tile, const bool v) {
+    inline void random_flip(const tile_ref tile, std::mt19937& rand, double density) {
+        const uint32_t c = std::mt19937::max() * std::clamp(density, 0.0, 1.0);
+        tile.for_all_data([&](std::span<bool> line) {
+            for (bool& b : line) {
+                b ^= (rand() < c);
+            }
+        });
+    }
+
+    inline void fill(const tile_ref tile, const bool v) {
         tile.for_all_data([v](std::span<bool> line) { //
             std::ranges::fill(line, v);
         });
     }
 
-    inline void clear_outside(const tile_ref tile, const rangeT& range, const bool v) {
+    // (`tile` and `repeat` should not overlap.)
+    // (`repeat.at(0, 0)` is bound to `tile.at(0, 0)`.)
+    inline void fill(const tile_ref tile, const tile_const_ref repeat) {
+        int dy = 0;
+        tile.for_each_line([&](const int y, std::span<bool> line) {
+            for (int dx = 0; bool& b : line) {
+                b = repeat.at(dx, dy);
+                if (++dx == repeat.size.x) {
+                    dx = 0;
+                }
+            }
+            if (++dy == repeat.size.y) {
+                dy = 0;
+            }
+        });
+    }
+
+    inline void fill_outside(const tile_ref tile, const rangeT& range, const bool v) {
         assert(tile.has_range(range));
         tile.for_each_line([&](int y, std::span<bool> line) {
             if (y < range.begin.y || y >= range.end.y) {
@@ -83,12 +117,15 @@ namespace aniso {
         });
     }
 
-    inline rangeT bounding_box(const tile_const_ref tile, const bool v) {
+    // TODO: whether to support this?
+    inline void fill_outside(const tile_ref tile, const rangeT& range, const tile_const_ref repeat) = delete;
+
+    inline rangeT bounding_box(const tile_const_ref tile, const bool background) {
         int min_x = INT_MAX, max_x = INT_MIN;
         int min_y = INT_MAX, max_y = INT_MIN;
         tile.for_each_line([&](int y, std::span<const bool> line) {
             for (int x = 0; const bool b : line) {
-                if (b != v) {
+                if (b != background) {
                     min_x = std::min(min_x, x);
                     max_x = std::max(max_x, x);
                     min_y = std::min(min_y, y);
@@ -104,41 +141,59 @@ namespace aniso {
         }
     }
 
-    inline rangeT bounding_box(const tile_const_ref tile, const rangeT& range, const bool v) {
-        assert(tile.has_range(range));
-        const rangeT box = bounding_box(tile.clip(range), v);
-        if (!box.empty()) {
-            return {.begin = range.begin + box.begin, .end = range.begin + box.end};
+    // (`repeat.at(0, 0)` is bound to `tile.at(0, 0)`.)
+    inline rangeT bounding_box(const tile_const_ref tile, const tile_const_ref repeat /*background*/) {
+        int min_x = INT_MAX, max_x = INT_MIN;
+        int min_y = INT_MAX, max_y = INT_MIN;
+        int dy = 0;
+        tile.for_each_line([&](const int y, std::span<const bool> line) {
+            for (int x = 0, dx = 0; const bool b : line) {
+                if (b != repeat.at(dx, dy)) {
+                    min_x = std::min(min_x, x);
+                    max_x = std::max(max_x, x);
+                    min_y = std::min(min_y, y);
+                    max_y = std::max(max_y, y);
+                }
+                ++x;
+                if (++dx == repeat.size.x) {
+                    dx = 0;
+                }
+            }
+            if (++dy == repeat.size.y) {
+                dy = 0;
+            }
+        });
+        if (max_x != INT_MIN) {
+            return {.begin{.x = min_x, .y = min_y}, .end{.x = max_x + 1, .y = max_y + 1}};
         } else {
             return {};
         }
     }
 
     // (`dest` and `source` should not overlap.)
-    // Map (0, 0) to (wrap(d.x), wrap(d.y)).
-    inline void rotate_copy(const tile_ref dest, const tile_const_ref source, vecT d) {
+    // Map (0, 0) to (wrap(to.x), wrap(to.y)).
+    inline void rotate_copy_00_to(const tile_ref dest, const tile_const_ref source, vecT to) {
         assert(dest.size == source.size);
         const vecT size = dest.size;
 
         const auto wrap = [](int v, int r) { return ((v % r) + r) % r; };
-        d.x = wrap(d.x, size.x);
-        d.y = wrap(d.y, size.y);
-        assert(d.both_gteq({0, 0}) && d.both_lt(size));
+        to = {.x = wrap(to.x, size.x), .y = wrap(to.y, size.y)};
+        assert(to.both_gteq({0, 0}) && to.both_lt(size));
 
-        if (d.x == 0 && d.y == 0) [[unlikely]] {
+        if (to.x == 0 && to.y == 0) {
             copy(dest, source);
             return;
         }
 
 #ifndef NDEBUG
-        const bool test = source.at({0, 0});
+        const bool test = source.at(0, 0);
 #endif // !NDEBUG
         source.for_each_line([&](int y, std::span<const bool> line) {
-            bool* const dest_ = dest.line((y + d.y) % size.y);
-            std::copy_n(line.data(), size.x - d.x, dest_ + d.x);
-            std::copy_n(line.data() + size.x - d.x, d.x, dest_);
+            bool* const dest_ = dest.line((y + to.y) % size.y);
+            std::copy_n(line.data(), size.x - to.x, dest_ + to.x);
+            std::copy_n(line.data() + size.x - to.x, to.x, dest_);
         });
-        assert(test == dest.at(d));
+        assert(test == dest.at(to));
     }
 
     namespace _misc {
@@ -276,7 +331,7 @@ namespace aniso {
             assert(width != 0 && height != 0);
             const tile_ref tile = *tile_opt;
             assert(tile.size.x == width && tile.size.y == height);
-            clear(tile, 0); // `tile` data might be dirty.
+            fill(tile, 0); // `tile` data might be dirty.
 
             int x = 0, y = 0;
             for (takerT taker(text);;) {
@@ -490,7 +545,7 @@ namespace aniso {
             random_fill(tile, testT::rand, 0.5);
 
             for (int i = 0; i < 12; ++i) {
-                rotate_copy(compare, tile, {1, 1});
+                rotate_copy_00_to(compare, tile, {1, 1});
                 apply_rule_torus(copy_q, tile, tile);
                 assert(data[0] == data[1]);
             }
