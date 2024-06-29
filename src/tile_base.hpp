@@ -20,6 +20,7 @@ namespace aniso {
         bool both_gteq(const vecT& b) const { return x >= b.x && y >= b.y; } // >=
         bool both_lteq(const vecT& b) const { return x <= b.x && y <= b.y; } // <=
         bool both_lt(const vecT& b) const { return x < b.x && y < b.y; }     // <
+        bool both_gt(const vecT& b) const { return x > b.x && y > b.y; }     // >
     };
 
     inline vecT clamp(const vecT& p, const vecT& min, const vecT& max) { // []
@@ -73,6 +74,10 @@ namespace aniso {
                 assert(pos.both_gteq({0, 0}) && pos.both_lt(size));
                 return *(data + stride * pos.y + pos.x);
             }
+            T& at(int x, int y) const {
+                assert(x >= 0 && y >= 0 && x < size.x && y < size.y);
+                return *(data + stride * y + x);
+            }
 
             bool has_range(const rangeT& range) const {
                 return range.begin.both_gteq({0, 0}) && range.end.both_lteq(size);
@@ -94,10 +99,13 @@ namespace aniso {
                 }
             }
 
+            // TODO: (wontfix?) there are several uses of `const std::invocable<...> auto& fn` in the project.
+            // In these cases, the concept applies to `T` instead of `const T`, so it is requiring non-const-invocable
+            // instead. (Also, should these `fn` really be passed as `const auto&`?)
             void for_all_data(const auto& fn) const {
                 static_assert(requires { fn(std::span{data, data + size.x * size.y}); });
                 if (size.x == stride) {
-                    fn(std::span{data, data + size.x * size.y});
+                    fn(std::span{data, data + size.xy()});
                 } else {
                     this->for_each_line(fn);
                 }
@@ -109,7 +117,7 @@ namespace aniso {
                 assert(size == b.size);
 
                 if (size.x == stride && b.size.x == b.stride) {
-                    fn(data, b.data, size.x * size.y);
+                    fn(data, b.data, size.xy());
                     return;
                 }
 
@@ -119,11 +127,26 @@ namespace aniso {
                     fn(this_data, that_data, size.x);
                 }
             }
-
-            // TODO: add operator==?
         };
     } // namespace _misc
 
     using tile_ref = _misc::tile_ref_<bool>;
     using tile_const_ref = _misc::tile_ref_<const bool>;
+
+    inline bool equal(const tile_const_ref a, const tile_const_ref b) {
+        if (a.size != b.size) {
+            return false;
+        }
+        if (a.size.x == a.stride && b.size.x == b.stride) {
+            return std::equal(a.data, a.data + a.size.xy(), b.data);
+        }
+
+        const bool *a_data = a.data, *b_data = b.data;
+        for (int y = 0; y < a.size.y; ++y, a_data += a.stride, b_data += b.stride) {
+            if (!std::equal(a_data, a_data + a.size.x, b_data)) {
+                return false;
+            }
+        }
+        return true;
+    }
 } // namespace aniso

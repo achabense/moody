@@ -354,10 +354,10 @@ namespace aniso {
             {
                 std::copy_n(w.line(w.size.y - 1), size.x, up_line());
                 std::copy_n(x.line(0), size.x, down_line());
-                set_lr(-1, q.at({q.size.x - 1, q.size.y - 1}), e.at({0, e.size.y - 1}));
-                set_lr(size.y, z.at({z.size.x - 1, 0}), c.at({0, 0}));
+                set_lr(-1, q.at(q.size.x - 1, q.size.y - 1), e.at(0, e.size.y - 1));
+                set_lr(size.y, z.at(z.size.x - 1, 0), c.at(0, 0));
                 for (int y = 0; y < size.y; ++y) {
-                    set_lr(y, a.at({a.size.x - 1, y}), d.at({0, y}));
+                    set_lr(y, a.at(a.size.x - 1, y), d.at(0, y));
                 }
             }
         };
@@ -408,7 +408,7 @@ namespace aniso {
             }
             p3_up = (p3_up >> 1) | (up_r << 2);
             p3_cn = (p3_cn >> 1) | (cn_r << 2);
-            vec_p6[size.x - 1] = p3_up | p3_cn << 3;
+            vec_p6[size.x - 1] = p3_up | (p3_cn << 3);
         }
 
         for (int y = 0; y < size.y; ++y) {
@@ -423,7 +423,7 @@ namespace aniso {
                 vec_p6[x] = code >> 3;
             }
             p3_dw = (p3_dw >> 1) | (dw_r << 2);
-            const int code = vec_p6[size.x - 1] | p3_dw << 6;
+            const int code = vec_p6[size.x - 1] | (p3_dw << 6);
             dest_[size.x - 1] = rule(codeT{code});
             vec_p6[size.x - 1] = code >> 3;
         }
@@ -436,6 +436,10 @@ namespace aniso {
         const border_ref border = _misc::temp_border_for(size);
         border.collect_from(source, source, source, source, source, source, source, source);
         apply_rule(rule, dest, source, border);
+    }
+
+    inline void apply_rule_torus(const rule_like auto& rule, const tile_ref tile) { //
+        apply_rule_torus(rule, tile, tile);
     }
 
     // (For `capture_open`.)
@@ -485,7 +489,6 @@ namespace aniso {
             const tile_ref compare{.size{.x = 10, .y = 12}, .stride = 10, .data = &data[1][0]};
             random_fill(tile, testT::rand, 0.5);
 
-            const border_ref border = _misc::temp_border_for({.x = 10, .y = 12});
             for (int i = 0; i < 12; ++i) {
                 rotate_copy(compare, tile, {1, 1});
                 apply_rule_torus(copy_q, tile, tile);
@@ -495,13 +498,12 @@ namespace aniso {
     }  // namespace _tests
 #endif // ENABLE_TESTS
 
-    struct tileT {
+    class tileT {
         vecT m_size;
         bool* m_data; // [x]*y
 
         bool empty() const {
-            assert(m_size.x >= 0);
-            assert_implies(m_size.x > 0, m_size.y > 0 && m_data);
+            assert((m_size.x == 0 && m_size.y == 0 && !m_data) || (m_size.x > 0 && m_size.y > 0 && m_data));
             return m_size.x == 0;
         }
 
@@ -519,26 +521,27 @@ namespace aniso {
         }
 
         explicit tileT(const vecT size) : m_size{size}, m_data{} {
-            assert(size.both_gteq({0, 0}));
+            assert((size.x == 0 && size.y == 0) || (size.x > 0 && size.y > 0));
             if (m_size.x > 0) {
-                assert(m_size.y > 0);
                 m_data = new bool[m_size.xy()]{};
             }
         }
 
         ~tileT() { delete[] m_data; }
 
-        explicit tileT(const tile_const_ref tile) : tileT(tile.size) {
-            assert(!empty());
+        explicit tileT(const tile_const_ref tile) : m_size{tile.size}, m_data{} {
+            assert(tile.size.x > 0 && tile.size.y > 0);
+            m_data = new bool[m_size.xy()];
             copy(data(), tile);
         }
 
-        tileT(const tileT& other) : m_size(other.m_size) {
+        tileT(const tileT& other) : m_size{other.m_size}, m_data{} {
             if (!other.empty()) {
                 m_data = new bool[m_size.xy()];
                 std::copy_n(other.m_data, m_size.xy(), m_data);
             }
         }
+        tileT& operator=(const tileT&) = delete; // -> `= tileT(other)`
 
         void resize(const vecT size) {
             if (m_size != size) {
@@ -558,7 +561,18 @@ namespace aniso {
         }
 
         void run_torus(const rule_like auto& rule) { //
-            apply_rule_torus(rule, data(), data());
+            apply_rule_torus(rule, data());
+        }
+
+        friend bool operator==(const tileT& a, const tileT& b) {
+            if (a.m_size != b.m_size) {
+                return false;
+            } else if (a.empty()) {
+                assert(b.empty());
+                return true;
+            } else {
+                return std::equal(a.m_data, a.m_data + a.m_size.xy(), b.m_data);
+            }
         }
     };
 
