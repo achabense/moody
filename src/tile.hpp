@@ -274,8 +274,20 @@ namespace aniso {
             { prepare((long long)(0), (long long)(0)) } -> std::same_as<std::optional<tile_ref>>;
         });
 
+        const auto drop_line = [](std::string_view& text) {
+            const auto find_nl = text.find('\n');
+            if (find_nl != text.npos) {
+                text.remove_prefix(find_nl + 1);
+            } else {
+                text = {};
+            }
+        };
+        // TODO: whether to allow empty lines in between?
+        while (text.starts_with('#')) {
+            drop_line(text);
+        }
         if (text.starts_with('x')) {
-            text.remove_prefix(std::min(text.size(), text.find('\n')));
+            drop_line(text);
         }
 
         struct takerT {

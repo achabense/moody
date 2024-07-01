@@ -24,6 +24,7 @@ static bool strobing(const aniso::ruleT& rule) {
     return rule[all_0] == 1 && rule[all_1] == 0;
 }
 
+// TODO: error-prone. Should work in a way similar to `identify`.
 // Copy the subrange and run as a torus space, recording all invoked mappings.
 // This is good at capturing "self-contained" patterns (oscillators/spaceships).
 static aniso::moldT::lockT capture_closed(const aniso::tile_const_ref tile, const aniso::ruleT& rule) {
@@ -53,6 +54,155 @@ static aniso::moldT::lockT capture_closed(const aniso::tile_const_ref tile, cons
 // In these cases we need a way to record what actually happened in the range.
 static void capture_open(const aniso::tile_const_ref tile, aniso::moldT::lockT& lock) { //
     aniso::fake_apply(tile, lock);
+}
+
+// Identify spaceships or oscillators in 2*2 periodic (including pure) background. (Cannot deal with non-trivial
+// objects like guns, puffers etc.)
+// The area should be fully surrounded by 2*2 periodic border, and contain a full phase of the object (one or
+// several oscillators, or a single spaceship).
+static void identify(const aniso::tile_const_ref tile, const aniso::ruleT& rule,
+                     const bool require_matching_background = true) {
+    static constexpr aniso::vecT period_size{2, 2};
+    struct periodT {
+        std::array<bool, period_size.x * period_size.y> m_data{};
+
+        bool operator==(const periodT&) const = default;
+
+        static aniso::vecT size() { return period_size; }
+        aniso::tile_ref data() { return {period_size, period_size.x, m_data.data()}; }
+        aniso::tile_const_ref data() const { return {period_size, period_size.x, m_data.data()}; }
+
+        bool is_periodic(const aniso::ruleT& rule) const {
+            periodT torus = *this;
+            for (int g = 0; g < (1 << (period_size.x * period_size.y)); ++g) {
+                aniso::apply_rule_torus(rule, torus.data());
+                if (torus == *this) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        bool rotate_equal(const periodT& b) const {
+            for (int dy = 0; dy < period_size.y; ++dy) {
+                for (int dx = 0; dx < period_size.x; ++dx) {
+                    periodT ro{};
+                    aniso::rotate_copy_00_to(ro.data(), data(), {.x = dx, .y = dy});
+                    if (ro == b) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+    };
+
+    static const auto take_corner = [](const aniso::tile_const_ref tile) {
+        assert(tile.size.both_gteq(period_size));
+        periodT p{};
+        aniso::copy(p.data(), tile.clip({{0, 0}, period_size}));
+        return p;
+    };
+    static const auto locate_pattern = [](const aniso::tile_const_ref tile,
+                                          const bool for_input = false) -> std::optional<aniso::rangeT> {
+        assert(tile.size.both_gt(period_size * 2));
+        const aniso::rangeT range = aniso::bounding_box(tile, take_corner(tile).data());
+        if (range.empty()) {
+            messenger::set_msg(for_input ? "The area contains nothing." : "The pattern dies out.");
+            return {};
+        } else if (!(range.begin.both_gteq(period_size) && range.end.both_lteq(tile.size - period_size))) {
+            if (for_input) {
+                // TODO: better message.
+                messenger::set_msg("The border is invalid.");
+            } else {
+                assert(false); // Guaranteed by `regionT::run`.
+            }
+            return {};
+        } else if (const auto size = range.size(); size.x > 3000 || size.y > 3000 || size.xy() > 400 * 400) {
+            // For example, this can happen when the initial area contains a still life and a spaceship.
+            messenger::set_msg(for_input ? "The area is too large." : "The pattern grows too large.");
+            return {};
+        }
+        return aniso::rangeT{.begin = range.begin - period_size, .end = range.end + period_size};
+    };
+    struct regionT {
+        aniso::tileT tile;
+        aniso::rangeT range; // Range of pattern (including the background border), relative to the tile.
+        aniso::vecT off;     // Pattern's begin pos, relative to the initial pattern.
+        bool run(const aniso::ruleT& rule) {
+            const aniso::tile_const_ref pattern = tile.data().clip(range);
+            const aniso::tile_const_ref background = pattern.clip({{0, 0}, period_size});
+            const aniso::vecT padding = {1, 1};
+            // (Ceiled for torus run. This can be avoided if `border_ref` is calculated manually, but that
+            // will be a lot of code.)
+            aniso::tileT next(aniso::divmul_ceil(range.size() + padding * 2, period_size));
+
+            periodT aligned{}; // Aligned to next.data().at(0, 0).
+            aniso::rotate_copy_00_to(aligned.data(), background, padding);
+            aniso::fill(next.data(), aligned.data()); // TODO: could be fill_outside (not implemented yet).
+            aniso::copy(next.data().clip({.begin = padding, .end = padding + pattern.size}), pattern);
+            next.run_torus(rule);
+
+            tile.swap(next);
+            if (const auto next_range = locate_pattern(tile.data())) {
+                off = off - padding + next_range->begin;
+                range = *next_range;
+                return true;
+            }
+            return false;
+        }
+    };
+
+    if (!tile.size.both_gt(period_size * 2)) {
+        // TODO: better message.
+        messenger::set_msg("The area is too small.");
+        return;
+    }
+
+    const periodT init_background = take_corner(tile);
+    const std::optional<aniso::rangeT> init_range = locate_pattern(tile, true);
+    if (!init_range) {
+        return;
+    } else if (!init_background.is_periodic(rule)) {
+        // TODO: better message.
+        messenger::set_msg("The background is not periodic.");
+        return;
+    }
+
+    const aniso::tile_const_ref init_pattern = tile.clip(*init_range);
+    regionT region{.tile = aniso::tileT(init_pattern), .range = {{0, 0}, init_pattern.size}, .off = {0, 0}};
+    aniso::tileT smallest = region.tile;
+
+    const int limit = 4000; // Max period to deal with.
+    for (int g = 1; g <= limit; ++g) {
+        if (!region.run(rule)) {
+            return;
+        }
+
+        const aniso::tile_const_ref pattern = region.tile.data().clip(region.range);
+        if ((!require_matching_background || init_background.rotate_equal(take_corner(pattern))) &&
+            pattern.size.xy() < smallest.size().xy()) {
+            smallest = aniso::tileT(pattern);
+        }
+        if (aniso::equal(init_pattern, pattern)) {
+            std::string str;
+            const bool is_oscillator = region.off == aniso::vecT{0, 0};
+            if (is_oscillator && g == 1) {
+                str = "#C Still life.\n";
+            } else if (is_oscillator) {
+                str = std::format("#C Oscillator. Period:{}.\n", g);
+            } else {
+                str = std::format("#C Spaceship. Period:{}. Offset(x,y):({},{}).\n", g, region.off.x, region.off.y);
+            }
+            assert(str.ends_with('\n'));
+            str += aniso::to_RLE_str(smallest.data(), &rule);
+            ImGui::SetClipboardText(str.c_str());
+            messenger::set_msg(std::move(str));
+            return;
+        }
+    }
+    // For example, this can happen the object really has a huge period, or the initial area doesn't
+    // contain a full phase (fragments that evolves to full objects are not recognized), or whatever else.
+    messenger::set_msg("Cannot identify.");
 }
 
 class percentT {
@@ -771,7 +921,8 @@ public:
                     _bounding_box,
                     _copy,
                     _cut,
-                    _paste
+                    _paste,
+                    _identify
                 };
 
                 static bool replace = true;     // Closed-capture.
@@ -869,6 +1020,7 @@ public:
                         term("Bound", "B", ImGuiKey_B, true, _bounding_box);
 
                         // Copy/Cut/Paste.
+                        // !!TODO: add tooltip...
                         ImGui::Separator();
                         set_tag(add_rule, "Rule info",
                                 "Whether to include rule info ('rule = ...') in the header when copying patterns.");
@@ -877,6 +1029,7 @@ public:
                         term("Copy", "C", ImGuiKey_C, true, _copy);
                         term("Cut", "X", ImGuiKey_X, true, _cut);
                         term("Paste", "V", ImGuiKey_V, false, _paste);
+                        term("Identify", "I (i)", ImGuiKey_I, true, _identify);
                     } else { // Shortcut only.
                         auto term2 = [&](ImGuiKey key, bool use_sel, operationE op2) {
                             const bool enabled = !use_sel || m_sel.has_value();
@@ -893,6 +1046,7 @@ public:
                         term2(ImGuiKey_C, true, _copy);
                         term2(ImGuiKey_X, true, _cut);
                         term2(ImGuiKey_V, false, _paste);
+                        term2(ImGuiKey_I, true, _identify);
                     }
                 };
 
@@ -981,6 +1135,8 @@ public:
                             }
                         });
                     }
+                } else if (op == _identify) {
+                    identify(m_torus.read_only(m_sel->to_range()), sync.current.rule);
                 }
             }
 
