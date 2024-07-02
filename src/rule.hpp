@@ -64,7 +64,13 @@ namespace aniso {
             friend bool operator==(const map_to&, const map_to&) = default;
         };
 
-        enum bposE : int { bpos_q = 0, bpos_w, bpos_e, bpos_a, bpos_s, bpos_d, bpos_z, bpos_x, bpos_c };
+        // clang-format off
+        enum bposE : int {
+            bpos_q = 8, bpos_w = 7, bpos_e = 6,
+            bpos_a = 5, bpos_s = 4, bpos_d = 3,
+            bpos_z = 2, bpos_x = 1, bpos_c = 0
+        };
+        // clang-format on
 
         bool get(bposE bpos) const { return (val >> bpos) & 1; }
     };
@@ -123,9 +129,10 @@ namespace aniso {
         friend bool operator==(const ruleT&, const ruleT&) = default;
     };
 
-    // The program uses normal "MAP strings" to store the rules (so the output can be accepted by other
-    // programs like Golly), which is based on `q*256+w*128+...` encoding scheme.
-    // See `to_MAP` and `from_MAP` below for details.
+    // The program stores `ruleT` as normal "MAP strings" (which is based on `q*256+w*128+...` encoding scheme),
+    // so the output can be accepted by other programs like Golly.
+    // See `to_MAP` and `from_MAP` below for details - the encoding scheme of `codeT` affects only internal
+    // representation of `ruleT` etc in this program, and is conceptually independent of input/output.
 
     template <class T>
     concept rule_like = std::is_invocable_r_v<bool, T, codeT>;
@@ -211,15 +218,22 @@ namespace aniso {
         }
 
         // https://golly.sourceforge.io/Help/Algorithms/QuickLife.html
-        // "MAP string" is based on `q * 256 + w * 128 + ...` encoding scheme, which differs from `codeT`'s.
-        inline int encode_MAP(const situT& situ) {
-            const auto [q, w, e, a, s, d, z, x, c] = situ;
-            return q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1;
+        // "MAP string" is based on `q * 256 + w * 128 + ...` encoding scheme, which may differ from `codeT`'s.
+        inline int transcode_MAP(const codeT code) {
+            using enum codeT::bposE;
+            if constexpr (bpos_q == 8 && bpos_w == 7 && bpos_e == 6 && //
+                          bpos_a == 5 && bpos_s == 4 && bpos_d == 3 && //
+                          bpos_z == 2 && bpos_x == 1 && bpos_c == 0) {
+                return code.val;
+            } else {
+                const auto [q, w, e, a, s, d, z, x, c] = decode(code);
+                return q * 256 + w * 128 + e * 64 + a * 32 + s * 16 + d * 8 + z * 4 + x * 2 + c * 1;
+            }
         }
 
         inline void to_MAP(std::string& str, const auto& source /* ruleT or lockT */) {
             bool MAP_data[512]{};
-            for_each_code([&](codeT code) { MAP_data[encode_MAP(decode(code))] = source[code]; });
+            for_each_code([&](codeT code) { MAP_data[transcode_MAP(code)] = source[code]; });
 
             const auto get = [&MAP_data](int i) { return i < 512 ? MAP_data[i] : 0; };
             for (int i = 0; i < 512; i += 6) {
@@ -248,7 +262,7 @@ namespace aniso {
                 put(i + 0, (b6 >> 5) & 1);
             }
 
-            for_each_code([&](codeT code) { dest[code] = MAP_data[encode_MAP(decode(code))]; });
+            for_each_code([&](codeT code) { dest[code] = MAP_data[transcode_MAP(code)]; });
         }
     } // namespace _misc
 

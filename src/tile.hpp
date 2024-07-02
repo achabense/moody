@@ -450,6 +450,7 @@ namespace aniso {
     using border_ref = _misc::border_ref_<false /* !is_const */>;
     using border_const_ref = _misc::border_ref_<true /* is_const */>;
 
+    // Relying on codeT::bpos_q = 8, bpos_w = 7, ... bpos_c = 0.
     // `dest` and `source` may either refer to the same area, or completely non-overlapping.
     inline void apply_rule(const rule_like auto& rule, const tile_ref dest, const tile_const_ref source,
                            const border_const_ref source_border) {
@@ -463,36 +464,37 @@ namespace aniso {
 
         char* const vec_p6 = _misc::helper_memory_for_apply.data();
         {
-            const bool *up = source_border.up_line(), *cn = source.line(0);
+            const bool *const up = source_border.up_line(), *cn = source.line(0);
             const auto [up_l, up_r] = source_border.get_lr(-1);
             const auto [cn_l, cn_r] = source_border.get_lr(0);
-            int p3_up = (up_l << 1) | (up[0] << 2);
-            int p3_cn = (cn_l << 1) | (cn[0] << 2);
+            int p3_up = (up_l << 1) | up[0];
+            int p3_cn = (cn_l << 1) | cn[0];
             for (int x = 0; x < size.x - 1; ++x) {
-                p3_up = (p3_up >> 1) | (up[x + 1] << 2); // up[x - 1] | (up[x] << 1) | (up[x + 1] << 2)
-                p3_cn = (p3_cn >> 1) | (cn[x + 1] << 2); // cn[x - 1] | (cn[x] << 1) | (cn[x + 1] << 2)
-                vec_p6[x] = p3_up | (p3_cn << 3);
+                // ~ "arbitrary-signed-int << bits" is made well-defined in C++20.
+                p3_up = (p3_up << 1) | up[x + 1]; // ... | (up[x - 1] << 2) | (up[x] << 1) | up[x + 1]
+                p3_cn = (p3_cn << 1) | cn[x + 1]; // ... | (cn[x - 1] << 2) | (cn[x] << 1) | cn[x + 1]
+                vec_p6[x] = (p3_up << 3) | (p3_cn & 0b111);
             }
-            p3_up = (p3_up >> 1) | (up_r << 2);
-            p3_cn = (p3_cn >> 1) | (cn_r << 2);
-            vec_p6[size.x - 1] = p3_up | (p3_cn << 3);
+            p3_up = (p3_up << 1) | up_r;
+            p3_cn = (p3_cn << 1) | cn_r;
+            vec_p6[size.x - 1] = (p3_up << 3) | (p3_cn & 0b111);
         }
 
         for (int y = 0; y < size.y; ++y) {
-            bool* dest_ = dest.line(y);
-            const bool* dw = y == size.y - 1 ? source_border.down_line() : source.line(y + 1);
+            bool* const dest_ = dest.line(y);
+            const bool* const dw = y == size.y - 1 ? source_border.down_line() : source.line(y + 1);
             const auto [dw_l, dw_r] = source_border.get_lr(y + 1);
-            int p3_dw = (dw_l << 1) | (dw[0] << 2);
+            int p3_dw = (dw_l << 1) | dw[0];
             for (int x = 0; x < size.x - 1; ++x) {
-                p3_dw = (p3_dw >> 1) | (dw[x + 1] << 2); // dw[x - 1] | (dw[x] << 1) | (dw[x + 1] << 2)
-                const int code = vec_p6[x] | (p3_dw << 6);
+                p3_dw = (p3_dw << 1) | dw[x + 1]; // ... | (dw[x - 1] << 2) | (dw[x] << 1) | dw[x + 1]
+                const int code = ((vec_p6[x] << 3) | (p3_dw & 0b111)) & 0b111'111'111;
                 dest_[x] = rule(codeT{code});
-                vec_p6[x] = code >> 3;
+                vec_p6[x] = code;
             }
-            p3_dw = (p3_dw >> 1) | (dw_r << 2);
-            const int code = vec_p6[size.x - 1] | (p3_dw << 6);
+            p3_dw = (p3_dw << 1) | dw_r;
+            const int code = ((vec_p6[size.x - 1] << 3) | (p3_dw & 0b111)) & 0b111'111'111;
             dest_[size.x - 1] = rule(codeT{code});
-            vec_p6[size.x - 1] = code >> 3;
+            vec_p6[size.x - 1] = code;
         }
     }
 
