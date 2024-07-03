@@ -133,8 +133,9 @@ static void identify(const aniso::tile_const_ref tile, const aniso::ruleT& rule,
 
             periodT aligned{}; // Aligned to next.data().at(0, 0).
             aniso::rotate_copy_00_to(aligned.data(), background, padding);
-            aniso::fill(next.data(), aligned.data()); // TODO: could be fill_outside (not implemented yet).
-            aniso::copy(next.data().clip({.begin = padding, .end = padding + pattern.size}), pattern);
+            const aniso::rangeT relocate{.begin = padding, .end = padding + pattern.size};
+            aniso::fill_outside(next.data(), relocate, aligned.data());
+            aniso::copy(next.data().clip(relocate), pattern);
             next.run_torus(rule);
 
             tile.swap(next);
