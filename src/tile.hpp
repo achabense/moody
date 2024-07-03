@@ -218,8 +218,8 @@ namespace aniso {
     namespace _tests {
         // TODO: many tests in this header can be simplified if using `tileT`.
         inline const testT test_periodic_functions = [] {
-            const vecT padding_a{.x = testT::rand() % 5, .y = testT::rand() % 5};
-            const vecT padding_b{.x = testT::rand() % 5, .y = testT::rand() % 5};
+            const vecT padding_a{.x = int(testT::rand() % 5), .y = int(testT::rand() % 5)};
+            const vecT padding_b{.x = int(testT::rand() % 5), .y = int(testT::rand() % 5)};
             const vecT inner_size{10, 10};
             const vecT size = padding_a + inner_size + padding_b;
             std::unique_ptr<bool> data(new bool[size.xy()]);
