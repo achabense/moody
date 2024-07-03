@@ -511,7 +511,6 @@ namespace aniso {
         apply_rule_torus(rule, tile, tile);
     }
 
-    // (For `capture_open`.)
     inline void fake_apply(const tile_const_ref tile, moldT::lockT& lock) {
         if (tile.size.x <= 2 || tile.size.y <= 2) {
             return;

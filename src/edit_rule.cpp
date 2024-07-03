@@ -745,11 +745,11 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
         });
         ImGui::SameLine();
         imgui_StrTooltip("(?)",
-                         "Iterate through the whole working set, by firstly iterating through all rules that have "
+                         "Iterate through the whole working set, by firstly iterating through all rules with "
                          "distance = 1 to the masking rule, then 2, 3, ..., until max distance.\n\n"
                          "For example, suppose the current rule belongs to the working set. To iterate through all "
-                         "rules that have distance = 1 to the current rule, you can:\n"
-                         "1. '<< Cur' to set the current rule as the custom mask.\n"
+                         "rules with distance = 1 to the current rule, you can:\n"
+                         "1. '<< Cur' to set it as the custom mask.\n"
                          "2. 'Next' to iterate. The left/right arrow key will be bound to 'Prev/Next' after you "
                          "click the button.");
 

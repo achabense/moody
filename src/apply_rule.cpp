@@ -26,7 +26,9 @@ static bool strobing(const aniso::ruleT& rule) {
 
 // TODO: error-prone. Should work in a way similar to `identify`.
 // Copy the subrange and run as a torus space, recording all invoked mappings.
-// This is good at capturing "self-contained" patterns (oscillators/spaceships).
+// This is only good at capturing simple, "self-contained" patterns (oscillators/spaceships).
+// For more complex situations, the program has "open-capture" (`fake_apply`) to record
+// areas frame-by-frame.
 static aniso::moldT::lockT capture_closed(const aniso::tile_const_ref tile, const aniso::ruleT& rule) {
     aniso::moldT::lockT lock{};
     aniso::tileT torus(tile);
@@ -47,13 +49,6 @@ static aniso::moldT::lockT capture_closed(const aniso::tile_const_ref tile, cons
     }
 
     return lock;
-}
-
-// `capture_closed` is not suitable for capturing patterns that are not self-contained (what happens in the
-// copied subrange (treated as torus space) is not exactly what we see in the source space)
-// In these cases we need a way to record what actually happened in the range.
-static void capture_open(const aniso::tile_const_ref tile, aniso::moldT::lockT& lock) { //
-    aniso::fake_apply(tile, lock);
 }
 
 // Identify spaceships or oscillators in 2*2 periodic (including pure) background. (Cannot deal with non-trivial
@@ -669,7 +664,7 @@ public:
         ImGui::SameLine();
         if (ImGui::Button("Center")) {
             locate_center = true;
-            // find_suitable_zoom = true;
+            find_suitable_zoom = true;
         }
 
         ImGui::SameLine();
@@ -681,8 +676,6 @@ public:
         const bool show_range_window_in_tooltip = ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip);
 
         ImGui::SameLine(0, 0);
-        // ImGui::Text("  Generation:%d, density:%.4f", m_torus.gen(),
-        //             double(aniso::count(m_torus.read_only())) / m_torus.area());
         ImGui::Text("  Generation:%d", m_torus.gen());
 
         ImGui::SameLine(0, 0);
@@ -1080,7 +1073,7 @@ public:
                     sync.set_lock(lock);
                 } else if (op == _capture_open && m_sel) {
                     auto lock = sync.current.lock;
-                    capture_open(m_torus.read_only(m_sel->to_range()), lock);
+                    aniso::fake_apply(m_torus.read_only(m_sel->to_range()), lock);
                     sync.set_lock(lock);
                 } else if (op == _random_fill && m_sel) {
                     aniso::random_fill(m_torus.write_only(m_sel->to_range()), global_mt19937(), fill_den.get());
@@ -1172,8 +1165,8 @@ void previewer::configT::_set() {
     ImGui::Separator();
 
     ImGui::SetNextItemWidth(item_width);
-    imgui_StepSliderInt("Step", &step, 1, 10);
-    imgui_Str("Interval ~ 0ms");
+    imgui_StepSliderInt("Step", &step, 1, 16);
+    imgui_Str("Interval ~ 0ms, zoom ~ 1");
 }
 
 // TODO: support ctrl + drag to rotate?
