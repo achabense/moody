@@ -8,7 +8,7 @@ set(FETCHCONTENT_UPDATES_DISCONNECTED TRUE)
 FetchContent_Declare(
     SDL2
     GIT_REPOSITORY "https://github.com/libsdl-org/SDL.git"
-    GIT_TAG        fb1497566c5a05e2babdcf45ef0ab5c7cca2c4ae #release-2.30.3
+    GIT_TAG        92fe3b19c868ad062c323dde2cfc9d8b4bfdd785 #release-2.30.4
     GIT_PROGRESS   TRUE
     GIT_SHALLOW    TRUE
 )
