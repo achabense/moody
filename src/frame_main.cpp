@@ -1,4 +1,47 @@
+#include <thread>
+
 #include "common.hpp"
+
+class timerT {
+    // (Typically the framerate is limited by VSync in this case, like 60 fps.)
+    static constexpr int max_fps = 100;
+    int fps = max_fps;
+
+    using clockT = std::chrono::steady_clock;
+    clockT::time_point last{};
+
+public:
+    void wait() {
+        using namespace std::chrono_literals;
+        const auto now = clockT::now();
+        const auto until = last + 1000ms / fps;
+        if (now < until) {
+            std::this_thread::sleep_until(until);
+            last = until; // Instead of another `clockT::now()` call.
+        } else {
+            last = now;
+        }
+    }
+
+    void set_fps() {
+        auto radio = [&](int set, const char* label, bool do_sameline = true) {
+            if (do_sameline) {
+                ImGui::SameLine();
+            }
+            if (ImGui::RadioButton(label, fps == set)) {
+                fps = set;
+            }
+        };
+        radio(max_fps, "Auto", false);
+        ImGui::SameLine();
+        imgui_StrTooltip("(?)", "Typically limited by VSync.");
+        radio(50, "50 fps");
+        radio(40, "40 fps");
+#ifndef NDEBUG
+        radio(15, "15 fps");
+#endif // !NDEBUG
+    }
+};
 
 // TODO: improve recorder logic if possible...
 // Never empty.
@@ -56,6 +99,9 @@ private:
 };
 
 void frame_main() {
+    static timerT timer;
+    timer.wait();
+
     messenger::display();
 
     // TODO: the constraint model (constraint = {recorder.current(), lock}) is very fragile now.
@@ -98,9 +144,16 @@ void frame_main() {
         ImGui::SameLine();
         load_rule(show_doc, "Documents", load_doc);
         quick_info("< Concepts, example rules, etc.");
-        ImGui::SameLine();
-        ImGui::Text("  (%d FPS)  ", (int)round(ImGui::GetIO().Framerate));
-        ImGui::SameLine();
+        const int wide_spacing = ImGui::CalcTextSize(" ").x * 3;
+        ImGui::SameLine(0, wide_spacing);
+        ImGui::Text("(%d FPS)", (int)round(ImGui::GetIO().Framerate));
+        // !!TODO: unify hint styles for right-click operations.
+        imgui_ItemTooltip("Right-click to set frame rate.");
+        if (begin_popup_for_item(ImGui::IsItemClicked(ImGuiMouseButton_Right), "0")) {
+            timer.set_fps();
+            ImGui::EndPopup();
+        }
+        ImGui::SameLine(0, wide_spacing);
         ImGui::Checkbox("Lock & capture", &sync.enable_lock_next);
 #ifndef NDEBUG
         ImGui::SameLine();
@@ -142,7 +195,7 @@ void frame_main() {
         ImGui::SameLine();
         ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1 /* [1, size()] */);
         quick_info("^ Right-click to clear.");
-        if (begin_popup_for_item(ImGui::IsItemClicked(ImGuiMouseButton_Right), "")) {
+        if (begin_popup_for_item(ImGui::IsItemClicked(ImGuiMouseButton_Right), "1")) {
             if (ImGui::Selectable("Clear")) {
                 freeze = true, recorder.clear();
             }
