@@ -1049,7 +1049,7 @@ void static_constraints(sync_point& out) {
         imgui_Str("(You can right-click this '(...)' to get an example.)");
         ImGui::Separator();
         imgui_Str("Operations:\n"
-                  "Left-click the cell to set the value.\n"
+                  "Left-click a cell to set the value.\n"
                   "Right-click to set back to any-background.\n"
                   "Scroll in the board to change the value for left-click.\n");
         term(O, ": Supposed to remain 0.");
@@ -1135,7 +1135,7 @@ void static_constraints(sync_point& out) {
             imgui_ItemRectFilled(!editable ? IM_COL32(80, 80, 80, 255) : cols[state]);
             imgui_ItemRect(IM_COL32(200, 200, 200, 255));
 
-            if (editable && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)) {
+            if (editable && ImGui::IsItemHovered()) {
                 if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
                     state = state_rbutton;
                 } else if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {

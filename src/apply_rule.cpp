@@ -214,25 +214,30 @@ public:
     friend bool operator==(const percentT&, const percentT&) = default;
 };
 
-// TODO: support setting patterns as init state?
 struct initT {
     int seed;
     percentT density;
     percentT area; // TODO: support more strategies (separate x/y, and fixed size)?
 
+    // TODO: avoid dynamic allocation?
+    aniso::tileT background; // Periodic background.
+
     friend bool operator==(const initT&, const initT&) = default;
 
     void initialize(aniso::tileT& tile) const {
+        assert(!tile.empty() && !background.empty());
         const aniso::vecT tile_size = tile.size();
         const auto range = clamp_window(tile_size, tile_size / 2, from_imvec_floor(to_imvec(tile_size) * area.get()));
 
         if (!range.empty()) {
-            // TODO: support more backgrounds (white, or other periodic backgrounds)?
-            aniso::fill_outside(tile.data(), range, 0);
+            // It does not matter much how the area is aligned with the background, as
+            // it's randomized.
+            aniso::fill(tile.data(), background.data());
             std::mt19937 rand{(uint32_t)seed};
-            aniso::random_fill(tile.data().clip(range), rand, density.get());
+            aniso::random_flip(tile.data().clip(range), rand, density.get());
+            // TODO: support random_fill mode (fill_outside + random_fill) as well?
         } else {
-            aniso::fill(tile.data(), 0);
+            aniso::fill(tile.data(), background.data());
         }
     }
 };
@@ -276,8 +281,6 @@ public:
 class runnerT {
     static constexpr aniso::vecT size_min{.x = 20, .y = 15};
     static constexpr aniso::vecT size_max{.x = 1600, .y = 1200};
-    static aniso::vecT size_clamped(const aniso::vecT size) { return aniso::clamp(size, size_min, size_max); }
-
     static constexpr ImVec2 min_canvas_size{size_min.x * zoomT::max(), size_min.y* zoomT::max()};
 
     struct ctrlT {
@@ -319,7 +322,7 @@ class runnerT {
     };
 
     class torusT {
-        initT m_init{.seed = 0, .density = 0.5, .area = 0.5};
+        initT m_init{.seed = 0, .density = 0.5, .area = 0.5, .background = aniso::tileT{{.x = 1, .y = 1}}};
         aniso::tileT m_torus{{.x = 600, .y = 400}};
         ctrlT m_ctrl{.rule{}, .step = 1, .anti_strobing = true, .gap = 0, .pause = false};
         int m_gen = 0;
@@ -331,7 +334,10 @@ class runnerT {
         }
 
     public:
-        torusT() { restart(); }
+        torusT() {
+            assert(m_torus.size() == calc_size(m_torus.size()));
+            restart();
+        }
 
         void begin_frame(const aniso::ruleT& rule) {
             extra_pause = false;
@@ -378,23 +384,39 @@ class runnerT {
             }
         }
 
-        int area() const { return m_torus.size().xy(); }
+        // int area() const { return m_torus.size().xy(); }
         int gen() const { return m_gen; }
         aniso::vecT size() const {
-            assert(m_torus.size().both_gteq(size_min) && m_torus.size().both_lteq(size_max));
+            assert(m_torus.size() == calc_size(m_torus.size()));
             return m_torus.size();
         }
 
-        void resize(const aniso::vecT size) {
-            m_torus.resize(size_clamped(size));
-            restart();
+        aniso::vecT calc_size(const aniso::vecT size) const {
+            const aniso::vecT n_size =
+                aniso::divmul_floor(aniso::clamp(size, size_min, size_max), m_init.background.size());
+            if (!n_size.both_gteq(size_min)) [[unlikely]] {
+                return aniso::divmul_ceil(size_min, m_init.background.size());
+            }
+            return n_size;
+        }
+
+        bool resize(const aniso::vecT size) {
+            const aniso::vecT n_size = calc_size(size);
+            if (m_torus.size() != n_size) {
+                m_torus.resize(n_size);
+                restart();
+                return true;
+            }
+            return false;
         }
         void set_ctrl(const auto& fn) { fn(m_ctrl); }
         void set_init(const auto& fn) {
-            initT init = m_init;
-            if (fn(init) || init != m_init) {
-                m_init = init;
-                restart();
+            const initT old_init = m_init;
+            if (fn(m_init) || old_init != m_init) {
+                const bool restarted = resize(m_torus.size()); // In case the background is resized.
+                if (!restarted) {
+                    restart();
+                }
             }
         }
 
@@ -472,6 +494,8 @@ public:
         };
 
         auto set_init_state = [&] {
+            // TODO: redesign this part. This has became clumsy due to the introduction of periodic background.
+            // !!TODO: recheck restarting/blocking logic...
             m_torus.set_init([&](initT& init) {
                 ImGui::BeginGroup();
                 ImGui::PushItemWidth(item_width);
@@ -483,7 +507,88 @@ public:
                 if (ImGui::IsItemActive()) {
                     m_torus.pause_for_this_frame();
                 }
-                return ImGui::IsItemActivated();
+                bool force_restart = ImGui::IsItemActivated();
+
+                ImGui::Separator();
+
+                ImGui::AlignTextToFramePadding();
+                imgui_StrTooltip("(...)", "Left-click a cell to set it to 1.\n"
+                                          "Right-click a cell to set it to 0.\n"
+                                          "Ctrl + left-click to resize.");
+                ImGui::SameLine();
+                imgui_Str("Background ~");
+                ImGui::SameLine();
+                if (ImGui::Button("Clear##Bg")) {
+                    aniso::fill(init.background.data(), 0);
+                }
+
+                std::optional<aniso::vecT> resize{};
+                const aniso::tile_ref data = init.background.data();
+                ImGui::BeginGroup();
+                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {0, 0});
+                for (int y = 0; y < 4 /*max-height*/; ++y) {
+                    for (int x = 0; x < 4 /*max-width*/; ++x) {
+                        if (x != 0) {
+                            ImGui::SameLine();
+                        }
+                        const bool in_range = x < data.size.x && y < data.size.y;
+
+                        // (No need for unique ID here.)
+                        ImGui::InvisibleButton(
+                            "##Invisible", square_size(),
+                            ImGuiButtonFlags_MouseButtonLeft |
+                                ImGuiButtonFlags_MouseButtonRight); // So right-click can activate the button.
+                        imgui_ItemRectFilled(in_range ? (data.at(x, y) ? IM_COL32_WHITE : IM_COL32_BLACK)
+                                                      : IM_COL32(40, 40, 40, 255));
+                        imgui_ItemRect(IM_COL32(100, 100, 100, 255));
+                        // TODO: unify colors with `static_constraints`.
+
+                        if (ImGui::IsItemHovered()) {
+                            if (ImGui::GetIO().KeyCtrl) {
+                                if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                                    resize = {.x = x + 1, .y = y + 1};
+                                }
+                            } else if (in_range) {
+                                if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+                                    data.at(x, y) = 0;
+                                } else if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                                    data.at(x, y) = 1;
+                                }
+                            }
+                        }
+                    }
+                }
+                ImGui::PopStyleVar();
+                ImGui::EndGroup();
+                if (ImGui::IsItemActive()) {
+                    m_torus.pause_for_this_frame();
+                }
+                if (ImGui::IsItemActivated()) {
+                    force_restart = true;
+                }
+
+                ImGui::SameLine(0, 0);
+                imgui_Str(" ~ ");
+                ImGui::SameLine(0, 0);
+                aniso::tileT result({.x = data.size.x * 5, .y = data.size.y * 5});
+                aniso::fill(result.data(), data);
+                ImGui::Image(make_screen(result.data(), scaleE::Nearest), to_imvec(result.size() * 3), ImVec2(0, 0),
+                             ImVec2(1, 1), ImVec4(1, 1, 1, 1),
+                             ImGui::ColorConvertU32ToFloat4(IM_COL32(100, 100, 100, 255)));
+                // The background does not make much sense if it is not stable for the current rule, but
+                // I have no idea how it should behave.
+
+                if (resize) {
+                    init.background.resize(*resize);
+                    aniso::fill(init.background.data(), 0);
+                    // The space may not be resized; reset anyway.
+                    m_sel.reset();
+                    m_paste.reset();
+                    // !!TODO: recheck resetting logic. `m_sel` and `m_paste` may need to reset
+                    // in more situations.
+                }
+
+                return force_restart;
             });
         };
 
@@ -523,9 +628,10 @@ public:
                     locate_center = true;
                     find_suitable_zoom = true;
 
-                    m_torus.resize(size_clamped(size));
-                    m_sel.reset();
-                    m_paste.reset();
+                    if (m_torus.resize(size)) {
+                        m_sel.reset();
+                        m_paste.reset();
+                    }
                 }
                 input_w[0] = '\0';
                 input_h[0] = '\0';
@@ -721,10 +827,8 @@ public:
             if (auto_fit) {
                 locate_center = true;
                 if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-                    const aniso::vecT size =
-                        size_clamped(from_imvec_floor((canvas_size - ImVec2(20, 20)) / m_coord.zoom));
-                    if (size != m_torus.size()) {
-                        m_torus.resize(size);
+                    const aniso::vecT size = from_imvec_floor((canvas_size - ImVec2(20, 20)) / m_coord.zoom);
+                    if (m_torus.resize(size)) {
                         m_sel.reset();
                         m_paste.reset();
                     }
@@ -739,7 +843,7 @@ public:
                 // Select the largest zoom that can hold the entire tile.
                 m_coord.zoom.slide(-100); // -> smallest.
                 m_coord.zoom.select([&](bool, float z, const char*) {
-                    const aniso::vecT size = size_clamped(from_imvec_floor((canvas_size - ImVec2(20, 20)) / z));
+                    const aniso::vecT size = m_torus.calc_size(from_imvec_floor((canvas_size - ImVec2(20, 20)) / z));
                     return size.both_gteq(tile_size);
                 });
             }
@@ -1077,6 +1181,7 @@ public:
                     aniso::fake_apply(m_torus.read_only(m_sel->to_range()), lock);
                     sync.set_lock(lock);
                 } else if (op == _random_fill && m_sel) {
+                    // TODO: or `random_flip`?
                     aniso::random_fill(m_torus.write_only(m_sel->to_range()), global_mt19937(), fill_den.get());
                 } else if (op == _clear_inside && m_sel) {
                     aniso::fill(m_torus.write_only(m_sel->to_range()), background);
@@ -1150,6 +1255,8 @@ void apply_rule(sync_point& sync) {
     return runner.display(sync);
 }
 
+// TODO: support zoom = 0.5, 1, 2?
+// TODO: apply initT?
 void previewer::configT::_set() {
     ImGui::AlignTextToFramePadding();
     imgui_Str("Size ~");
@@ -1162,6 +1269,7 @@ void previewer::configT::_set() {
     ImGui::SetNextItemWidth(item_width);
     imgui_StepSliderInt("Seed", &seed, 0, 9);
     imgui_Str("Density ~ 0.5, area ~ 1.0");
+    // TODO: what about background?
 
     ImGui::Separator();
 

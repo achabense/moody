@@ -63,6 +63,18 @@ namespace aniso {
     // (`repeat.at(0, 0)` is bound to `source.at(0, 0)`.)
     inline void copy_diff(const tile_ref dest, const tile_const_ref source,
                           const tile_const_ref repeat /*background*/) {
+        if (repeat.size == vecT{1, 1}) {
+            // Different from `blit` here.
+            dest.for_all_data_vs(source, [background = *repeat.data](bool* d, const bool* s, int len) {
+                for (int i = 0; i < len; ++i) {
+                    if (s[i] != background) {
+                        d[i] = s[i];
+                    }
+                }
+            });
+            return;
+        }
+
         assert(dest.size == source.size);
         _misc::wrapped_int dy(0, repeat.size.y);
         dest.for_each_line([&](const int y, std::span<bool> line) {
@@ -126,6 +138,11 @@ namespace aniso {
     // (`tile` and `repeat` should not overlap.)
     // (`repeat.at(0, 0)` is bound to `tile.at(0, 0)`.)
     inline void fill(const tile_ref tile, const tile_const_ref repeat) {
+        if (repeat.size == vecT{1, 1}) {
+            fill(tile, *repeat.data);
+            return;
+        }
+
         _misc::wrapped_int dy(0, repeat.size.y);
         tile.for_each_line([&](const int y, std::span<bool> line) {
             const bool* const rep = repeat.line(dy++);
@@ -149,6 +166,11 @@ namespace aniso {
 
     // (`repeat.at(0, 0)` is bound to `tile.at(0, 0)` instead of `range.begin`.)
     inline void fill_outside(const tile_ref tile, const rangeT& range, const tile_const_ref repeat) {
+        if (repeat.size == vecT{1, 1}) {
+            fill_outside(tile, range, *repeat.data);
+            return;
+        }
+
         assert(tile.has_range(range));
         const auto fill = [](std::span<bool> line, const bool* rep, _misc::wrapped_int dx) {
             for (bool& b : line) {
@@ -191,6 +213,10 @@ namespace aniso {
 
     // (`repeat.at(0, 0)` is bound to `tile.at(0, 0)`.)
     inline rangeT bounding_box(const tile_const_ref tile, const tile_const_ref repeat /*background*/) {
+        if (repeat.size == vecT{1, 1}) {
+            return bounding_box(tile, *repeat.data);
+        }
+
         int min_x = INT_MAX, max_x = INT_MIN;
         int min_y = INT_MAX, max_y = INT_MIN;
         _misc::wrapped_int dy(0, repeat.size.y);
@@ -635,19 +661,19 @@ namespace aniso {
         vecT m_size;
         bool* m_data; // [x]*y
 
+    public:
         bool empty() const {
             assert((m_size.x == 0 && m_size.y == 0 && !m_data) || (m_size.x > 0 && m_size.y > 0 && m_data));
             return m_size.x == 0;
         }
 
-    public:
-        tileT() noexcept : m_size{}, m_data{} {}
+        tileT() : m_size{}, m_data{} {}
 
         void swap(tileT& other) noexcept {
             std::swap(m_size, other.m_size);
             std::swap(m_data, other.m_data);
         }
-        tileT(tileT&& other) noexcept : tileT() { swap(other); }
+        tileT(tileT&& other) noexcept : m_size{}, m_data{} { swap(other); }
         tileT& operator=(tileT&& other) noexcept {
             swap(other);
             return *this;
