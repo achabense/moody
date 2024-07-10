@@ -434,3 +434,12 @@ public:
         }
     }
 };
+
+inline void set_clipboard_and_notify(const char* c_str) {
+    ImGui::SetClipboardText(c_str);
+    messenger::set_msg("Copied.");
+}
+
+inline void set_clipboard_and_notify(const std::string& str) { //
+    set_clipboard_and_notify(str.c_str());
+}

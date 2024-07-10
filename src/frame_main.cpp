@@ -147,9 +147,8 @@ void frame_main() {
         const int wide_spacing = ImGui::CalcTextSize(" ").x * 3;
         ImGui::SameLine(0, wide_spacing);
         ImGui::Text("(%d FPS)", (int)round(ImGui::GetIO().Framerate));
-        // !!TODO: unify hint styles for right-click operations.
         imgui_ItemTooltip("Right-click to set frame rate.");
-        if (begin_popup_for_item(ImGui::IsItemClicked(ImGuiMouseButton_Right), "0")) {
+        if (begin_popup_for_item(imgui_ItemClickable(), "0")) {
             timer.set_fps();
             ImGui::EndPopup();
         }
@@ -182,8 +181,7 @@ void frame_main() {
                      "To save the current rule, right-click the MAP-string, and it will be copied to the clipboard.");
 
         ImGui::SameLine();
-        const ImGuiID id_prev =
-            ImGui::GetID("Prev"); // For `sequence::bind_to` (when the rule is gotten by randomization.)
+        const ImGuiID id_prev = ImGui::GetID("Prev"); // For `sequence::bind_to`.
         ImGui::BeginGroup();
         sequence::seq(
             "<|", "Prev", "Next", "|>", //
@@ -194,9 +192,9 @@ void frame_main() {
 
         ImGui::SameLine();
         ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1 /* [1, size()] */);
-        quick_info("^ Right-click to clear.");
-        if (begin_popup_for_item(ImGui::IsItemClicked(ImGuiMouseButton_Right), "1")) {
-            if (ImGui::Selectable("Clear")) {
+        imgui_ItemTooltip("Right-click to clear.");
+        if (begin_popup_for_item(imgui_ItemClickable(), "1")) {
+            if (ImGui::Selectable("Clear (except the current rule)")) {
                 freeze = true, recorder.clear();
             }
             ImGui::EndPopup();
@@ -227,11 +225,10 @@ void frame_main() {
 
             static bool hover_lock = false;
             if (sync.enable_lock && hover_lock) {
-                imgui_StrCopyable(aniso::to_MAP_str(sync.current), imgui_Str);
+                imgui_StrCopyable(aniso::to_MAP_str(sync.current), imgui_Str, set_clipboard_and_notify);
                 hover_lock = ImGui::IsItemHovered();
             } else {
-                imgui_StrCopyable(aniso::to_MAP_str(sync.current.rule), imgui_Str);
-                quick_info("< Right-click to copy to the clipboard.");
+                imgui_StrCopyable(aniso::to_MAP_str(sync.current.rule), imgui_Str, set_clipboard_and_notify);
                 if (sync.enable_lock) {
                     ImGui::SameLine(0, ImGui::CalcTextSize(" ").x - 1 /* For correct alignment */);
                     std::string lock_str = "[";

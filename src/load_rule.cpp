@@ -100,7 +100,7 @@ static void display_path(const pathT& p, float avail_w) {
         imgui_ItemTooltip([&] { imgui_Str(cpp17_u8string(p)); });
     }
     if (imgui_ItemClickable()) {
-        ImGui::SetClipboardText(cpp17_u8string(p).c_str());
+        set_clipboard_and_notify(cpp17_u8string(p));
     }
 }
 
@@ -108,7 +108,7 @@ static void display_filename(const pathT& p) {
     imgui_Str(std::string("...") + char(pathT::preferred_separator) + cpp17_u8string(p.filename()));
     imgui_ItemTooltip([&] { imgui_Str(cpp17_u8string(p)); });
     if (imgui_ItemClickable()) {
-        ImGui::SetClipboardText(cpp17_u8string(p).c_str());
+        set_clipboard_and_notify(cpp17_u8string(p));
     }
 }
 
@@ -416,6 +416,7 @@ public:
                 str += m_lines[i].text;
             }
             ImGui::SetClipboardText(str.c_str());
+            // set_clipboard_and_notify(str);
             m_sel.reset();
         }
 
@@ -705,7 +706,7 @@ void load_doc(sync_point& out) {
         imgui_Str("A toy for exploring MAP rules, by GitHub user 'achabense'.");
         imgui_Str("The latest version is available at: ");
         ImGui::SameLine(0, 0);
-        imgui_StrCopyable("https://github.com/achabense/moody", imgui_Str);
+        imgui_StrCopyable("https://github.com/achabense/moody", imgui_Str, set_clipboard_and_notify);
 
         ImGui::Separator();
         select();

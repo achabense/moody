@@ -491,9 +491,9 @@ public:
         } else {
             ImGui::Text("Total:%d At:N/A", (int)pages.size());
         }
-        quick_info("^ Right-click to clear.");
+        imgui_ItemTooltip("Right-click to clear.");
         // (Using the same style as in `frame_main`.)
-        if (begin_popup_for_item(ImGui::IsItemClicked(ImGuiMouseButton_Right), "")) {
+        if (begin_popup_for_item(imgui_ItemClickable(), "")) {
             if (ImGui::Selectable("Clear (including this page)") && !pages.empty()) {
                 pages = std::vector<pageT>{};
                 page_no = 0;

@@ -6,8 +6,8 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 
-// Follows `IM_COL32_XX`; this can be constexpr, but that cannot guarantee `fn(100, 255)`
-// be calculated at run time, especially in debug mode.
+// Follows `IM_COL32_XX`; note that `constexpr` cannot guarantee `fn(100, 255)` be
+// calculated at compile time, especially in debug mode.
 consteval ImU32 IM_COL32_GREY(ImU8 v, ImU8 alpha) { return IM_COL32(v, v, v, alpha); }
 
 inline void imgui_ItemRect(ImU32 col, ImVec2 off_min = {0, 0}) {
@@ -45,13 +45,15 @@ inline void imgui_ItemTooltip(std::string_view desc) {
 }
 
 inline bool imgui_ItemClickable(ImGuiMouseButton_ mouse_button = ImGuiMouseButton_Right) {
-    if (ImGui::IsItemClicked(mouse_button)) {
-        imgui_ItemRect(IM_COL32_WHITE);
-        return true;
-    } else if (ImGui::IsItemHovered()) {
-        imgui_ItemRect(IM_COL32_GREY(128, 255));
+    if (!ImGui::IsItemHovered()) {
+        return false;
     }
-    return false;
+    const bool clicked = ImGui::IsMouseClicked(mouse_button);
+    const ImU32 col = clicked ? IM_COL32_WHITE : IM_COL32_GREY(128, 255);
+    const ImVec2 pos_min = ImGui::GetItemRectMin();
+    const ImVec2 pos_max = ImGui::GetItemRectMax();
+    ImGui::GetWindowDrawList()->AddLine({pos_min.x, pos_max.y - 1}, {pos_max.x, pos_max.y - 1}, col);
+    return clicked;
 }
 
 // Unlike ImGui::Text(Wrapped/...), these functions take unformatted string as the argument.
@@ -75,12 +77,14 @@ inline void imgui_StrDisabled(std::string_view str) {
     imgui_StrColored(ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled), str);
 }
 
+// TODO: the name is outdated now...
 // Using std::string as `SetClipboardText` requires C-style string.
 inline void imgui_StrCopyable(const std::string& str, void (*str_func)(std::string_view),
+                              void (*copy_func)(const std::string&),
                               ImGuiMouseButton_ mouse_button = ImGuiMouseButton_Right) {
     str_func(str);
     if (imgui_ItemClickable(mouse_button)) {
-        ImGui::SetClipboardText(str.c_str());
+        copy_func(str);
     }
 }
 
