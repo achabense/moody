@@ -485,7 +485,7 @@ private:
         if (rewind) {
             ImGui::SetNextWindowScroll({0, 0});
         }
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(24, 24, 24, 255));
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32_GREY(24, 255));
         if (auto child = imgui_ChildWindow("Content")) {
             set_scroll_by_up_down(ImGui::GetTextLineHeight() * 2); // TODO: document the behavior.
 
@@ -509,7 +509,7 @@ private:
                     }
                 }
                 if (m_sel && m_sel->contains(this_l)) {
-                    imgui_ItemRectFilled(IM_COL32(255, 255, 255, 90));
+                    imgui_ItemRectFilled(IM_COL32_GREY(255, 90));
                 }
 
                 if (id.has_value()) {

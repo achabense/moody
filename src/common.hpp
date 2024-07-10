@@ -106,7 +106,7 @@ inline void quick_info(std::string_view msg) {
         const ImVec2 msg_max = msg_min + msg_size;
         // TODO: ideally, the message should be rendered on the foreground of individual windows...
         ImDrawList* const drawlist = ImGui::GetForegroundDrawList();
-        drawlist->AddRectFilled(msg_min, msg_max, IM_COL32(48, 48, 48, 255));
+        drawlist->AddRectFilled(msg_min, msg_max, IM_COL32_GREY(48, 255));
         drawlist->AddRect(msg_min, msg_max, IM_COL32_WHITE);
         drawlist->AddText(msg_min + padding, IM_COL32_WHITE, text_beg, text_end);
     }

@@ -256,7 +256,7 @@ public:
                                                         : IM_COL32(200, 45, 0, 255); // Red
             ImU32 title_col = IM_COL32_WHITE;
             if (center == Disabled) {
-                title_col = IM_COL32(150, 150, 150, 255);
+                title_col = IM_COL32_GREY(150, 255);
                 if (!title) {
                     title = "-";
                 }
@@ -274,7 +274,7 @@ public:
             }
             imgui_ItemRect(ring_col);
             if (interactive && center != Disabled && ImGui::IsItemHovered()) {
-                imgui_ItemRectFilled(IM_COL32(255, 255, 255, 45));
+                imgui_ItemRectFilled(IM_COL32_GREY(255, 45));
             }
 
             return hit;
@@ -508,7 +508,7 @@ public:
         // ImGui::SetNextWindowSizeConstraints(
         //     ImVec2(ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x - ImGui::GetStyle().WindowPadding.x, 0),
         //     ImVec2(FLT_MAX, FLT_MAX));
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(24, 24, 24, 255));
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32_GREY(24, 255));
         if (auto child = imgui_ChildWindow("Page", {}, ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY)) {
             for (int j = 0; j < page_size; ++j) {
                 if (j % perline != 0) {
@@ -878,7 +878,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
         }
     }
 
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(24, 24, 24, 255));
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32_GREY(24, 255));
     if (auto child = imgui_ChildWindow("Groups")) {
         // TODO: document the behavior.
         set_scroll_by_up_down(preview_mode ? floor(config.height() * 0.5) : ImGui::GetFrameHeight());
@@ -974,7 +974,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                 align_text(ImGui::GetItemRectSize().y);
                 imgui_Str(preview_mode ? labels_preview[masked[head]] : labels_normal[masked[head]]);
                 if (has_lock) {
-                    const ImU32 col = scanlist[j].all_locked() ? IM_COL32_WHITE : IM_COL32(128, 128, 128, 255);
+                    const ImU32 col = scanlist[j].all_locked() ? IM_COL32_WHITE : IM_COL32_GREY(128, 255);
                     imgui_ItemRect(col, ImVec2(-2, -2));
                 }
 
@@ -1027,27 +1027,32 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
 // TODO: move to "apply_rule.cpp"? (as this is a special type of capture...)
 void static_constraints(sync_point& out) {
     enum stateE { Any_background, O, I, O_background, I_background };
-    const int r = 10;
+
+    // (Follows `ImGui::Dummy` or `ImGui::InvisibleButton`.)
+    static const auto put_col = [](stateE state, bool disabled = false) {
+        static const ImU32 cols[5]{IM_COL32_GREY(100, 255),  //
+                                   IM_COL32_BLACK,           //
+                                   IM_COL32_WHITE,           //
+                                   IM_COL32(80, 0, 80, 255), //
+                                   IM_COL32(200, 0, 200, 255)};
+        assert_implies(disabled, state == Any_background);
+        imgui_ItemRectFilled(disabled ? IM_COL32_GREY(80, 255) : cols[state]);
+        imgui_ItemRect(IM_COL32_GREY(200, 255));
+    };
+
+    const int r = 10; // TODO: use separate values for w and h?
     static stateE board[r][r]{/* Any_background... */};
     static stateE state_lbutton = I;
     const stateE state_rbutton = Any_background;
-    static const ImU32 cols[5]{IM_COL32(100, 100, 100, 255), //
-                               IM_COL32(0, 0, 0, 255),       //
-                               IM_COL32(255, 255, 255, 255), //
-                               IM_COL32(80, 0, 80, 255),     //
-                               IM_COL32(200, 0, 200, 255)};
     static const auto description = [] {
         auto term = [](stateE s, const char* desc) {
             ImGui::Dummy(square_size());
-            imgui_ItemRectFilled(cols[s]);
-            imgui_ItemRect(IM_COL32(200, 200, 200, 255));
+            put_col(s);
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
             ImGui::AlignTextToFramePadding(); // `Dummy` does not align automatically.
             imgui_Str(desc);
         };
 
-        imgui_Str("(You can right-click this '(...)' to get an example.)");
-        ImGui::Separator();
         imgui_Str("Operations:\n"
                   "Left-click a cell to set the value.\n"
                   "Right-click to set back to any-background.\n"
@@ -1059,7 +1064,7 @@ void static_constraints(sync_point& out) {
         term(Any_background, ": Any background.");
         imgui_Str("By 'Adopt', you will get a rule-lock pair that can satisfy the constraints represented by the "
                   "arrangements. (For example, a pattern of white cells surrounded by any-background cells will keep "
-                  "stable whatever its surroundings are.)");
+                  "stable whatever its surroundings are. You can right-click this '(...)' to get an example.)");
     };
 
     ImGui::AlignTextToFramePadding();
@@ -1114,8 +1119,7 @@ void static_constraints(sync_point& out) {
         ImGui::RadioButton("##Radio", s == state_lbutton);
         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
         ImGui::Dummy(square_size());
-        imgui_ItemRectFilled(cols[s]);
-        imgui_ItemRect(IM_COL32(200, 200, 200, 255));
+        put_col(s);
     }
     ImGui::EndDisabled();
 
@@ -1126,15 +1130,11 @@ void static_constraints(sync_point& out) {
             if (x != 0) {
                 ImGui::SameLine();
             }
+            const bool editable = y >= 1 && y < r - 1 && x >= 1 && x < r - 1;
+            stateE& state = board[y][x];
 
             // No need for unique ID here (as IsItemHovered + IsMouseDown doesn't rely on ID).
             ImGui::InvisibleButton("##Invisible", square_size());
-
-            const bool editable = y >= 1 && y < r - 1 && x >= 1 && x < r - 1;
-            stateE& state = board[y][x];
-            imgui_ItemRectFilled(!editable ? IM_COL32(80, 80, 80, 255) : cols[state]);
-            imgui_ItemRect(IM_COL32(200, 200, 200, 255));
-
             if (editable && ImGui::IsItemHovered()) {
                 if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
                     state = state_rbutton;
@@ -1142,6 +1142,7 @@ void static_constraints(sync_point& out) {
                     state = state_lbutton;
                 }
             }
+            put_col(state, !editable /*-> disabled*/);
         }
     }
     ImGui::PopStyleVar();

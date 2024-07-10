@@ -6,6 +6,10 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 
+// Follows `IM_COL32_XX`; this can be constexpr, but that cannot guarantee `fn(100, 255)`
+// be calculated at run time, especially in debug mode.
+consteval ImU32 IM_COL32_GREY(ImU8 v, ImU8 alpha) { return IM_COL32(v, v, v, alpha); }
+
 inline void imgui_ItemRect(ImU32 col, ImVec2 off_min = {0, 0}) {
     const ImVec2 pos_min = ImGui::GetItemRectMin();
     const ImVec2 pos_max = ImGui::GetItemRectMax();
@@ -45,7 +49,7 @@ inline bool imgui_ItemClickable(ImGuiMouseButton_ mouse_button = ImGuiMouseButto
         imgui_ItemRect(IM_COL32_WHITE);
         return true;
     } else if (ImGui::IsItemHovered()) {
-        imgui_ItemRect(IM_COL32(128, 128, 128, 255));
+        imgui_ItemRect(IM_COL32_GREY(128, 255));
     }
     return false;
 }

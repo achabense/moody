@@ -106,7 +106,7 @@ static void identify(const aniso::tile_const_ref tile, const aniso::ruleT& rule,
             return {};
         } else if (!(range.begin.both_gteq(period_size) && range.end.both_lteq(tile.size - period_size))) {
             if (for_input) {
-                // TODO: better message.
+                // !!TODO: better message.
                 messenger::set_msg("The border is invalid.");
             } else {
                 assert(false); // Guaranteed by `regionT::run`.
@@ -149,7 +149,7 @@ static void identify(const aniso::tile_const_ref tile, const aniso::ruleT& rule,
     };
 
     if (!tile.size.both_gt(period_size * 2)) {
-        // TODO: better message.
+        // !!TODO: better message.
         messenger::set_msg("The area is too small.");
         return;
     }
@@ -159,7 +159,7 @@ static void identify(const aniso::tile_const_ref tile, const aniso::ruleT& rule,
     if (!init_range) {
         return;
     } else if (!init_background.is_periodic(rule)) {
-        // TODO: better message.
+        // !!TODO: better message.
         messenger::set_msg("The background is not periodic.");
         return;
     }
@@ -539,8 +539,8 @@ public:
                             ImGuiButtonFlags_MouseButtonLeft |
                                 ImGuiButtonFlags_MouseButtonRight); // So right-click can activate the button.
                         imgui_ItemRectFilled(in_range ? (data.at(x, y) ? IM_COL32_WHITE : IM_COL32_BLACK)
-                                                      : IM_COL32(40, 40, 40, 255));
-                        imgui_ItemRect(IM_COL32(100, 100, 100, 255));
+                                                      : IM_COL32_GREY(40, 255));
+                        imgui_ItemRect(IM_COL32_GREY(100, 255));
                         // TODO: unify colors with `static_constraints`.
 
                         if (ImGui::IsItemHovered()) {
@@ -573,8 +573,7 @@ public:
                 aniso::tileT result({.x = data.size.x * 5, .y = data.size.y * 5});
                 aniso::fill(result.data(), data);
                 ImGui::Image(make_screen(result.data(), scaleE::Nearest), to_imvec(result.size() * 3), ImVec2(0, 0),
-                             ImVec2(1, 1), ImVec4(1, 1, 1, 1),
-                             ImGui::ColorConvertU32ToFloat4(IM_COL32(100, 100, 100, 255)));
+                             ImVec2(1, 1), ImVec4(1, 1, 1, 1), ImGui::ColorConvertU32ToFloat4(IM_COL32_GREY(100, 255)));
                 // The background does not make much sense if it is not stable for the current rule, but
                 // I have no idea how it should behave.
 
@@ -926,7 +925,7 @@ public:
 
                 ImDrawList* const drawlist = ImGui::GetWindowDrawList();
                 drawlist->PushClipRect(canvas_min, canvas_max);
-                drawlist->AddRectFilled(canvas_min, canvas_max, IM_COL32(24, 24, 24, 255));
+                drawlist->AddRectFilled(canvas_min, canvas_max, IM_COL32_GREY(24, 255));
 
                 const scaleE scale_mode = m_coord.zoom < 1 ? scaleE::Linear : scaleE::Nearest;
                 if (!m_paste) {
@@ -1309,7 +1308,7 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
 
     termT& term = terms[id];
     if (term.active) [[unlikely]] {
-        imgui_ItemRect(IM_COL32(255, 255, 255, 255));
+        imgui_ItemRect(IM_COL32_WHITE);
         return;
     }
     term.active = true;
