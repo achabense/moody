@@ -1151,7 +1151,7 @@ public:
                     if (show_range_window) {
                         ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
                         if (ImGui::IsMousePosValid()) {
-                            ImGui::SetNextWindowPos(ImGui::GetIO().MousePos + ImVec2(2, 2), ImGuiCond_Appearing);
+                            ImGui::SetNextWindowPos(ImGui::GetMousePos() + ImVec2(2, 2), ImGuiCond_Appearing);
                         }
                         auto window =
                             imgui_Window("Range operations", &show_range_window,
@@ -1336,7 +1336,7 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
     ImGui::GetWindowDrawList()->AddImage(texture, ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
     if (interactive && ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
         assert(ImGui::IsMousePosValid());
-        const ImVec2 pos = ImGui::GetIO().MousePos - ImGui::GetItemRectMin();
+        const ImVec2 pos = ImGui::GetMousePos() - ImGui::GetItemRectMin();
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
         if (ImGui::BeginTooltip()) {
             const aniso::rangeT clamped = clamp_window(size, from_imvec_floor(pos), {64, 48});

@@ -215,13 +215,13 @@ public:
 
         // q w -    q w
         // a s d ~ a s d
-        // - x c    x c"
+        // - x c    x c
         terms_hex.emplace_back("All", &hex_isotropic,
                                "Rules that emulate isotropic hexagonal rules.\n\n"
                                "(Remember to unselect native-symmetry terms when working with this line.)");
         terms_hex.emplace_back(
             "a-d", &hex_refl_asd,
-            "Rules that emulate reflection symmetry in the hexagonal tiling, taking the axis from 'a to d'.");
+            "Rules that emulate reflection symmetry in the hexagonal tiling, taking the axis from 'a' to 'd'.");
         terms_hex.emplace_back("q-c", &hex_refl_qsc, "Ditto, the reflection axis is 'q to c'.");
         terms_hex.emplace_back("w-x", &hex_refl_wsx, "Ditto, the reflection axis is 'w to x'.");
         terms_hex.emplace_back("a|q", &hex_refl_aq, "Ditto, the reflection axis is vertical to 'a to q'.");
@@ -766,7 +766,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                 assert(compatible); // Otherwise, the checkbox should be disabled.
                 ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
                 if (ImGui::IsMousePosValid()) {
-                    ImGui::SetNextWindowPos(ImGui::GetIO().MousePos + ImVec2(2, -80), ImGuiCond_Always);
+                    ImGui::SetNextWindowPos(ImGui::GetMousePos() + ImVec2(2, -80), ImGuiCond_Always);
                 }
             }
 

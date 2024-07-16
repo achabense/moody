@@ -271,7 +271,7 @@ class messenger {
             if (!m_min) {
                 const ImVec2 main_size = ImGui::GetMainViewport()->Size;
                 if (ImGui::IsMousePosValid()) {
-                    const ImVec2 pos = ImClamp(ImGui::GetIO().MousePos, ImVec2{0, 0}, main_size);
+                    const ImVec2 pos = ImClamp(ImGui::GetMousePos(), ImVec2{0, 0}, main_size);
                     ImGuiDir dir = ImGuiDir_None;
                     m_min = ImGui::FindBestWindowPosForPopupEx(pos, window_size, &dir, {padding, main_size - padding},
                                                                {pos - padding, pos + padding},
@@ -425,7 +425,7 @@ public:
         if (enable_lock) {
             ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
             if (ImGui::IsMousePosValid()) {
-                ImGui::SetNextWindowPos(ImGui::GetIO().MousePos + ImVec2(2, 2), ImGuiCond_Appearing);
+                ImGui::SetNextWindowPos(ImGui::GetMousePos() + ImVec2(2, 2), ImGuiCond_Appearing);
             }
             // (wontfix) Will append to the same window if there are to be multiple instances (won't happen).
             auto window = imgui_Window("Lock & capture (experimental)", &enable_lock_next,
