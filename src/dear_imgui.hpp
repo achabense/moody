@@ -130,6 +130,10 @@ inline bool imgui_TestItemFlag(ImGuiItemFlags_ flag) { //
     return (GImGui->CurrentItemFlags & flag) != 0;
 }
 
+inline bool imgui_IsWindowHoverable(ImGuiHoveredFlags flags = 0) { //
+    return ImGui::IsWindowContentHoverable(ImGui::GetCurrentWindow(), flags);
+}
+
 inline float imgui_ItemSpacingX() { return ImGui::GetStyle().ItemSpacing.x; }
 
 inline float imgui_ItemInnerSpacingX() { return ImGui::GetStyle().ItemInnerSpacing.x; }

@@ -80,9 +80,10 @@ inline float wrap_len() {
     return ImGui::GetFontSize() * 35.0f;
 }
 
-inline bool test_key(ImGuiKey key, bool repeat) {
-    return !ImGui::GetIO().WantCaptureKeyboard && ImGui::IsKeyPressed(key, repeat);
-};
+inline bool may_test_key() { //
+    // (`!IsAnyItemActive` may be implied by `!WantCaptureKeyboard`; added anyway.)
+    return !ImGui::GetIO().WantCaptureKeyboard && !ImGui::IsAnyItemActive();
+}
 
 inline void quick_info(std::string_view msg) {
     if (!ImGui::GetIO().WantTextInput && ImGui::IsKeyDown(ImGuiKey_H) && ImGui::IsItemVisible()) {
@@ -112,11 +113,14 @@ inline void quick_info(std::string_view msg) {
     }
 }
 
+// There is intended to be at most one call to this function in each window hierarchy.
 inline void set_scroll_by_up_down(float dy) {
-    if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) {
-        if (test_key(ImGuiKey_DownArrow, true)) {
+    // TODO: are there easy ways to query "is current window or its parent windows focused"?
+    const ImGuiFocusedFlags flags = ImGuiFocusedFlags_RootAndChildWindows | ImGuiFocusedFlags_NoPopupHierarchy;
+    if (may_test_key() && ImGui::IsWindowFocused(flags)) {
+        if (ImGui::IsKeyPressed(ImGuiKey_DownArrow, true /*repeat*/)) {
             ImGui::SetScrollY(ImGui::GetScrollY() + dy);
-        } else if (test_key(ImGuiKey_UpArrow, true)) {
+        } else if (ImGui::IsKeyPressed(ImGuiKey_UpArrow, true /*repeat*/)) {
             ImGui::SetScrollY(ImGui::GetScrollY() - dy);
         }
     }
@@ -136,17 +140,18 @@ inline bool begin_popup_for_item(bool open, const char* str_id = nullptr) {
                                        ImGuiWindowFlags_NoSavedSettings);
 }
 
-inline bool button_with_shortcut(const char* label, ImGuiKey shortcut = ImGuiKey_None, const ImVec2& size = {}) {
-    bool ret = ImGui::Button(label, size);
-    if (shortcut != ImGuiKey_None && !imgui_TestItemFlag(ImGuiItemFlags_Disabled)) {
-        const bool pressed = test_key(shortcut, imgui_TestItemFlag(ImGuiItemFlags_ButtonRepeat));
-        imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_ButtonActive, pressed ? 0.3f : 1.0f));
-        ret = ret || pressed;
-    }
-    return ret;
-}
-
 class sequence {
+    static bool button_with_shortcut(const char* label, ImGuiKey shortcut = ImGuiKey_None) {
+        bool ret = ImGui::Button(label);
+        if (shortcut != ImGuiKey_None && !imgui_TestItemFlag(ImGuiItemFlags_Disabled)) {
+            const bool pressed =
+                may_test_key() && imgui_IsWindowHoverable() && ImGui::IsKeyPressed(shortcut, false /*!repeat*/);
+            imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_ButtonActive, pressed ? 0.3f : 1.0f));
+            ret = ret || pressed;
+        }
+        return ret;
+    }
+
     enum tagE { None, First, Prev, Next, Last };
 
     inline static ImGuiID bound_id = 0;

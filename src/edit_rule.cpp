@@ -1134,7 +1134,8 @@ void static_constraints(sync_point& out) {
             stateE& state = board[y][x];
 
             // No need for unique ID here (as IsItemHovered + IsMouseDown doesn't rely on ID).
-            ImGui::InvisibleButton("##Invisible", square_size());
+            ImGui::InvisibleButton("##Invisible", square_size(),
+                                   ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
             if (editable && ImGui::IsItemHovered()) {
                 if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
                     state = state_rbutton;

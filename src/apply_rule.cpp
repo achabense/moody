@@ -486,9 +486,7 @@ public:
 
         const char* const canvas_name = "Canvas";
         const bool enable_shortcuts =
-            (!ImGui::GetIO().WantCaptureKeyboard && !ImGui::IsPopupOpen(ImGuiID(0), ImGuiPopupFlags_AnyPopupId)) ||
-            (GImGui->ActiveId == ImGui::GetID(canvas_name));
-        // Shadowing `::test_key`.
+            (may_test_key() && imgui_IsWindowHoverable()) || (GImGui->ActiveId == ImGui::GetID(canvas_name));
         auto test_key = [enable_shortcuts](ImGuiKey key, bool repeat) {
             return enable_shortcuts && ImGui::IsKeyPressed(key, repeat);
         };
@@ -1313,8 +1311,10 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
     }
     term.active = true;
 
-    if (test_key(ImGuiKey_T, false) || (interactive && ImGui::IsItemClicked(ImGuiMouseButton_Right)) ||
-        term.tile.size() != size || term.seed != config.seed || term.rule != rule) {
+    // TODO: whether to support batch restart ('T') after all?
+    if ((may_test_key() && ImGui::IsKeyPressed(ImGuiKey_T, false /*!repeat*/)) ||
+        (interactive && ImGui::IsItemClicked(ImGuiMouseButton_Right)) || term.tile.size() != size ||
+        term.seed != config.seed || term.rule != rule) {
         term.tile.resize(size);
         term.seed = config.seed;
         term.rule = rule;
