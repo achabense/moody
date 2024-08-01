@@ -1,0 +1,47 @@
+MAP6ZYXfpZofuiWaX7oeIDogJZsfuhsgOiAaIDogMAAgACWan7oaYDogGig6ICgAIAAaIjogIAAgACAQIAACAAAAA (spaceship guns)
+MAP6ZYXfpZofuiWaX7oeIDogJZsfuhsgOiAaIDogMEEgACWan7oaYDogGih6IChEoAAaInogIAEgACARoAAHAAAAA
+
+MAP6ZaXaJbsaEieaWrJfPDomLdvXol9/sEAfICqAPFkBEDWbnjoaarJwnutoALlshAAbqvwBIAsAAikZoBgPAAoAA
+
+MAPJIhsqsCk8OhgAuQjwkORie0g+uQgoKyAEAsiBQoJyAIomKyDEBkxwaAAyDAAgCIBAlAwyFFBBRAgEABZAltLTA (!!)
+
+x = 133, y = 7, rule = MAPBBAAAAIBAIBBBAAAAQgCQAAAIQAAAAAAApQACAAABAAJAQAQBEAACIBQBQcKABUEEAAABIYAQABICCUEQIAEAA
+133b3$3bobobobobobobobobobobobobobobobobobobobobobobobobobo
+bobobobobobobobobobobobobobobobobobobobobobobobobobobobobob
+obobobobobobobobo3$133b!
+
+(spaceship gun)
+x = 7, y = 27, rule = MAPk2YSbjwgfOgW6D6oaADogATofujogOiAyADoAIAAgAAWaHbo6ADggGiAaICAAIAAyIDogAAAAACAAAAAAAAAAA
+7b2$3bo$3bo$2b3o$2b3o$2b3o$3bo$3bo10$3bo$3bo$2b3o$2b3o$2b3o
+$3bo$3bo2$7b!
+
+!! has many interesting rules nearby
+MAP21YXbh6AfOmW6H7obADogCRIfuhIAOiAzIDoEIAAgACWbH7o6ADogHqI6IDAAIAAzIDogIAAAgCAAIAAAAAAgA
+->
+MAP21YXbh6BfOmW6H7obADogCRIfuhIAOiAzJDoEIAAgACWbH7o6ADogHqI6IDAAIAAzIDogIIAAgCAAIAAAIAAgA
+
+
+(close to a rule in 'rules in different subsets'.)
+MAPyC6AMHTtItqwIAEF8IQAkH7sMpHssoMkcRAgoMAgFcSiqgEAIIQFgiGlAEOlyRkyK4ggBwIgoIwWBUhmBYQ8AA
+-> (huge spaceship)
+MAPyC6AMHTtItqwIgEF8IQAkH7sMpHssoMkcRAgoMggFcSiqgEAMIQFgiGlAEOlyRkyK8ggBwIgoIwWBUhmBYQ8AA
+..-> (has a lot of wild rules nearby)
+MAPyC6AMnTsMtqwIAEl8IQAkH7sMtHssoskcQAgoMAglcSiqgEAIIQlgiGlAEOlyRkyK4gghwAgoIwWBUhmBQQ8AA
+
+MAPTBAEAAIXAGzEAEIIQHE4iAUTEiwTWmSWELE6ACDgUCCMCBhiACtAwOwAgCAAhCCkAiByCqOoACAhMAEAIsgAAA
+
+{
+MAPIJChgIK2gIUBBQBAJEgQAKE4oARioAQSFqAQEAGERCABJAACBUgIABJJASZJlzSBFgECDKCEAiBpR4QBHQQBhQ
+~ rotating oscillator:
+#C Oscillator. Period:376.
+x = 8, y = 9, rule = MAPIJChgIK2gIUBBQBAJEgQAKE4oARioAQSFqAQEAGERCABJAACBUgIABJJASZJlzSBFgECDKCEAiBpR4QBHQQBhQ
+bobobobo$obobobo$bobo3bo$obob3o$bo2bo2bo$o3bobo$bo5bo$obobo
+bo$bobobobo!
+}
+->
+MAPIJChgIK2gIUBBQBAJEgQAKE4oARioAQSFqAQEAGERCABJAACBUgIABJJASZJlzSBFgECDKCEAiBpR4QBHQUBhQ
+->
+MAPIJChgIK2gIUBBQBAJEgQAKE4oARioQQSFqAQEAGURCABJAACBUgIABJJASZJlzSBFgECDKCGAiBpR4QBHSUBhQ
+
+(gotten by removing as many as 1 from a rule in 'rules in different subsets')
+MAPgAAEEAAAAgAAAEQABgAAAAAAAAAAAAAABAgAgAAAAAAAFAwAAAAAABIIzABAAAAABAAAAEAAgAAAAAAAAAAAAQ
