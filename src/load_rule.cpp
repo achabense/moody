@@ -406,18 +406,30 @@ public:
 
     // (Workaround: using `rewind` tag to reset the scroll after opening new files.)
     void display(sync_point& out, bool rewind = false) {
-        if (m_sel && ImGui::IsMouseReleased(ImGuiMouseButton_Right) /* From anywhere */) {
-            std::string str;
-            const auto [min, max] = m_sel->minmax();
-            for (int i = min; i <= max; ++i) {
-                if (i != min) {
-                    str += '\n';
+        if (m_sel) {
+            if (ImGui::IsWindowAppearing()) {
+                // This should not happen, as the interaction to the parent window will be blocked
+                // when there are selected lines.
+                assert(false);
+                m_sel.reset(); // Defensive.
+            } else if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) /* From anywhere */) {
+                // TODO: undocumented, and may be subject to changes.
+                messenger::set_msg("Canceled.");
+                m_sel.reset();
+            } else if (ImGui::IsMouseReleased(ImGuiMouseButton_Right) /* From anywhere */) {
+                const auto [min, max] = m_sel->minmax();
+                std::string str;
+                for (int i = min; i <= max; ++i) {
+                    if (i != min) {
+                        str += '\n';
+                    }
+                    str += m_lines[i].text;
                 }
-                str += m_lines[i].text;
+                // (wontfix) `SetClipboardText` will skip contents after '\0' (normally a utf8 text file
+                // should not contain '\0' between the lines).
+                set_clipboard_and_notify(str);
+                m_sel.reset();
             }
-            ImGui::SetClipboardText(str.c_str());
-            // set_clipboard_and_notify(str);
-            m_sel.reset();
         }
 
         std::optional<int> n_pos = std::nullopt;
@@ -433,7 +445,8 @@ public:
     }
 
 private:
-    void display_const(std::optional<int>& n_pos, std::optional<selT>& n_sel, bool show_lock, bool rewind) const {
+    void display_const(std::optional<int>& n_pos, std::optional<selT>& n_sel, const bool show_lock,
+                       const bool rewind) const {
         const int total = m_rules.size();
 
         if (total != 0) {
@@ -467,7 +480,7 @@ private:
                 }
                 return w;
             }();
-            if (ImGui::GetItemRectMax().x + 16 + w <= ImGui::GetWindowPos().x + ImGui::GetContentRegionMax().x) {
+            if (ImGui::GetItemRectMax().x + 16 + w <= imgui_ContentRegionMaxAbsX()) {
                 ImGui::SameLine(0, 16);
             }
             ImGui::Checkbox("Preview", &preview_mode);
@@ -479,8 +492,9 @@ private:
             ImGui::Text("(No rules)");
         }
 
+        assert_implies(m_sel, !n_pos);
         const std::optional<int> locate = n_pos;
-        assert_implies(m_sel, !locate);
+
         ImGui::Separator();
 
         if (rewind) {
@@ -489,6 +503,11 @@ private:
         ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32_GREY(24, 255));
         if (auto child = imgui_ChildWindow("Content")) {
             set_scroll_by_up_down(ImGui::GetTextLineHeight() * 2); // TODO: document the behavior.
+
+            const bool test_hover = (ImGui::IsWindowHovered() || m_sel) && ImGui::IsMousePosValid();
+            const ImVec2 mouse_pos = ImGui::GetMousePos();
+            const float region_max_x = imgui_ContentRegionMaxAbsX();
+            ImDrawList* const drawlist = ImGui::GetWindowDrawList();
 
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
             for (int l = 0; const auto& [text, id] : m_lines) {
@@ -501,28 +520,35 @@ private:
                 // (`ImGui::TextWrapped` has no problem rendering long single-lines now.)
                 // (Related: https://github.com/ocornut/imgui/issues/7496)
                 imgui_StrWrapped(text, item_width);
+                const ImVec2 str_min = ImGui::GetItemRectMin();
+                const ImVec2 str_max = ImGui::GetItemRectMax();
+                const bool line_hovered = test_hover && mouse_pos.y >= str_min.y && mouse_pos.y <= str_max.y;
 
-                if (!locate) {
-                    if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+                if (!locate && line_hovered) {
+                    if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
                         n_sel = {this_l, this_l};
-                    } else if (m_sel && ImGui::IsItemHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+                    } else if (m_sel && ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
                         n_sel = {m_sel->beg, this_l};
                     }
                 }
                 if (m_sel && m_sel->contains(this_l)) {
-                    imgui_ItemRectFilled(IM_COL32_GREY(255, 90));
+                    drawlist->AddRectFilled(str_min, {region_max_x, str_max.y}, IM_COL32_GREY(255, 16));
+                    drawlist->AddRectFilled(str_min, str_max, IM_COL32_GREY(255, 40));
                 }
 
                 if (id.has_value()) {
+                    assert(*id >= 0 && *id < total);
+
                     // Pretend there is no lock if `!show_lock`.
                     const bool has_lock = show_lock && m_rules[*id].lock.has_value();
 
                     if (*id == m_pos) {
-                        imgui_ItemRectFilled(IM_COL32(has_lock ? 196 : 0, 255, 0, 60));
+                        drawlist->AddRectFilled(str_min, str_max, IM_COL32(has_lock ? 196 : 0, 255, 0, 60));
                     }
-                    if (!m_sel && !n_sel && ImGui::IsItemHovered()) {
-                        imgui_ItemRectFilled(IM_COL32(has_lock ? 196 : 0, 255, 0, 30));
-                        if (!locate && ImGui::IsItemClicked()) {
+                    if (!m_sel && !n_sel &&
+                        (line_hovered && mouse_pos.x >= str_min.x && mouse_pos.x <= str_max.x /*str-hovered*/)) {
+                        drawlist->AddRectFilled(str_min, str_max, IM_COL32(has_lock ? 196 : 0, 255, 0, 30));
+                        if (!locate && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
                             n_pos = *id;
                         }
                     }
@@ -545,6 +571,26 @@ private:
                 }
             }
             ImGui::PopStyleVar();
+
+            // Prevent interaction with other widgets, so that for example, the parent window cannot be
+            // closed when there are selected lines.
+            if (m_sel || n_sel) {
+                const ImGuiID claim = ImGui::GetID("Claim");
+                ImGuiWindow* const window = ImGui::GetCurrentWindow();
+
+                // (Idk which are actually necessary/preferable, but the following combination works as intended.)
+
+                // ImGui::SetHoveredID(claim);
+                ImGui::SetActiveID(claim, window);
+                // ImGui::SetFocusID(claim, window);
+                ImGui::FocusWindow(window);
+
+                // Otherwise, for some reason the parent window will still be collapsed if its
+                // title bar is double-clicked.
+                // Related: https://github.com/ocornut/imgui/issues/7841
+                ImGui::SetKeyOwner(ImGui::MouseButtonToKey(ImGuiMouseButton_Left), claim);
+                // ImGui::SetKeyOwner(ImGui::MouseButtonToKey(ImGuiMouseButton_Right), claim);
+            }
         }
         ImGui::PopStyleColor();
 
