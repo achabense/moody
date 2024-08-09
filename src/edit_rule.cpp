@@ -930,7 +930,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                 }
                 ++n;
 
-                const bool incomptible = scanlist[j].locked_0 != 0 && scanlist[j].locked_1 != 0;
+                const bool incompatible = scanlist[j].locked_0 != 0 && scanlist[j].locked_1 != 0;
                 const aniso::codeT head = group[0];
 
                 // TODO: better color... (will be ugly if using green colors...)
@@ -940,10 +940,10 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                     {0.26f, 0.59f, 0.98f, 0.70f}, {0.26f, 0.59f, 0.98f, 0.85f}, {0.26f, 0.59f, 0.98f, 1.00f}};
                 static const ImVec4 button_col_impure[3]{
                     {0.26f, 0.59f, 0.98f, 0.30f}, {0.26f, 0.59f, 0.98f, 0.40f}, {0.26f, 0.59f, 0.98f, 0.50f}};
-                static const ImVec4 button_col_incomptible[3]{{0.6f, 0, 0, 1}, {0.8f, 0, 0, 1}, {0.9f, 0, 0, 1}};
-                const ImVec4* const button_color = pure           ? button_col_normal
-                                                   : !incomptible ? button_col_impure
-                                                                  : button_col_incomptible;
+                static const ImVec4 button_col_incompatible[3]{{0.6f, 0, 0, 1}, {0.8f, 0, 0, 1}, {0.9f, 0, 0, 1}};
+                const ImVec4* const button_color = pure            ? button_col_normal
+                                                   : !incompatible ? button_col_impure
+                                                                   : button_col_incompatible;
 
                 if (preview_mode) {
                     ImGui::BeginGroup();
@@ -1030,14 +1030,14 @@ void static_constraints(sync_point& out) {
 
     // (Follows `ImGui::Dummy` or `ImGui::InvisibleButton`.)
     static const auto put_col = [](stateE state, bool disabled = false) {
-        static const ImU32 cols[5]{IM_COL32_GREY(100, 255),  //
+        static const ImU32 cols[5]{IM_COL32_GREY(80, 255),  //
                                    IM_COL32_BLACK,           //
                                    IM_COL32_WHITE,           //
                                    IM_COL32(80, 0, 80, 255), //
                                    IM_COL32(200, 0, 200, 255)};
         assert_implies(disabled, state == Any_background);
-        imgui_ItemRectFilled(disabled ? IM_COL32_GREY(80, 255) : cols[state]);
-        imgui_ItemRect(IM_COL32_GREY(200, 255));
+        imgui_ItemRectFilled(disabled ? IM_COL32_GREY(60, 255) : cols[state]);
+        imgui_ItemRect(IM_COL32_GREY(160, 255));
     };
 
     const int r = 10; // TODO: use separate values for w and h?
@@ -1117,6 +1117,8 @@ void static_constraints(sync_point& out) {
         }
         // No need for unique ID here (as the return value is not used).
         ImGui::RadioButton("##Radio", s == state_lbutton);
+        // TODO: show message?
+        // imgui_ItemTooltip("Scroll in the board to change the value for left-click.");
         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
         ImGui::Dummy(square_size());
         put_col(s);

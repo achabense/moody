@@ -131,7 +131,7 @@ inline bool imgui_TestItemFlag(ImGuiItemFlags_ flag) { //
 }
 
 inline bool imgui_IsWindowHoverable(ImGuiHoveredFlags flags = 0) { //
-    return ImGui::IsWindowContentHoverable(ImGui::GetCurrentWindow(), flags);
+    return ImGui::IsWindowContentHoverable(ImGui::GetCurrentWindowRead(), flags);
 }
 
 inline float imgui_ContentRegionMaxAbsX() { return ImGui::GetContentRegionMaxAbs().x; }

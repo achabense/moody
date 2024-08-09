@@ -537,9 +537,8 @@ public:
                             ImGuiButtonFlags_MouseButtonLeft |
                                 ImGuiButtonFlags_MouseButtonRight); // So right-click can activate the button.
                         imgui_ItemRectFilled(in_range ? (data.at(x, y) ? IM_COL32_WHITE : IM_COL32_BLACK)
-                                                      : IM_COL32_GREY(40, 255));
-                        imgui_ItemRect(IM_COL32_GREY(100, 255));
-                        // TODO: unify colors with `static_constraints`.
+                                                      : IM_COL32_GREY(60, 255));
+                        imgui_ItemRect(IM_COL32_GREY(160, 255));
 
                         if (ImGui::IsItemHovered()) {
                             if (ImGui::GetIO().KeyCtrl) {
@@ -571,7 +570,7 @@ public:
                 aniso::tileT result({.x = data.size.x * 5, .y = data.size.y * 5});
                 aniso::fill(result.data(), data);
                 ImGui::Image(make_screen(result.data(), scaleE::Nearest), to_imvec(result.size() * 3), ImVec2(0, 0),
-                             ImVec2(1, 1), ImVec4(1, 1, 1, 1), ImGui::ColorConvertU32ToFloat4(IM_COL32_GREY(100, 255)));
+                             ImVec2(1, 1), ImVec4(1, 1, 1, 1), ImGui::ColorConvertU32ToFloat4(IM_COL32_GREY(160, 255)));
                 // The background does not make much sense if it is not stable for the current rule, but
                 // I have no idea how it should behave.
 
