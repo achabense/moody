@@ -469,6 +469,9 @@ public:
     // For example, there are a lot of static variables in `display`, and the keyboard controls are not designed
     // for per-object use.
     void display(sync_point& sync) {
+        // !!TODO: recheck resetting logic. `m_sel` and `m_paste` may need to reset
+        // in more situations. For example, `m_paste` does not make much sense if the rule
+        // is updated / the space is restarted... (or, should it block such operations?)
         m_torus.begin_frame(sync.current.rule);
 
         static bool background = 0;
@@ -491,21 +494,33 @@ public:
             return enable_shortcuts && ImGui::IsKeyPressed(key, repeat);
         };
 
-        auto set_init_state = [&] {
-            // TODO: redesign this part. This has became clumsy due to the introduction of periodic background.
-            // !!TODO: recheck restarting/blocking logic...
+        auto set_init_state = [&](const bool tooltip_mode) {
+            if (!tooltip_mode) {
+                m_sel.reset();
+                m_paste.reset();
+            }
+
             m_torus.set_init([&](initT& init) {
-                ImGui::BeginGroup();
+                bool force_restart = !tooltip_mode && ImGui::IsWindowAppearing();
+
+                if (!tooltip_mode) {
+                    // m_torus.pause_for_this_frame();
+
+                    // !!TODO: whether to support this?
+                    ImGui::Button("Click and hold to test effect");
+                    if (!ImGui::IsItemActive()) {
+                        m_torus.pause_for_this_frame();
+                    }
+                    if (ImGui::IsItemDeactivated()) {
+                        force_restart = true;
+                    }
+                }
+
                 ImGui::PushItemWidth(item_width);
                 imgui_StepSliderInt("Seed", &init.seed, 0, 29);
                 init.density.step_slide("Density");
                 init.area.step_slide("Area");
                 ImGui::PopItemWidth();
-                ImGui::EndGroup();
-                if (ImGui::IsItemActive()) {
-                    m_torus.pause_for_this_frame();
-                }
-                bool force_restart = ImGui::IsItemActivated();
 
                 ImGui::Separator();
 
@@ -557,12 +572,6 @@ public:
                 }
                 ImGui::PopStyleVar();
                 ImGui::EndGroup();
-                if (ImGui::IsItemActive()) {
-                    m_torus.pause_for_this_frame();
-                }
-                if (ImGui::IsItemActivated()) {
-                    force_restart = true;
-                }
 
                 ImGui::SameLine(0, 0);
                 imgui_Str(" ~ ");
@@ -575,15 +584,13 @@ public:
                 // I have no idea how it should behave.
 
                 if (resize) {
+                    assert(!tooltip_mode);
                     init.background.resize(*resize);
                     aniso::fill(init.background.data(), 0);
-                    // The space may not be resized; reset anyway.
-                    m_sel.reset();
-                    m_paste.reset();
-                    // !!TODO: recheck resetting logic. `m_sel` and `m_paste` may need to reset
-                    // in more situations.
                 }
 
+                assert_implies(tooltip_mode, !force_restart);
+                assert_implies(!tooltip_mode, !m_sel && !m_paste);
                 return force_restart;
             });
         };
@@ -736,12 +743,12 @@ public:
         ImGui::SameLine(floor(1.5 * item_width));
         ImGui::BeginGroup();
         if (begin_popup_for_item(ImGui::Button("Init state"))) {
-            set_init_state();
+            set_init_state(false /*!tooltip-mode*/);
             ImGui::EndPopup();
         }
         quick_info("< Seed, density and area.");
         ImGui::SameLine();
-        imgui_StrTooltip("(?)", set_init_state);
+        imgui_StrTooltip("(?)", [&] { set_init_state(true /*tooltip-mode*/); });
 
         ImGui::Spacing(); // To align with the separator.
 
