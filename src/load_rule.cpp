@@ -375,6 +375,8 @@ class textT {
     mutable bool preview_mode = true;
     mutable previewer::configT config{previewer::configT::_220_160};
 
+    mutable bool rewind = false;
+
 public:
     textT() {}
     textT(std::string_view str) { append(str); }
@@ -404,8 +406,9 @@ public:
         }
     }
 
-    // (Workaround: using `rewind` tag to reset the scroll after opening new files.)
-    void display(sync_point& out, bool rewind = false) {
+    void reset_scroll() { rewind = true; }
+
+    void display(sync_point& out) {
         if (m_sel) {
             if (ImGui::IsWindowAppearing()) {
                 // This should not happen, as the interaction to the parent window will be blocked
@@ -435,7 +438,7 @@ public:
         std::optional<int> n_pos = std::nullopt;
         std::optional<selT> n_sel = std::nullopt;
 
-        display_const(n_pos, n_sel, out.enable_lock, rewind);
+        display_const(n_pos, n_sel, out.enable_lock);
         if (n_sel) {
             m_sel = *n_sel;
         } else if (n_pos) {
@@ -445,8 +448,7 @@ public:
     }
 
 private:
-    void display_const(std::optional<int>& n_pos, std::optional<selT>& n_sel, const bool show_lock,
-                       const bool rewind) const {
+    void display_const(std::optional<int>& n_pos, std::optional<selT>& n_sel, const bool show_lock) const {
         const int total = m_rules.size();
 
         if (total != 0) {
@@ -497,7 +499,7 @@ private:
 
         ImGui::Separator();
 
-        if (rewind) {
+        if (std::exchange(rewind, false)) {
             ImGui::SetNextWindowScroll({0, 0});
         }
         ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32_GREY(24, 255));
@@ -576,7 +578,7 @@ private:
             // closed when there are selected lines.
             if (m_sel || n_sel) {
                 const ImGuiID claim = ImGui::GetID("Claim");
-                ImGuiWindow* const window = ImGui::GetCurrentWindow();
+                ImGuiWindow* const window = ImGui::GetCurrentWindow(); // TODO: or GetCurrentWindowRead?
 
                 // (Idk which are actually necessary/preferable, but the following combination works as intended.)
 
@@ -642,7 +644,6 @@ void load_file(sync_point& out) {
     static file_nav nav;
 
     static textT text;
-    static bool rewind = false;
     static std::optional<pathT> path;
 
     auto try_load = [](const pathT& p) -> bool {
@@ -671,7 +672,7 @@ void load_file(sync_point& out) {
 
         ImGui::Separator();
         if (auto sel = nav.display(); sel && try_load(*sel)) {
-            rewind = true;
+            text.reset_scroll();
             path = std::move(*sel);
         }
     } else {
@@ -679,7 +680,7 @@ void load_file(sync_point& out) {
         ImGui::SameLine();
         if (ImGui::SmallButton("Reload")) {
             try_load(*path);
-            // Don't rewind.
+            // Won't reset scroll.
         }
         ImGui::SameLine();
         const bool clicked = ImGui::SmallButton("...");
@@ -688,7 +689,7 @@ void load_file(sync_point& out) {
             std::optional<pathT> sel = std::nullopt;
             nav.select_file(&*path, sel);
             if (sel && try_load(*sel)) {
-                rewind = true; // Rewind, even if the new path is the same as the old one.
+                text.reset_scroll(); // Even if the new path is the same as the old one.
                 path = std::move(*sel);
             }
             ImGui::EndPopup();
@@ -697,7 +698,7 @@ void load_file(sync_point& out) {
         display_filename(*path);
 
         ImGui::Separator();
-        text.display(out, std::exchange(rewind, false));
+        text.display(out);
         if (close) {
             path.reset();
             text.clear();
@@ -707,7 +708,6 @@ void load_file(sync_point& out) {
 
 void load_clipboard(sync_point& out) {
     static textT text;
-    static bool rewind = false;
     if (ImGui::SmallButton("Read clipboard")) {
         if (const char* str = ImGui::GetClipboardText()) {
             std::string_view str_view(str);
@@ -716,7 +716,7 @@ void load_clipboard(sync_point& out) {
             } else {
                 text.clear();
                 text.append(str_view);
-                rewind = true;
+                text.reset_scroll();
             }
         }
     }
@@ -726,7 +726,7 @@ void load_clipboard(sync_point& out) {
     }
 
     ImGui::Separator();
-    text.display(out, std::exchange(rewind, false));
+    text.display(out);
 }
 
 // Defined in "docs.cpp". [0]:title [1]:contents, null-terminated.
@@ -734,7 +734,6 @@ extern const char* const docs[][2];
 
 void load_doc(sync_point& out) {
     static textT text;
-    static bool rewind = false;
     static std::optional<int> doc_id = std::nullopt;
     static auto select = []() {
         for (int i = 0; docs[i][0] != nullptr; ++i) {
@@ -742,7 +741,7 @@ void load_doc(sync_point& out) {
             if (ImGui::Selectable(title, doc_id == i, ImGuiSelectableFlags_DontClosePopups) && doc_id != i) {
                 text.clear();
                 text.append(contents);
-                rewind = true;
+                text.reset_scroll();
                 doc_id = i;
             }
         }
@@ -768,7 +767,7 @@ void load_doc(sync_point& out) {
         imgui_Str(docs[*doc_id][0]);
 
         ImGui::Separator();
-        text.display(out, std::exchange(rewind, false));
+        text.display(out);
         if (close) {
             text.clear();
             doc_id.reset();
