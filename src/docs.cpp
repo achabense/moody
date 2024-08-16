@@ -14,6 +14,7 @@ The project was then abandoned for many years. Last year I felt an urgency to br
 
 // TODO: about MAP rules...
 // TODO: about the lock & capture feature...
+// !!TODO: 'Randomize' is renamed... (many parts should be rewritten in this version...)
 const char* const doc_overview =
     R"(At any time, the program has a rule shown in the right panel (which is an editable torus space; the operations are recorded in the tooltips (...)). This is later called the "current rule". As you see, it is the Game of Life rule initially.
 

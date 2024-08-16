@@ -451,30 +451,32 @@ public:
     }
 };
 
+static int fit_count(int avail, int size, int spacing) { //
+    return std::max(1, (avail + spacing) / (size + spacing));
+}
+
 class batch_adapter {
-    static const int page_size = 6, perline = 3;
-    using pageT = std::array<aniso::ruleT, page_size>;
-    std::vector<pageT> pages;
+    std::vector<aniso::ruleT> rules{};
+    int page_size = 6, perline = 3;
     int page_no = 0;
 
     previewer::configT config{previewer::configT::_220_160};
 
 public:
-    void display(std::function<aniso::ruleT()> gen, sync_point& out, bool bind) {
-        auto make_page = [&] {
-            for (aniso::ruleT& rule : pages.emplace_back()) {
-                rule = gen();
-            }
-            page_no = pages.size() - 1;
-        };
-
-        auto set_page = [&](int p, bool force = false) {
+    void display(std::function<aniso::ruleT()> gen, sync_point& out, const bool bind, ImVec2& min_req_size) {
+        auto calc_page = [&] { return (rules.size() + page_size - 1) / page_size; };
+        auto set_page = [&](int p, bool make_page = false) {
             if (p < 0) {
                 return;
-            } else if (p < pages.size()) {
+            } else if (p < calc_page()) {
                 page_no = p;
-            } else if (force) {
-                make_page();
+            } else if (make_page) {
+                const int count = (rules.size() / page_size) * page_size + page_size - rules.size();
+                for (int i = 0; i < count; ++i) {
+                    rules.push_back(gen());
+                }
+                assert((rules.size() % page_size) == 0);
+                page_no = (rules.size() / page_size) - 1;
             }
         };
 
@@ -484,18 +486,19 @@ public:
         sequence::seq(
             "<|", "<<", ">>>", "|>", //
             [&] { set_page(0); }, [&] { set_page(page_no - 1); }, [&] { set_page(page_no + 1, true); },
-            [&] { set_page((int)pages.size() - 1); });
+            [&] { set_page(rules.empty() ? 0 : calc_page() - 1); });
         ImGui::SameLine();
-        if (!pages.empty()) {
-            ImGui::Text("Total:%d At:%d", (int)pages.size(), page_no + 1);
+        if (!rules.empty()) {
+            // TODO: will this be confusing when the page is resized?
+            ImGui::Text("Pages:%d At:%d", calc_page(), page_no + 1);
         } else {
-            ImGui::Text("Total:%d At:N/A", (int)pages.size());
+            ImGui::Text("Pages:%d At:N/A", calc_page());
         }
         imgui_ItemTooltip("Right-click to clear.");
         // (Using the same style as in `frame_main`.)
         if (begin_popup_for_item(imgui_ItemClickable(), "")) {
-            if (ImGui::Selectable("Clear (including this page)") && !pages.empty()) {
-                pages = std::vector<pageT>{};
+            if (ImGui::Selectable("Clear all pages") && !rules.empty()) {
+                rules = std::vector<aniso::ruleT>{};
                 page_no = 0;
             }
             ImGui::EndPopup();
@@ -504,40 +507,62 @@ public:
         ImGui::SameLine(0, 16);
         config.set("Preview settings");
 
-        // Guarantee the child is at least as wide as the previous line (won't happen now).
-        // ImGui::SetNextWindowSizeConstraints(
-        //     ImVec2(ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x - ImGui::GetStyle().WindowPadding.x, 0),
-        //     ImVec2(FLT_MAX, FLT_MAX));
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32_GREY(24, 255));
-        if (auto child = imgui_ChildWindow("Page", {}, ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY)) {
-            for (int j = 0; j < page_size; ++j) {
-                if (j % perline != 0) {
-                    ImGui::SameLine(0, 16); // (The same value as in `edit_rule`.)
-                } else {
-                    ImGui::Separator();
-                }
+        const ImVec2 avail_size = ImGui::GetContentRegionAvail();
 
-                ImGui::BeginGroup();
-                if (pages.empty()) {
-                    ImGui::BeginDisabled();
-                    ImGui::Button(">> Cur");
-                    ImGui::EndDisabled();
-                    imgui_ItemTooltip("Empty. ('>>>' to generate rules.)");
-                    ImGui::Dummy(ImVec2(config.width(), config.height()));
-                    imgui_ItemRectFilled(IM_COL32_BLACK);
-                    imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_TableBorderStrong));
-                } else {
-                    ImGui::PushID(j);
-                    if (ImGui::Button(">> Cur")) {
-                        out.set_rule(pages[page_no][j]);
-                    }
-                    ImGui::PopID();
-                    previewer::preview(j, config, pages[page_no][j]);
-                }
-                ImGui::EndGroup();
+        // Background
+        ImGui::GetWindowDrawList()->AddRectFilled(ImGui::GetCursorScreenPos(), ImGui::GetCursorScreenPos() + avail_size,
+                                                  IM_COL32_GREY(24, 255));
+
+        // Resize the page so all previewers can fit into the area. This should be done before the loop.
+        if (!ImGui::IsWindowAppearing()) {
+            const ImVec2 button_size = ImGui::CalcTextSize(">> Cur") + ImGui::GetStyle().FramePadding * 2;
+            const ImVec2 previewer_size = config.size_imvec();
+            const float item_spacing_y = ImGui::GetStyle().ItemSpacing.y;
+            const float group_size_x = std::max(button_size.x, previewer_size.x);
+            const float group_size_y = item_spacing_y /*separator*/ + button_size.y +
+                                       item_spacing_y /*between the button and previewer*/ + previewer_size.y;
+
+            const int xc = fit_count(avail_size.x, group_size_x, 16 /*SameLine(0, 16)*/);
+            const int yc = fit_count(avail_size.y, group_size_y, item_spacing_y);
+            if (page_size != xc * yc || perline != xc) {
+                page_size = xc * yc;
+                perline = xc;
+                set_page(rules.empty() ? 0 : calc_page() - 1);
             }
         }
-        ImGui::PopStyleColor();
+
+        for (int j = 0; j < page_size; ++j) {
+            if (j % perline != 0) {
+                ImGui::SameLine(0, 16); // (The same value as in `edit_rule`.)
+            } else {
+                ImGui::Separator();
+            }
+
+            const int r = page_no * page_size + j;
+            ImGui::BeginGroup();
+            if (r >= rules.size()) {
+                ImGui::BeginDisabled();
+                ImGui::Button(">> Cur");
+                ImGui::EndDisabled();
+                imgui_ItemTooltip("Empty. ('>>>' to generate rules.)");
+                previewer::dummy(config, IM_COL32_BLACK);
+            } else {
+                ImGui::PushID(j);
+                if (ImGui::Button(">> Cur")) {
+                    out.set_rule(rules[r]);
+                }
+                ImGui::PopID();
+                previewer::preview(j, config, rules[r]);
+            }
+            ImGui::EndGroup();
+
+            if (j == 0) {
+                // The enclosing window should be able to fully contain at least one previewer.
+                // The code looks fairly fragile but works...
+                min_req_size = ImGui::GetCurrentWindowRead()->DC.CursorMaxPos + ImGui::GetStyle().WindowPadding -
+                               ImGui::GetWindowPos();
+            }
+        }
     }
 };
 
@@ -761,20 +786,22 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                 show_rand = false;
             }
 
-            const bool clicked = ImGui::Checkbox("Randomize", &show_rand);
+            const bool clicked = ImGui::Checkbox("Random", &show_rand);
             if (clicked && show_rand) {
                 assert(compatible); // Otherwise, the checkbox should be disabled.
                 ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
                 if (ImGui::IsMousePosValid()) {
-                    ImGui::SetNextWindowPos(ImGui::GetMousePos() + ImVec2(2, -80), ImGuiCond_Always);
+                    ImGui::SetNextWindowPos(ImGui::GetMousePos() + ImVec2(40, -100), ImGuiCond_FirstUseEver);
                 }
             }
 
             // TODO: ideally, !compatible should only disable generation ('>>>' at last page).
             if (show_rand) {
                 assert(compatible);
-                if (auto window = imgui_Window("Randomize", &show_rand,
-                                               ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
+                static ImVec2 size_constraint_min{};
+                ImGui::SetNextWindowSizeConstraints(size_constraint_min, ImVec2(FLT_MAX, FLT_MAX));
+                if (auto window = imgui_Window("Random rules", &show_rand,
+                                               ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar)) {
                     // `dist`: The "distance" to the masking rule the randomization want to achieve.
                     // (which does not make sense when !compatible)
                     static double rate = 0.29;
@@ -807,6 +834,8 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                     // 1. left/right arrow key will be bound to '<</>>>' when the window is toggled open.
                     // 2. further operations are supported via '>> Cur'. For example to save a rule the user needs
                     // to firstly set it as the current rule.
+                    // !!TODO: the window can be auto-resized if resize border or corner is double clicked. Document
+                    // somewhere.
 
                     static batch_adapter batch;
                     batch.display(
@@ -817,7 +846,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                                 return aniso::randomize_p(subset, mask, mold, global_mt19937(), rate);
                             }
                         },
-                        sync, clicked);
+                        sync, clicked, size_constraint_min);
                 }
             }
         });
@@ -905,8 +934,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
             if (preview_mode) {
                 group_size = std::max(group_size, config.width());
             }
-            int perline = floor((ImGui::GetContentRegionAvail().x + spacing) / (group_size + spacing));
-            return std::max(perline, 1);
+            return fit_count(ImGui::GetContentRegionAvail().x, group_size, spacing);
         }();
 
         int n = 0;
@@ -1030,7 +1058,7 @@ void static_constraints(sync_point& out) {
 
     // (Follows `ImGui::Dummy` or `ImGui::InvisibleButton`.)
     static const auto put_col = [](stateE state, bool disabled = false) {
-        static const ImU32 cols[5]{IM_COL32_GREY(80, 255),  //
+        static const ImU32 cols[5]{IM_COL32_GREY(80, 255),   //
                                    IM_COL32_BLACK,           //
                                    IM_COL32_WHITE,           //
                                    IM_COL32(80, 0, 80, 255), //

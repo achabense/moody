@@ -1306,7 +1306,7 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
     }
 
     const int width = config.width(), height = config.height();
-    const aniso::vecT size{.x = config.width(), .y = config.height()};
+    const aniso::vecT size{.x = width, .y = height};
     assert(ImGui::GetItemRectSize() == ImVec2(width, height));
     assert(ImGui::IsItemVisible());
 

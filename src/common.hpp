@@ -341,6 +341,7 @@ public:
 
         int width() const { return size_terms[size].w; }
         int height() const { return size_terms[size].h; }
+        ImVec2 size_imvec() const { return ImVec2(size_terms[size].w, size_terms[size].h); }
 
         void set(const char* label) {
             const bool clicked = ImGui::Button(label);
@@ -359,8 +360,16 @@ public:
         }
     };
 
+    static void dummy(const configT& config, const ImU32 col) {
+        ImGui::Dummy(config.size_imvec());
+        if (ImGui::IsItemVisible()) {
+            imgui_ItemRectFilled(col);
+            imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_TableBorderStrong));
+        }
+    }
+
     static void preview(uint32_t id, const configT& config, const aniso::ruleT& rule, bool interactive = true) {
-        ImGui::Dummy(ImVec2(config.width(), config.height()));
+        ImGui::Dummy(config.size_imvec());
         if (ImGui::IsItemVisible()) {
             _preview((uint64_t(ImGui::GetID("")) << 32) | id, config, rule, interactive);
             imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_TableBorderStrong)); // Instead of `ImGuiCol_Border`
@@ -369,7 +378,7 @@ public:
 
     static void preview(uint32_t id, const configT& config, const std::invocable<> auto& get_rule,
                         bool interactive = true) {
-        ImGui::Dummy(ImVec2(config.width(), config.height()));
+        ImGui::Dummy(config.size_imvec());
         if (ImGui::IsItemVisible()) {
             _preview((uint64_t(ImGui::GetID("")) << 32) | id, config, get_rule(), interactive);
             imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_TableBorderStrong));
