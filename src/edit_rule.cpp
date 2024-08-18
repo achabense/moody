@@ -309,6 +309,7 @@ public:
                     imgui_Str(desc);
                 };
 
+                // !!TODO: should be rewritten....
                 imgui_Str(
                     "The following terms represent subsets of MAP rules. You can select these terms freely - "
                     "the program will calculate the intersection of selected subsets (with the whole MAP set), and "
@@ -344,13 +345,13 @@ public:
                 explain(Compatible, Disabled, "Not selectable, otherwise the working set will be empty.");
             });
             ImGui::SameLine();
-            imgui_Str("Subsets ~");
+            imgui_Str("Working set ~");
             ImGui::SameLine();
             put_term(current.contains(mold.rule)        ? Contained
                      : aniso::compatible(current, mold) ? Compatible
                                                         : Incompatible,
                      None, nullptr, false);
-            imgui_ItemTooltip("The working set. See '(...)' for explanation.");
+            imgui_ItemTooltip("See '(...)' for explanation.");
 
             // TODO: `static` for convenience. This must be refactored when there are to be multiple instances.
             static bool hide_details = false;
@@ -984,15 +985,15 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                     for (aniso::codeT code : group) {
                         rule[code] = !rule[code];
                     }
-                    bind_undo = true;
                     sync.set_rule(rule);
+                    bind_undo = true;
                 } else if (sync.enable_lock && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
                     aniso::moldT::lockT lock = mold.lock;
                     for (aniso::codeT code : group) {
                         lock[code] = !has_lock;
                     }
-                    // bind_undo = true;
                     sync.set_lock(lock);
+                    // bind_undo = true;
                 }
                 ImGui::PopStyleColor(3);
 

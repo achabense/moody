@@ -55,6 +55,8 @@ static aniso::moldT::lockT capture_closed(const aniso::tile_const_ref tile, cons
 // objects like guns, puffers etc.)
 // The area should be fully surrounded by 2*2 periodic border, and contain a full phase of the object (one or
 // several oscillators, or a single spaceship).
+// TODO: should be able to deal with larger periods in the future... (notice the error messages are currently
+// hard-coded.)
 static void identify(const aniso::tile_const_ref tile, const aniso::ruleT& rule,
                      const bool require_matching_background = true) {
     static constexpr aniso::vecT period_size{2, 2};
@@ -106,8 +108,7 @@ static void identify(const aniso::tile_const_ref tile, const aniso::ruleT& rule,
             return {};
         } else if (!(range.begin.both_gteq(period_size) && range.end.both_lteq(tile.size - period_size))) {
             if (for_input) {
-                // !!TODO: better message.
-                messenger::set_msg("The border is invalid.");
+                messenger::set_msg("The area should fully enclose the pattern with 2*2 periodic background.");
             } else {
                 assert(false); // Guaranteed by `regionT::run`.
             }
@@ -149,8 +150,7 @@ static void identify(const aniso::tile_const_ref tile, const aniso::ruleT& rule,
     };
 
     if (!tile.size.both_gt(period_size * 2)) {
-        // !!TODO: better message.
-        messenger::set_msg("The area is too small.");
+        messenger::set_msg("The area is too small. (Should be larger than 4*4.)");
         return;
     }
 
@@ -159,8 +159,7 @@ static void identify(const aniso::tile_const_ref tile, const aniso::ruleT& rule,
     if (!init_range) {
         return;
     } else if (!init_background.is_periodic(rule)) {
-        // !!TODO: better message.
-        messenger::set_msg("The background is not periodic.");
+        messenger::set_msg("The background is not temporally periodic.");
         return;
     }
 
@@ -1121,7 +1120,6 @@ public:
                         term("Bound", "B", ImGuiKey_B, true, _bounding_box);
 
                         // Copy/Cut/Paste.
-                        // !!TODO: add tooltip...
                         ImGui::Separator();
                         set_tag(add_rule, "Rule info",
                                 "Whether to include rule info ('rule = ...') in the header when copying patterns.");
@@ -1130,6 +1128,13 @@ public:
                         term("Copy", "C", ImGuiKey_C, true, _copy);
                         term("Cut", "X", ImGuiKey_X, true, _cut);
                         term("Paste", "V", ImGuiKey_V, false, _paste);
+
+                        ImGui::Separator();
+                        imgui_StrTooltip("(?)",
+                                         "Identify a single oscillator or spaceship in 2*2 periodic background "
+                                         "(e.g., pure white, pure black, striped, or checkerboard background), and "
+                                         "copy its smallest phase to the clipboard.");
+                        ImGui::SameLine();
                         term("Identify", "I (i)", ImGuiKey_I, true, _identify);
                     } else { // Shortcut only.
                         auto term2 = [&](ImGuiKey key, bool use_sel, operationE op2) {
