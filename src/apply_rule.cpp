@@ -13,8 +13,7 @@ static ImVec2 to_imvec(const aniso::vecT& vec) { return ImVec2(vec.x, vec.y); }
 static aniso::vecT from_imvec_floor(const ImVec2& vec) { return {.x = int(floor(vec.x)), .y = int(floor(vec.y))}; }
 
 static aniso::rangeT clamp_window(aniso::vecT size, aniso::vecT region_center, aniso::vecT region_size) {
-    region_size.x = std::min(size.x, region_size.x);
-    region_size.y = std::min(size.y, region_size.y);
+    region_size = aniso::min(size, region_size);
     aniso::vecT begin = aniso::clamp(region_center - region_size / 2, {0, 0}, size - region_size);
     return {.begin = begin, .end = begin + region_size};
 }
@@ -338,7 +337,7 @@ class runnerT {
             restart();
         }
 
-        void begin_frame(const aniso::ruleT& rule) {
+        bool begin_frame(const aniso::ruleT& rule) {
             extra_pause = false;
             m_ctrl.extra_step = 0;
 
@@ -348,7 +347,9 @@ class runnerT {
                 m_ctrl.pause = false;
 
                 restart();
+                return true;
             }
+            return false;
         }
         void restart() {
             m_gen = 0;
@@ -471,7 +472,11 @@ public:
         // !!TODO: recheck resetting logic. `m_sel` and `m_paste` may need to reset
         // in more situations. For example, `m_paste` does not make much sense if the rule
         // is updated / the space is restarted... (or, should it block such operations?)
-        m_torus.begin_frame(sync.current.rule);
+        const bool rule_changed = m_torus.begin_frame(sync.current.rule);
+        // if (rule_changed) {
+        //     // m_sel.reset();
+        //     m_paste.reset();
+        // }
 
         static bool background = 0;
         static bool auto_fit = false;
@@ -505,7 +510,6 @@ public:
                 if (!tooltip_mode) {
                     // m_torus.pause_for_this_frame();
 
-                    // !!TODO: whether to support this?
                     ImGui::Button("Click and hold to test effect");
                     if (!ImGui::IsItemActive()) {
                         m_torus.pause_for_this_frame();
@@ -534,12 +538,21 @@ public:
                     aniso::fill(init.background.data(), 0);
                 }
 
+                // There are:
+                // demo_size.z is a multiple of any i <= max_period.z, and
+                // cell_button_size.z * max_period.z == demo_size.z * demo_zoom (so the images have the same
+                // size as the board)
+                const aniso::vecT max_period{.x = 4, .y = 4};
+                const aniso::vecT demo_size{.x = 24, .y = 24};
+                const int demo_zoom = 3;
+                const ImVec2 cell_button_size{18, 18};
+
                 std::optional<aniso::vecT> resize{};
                 const aniso::tile_ref data = init.background.data();
                 ImGui::BeginGroup();
                 ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {0, 0});
-                for (int y = 0; y < 4 /*max-height*/; ++y) {
-                    for (int x = 0; x < 4 /*max-width*/; ++x) {
+                for (int y = 0; y < max_period.y; ++y) {
+                    for (int x = 0; x < max_period.x; ++x) {
                         if (x != 0) {
                             ImGui::SameLine();
                         }
@@ -547,7 +560,7 @@ public:
 
                         // (No need for unique ID here.)
                         ImGui::InvisibleButton(
-                            "##Invisible", square_size(),
+                            "##Invisible", cell_button_size,
                             ImGuiButtonFlags_MouseButtonLeft |
                                 ImGuiButtonFlags_MouseButtonRight); // So right-click can activate the button.
                         imgui_ItemRectFilled(in_range ? (data.at(x, y) ? IM_COL32_WHITE : IM_COL32_BLACK)
@@ -572,20 +585,42 @@ public:
                 ImGui::PopStyleVar();
                 ImGui::EndGroup();
 
-                ImGui::SameLine(0, 0);
-                imgui_Str(" ~ ");
-                ImGui::SameLine(0, 0);
-                aniso::tileT result({.x = data.size.x * 5, .y = data.size.y * 5});
-                aniso::fill(result.data(), data);
-                ImGui::Image(make_screen(result.data(), scaleE::Nearest), to_imvec(result.size() * 3), ImVec2(0, 0),
-                             ImVec2(1, 1), ImVec4(1, 1, 1, 1), ImGui::ColorConvertU32ToFloat4(IM_COL32_GREY(160, 255)));
-                // The background does not make much sense if it is not stable for the current rule, but
-                // I have no idea how it should behave.
+                {
+                    aniso::tileT demo(demo_size);
+                    aniso::fill(demo.data(), data);
 
-                if (resize) {
+                    ImGui::SameLine(0, 0);
+                    imgui_Str(" ~ ");
+                    ImGui::SameLine(0, 0);
+                    ImGui::Image(make_screen(demo.data(), scaleE::Nearest), to_imvec(demo.size() * demo_zoom));
+                    imgui_ItemRect(IM_COL32_GREY(160, 255));
+
+                    static aniso::tileT init, curr;
+                    // `rule_updated` will be true when the function works in the tooltip, while the user changes the
+                    // current rule with a shortcut.
+                    if (rule_changed || ImGui::IsWindowAppearing() || init != demo) {
+                        init = aniso::tileT(demo);
+                        curr = aniso::tileT(demo);
+                    }
+
+                    ImGui::SameLine(0, 0);
+                    imgui_Str(" ~ ");
+                    ImGui::SameLine(0, 0);
+                    ImGui::Image(make_screen(curr.data(), scaleE::Nearest), to_imvec(curr.size() * demo_zoom));
+                    imgui_ItemRect(IM_COL32_GREY(160, 255));
+
+                    // TODO: be timer-based? (frame-based approach works well in practice)
+                    if (ImGui::GetFrameCount() % 12 == 0) {
+                        curr.run_torus(sync.current.rule);
+                    }
+                }
+
+                if (resize && init.background.size() != *resize) {
                     assert(!tooltip_mode);
-                    init.background.resize(*resize);
-                    aniso::fill(init.background.data(), 0);
+                    aniso::tileT resized(*resize); // Already 0-filled.
+                    const aniso::vecT common = aniso::min(resized.size(), init.background.size());
+                    aniso::copy(resized.data().clip({{}, common}), init.background.data().clip({{}, common}));
+                    init.background.swap(resized);
                 }
 
                 assert_implies(tooltip_mode, !force_restart);

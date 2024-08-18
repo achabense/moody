@@ -13,6 +13,9 @@ namespace aniso {
         return {.x = divmul_ceil(a.x, b.x), .y = divmul_ceil(a.y, b.y)};
     }
 
+    inline vecT min(const vecT a, const vecT b) { return {.x = std::min(a.x, b.x), .y = std::min(a.y, b.y)}; }
+    inline vecT max(const vecT a, const vecT b) { return {.x = std::max(a.x, b.x), .y = std::max(a.y, b.y)}; }
+
     namespace _misc {
         class wrapped_int {
             int i; // [0, r).
