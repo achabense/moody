@@ -528,9 +528,9 @@ public:
                 ImGui::Separator();
 
                 ImGui::AlignTextToFramePadding();
-                imgui_StrTooltip("(...)", "Left-click a cell to set it to 1.\n"
-                                          "Right-click a cell to set it to 0.\n"
-                                          "Ctrl + left-click to resize.");
+                imgui_StrTooltip("(...)", "Left-click a cell to set it to 1 (white).\n"
+                                          "Right-click to set to 0 (black).\n\n"
+                                          "'Ctrl + left-click' to resize.");
                 ImGui::SameLine();
                 imgui_Str("Background ~");
                 ImGui::SameLine();
@@ -691,10 +691,12 @@ public:
                 return false;
             });
             auto_fit = auto_fit_next;
-            ImGui::SameLine(); // TODO: clarify that rotating is still allowed?
+            ImGui::SameLine();
             imgui_StrTooltip("(?)",
-                             "Click to automatically resize to full-screen.\n\n"
-                             "(Click again to quit this mode; dragging and scrolling are not available in this mode.)");
+                             "Click to enter auto-resizing mode.\n\n"
+                             "The window will be automatically resized to full-screen. Dragging and scrolling are "
+                             "not available, but you can still rotate the space with 'Ctrl + drag'.\n\n"
+                             "(Click the same button to quit this mode.)");
         };
 
         ImGui::PushItemWidth(item_width);
@@ -702,7 +704,7 @@ public:
         m_torus.set_ctrl([&](ctrlT& ctrl) {
             ImGui::AlignTextToFramePadding();
             imgui_StrTooltip("(...)", "Keyboard shortcuts:\n"
-                                      "R: Restart    Space: Pause\nN/M (repeatable): +p/+1\n"
+                                      "R: Restart    Space: Pause\nN/M (repeatable): +s/+1\n"
                                       "1/2 (repeatable): -/+ Step\n3/4 (repeatable): -/+ Interval\n");
             quick_info("< Keyboard shortcuts.");
             ImGui::SameLine();
@@ -713,7 +715,7 @@ public:
             ImGui::Checkbox("Pause", &ctrl.pause);
             ImGui::PushButtonRepeat(true);
             ImGui::SameLine();
-            if (ImGui::Button("+p")) {
+            if (ImGui::Button("+s")) {
                 ctrl.extra_step = ctrl.pause ? ctrl.actual_step() : 0;
                 ctrl.pause = true;
             }
@@ -724,13 +726,12 @@ public:
             ImGui::PopButtonRepeat();
             ImGui::SameLine();
             imgui_StrTooltip("(?)", [] {
-                imgui_Str("+p: ");
+                imgui_Str("+s: ");
                 ImGui::SameLine(0, 0);
-                imgui_Str("Run manually (advance generation by step, controlled by the button/'N').");
+                imgui_Str("Run manually (advance generation by step).");
                 imgui_Str("+1: ");
                 ImGui::SameLine(0, 0);
-                imgui_Str("Advance generation by 1 instead of step. This is useful for changing the parity "
-                          "of generation when (actual) step != 1.");
+                imgui_Str("Advance generation by 1 instead of step.");
             });
 
             ImGui::Separator(); // To align with the left panel.
@@ -747,7 +748,7 @@ public:
                 ImGui::SameLine();
                 imgui_StrTooltip("(?)",
                                  "As the current rule has '000...->1' and '111...->0', the step will be adjusted "
-                                 "to 2*n to avoid bad visual effect.\n\n"
+                                 "to 2*n to avoid bad visual effect (flashing pure-color background).\n\n"
                                  "(You can change the parity of generation with the '+1' button.)");
             }
 
@@ -795,14 +796,13 @@ public:
         ImGui::Separator();
 
         ImGui::AlignTextToFramePadding();
-        imgui_StrTooltip("(...)", [] {
-            imgui_Str("Mouse operations:\n"
-                      "1. Scroll in the window to zoom in/out.\n"
-                      "2. When there is nothing to paste, you can drag with left button to move the window, or 'Ctrl + "
-                      "left-drag' to \"rotate\" the space, or drag with right button to select area.\n"
-                      "3. Otherwise, left-click to decide where to paste. To move the window you can drag with "
-                      "right button. Rotating and selecting are not available in this mode.");
-        });
+        imgui_StrTooltip(
+            "(...)", "Mouse operations:\n"
+                     "1. Scroll in the window to zoom in/out.\n"
+                     "2. When there is nothing to paste, you can drag with left button to move the window, or 'Ctrl + "
+                     "left-drag' to \"rotate\" the space, or drag with right button to select area.\n"
+                     "3. Otherwise, left-click to decide where to paste. To move the window you can drag with "
+                     "right button. Rotating and selecting are not available in this case.");
         quick_info("v Mouse operations.");
 
         ImGui::SameLine();
