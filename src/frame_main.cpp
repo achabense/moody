@@ -1,6 +1,9 @@
-#include <thread>
-
 #include "common.hpp"
+
+// #define SET_FRAME_RATE
+
+#ifdef SET_FRAME_RATE
+#include <thread>
 
 class timerT {
     // (Typically the framerate is limited by VSync in this case, like 60 fps.)
@@ -42,6 +45,7 @@ public:
 #endif // !NDEBUG
     }
 };
+#endif
 
 // TODO: improve recorder logic if possible...
 // Never empty.
@@ -99,8 +103,10 @@ private:
 };
 
 void frame_main() {
+#ifdef SET_FRAME_RATE
     static timerT timer;
     timer.wait();
+#endif // SET_FRAME_RATE
 
     messenger::display();
 
@@ -147,11 +153,14 @@ void frame_main() {
         const int wide_spacing = ImGui::CalcTextSize(" ").x * 3;
         ImGui::SameLine(0, wide_spacing);
         ImGui::Text("(%d FPS)", (int)round(ImGui::GetIO().Framerate));
+#ifdef SET_FRAME_RATE
         imgui_ItemTooltip("Right-click to set frame rate.");
         if (begin_popup_for_item(imgui_ItemClickable(), "0")) {
             timer.set_fps();
             ImGui::EndPopup();
         }
+#endif // SET_FRAME_RATE
+
         ImGui::SameLine(0, wide_spacing);
         ImGui::Checkbox("Lock & capture", &sync.enable_lock_next);
 #ifndef NDEBUG

@@ -292,7 +292,6 @@ int main(int, char**) {
 
         end_frame();
 
-#if 0
         // Limit the framerate to be at most 100 fps.
         // (Normally `SDL_RENDERER_PRESENTVSYNC` will further limit to a smaller framerate, like 60fps.)
         static Uint64 last = 0;
@@ -304,7 +303,6 @@ int main(int, char**) {
         } else {
             last = now;
         }
-#endif
     }
     code_atlas::end();
     screen_textures::end();
