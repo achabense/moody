@@ -465,7 +465,7 @@ class batch_adapter {
 
 public:
     void display(std::function<aniso::ruleT()> gen, sync_point& out, const bool bind, ImVec2& min_req_size) {
-        auto calc_page = [&] { return (rules.size() + page_size - 1) / page_size; };
+        auto calc_page = [&]() -> int { return (rules.size() + page_size - 1) / page_size; };
         auto set_page = [&](int p, bool make_page = false) {
             if (p < 0) {
                 return;
