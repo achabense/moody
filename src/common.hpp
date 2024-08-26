@@ -351,12 +351,15 @@ public:
             }
             ImGui::SameLine();
             imgui_StrTooltip("(?)", [&] {
-                imgui_Str("Press 'T' to restart all preview windows.\n"
+                imgui_Str("Press 'T' to restart all preview windows.\n\n"
                           "For individual windows:\n"
-                          "Right-click to restart, left-click and hold to pause.");
+                          "Right-click to restart, left-click and hold to pause.\n"
+                          "'Ctrl + right-click' to copy the rule.");
                 ImGui::Separator();
                 _set();
             });
+            // !!TODO: 'ctrl + right-click' is an important convenience improvement.
+            // Should record this feature in 'Documents' as well.
         }
     };
 
@@ -364,15 +367,16 @@ public:
         ImGui::Dummy(config.size_imvec());
         if (ImGui::IsItemVisible()) {
             imgui_ItemRectFilled(col);
-            imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_TableBorderStrong));
+            imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_TableBorderStrong)); // Instead of `ImGuiCol_Border`
         }
     }
 
     static void preview(uint32_t id, const configT& config, const aniso::ruleT& rule, bool interactive = true) {
         ImGui::Dummy(config.size_imvec());
         if (ImGui::IsItemVisible()) {
-            _preview((uint64_t(ImGui::GetID("")) << 32) | id, config, rule, interactive);
-            imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_TableBorderStrong)); // Instead of `ImGuiCol_Border`
+            ImU32 border_col = ImGui::GetColorU32(ImGuiCol_TableBorderStrong);
+            _preview((uint64_t(ImGui::GetID("")) << 32) | id, config, rule, interactive, border_col);
+            imgui_ItemRect(border_col);
         }
     }
 
@@ -380,13 +384,15 @@ public:
                         bool interactive = true) {
         ImGui::Dummy(config.size_imvec());
         if (ImGui::IsItemVisible()) {
-            _preview((uint64_t(ImGui::GetID("")) << 32) | id, config, get_rule(), interactive);
-            imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_TableBorderStrong));
+            ImU32 border_col = ImGui::GetColorU32(ImGuiCol_TableBorderStrong);
+            _preview((uint64_t(ImGui::GetID("")) << 32) | id, config, get_rule(), interactive, border_col);
+            imgui_ItemRect(border_col);
         }
     }
 
 private:
-    static void _preview(uint64_t id, const configT& config, const aniso::ruleT& rule, bool interactive);
+    static void _preview(uint64_t id, const configT& config, const aniso::ruleT& rule, bool interactive,
+                         ImU32& border_col);
 };
 
 // The program will behave as if the lock feature doesn't exist when !enable_lock.

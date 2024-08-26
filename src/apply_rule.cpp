@@ -1321,8 +1321,8 @@ void previewer::configT::_set() {
     imgui_Str("Interval ~ 0ms, zoom ~ 1");
 }
 
-// TODO: support ctrl + drag to rotate?
-void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT& rule, bool interactive) {
+void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT& rule, bool interactive,
+                         ImU32& border_col) {
     struct termT {
         bool active = false;
         int seed = {};
@@ -1357,10 +1357,12 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
     }
     term.active = true;
 
+    const bool ctrl = ImGui::GetIO().KeyCtrl;
     // TODO: whether to support batch restart ('T') after all?
-    if ((may_test_key() && ImGui::IsKeyPressed(ImGuiKey_T, false /*!repeat*/)) ||
-        (interactive && ImGui::IsItemClicked(ImGuiMouseButton_Right)) || term.tile.size() != size ||
-        term.seed != config.seed || term.rule != rule) {
+    const bool restart = (may_test_key() && ImGui::IsKeyPressed(ImGuiKey_T, false /*!repeat*/)) ||
+                         (interactive && !ctrl && ImGui::IsItemClicked(ImGuiMouseButton_Right)) ||
+                         term.tile.size() != size || term.seed != config.seed || term.rule != rule;
+    if (restart) {
         term.tile.resize(size);
         term.seed = config.seed;
         term.rule = rule;
@@ -1392,5 +1394,15 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
             ImGui::EndTooltip();
         }
         ImGui::PopStyleVar();
+    }
+
+    if (interactive && ctrl) {
+        if (ImGui::IsItemHovered()) {
+            imgui_ItemRectFilled(IM_COL32_GREY(128, 48));
+        }
+        if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+            set_clipboard_and_notify(aniso::to_MAP_str(rule));
+            border_col = IM_COL32_WHITE;
+        }
     }
 }
