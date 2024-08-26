@@ -4,9 +4,42 @@
 
 #include "common.hpp"
 
-// TODO: support boundless space...
+namespace {
+    // (This is put in unnamed namespace to avoid potential conflict with another `timerT` in "frame_main.cpp")
+    // Related (odr): https://stackoverflow.com/questions/69642941
+    class timerT {
+        using clockT = std::chrono::steady_clock;
 
-using clockT = std::chrono::steady_clock;
+        int interval; // ms.
+        clockT::time_point last = {};
+
+    public:
+        explicit timerT(int interval_ms) : interval(interval_ms) {}
+
+        void set_now() { last = clockT::now(); }
+
+        bool test() {
+            const clockT::time_point now = clockT::now();
+            if (last + std::chrono::milliseconds(interval) <= now) {
+                last = now;
+                return true;
+            }
+            return false;
+        }
+
+        void add_interval(int delta_ms, int min_ms, int max_ms) { //
+            interval = std::clamp(interval + delta_ms, min_ms, max_ms);
+        }
+        void slide_interval(const char* label, int min_ms, int max_ms, int ms_per_unit) {
+            int units = interval / ms_per_unit;
+            imgui_StepSliderInt(label, &units, min_ms / ms_per_unit, max_ms / ms_per_unit,
+                                std::format("{} ms", units * ms_per_unit).c_str());
+            interval = units * ms_per_unit;
+        }
+
+        static constexpr int default_unit = 25;
+    };
+} // namespace
 
 static ImVec2 to_imvec(const aniso::vecT& vec) { return ImVec2(vec.x, vec.y); }
 
@@ -294,41 +327,32 @@ class runnerT {
             return step;
         }
 
-        // gap * gap_unit ~ interval.
-        static constexpr int gap_unit = 25; // ms.
-        static constexpr int gap_min = 0, gap_max = 20;
-        int gap = 0;
-
         bool pause = false;
 
         int extra_step = 0;
+        timerT timer{timerT::default_unit};
 
-        clockT::time_point last_time = {};
         int calc_step_this_frame() {
-            int step = std::exchange(extra_step, 0);
-            if (step == 0) {
-                if (!pause && (last_time + std::chrono::milliseconds{gap * gap_unit} <= clockT::now())) {
-                    step = actual_step();
-                }
+            if (extra_step > 0) {
+                timer.set_now();
+                return std::exchange(extra_step, 0);
+            } else if (!pause && timer.test()) {
+                return actual_step();
             }
-
-            if (step != 0) {
-                last_time = clockT::now();
-            }
-            return step;
+            return 0;
         }
     };
 
     class torusT {
         initT m_init{.seed = 0, .density = 0.5, .area = 0.5, .background = aniso::tileT{{.x = 1, .y = 1}}};
         aniso::tileT m_torus{{.x = 600, .y = 400}};
-        ctrlT m_ctrl{.rule{}, .step = 1, .anti_strobing = true, .gap = 0, .pause = false};
+        ctrlT m_ctrl{.rule{}, .step = 1, .anti_strobing = true, .pause = false};
         int m_gen = 0;
 
         bool extra_pause = false;
         void mark_written() {
             extra_pause = true;
-            m_ctrl.last_time = clockT::now();
+            m_ctrl.timer.set_now();
         }
 
     public:
@@ -609,8 +633,8 @@ public:
                     ImGui::Image(make_screen(curr.data(), scaleE::Nearest), to_imvec(curr.size() * demo_zoom));
                     imgui_ItemRect(IM_COL32_GREY(160, 255));
 
-                    // TODO: be timer-based? (frame-based approach works well in practice)
-                    if (ImGui::GetFrameCount() % 12 == 0) {
+                    static timerT timer{200};
+                    if (timer.test()) {
                         curr.run_torus(sync.current.rule);
                     }
                 }
@@ -752,8 +776,8 @@ public:
                                  "(You can change the parity of generation with the '+1' button.)");
             }
 
-            imgui_StepSliderInt("Interval", &ctrl.gap, ctrl.gap_min, ctrl.gap_max,
-                                std::format("{} ms", ctrl.gap * ctrl.gap_unit).c_str());
+            const int min_ms = 0, max_ms = 400;
+            ctrl.timer.slide_interval("Interval", min_ms, max_ms, timerT::default_unit);
 
             if (test_key(ImGuiKey_R, false)) {
                 m_torus.restart();
@@ -762,9 +786,9 @@ public:
             } else if (test_key(ImGuiKey_2, true)) {
                 ctrl.step = std::min(ctrl.step_max, ctrl.step + 1);
             } else if (test_key(ImGuiKey_3, true)) {
-                ctrl.gap = std::max(ctrl.gap_min, ctrl.gap - 1);
+                ctrl.timer.add_interval(-timerT::default_unit, min_ms, max_ms);
             } else if (test_key(ImGuiKey_4, true)) {
-                ctrl.gap = std::min(ctrl.gap_max, ctrl.gap + 1);
+                ctrl.timer.add_interval(timerT::default_unit, min_ms, max_ms);
             } else if (test_key(ImGuiKey_Space, false)) {
                 ctrl.pause = !ctrl.pause;
             } else if (test_key(ImGuiKey_N, true)) {
@@ -1299,7 +1323,14 @@ void apply_rule(sync_point& sync) {
 }
 
 // TODO: support zoom = 0.5, 1, 2?
-// TODO: apply initT?
+// TODO: apply initT? (notice background poses extra size requirements...)
+
+// TODO: support setting step/interval with shortcuts when the preview window is hovered?
+// (The problem is, when to assign shortcuts to the main window?)
+struct global_config {
+    inline static timerT timer{timerT::default_unit};
+};
+
 void previewer::configT::_set() {
     ImGui::AlignTextToFramePadding();
     imgui_Str("Size ~");
@@ -1311,14 +1342,15 @@ void previewer::configT::_set() {
     }
     ImGui::SetNextItemWidth(item_width);
     imgui_StepSliderInt("Seed", &seed, 0, 9);
-    imgui_Str("Density ~ 0.5, area ~ 1.0");
-    // TODO: what about background?
-
+    imgui_Str("Density ~ 0.5, area ~ 1.0, background ~ default");
     ImGui::Separator();
 
     ImGui::SetNextItemWidth(item_width);
     imgui_StepSliderInt("Step", &step, 1, 16);
-    imgui_Str("Interval ~ 0ms, zoom ~ 1");
+    ImGui::SetNextItemWidth(item_width);
+    global_config::timer.slide_interval("Interval", 0, 400, timerT::default_unit);
+    ImGui::SameLine();
+    imgui_StrTooltip("(?)", "This setting is shared by all preview windows.");
 }
 
 void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT& rule, bool interactive,
@@ -1330,9 +1362,12 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
         aniso::tileT tile = {};
     };
     static std::unordered_map<uint64_t, termT> terms;
+    static bool run_this_frame = false;
 
     static unsigned latest = ImGui::GetFrameCount();
     if (const unsigned frame = ImGui::GetFrameCount(); frame != latest) {
+        run_this_frame = global_config::timer.test();
+
         if (latest + 1 != frame) {
             terms.clear();
         } else {
@@ -1372,7 +1407,7 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
 
     // (`IsItemActive` does not work as preview-window is based on `Dummy`.)
     const bool pause = interactive && ImGui::IsItemHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Left);
-    if (!pause) {
+    if (!pause && (restart || run_this_frame)) {
         const int p = config.step + ((config.step % 2 == 1) && strobing(rule));
         for (int i = 0; i < p; ++i) {
             term.tile.run_torus(rule);
