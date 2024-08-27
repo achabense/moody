@@ -156,7 +156,7 @@ namespace aniso {
     }
 
     inline void fill_outside(const tile_ref tile, const rangeT& range, const bool v) {
-        assert(tile.has_range(range));
+        assert(tile.contains(range));
         tile.for_each_line([&](const int y, std::span<bool> line) {
             if (y < range.begin.y || y >= range.end.y) {
                 std::ranges::fill(line, v);
@@ -174,7 +174,7 @@ namespace aniso {
             return;
         }
 
-        assert(tile.has_range(range));
+        assert(tile.contains(range));
         const auto fill = [](std::span<bool> line, const bool* rep, _misc::wrapped_int dx) {
             for (bool& b : line) {
                 b = rep[dx++];

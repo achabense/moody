@@ -66,24 +66,27 @@ namespace aniso {
                 return tile_ref_<const T>{size, stride, data};
             }
 
+            bool contains(vecT pos) const { return pos.x >= 0 && pos.y >= 0 && pos.x < size.x && pos.y < size.y; }
+            bool contains(int x, int y) const { return x >= 0 && y >= 0 && x < size.x && y < size.y; }
+            bool contains(const rangeT& range) const {
+                return range.begin.both_gteq({0, 0}) && range.end.both_lteq(size);
+            }
+
             T* line(int y) const {
                 assert(y >= 0 && y < size.y);
                 return data + stride * y;
             }
             T& at(vecT pos) const {
-                assert(pos.both_gteq({0, 0}) && pos.both_lt(size));
+                assert(contains(pos));
                 return *(data + stride * pos.y + pos.x);
             }
             T& at(int x, int y) const {
-                assert(x >= 0 && y >= 0 && x < size.x && y < size.y);
+                assert(contains(x, y));
                 return *(data + stride * y + x);
             }
 
-            bool has_range(const rangeT& range) const {
-                return range.begin.both_gteq({0, 0}) && range.end.both_lteq(size);
-            }
             [[nodiscard]] tile_ref_ clip(const rangeT& range) const {
-                assert(!range.empty() && has_range(range));
+                assert(!range.empty() && contains(range));
                 return {range.size(), stride, data + range.begin.x + stride * range.begin.y};
             }
 

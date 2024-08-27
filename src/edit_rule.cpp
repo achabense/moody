@@ -5,12 +5,6 @@
 // TODO: incorporate moldT into the subset system (let the working set be the intersection of subsetT and moldT)?
 // How to support an editable moldT that can be incompatible with the current rule?
 
-// This non-inline wrapper is necessary, as otherwise "the definition of an inline function must be reachable in the
-// translation unit where it is accessed".
-aniso::moldT aniso_trans_reverse(const aniso::moldT& mold) { //
-    return aniso::trans_reverse(mold);
-}
-
 namespace aniso {
     namespace _subsets {
         static const subsetT ignore_q = make_subset({mp_ignore_q});
@@ -103,6 +97,16 @@ namespace aniso {
 
 } // namespace aniso
 
+// `aniso::trans_reverse` cannot be directly declared and called in other TUs, as "the definition of
+// an inline function must be reachable in the translation unit where it is accessed".
+aniso::moldT rule_algo::trans_reverse(const aniso::moldT& mold) { //
+    return aniso::trans_reverse(mold);
+}
+
+bool rule_algo::is_hexagonal_rule(const aniso::ruleT& rule) { //
+    return aniso::_subsets::ignore_hex.contains(rule);
+}
+
 // `subsetT` (and `mapperT` pair) are highly customizable. However, for sanity there is no plan to
 // support user-defined subsets in the gui part.
 class subset_selector {
@@ -177,10 +181,11 @@ public:
         terms_misc.emplace_back("s(*)", &ignore_s_i,
                                 "Similar to 's' - for any two cases where only 's' is different, the \"flip-ness\" of "
                                 "the values are the same (either s:0->0, s:1->1 or s:0->1, s:1->0).");
-        terms_misc.emplace_back(
-            "Hex", &ignore_hex,
-            "Rules that emulate hexagonal neighborhood (by making the values independent of 'e/z'). "
-            "See the last line for demonstration.");
+        terms_misc.emplace_back("Hex", &ignore_hex,
+                                "Rules that emulate hexagonal neighborhood, by making the values independent of 'e/z'. "
+                                "See the last line for demonstration.\n\n"
+                                "For windows displaying hexagonal rules, you can hover on them and press '6' to see "
+                                "what \"actually\" happens in the corresponding hexagonal space.");
         terms_misc.emplace_back(
             "Von", &ignore_von,
             "Rules in the von-Neumann neighborhood. (Rules whose values are independent of 'q/e/z/c'.)\n\n"
@@ -219,6 +224,7 @@ public:
         terms_hex.emplace_back("All", &hex_isotropic,
                                "Rules that emulate isotropic hexagonal rules.\n\n"
                                "(Remember to unselect native-symmetry terms when working with this line.)");
+        // !!TODO: elaborate...
         terms_hex.emplace_back(
             "a-d", &hex_refl_asd,
             "Rules that emulate reflection symmetry in the hexagonal tiling, taking the axis from 'a' to 'd'.");

@@ -211,12 +211,12 @@ void frame_main() {
 
         ImGui::SameLine();
         if (ImGui::Button("Rev")) {
-            sync.set_mold(aniso_trans_reverse(sync.current));
+            sync.set_mold(rule_algo::trans_reverse(sync.current));
         }
         imgui_ItemTooltip([&] {
             imgui_Str("Get the 0/1 reversal dual of the current rule.");
             ImGui::Separator();
-            const aniso::ruleT rev = aniso_trans_reverse(sync.current).rule;
+            const aniso::ruleT rev = rule_algo::trans_reverse(sync.current).rule;
             if (rev != sync.current.rule) {
                 imgui_Str("Preview:");
                 ImGui::SameLine();

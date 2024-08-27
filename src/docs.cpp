@@ -15,6 +15,7 @@ The project was then abandoned for many years. Last year I felt an urgency to br
 // TODO: about MAP rules...
 // TODO: about the lock & capture feature...
 // !!TODO: 'Randomize' is renamed... (many parts should be rewritten in this version...)
+// !!TODO: about identify...
 const char* const doc_overview =
     R"(At any time, the program has a rule shown in the right panel (which is an editable torus space; the operations are recorded in the tooltips (...)). This is later called the "current rule". As you see, it is the Game of Life rule initially.
 
@@ -190,8 +191,9 @@ MAPIIAAAYABARcAAQEXARcXf4ABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf
 
 
 ---- Rules emulating hexagonal neighborhood
-The subsets at the last line emulate symmetries in the hexagonal tiling. For example, the two kinds of spaceships in the following rule are conceptually the same thing in the corresponding hexagonal rule (in the real hexagonal tiling).
+The subsets at the last line emulate symmetries in the hexagonal tiling. For example, the following rule has spaceships of different shapes moving in different directions, however, these spaceships are conceptually the same thing in the corresponding hexagonal space. To confirm this, you can hover on the preview window and press '6' to see their "actual" shapes in the projected space, and you will see that they all have the same shape.
 MAPEUQAIiIARGYRRAAiIgBEZgCIVSIAAO6IAIhVIgAA7ogAADPuiABEiAAAM+6IAESIiABmAAAAAACIAGYAAAAAAA
+(Also, if you identify those spaceships in the right panel (select a spaceship and press 'I'), you will find their periods are all the same.)
 
 Isotropic ('All', not to be confused with real isotropic rules):
 MAPEVWIADNmABERVYgAM2YAERHuABF37gAAEe4AEXfuAAARdwAA7u4RABF3AADu7hEA/6oARMwRIoj/qgBEzBEiiA

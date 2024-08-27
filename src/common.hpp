@@ -50,7 +50,10 @@ void edit_rule(sync_point&, bool& bind_undo);
 void static_constraints(sync_point&);
 void apply_rule(sync_point&);
 
-aniso::moldT aniso_trans_reverse(const aniso::moldT&);
+struct rule_algo {
+    static aniso::moldT trans_reverse(const aniso::moldT&);
+    static bool is_hexagonal_rule(const aniso::ruleT&);
+};
 
 // "tile_base.hpp"
 namespace aniso::_misc {

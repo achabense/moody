@@ -1,3 +1,4 @@
+#include <numbers>
 #include <unordered_map>
 
 #include "tile.hpp"
@@ -54,6 +55,79 @@ static aniso::rangeT clamp_window(aniso::vecT size, aniso::vecT region_center, a
 static bool strobing(const aniso::ruleT& rule) {
     constexpr aniso::codeT all_0{0}, all_1{511};
     return rule[all_0] == 1 && rule[all_1] == 0;
+}
+
+//           q w -
+//           a s d
+// Works for - x c case (~ rules in 'Hex' subset).
+static void hex_image(const aniso::tile_const_ref source, const aniso::vecT /*source*/ center,
+                      const aniso::vecT window_size, const double hex_d /*distance between adjacent centers*/) {
+    const auto rel_pos = [](const double x, const double y /*normalized, relative to a center*/) -> aniso::vecT {
+        // q w -     q w -
+        // a s d ~  a s d (1,0)
+        // - x c   - x c (1,1)
+        //         (0,1)
+        // When diameter = 1, there are:
+        // s>x = (-1/2,sqrt3/2), s>d = (1,0), and
+        // For any integers i and j, s>x * i + s>d * j points at hexagon centers (bijection).
+        constexpr double _sqrt3_div_2 = std::numbers::sqrt3 / 2;
+        constexpr double _2_div_sqrt3 = std::numbers::inv_sqrt3 * 2;
+
+        // Let (x,y) = s>x * y2 + s>d * x2, there are:
+        const double y2 = y * _2_div_sqrt3;
+        const double x2 = x + y2 * 0.5;
+
+        // And the point should belong to the hexagon with the nearest center:
+        double min_dist_sqr = 100;
+        int dx = 0, dy = 0;
+        auto find_nearest = [&](const double x2, const double y2 /*integral*/) {
+            const double center_x = -0.5 * y2 + x2;
+            const double center_y = _sqrt3_div_2 * y2;
+            const double dist_sqr = (x - center_x) * (x - center_x) + (y - center_y) * (y - center_y);
+            if (dist_sqr < min_dist_sqr) {
+                min_dist_sqr = dist_sqr;
+                dx = x2, dy = y2;
+            }
+        };
+
+        const double x2_flr = floor(x2), y2_flr = floor(y2);
+        find_nearest(x2_flr, y2_flr);
+        find_nearest(x2_flr + 1, y2_flr);
+        find_nearest(x2_flr, y2_flr + 1);
+        find_nearest(x2_flr + 1, y2_flr + 1);
+        return {.x = dx, .y = dy};
+    };
+
+    aniso::tileT dest(window_size);
+    const auto dest_data = dest.data();
+    const double _1_div_hex_d = 1.0 / hex_d;
+    for (int y = 0; y < window_size.y; ++y) {
+        for (int x = 0; x < window_size.x; ++x) {
+            const auto pos =
+                center + rel_pos((x - window_size.x / 2) * _1_div_hex_d, (y - window_size.y / 2) * _1_div_hex_d);
+            if (source.contains(pos)) {
+                dest_data.at(x, y) = source.at(pos);
+            } else {
+                dest_data.at(x, y) = (x + y) & 1; // Checkerboard texture.
+            }
+        }
+    }
+
+    ImGui::Image(make_screen(dest_data, scaleE::Linear), to_imvec(window_size));
+}
+
+// `is_hexagonal_rule` is not strictly necessary, but it ensures that the project view is
+// always meaningful.
+static bool want_hex_mode(const aniso::ruleT& rule) {
+    // return !ImGui::GetIO().WantTextInput && ImGui::IsKeyDown(ImGuiKey_6);
+
+    if (!ImGui::GetIO().WantTextInput && ImGui::IsKeyDown(ImGuiKey_6)) {
+        if (rule_algo::is_hexagonal_rule(rule)) {
+            return true;
+        }
+        messenger::set_msg("This rule does not belong to 'Hex' subset.");
+    }
+    return false;
 }
 
 // TODO: error-prone. Should work in a way similar to `identify`.
@@ -924,6 +998,8 @@ public:
             }
 
             std::optional<aniso::vecT> zoom_center = std::nullopt; // Not clamped.
+            bool hex_mode = false;
+
             if (hovered) {
                 const ImGuiIO& io = ImGui::GetIO();
                 assert(ImGui::IsMousePosValid(&io.MousePos));
@@ -959,9 +1035,12 @@ public:
 
                 const aniso::vecT cel_pos = from_imvec_floor(m_coord.to_space(mouse_pos));
 
-                if (m_coord.zoom <= 1 && !m_paste && (!active || false /* for testing */)) {
-                    if (cel_pos.both_gteq({-10, -10}) && cel_pos.both_lt(tile_size.plus(10, 10))) {
-                        if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
+                // (`want_hex_mode` should be tested only when the zoom window is really going to be shown.)
+                if (!m_paste && (!active || !r_down)) {
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip) && cel_pos.both_gteq({-10, -10}) &&
+                        cel_pos.both_lt(tile_size.plus(10, 10))) {
+                        hex_mode = want_hex_mode(sync.current.rule);
+                        if (hex_mode || m_coord.zoom <= 1) {
                             zoom_center = cel_pos;
                         }
                     }
@@ -995,12 +1074,17 @@ public:
 
                     drawlist->AddImage(texture, screen_min, screen_max);
                     if (zoom_center.has_value()) {
-                        const auto clamped = clamp_window(tile_size, *zoom_center, {80, 60});
-                        assert(!clamped.empty());
-
                         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
                         if (ImGui::BeginTooltip()) {
-                            if (scale_mode == scaleE::Nearest) {
+                            const aniso::rangeT clamped = clamp_window(tile_size, *zoom_center, {80, 60});
+                            assert(!clamped.empty());
+
+                            if (hex_mode) {
+                                // Using *zoom_center instead of (clamped.begin + .end) / 2, as otherwise the
+                                // bottom-left corner cannot be fully shown.
+                                hex_image(m_torus.read_only(), *zoom_center, clamped.size() * 3,
+                                          std::max(double(m_coord.zoom), 3.0));
+                            } else if (scale_mode == scaleE::Nearest) {
                                 ImGui::Image(texture, to_imvec(clamped.size() * 3),
                                              to_imvec(clamped.begin) / to_imvec(tile_size),
                                              to_imvec(clamped.end) / to_imvec(tile_size));
@@ -1011,7 +1095,8 @@ public:
                                              to_imvec(clamped.size() * 3));
                             }
 
-                            if (m_sel) {
+                            // (wontfix) It's too hard to correctly show selected area in hex mode.
+                            if (!hex_mode && m_sel) {
                                 const aniso::rangeT sel = aniso::common(clamped, m_sel->to_range());
                                 if (!sel.empty()) {
                                     const ImVec2 zoom_min = ImGui::GetItemRectMin();
@@ -1424,8 +1509,15 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
         if (ImGui::BeginTooltip()) {
             const aniso::rangeT clamped = clamp_window(size, from_imvec_floor(pos), {64, 48});
             assert(!clamped.empty());
-            ImGui::Image(texture, to_imvec(clamped.size() * 3), to_imvec(clamped.begin) / to_imvec(size),
-                         to_imvec(clamped.end) / to_imvec(size));
+            if (want_hex_mode(rule)) {
+                // Using `pos` instead of (clamped.begin + .end) / 2, as otherwise the bottom-left
+                // corner cannot be fully shown.
+                hex_image(term.tile.data(), from_imvec_floor(pos), clamped.size() * 3, 3);
+            } else {
+                ImGui::Image(texture, to_imvec(clamped.size() * 3), to_imvec(clamped.begin) / to_imvec(size),
+                             to_imvec(clamped.end) / to_imvec(size));
+            }
+
             ImGui::EndTooltip();
         }
         ImGui::PopStyleVar();
