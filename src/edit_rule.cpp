@@ -858,31 +858,6 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
             }
         });
 
-#if 0
-        // TODO: whether to expose this? This is conceptually well-defined, but very hard to explain and
-        // the effect may not be as expected.
-        // TODO: ... sometimes this is really useful...
-        // combine with batch preview -> approximated by different sets?
-        ImGui::SameLine();
-        guarded_block(compatible, [&] {
-            if (ImGui::Button("Approximate")) {
-                sync.set_rule(aniso::approximate(subset, mold));
-            }
-        });
-        imgui_ItemTooltip([&] {
-            // TODO: refine message; and approximation is not very useful in practice...
-            imgui_Str("When the current rule does not belong to the working set (but the "
-                      "constraints can be met), you can try this to get the closest rule in the set.");
-            ImGui::Separator();
-            if (!contained) {
-                imgui_Str("Preview:");
-                ImGui::SameLine();
-                previewer::preview(-1, previewer::configT::_220_160, aniso::approximate(subset, mold), false);
-            } else {
-                imgui_Str("(The current rule already belongs to the working set.)");
-            }
-        });
-#endif
         ImGui::SameLine();
         ImGui::Checkbox("Preview", &preview_mode);
         quick_info("^ Try this!");
@@ -902,10 +877,20 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
         } else if (compatible) {
             ImGui::Text("Groups:%d !contained", c_group);
             ImGui::SameLine();
-            imgui_StrTooltip(
-                "(?)",
-                "The current rule does not belong to the working set. (Check the dull-blue groups for details.)\n\n"
-                "(You can get rules in the working set with '<00..', '11..>', or 'Randomize'.)");
+            imgui_StrTooltip("(?)", [&] {
+                imgui_Str("The current rule does not belong to the working set.\n\n"
+                          "Check the dull-blue groups for details - no matter which mask is selected, for any rule in "
+                          "the working set, the masked values should be all the same in any group.\n\n"
+                          "You can get rules in the working set with '<00..', '11..>', or 'Randomize'. Or "
+                          "optionally, you can right-click this '(?)' to get the following rule in the working set.");
+                ImGui::Separator();
+                imgui_Str("Preview:");
+                ImGui::SameLine();
+                previewer::preview(-1, previewer::configT::_220_160, aniso::approximate(subset, mold), false);
+            });
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+                sync.set_rule(aniso::approximate(subset, mold));
+            }
         } else {
             ImGui::Text("Groups:%d !compatible", c_group);
             ImGui::SameLine();
