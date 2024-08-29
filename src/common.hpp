@@ -83,13 +83,64 @@ inline float wrap_len() {
     return ImGui::GetFontSize() * 35.0f;
 }
 
-inline bool may_test_key() { //
-    // (`!IsAnyItemActive` may be implied by `!WantCaptureKeyboard`; added anyway.)
-    return !ImGui::GetIO().WantCaptureKeyboard && !ImGui::IsAnyItemActive();
-}
+// TODO: consider using ImGui::Shortcut?
+// Some features cannot easily be satisfied with `ImGui::Shortcut` and `ImGui::SetNextItemShortcut`.
+// !!TODO: whether to focus item/window?
+struct shortcuts {
+    static bool global_flag(ImGuiKey key) { //
+        return !ImGui::GetIO().WantTextInput && ImGui::IsKeyDown(key);
+    }
+
+    static bool keys_avail() {
+        // (`!IsAnyItemActive` seems to be implied by `!WantCaptureKeyboard`; added anyway.)
+        return !ImGui::GetIO().WantCaptureKeyboard && !ImGui::IsAnyItemActive();
+    }
+
+    static bool keys_avail_and_window_hoverable() { // Not blocked by popup.
+        return keys_avail() && imgui_IsWindowHoverable();
+    }
+
+    static bool test(ImGuiKey key, bool repeat = false) {
+        assert(key != ImGuiKey_None);
+        {
+            // Resolve shortcut competition when multiple keys are pressed.
+            static unsigned latest = ImGui::GetFrameCount();
+            static bool occupied = false;
+            if (const unsigned frame = ImGui::GetFrameCount(); frame != latest) {
+                latest = frame;
+                occupied = false;
+            }
+            if (occupied) {
+                return false;
+            }
+            if (ImGui::IsKeyDown(key)) {
+                occupied = true;
+            }
+        }
+        return ImGui::IsKeyPressed(key, repeat);
+    }
+
+    static bool highlight(ImGuiID id = 0) {
+        if (id == 0) {
+            id = ImGui::GetItemID();
+        }
+        ImGui::NavHighlightActivated(id);
+        return true;
+    }
+
+    // Should be called after the item.
+    static bool item_shortcut(ImGuiKey key, bool repeat = false, std::optional<bool> cond = std::nullopt) {
+        if (key != ImGuiKey_None && !imgui_TestItemFlag(ImGuiItemFlags_Disabled)) {
+            if (cond.has_value() ? *cond : keys_avail_and_window_hoverable()) { // `value_or` won't short-circuit.
+                return test(key, repeat) && highlight();
+            }
+        }
+        return false;
+    }
+};
 
 inline void quick_info(std::string_view msg) {
-    if (!ImGui::GetIO().WantTextInput && ImGui::IsKeyDown(ImGuiKey_H) && ImGui::IsItemVisible()) {
+    if (shortcuts::global_flag(ImGuiKey_H) && ImGui::IsItemVisible()) {
         imgui_ItemRect(IM_COL32_WHITE);
 
         assert(!msg.empty());
@@ -120,11 +171,13 @@ inline void quick_info(std::string_view msg) {
 inline void set_scroll_by_up_down(float dy) {
     // TODO: are there easy ways to query "is current window or its parent windows focused"?
     const ImGuiFocusedFlags flags = ImGuiFocusedFlags_RootAndChildWindows | ImGuiFocusedFlags_NoPopupHierarchy;
-    if (may_test_key() && ImGui::IsWindowFocused(flags)) {
-        if (ImGui::IsKeyPressed(ImGuiKey_DownArrow, true /*repeat*/)) {
+    if (shortcuts::keys_avail() && ImGui::IsWindowFocused(flags)) {
+        if (shortcuts::test(ImGuiKey_DownArrow, true)) {
             ImGui::SetScrollY(ImGui::GetScrollY() + dy);
-        } else if (ImGui::IsKeyPressed(ImGuiKey_UpArrow, true /*repeat*/)) {
+            shortcuts::highlight(ImGui::GetWindowScrollbarID(ImGui::GetCurrentWindowRead(), ImGuiAxis_Y));
+        } else if (shortcuts::test(ImGuiKey_UpArrow, true)) {
             ImGui::SetScrollY(ImGui::GetScrollY() - dy);
+            shortcuts::highlight(ImGui::GetWindowScrollbarID(ImGui::GetCurrentWindowRead(), ImGuiAxis_Y));
         }
     }
 }
@@ -147,10 +200,10 @@ class sequence {
     static bool button_with_shortcut(const char* label, ImGuiKey shortcut = ImGuiKey_None) {
         bool ret = ImGui::Button(label);
         if (shortcut != ImGuiKey_None && !imgui_TestItemFlag(ImGuiItemFlags_Disabled)) {
-            const bool pressed =
-                may_test_key() && imgui_IsWindowHoverable() && ImGui::IsKeyPressed(shortcut, false /*!repeat*/);
-            imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_ButtonActive, pressed ? 0.3f : 1.0f));
-            ret = ret || pressed;
+            imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_ButtonActive, 1.0f));
+            if (!ret && shortcuts::item_shortcut(shortcut)) {
+                ret = true;
+            }
         }
         return ret;
     }
@@ -224,6 +277,67 @@ public:
         }
     }
 };
+
+class imgui_StepSliderShortcuts {
+    friend bool imgui_StepSliderInt(const char* label, int* v, int v_min, int v_max, const char* format);
+
+    inline static ImGuiKey minus = ImGuiKey_None;
+    inline static ImGuiKey plus = ImGuiKey_None;
+    inline static std::optional<bool> cond = std::nullopt; // Shared by both buttons.
+
+public:
+    static void reset() {
+        minus = plus = ImGuiKey_None;
+        cond.reset();
+    }
+
+    static void set(ImGuiKey m, ImGuiKey p, std::optional<bool> c = std::nullopt) {
+        minus = m;
+        plus = p;
+        cond = c;
+    }
+};
+
+// (Referring to ImGui::InputScalar; moved here to support shortcuts.)
+inline bool imgui_StepSliderInt(const char* label, int* v, int v_min, int v_max, const char* format = "%d") {
+    if (GImGui->CurrentWindow->SkipItems) {
+        return false;
+    }
+
+    int v2 = *v;
+
+    const float r = ImGui::GetFrameHeight();
+    const float s = imgui_ItemInnerSpacingX();
+    ImGui::BeginGroup();
+    ImGui::PushID(label);
+    ImGui::SetNextItemWidth(std::max(1.0f, ImGui::CalcItemWidth() - 2 * (r + s)));
+    ImGui::SliderInt("", &v2, v_min, v_max, format, ImGuiSliderFlags_NoInput);
+    ImGui::PushButtonRepeat(true);
+    ImGui::SameLine(0, s);
+    // (`InputScalar` makes .FramePadding.x = y for these buttons, not added here.)
+    if (ImGui::Button("-", ImVec2(r, r)) ||
+        shortcuts::item_shortcut(imgui_StepSliderShortcuts::minus, true, imgui_StepSliderShortcuts::cond)) {
+        --v2;
+    }
+    ImGui::SameLine(0, s);
+    if (ImGui::Button("+", ImVec2(r, r)) ||
+        shortcuts::item_shortcut(imgui_StepSliderShortcuts::plus, true, imgui_StepSliderShortcuts::cond)) {
+        ++v2;
+    }
+    ImGui::PopButtonRepeat();
+    const char* label_end = ImGui::FindRenderedTextEnd(label);
+    if (label != label_end) {
+        ImGui::SameLine(0, s);
+        imgui_Str(std::string_view(label, label_end));
+    }
+    ImGui::PopID();
+    ImGui::EndGroup();
+
+    v2 = std::clamp(v2, v_min, v_max);
+    const bool changed = *v != v2;
+    *v = v2;
+    return changed;
+}
 
 class messenger {
     class messageT {

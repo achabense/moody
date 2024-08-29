@@ -80,13 +80,13 @@ static void hex_image(const aniso::tile_const_ref source, const aniso::vecT /*so
         // And the point should belong to the hexagon with the nearest center:
         double min_dist_sqr = 100;
         int dx = 0, dy = 0;
-        auto find_nearest = [&](const double x2, const double y2 /*integral*/) {
-            const double center_x = -0.5 * y2 + x2;
-            const double center_y = _sqrt3_div_2 * y2;
+        auto find_nearest = [&](const double center_x2, const double center_y2 /*integral*/) {
+            const double center_x = -0.5 * center_y2 + center_x2;
+            const double center_y = _sqrt3_div_2 * center_y2;
             const double dist_sqr = (x - center_x) * (x - center_x) + (y - center_y) * (y - center_y);
             if (dist_sqr < min_dist_sqr) {
                 min_dist_sqr = dist_sqr;
-                dx = x2, dy = y2;
+                dx = center_x2, dy = center_y2;
             }
         };
 
@@ -119,9 +119,9 @@ static void hex_image(const aniso::tile_const_ref source, const aniso::vecT /*so
 // `is_hexagonal_rule` is not strictly necessary, but it ensures that the project view is
 // always meaningful.
 static bool want_hex_mode(const aniso::ruleT& rule) {
-    // return !ImGui::GetIO().WantTextInput && ImGui::IsKeyDown(ImGuiKey_6);
+    // return shortcuts::global_flag(ImGuiKey_6);
 
-    if (!ImGui::GetIO().WantTextInput && ImGui::IsKeyDown(ImGuiKey_6)) {
+    if (shortcuts::global_flag(ImGuiKey_6)) {
         if (rule_algo::is_hexagonal_rule(rule)) {
             return true;
         }
@@ -590,10 +590,13 @@ public:
         }
 
         const char* const canvas_name = "Canvas";
-        const bool enable_shortcuts =
-            (may_test_key() && imgui_IsWindowHoverable()) || (GImGui->ActiveId == ImGui::GetID(canvas_name));
-        auto test_key = [enable_shortcuts](ImGuiKey key, bool repeat) {
-            return enable_shortcuts && ImGui::IsKeyPressed(key, repeat);
+        const ImGuiID canvas_id = ImGui::GetID(canvas_name);
+        // The shortcuts are available only when the canvas is hovered or active (which won't happen when the window
+        // is blocked by popups).
+        // (Also, `shortcuts::keys_avail` is not true if the canvas is being held, but this does not matter.)
+        const bool enable_shortcuts = (ImGui::GetActiveID() == canvas_id) || (ImGui::GetHoveredID() == canvas_id);
+        auto test_shortcut = [enable_shortcuts](ImGuiKey key, bool repeat) {
+            return enable_shortcuts && shortcuts::test(key, repeat);
         };
 
         auto set_init_state = [&](const bool tooltip_mode) {
@@ -800,25 +803,31 @@ public:
         ImGui::PushItemWidth(item_width);
         ImGui::BeginGroup();
         m_torus.set_ctrl([&](ctrlT& ctrl) {
+            auto item_shortcut = [&](ImGuiKey key, bool repeat) {
+                return test_shortcut(key, repeat) && shortcuts::highlight();
+            };
+
             ImGui::AlignTextToFramePadding();
             imgui_StrTooltip("(...)", "Keyboard shortcuts:\n"
                                       "R: Restart    Space: Pause\nN/M (repeatable): +s/+1\n"
                                       "1/2 (repeatable): -/+ Step\n3/4 (repeatable): -/+ Interval\n");
             quick_info("< Keyboard shortcuts.");
             ImGui::SameLine();
-            if (ImGui::Button("Restart")) {
+            if (ImGui::Button("Restart") || item_shortcut(ImGuiKey_R, false)) {
                 m_torus.restart();
             }
             ImGui::SameLine();
-            ImGui::Checkbox("Pause", &ctrl.pause);
+            if (!ImGui::Checkbox("Pause", &ctrl.pause) && item_shortcut(ImGuiKey_Space, false)) {
+                ctrl.pause = !ctrl.pause;
+            }
             ImGui::PushButtonRepeat(true);
             ImGui::SameLine();
-            if (ImGui::Button("+s")) {
+            if (ImGui::Button("+s") || item_shortcut(ImGuiKey_N, true)) {
                 ctrl.extra_step = ctrl.pause ? ctrl.actual_step() : 0;
                 ctrl.pause = true;
             }
             ImGui::SameLine();
-            if (ImGui::Button("+1")) {
+            if (ImGui::Button("+1") || item_shortcut(ImGuiKey_M, true)) {
                 ctrl.extra_step = 1;
             }
             ImGui::PopButtonRepeat();
@@ -841,7 +850,10 @@ public:
                 step_str += std::format(" -> {}", ctrl.actual_step());
             }
 
+            // !!TODO: recheck this design... Ideally these sliders should use locally-defined `item_shortcut`.
+            imgui_StepSliderShortcuts::set(ImGuiKey_1, ImGuiKey_2, enable_shortcuts);
             imgui_StepSliderInt("Step", &ctrl.step, ctrl.step_min, ctrl.step_max, step_str.c_str());
+            imgui_StepSliderShortcuts::reset();
             if (is_strobing) {
                 ImGui::SameLine();
                 imgui_StrTooltip("(?)",
@@ -851,26 +863,9 @@ public:
             }
 
             const int min_ms = 0, max_ms = 400;
+            imgui_StepSliderShortcuts::set(ImGuiKey_3, ImGuiKey_4, enable_shortcuts);
             ctrl.timer.slide_interval("Interval", min_ms, max_ms, timerT::default_unit);
-
-            if (test_key(ImGuiKey_R, false)) {
-                m_torus.restart();
-            } else if (test_key(ImGuiKey_1, true)) {
-                ctrl.step = std::max(ctrl.step_min, ctrl.step - 1);
-            } else if (test_key(ImGuiKey_2, true)) {
-                ctrl.step = std::min(ctrl.step_max, ctrl.step + 1);
-            } else if (test_key(ImGuiKey_3, true)) {
-                ctrl.timer.add_interval(-timerT::default_unit, min_ms, max_ms);
-            } else if (test_key(ImGuiKey_4, true)) {
-                ctrl.timer.add_interval(timerT::default_unit, min_ms, max_ms);
-            } else if (test_key(ImGuiKey_Space, false)) {
-                ctrl.pause = !ctrl.pause;
-            } else if (test_key(ImGuiKey_N, true)) {
-                ctrl.extra_step = ctrl.pause ? ctrl.actual_step() : 0;
-                ctrl.pause = true;
-            } else if (test_key(ImGuiKey_M, true)) {
-                ctrl.extra_step = 1;
-            }
+            imgui_StepSliderShortcuts::reset();
         });
         ImGui::EndGroup();
         ImGui::SameLine(floor(1.5 * item_width));
@@ -1187,12 +1182,24 @@ public:
 
                 operationE op = _none;
 
+                auto checked_shortcut = [&](ImGuiKey key, bool valid /*!use_sel || m_sel.has_value()*/) {
+                    if (test_shortcut(key, false)) {
+                        if (valid) {
+                            return true;
+                        }
+                        messenger::set_msg("There is no selected area.");
+                    }
+                    return false;
+                };
+
                 auto term = [&](const char* label, const char* shortcut, ImGuiKey key, bool use_sel, operationE op2) {
-                    const bool enabled = !use_sel || m_sel.has_value();
-                    if (ImGui::MenuItem(label, shortcut, nullptr, enabled) || (enabled && test_key(key, false))) {
+                    const bool valid = !use_sel || m_sel.has_value();
+                    if (ImGui::MenuItem(label, shortcut, nullptr, valid) ||
+                        (checked_shortcut(key, valid) && shortcuts::highlight())) {
+                        assert(valid);
                         op = op2;
                     }
-                    if (!enabled) {
+                    if (!valid) {
                         imgui_ItemTooltip("There is no selected area.");
                     }
                 };
@@ -1221,7 +1228,8 @@ public:
                     imgui_StrTooltip("(?)", "This affects only closed-capture. See '(...)' for explanation.");
                     term("Capture (open)", "O (repeatable)", ImGuiKey_O, true, _capture_open);
                     // (`ImGui::IsKeyPressed(..., repeat = true)` does not return true in every frame.)
-                    if (m_sel && enable_shortcuts && ImGui::IsKeyDown(ImGuiKey_O)) {
+                    // TODO: or `shortcuts::global_flag`? Should `enable_shortcuts` be respected here?
+                    if (m_sel && enable_shortcuts && ImGui::IsKeyDown(ImGuiKey_O) && shortcuts::highlight()) {
                         op = _capture_open;
                     }
                     term("Capture (closed)", "P", ImGuiKey_P, true, _capture_closed);
@@ -1282,8 +1290,7 @@ public:
                         term("Identify", "I (i)", ImGuiKey_I, true, _identify);
                     } else { // Shortcut only.
                         auto term2 = [&](ImGuiKey key, bool use_sel, operationE op2) {
-                            const bool enabled = !use_sel || m_sel.has_value();
-                            if (enabled && test_key(key, false)) {
+                            if (checked_shortcut(key, !use_sel || m_sel.has_value())) {
                                 op = op2;
                             }
                         };
@@ -1430,10 +1437,16 @@ void previewer::configT::_set() {
     imgui_Str("Density ~ 0.5, area ~ 1.0, background ~ default");
     ImGui::Separator();
 
+    // TODO: whether to enable shortcuts in this case?
+    // (These shortcuts won't conflict with main-canvas's.)
     ImGui::SetNextItemWidth(item_width);
+    // imgui_StepSliderShortcuts::set(ImGuiKey_1, ImGuiKey_2);
     imgui_StepSliderInt("Step", &step, 1, 16);
+    // imgui_StepSliderShortcuts::reset();
     ImGui::SetNextItemWidth(item_width);
+    // imgui_StepSliderShortcuts::set(ImGuiKey_3, ImGuiKey_4);
     global_config::timer.slide_interval("Interval", 0, 400, timerT::default_unit);
+    // imgui_StepSliderShortcuts::reset();
     ImGui::SameLine();
     imgui_StrTooltip("(?)", "This setting is shared by all preview windows.");
 }
@@ -1479,7 +1492,7 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
 
     const bool ctrl = ImGui::GetIO().KeyCtrl;
     // TODO: whether to support batch restart ('T') after all?
-    const bool restart = (may_test_key() && ImGui::IsKeyPressed(ImGuiKey_T, false /*!repeat*/)) ||
+    const bool restart = (shortcuts::keys_avail() && shortcuts::test(ImGuiKey_T)) ||
                          (interactive && !ctrl && ImGui::IsItemClicked(ImGuiMouseButton_Right)) ||
                          term.tile.size() != size || term.seed != config.seed || term.rule != rule;
     if (restart) {

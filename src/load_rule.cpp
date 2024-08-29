@@ -561,7 +561,7 @@ private:
                         if (*id != 0 && m_rules[*id].rule == m_rules[*id - 1].rule) {
                             imgui_StrDisabled("The same as the last rule.");
                         } else {
-                            previewer::preview(*id, config, m_rules[*id].rule, true);
+                            previewer::preview(*id, config, m_rules[*id].rule);
                         }
                         ImGui::EndGroup();
                     }
