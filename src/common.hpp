@@ -105,16 +105,16 @@ struct shortcuts {
         {
             // Resolve shortcut competition when multiple keys are pressed.
             static unsigned latest = ImGui::GetFrameCount();
-            static bool occupied = false;
+            static ImGuiKey occupied = ImGuiKey_None;
             if (const unsigned frame = ImGui::GetFrameCount(); frame != latest) {
                 latest = frame;
-                occupied = false;
+                occupied = ImGuiKey_None;
             }
-            if (occupied) {
+            if (occupied != ImGuiKey_None && occupied != key) {
                 return false;
             }
             if (ImGui::IsKeyDown(key)) {
-                occupied = true;
+                occupied = key;
             }
         }
         return ImGui::IsKeyPressed(key, repeat);
@@ -579,4 +579,15 @@ inline void set_clipboard_and_notify(const char* c_str) {
 
 inline void set_clipboard_and_notify(const std::string& str) { //
     set_clipboard_and_notify(str.c_str());
+}
+
+// It's not obvious whether `ImGui::GetClipboardText` can return nullptr, and
+// in some cases the function returns empty string "" for errors...
+inline std::string_view read_clipboard() {
+    const char* str = ImGui::GetClipboardText();
+    if (!str || *str == '\0') {
+        messenger::set_msg("Failed to read from the clipboard.");
+        return {};
+    }
+    return str;
 }

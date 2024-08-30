@@ -809,8 +809,11 @@ public:
 
             ImGui::AlignTextToFramePadding();
             imgui_StrTooltip("(...)", "Keyboard shortcuts:\n"
-                                      "R: Restart    Space: Pause\nN/M (repeatable): +s/+1\n"
-                                      "1/2 (repeatable): -/+ Step\n3/4 (repeatable): -/+ Interval\n");
+                                      "Restart: R    Pause: Space    +s/+1: N/M (repeatable)\n"
+                                      "-/+ Step:     1/2 (repeatable)\n"
+                                      "-/+ Interval: 3/4 (repeatable)\n\n"
+                                      "These shortcuts are available only when the space window is hovered or held "
+                                      "by mouse button.");
             quick_info("< Keyboard shortcuts.");
             ImGui::SameLine();
             if (ImGui::Button("Restart") || item_shortcut(ImGuiKey_R, false)) {
@@ -1322,6 +1325,10 @@ public:
                         }
                     }
                     if (show_range_window_in_tooltip && ImGui::BeginTooltip()) {
+                        imgui_StrWrapped("The shortcuts are available only when the space window is hovered or held "
+                                         "by mouse button.",
+                                         ImGui::CalcItemWidth());
+                        ImGui::Separator();
                         range_operations(true /* display */);
                         ImGui::EndTooltip();
                     } else {
@@ -1368,13 +1375,14 @@ public:
                     copy_sel();
                     aniso::fill(m_torus.write_only(m_sel->to_range()), background);
                 } else if (op == _paste) {
-                    // TODO: support pasting rule as well?
-                    if (const char* text = ImGui::GetClipboardText()) {
-                        m_paste.reset();
-                        if (m_sel) {
-                            m_sel->active = false;
-                        }
+                    // m_paste.reset();
+                    if (m_sel) {
+                        m_sel->active = false;
+                    }
 
+                    // TODO: support pasting rule as well?
+                    const std::string_view text = read_clipboard();
+                    if (!text.empty()) {
                         aniso::from_RLE_str(text, [&](long long w, long long h) -> std::optional<aniso::tile_ref> {
                             if (w == 0 || h == 0) {
                                 messenger::set_msg("Found no pattern.\n\n"

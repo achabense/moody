@@ -126,12 +126,27 @@ void frame_main() {
     static bool show_clipboard = false;
     static bool show_doc = false;
     auto load_rule = [&](bool& flag, const char* title, void (*load_fn)(sync_point&)) {
-        ImGui::Checkbox(title, &flag);
+        if (ImGui::Checkbox(title, &flag) && flag) {
+            ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
+        }
+
+        // This is a workaround to support shortcut for clipboard-reading.
+        // !!TODO: using 'W' to avoid conflicts with pattern-pasting; not quite conventional...
+        // !!TODO: document the shortcut...
+        if (&flag == &show_clipboard) {
+            if (shortcuts::keys_avail_and_window_hoverable() && shortcuts::test(ImGuiKey_W)) {
+                flag = true;
+                ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
+                ImGui::SetNextWindowFocus();
+            }
+        }
+
         if (flag) {
+            ImGui::SetNextWindowPos(ImGui::GetItemRectMin() + ImVec2(0, ImGui::GetFrameHeight() + 4),
+                                    ImGuiCond_FirstUseEver);
             ImGui::SetNextWindowSize({600, 400}, ImGuiCond_FirstUseEver);
             ImGui::SetNextWindowSizeConstraints(ImVec2(400, 300), ImVec2(FLT_MAX, FLT_MAX));
-            ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
-            if (auto window = imgui_Window(title, &flag)) {
+            if (auto window = imgui_Window(title, &flag, ImGuiWindowFlags_NoSavedSettings)) {
                 load_fn(sync);
             }
         }

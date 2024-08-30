@@ -708,16 +708,14 @@ void load_file(sync_point& out) {
 
 void load_clipboard(sync_point& out) {
     static textT text;
-    if (ImGui::SmallButton("Read clipboard")) {
-        if (const char* str = ImGui::GetClipboardText()) {
-            std::string_view str_view(str);
-            if (str_view.size() > max_size) {
-                messenger::set_msg("Text too long: {}", too_long(str_view.size(), max_size));
-            } else {
-                text.clear();
-                text.append(str_view);
-                text.reset_scroll();
-            }
+    if (ImGui::SmallButton("Read clipboard") || shortcuts::item_shortcut(ImGuiKey_W)) {
+        const std::string_view str = read_clipboard();
+        if (str.size() > max_size) {
+            messenger::set_msg("Text too long: {}", too_long(str.size(), max_size));
+        } else if (!str.empty()) {
+            text.clear();
+            text.append(str);
+            text.reset_scroll();
         }
     }
     ImGui::SameLine();
