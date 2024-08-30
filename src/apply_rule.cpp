@@ -1380,9 +1380,9 @@ public:
                         m_sel->active = false;
                     }
 
-                    // TODO: support pasting rule as well?
-                    const std::string_view text = read_clipboard();
-                    if (!text.empty()) {
+                    if (std::string_view text = read_clipboard(); !text.empty()) {
+                        std::optional<aniso::ruleT> rule = std::nullopt;
+                        text = aniso::strip_RLE_header(text, &rule);
                         aniso::from_RLE_str(text, [&](long long w, long long h) -> std::optional<aniso::tile_ref> {
                             if (w == 0 || h == 0) {
                                 messenger::set_msg("Found no pattern.\n\n"
@@ -1396,6 +1396,15 @@ public:
                                                    tile_size.x, tile_size.y, w, h);
                                 return std::nullopt;
                             } else {
+                                // Set the rule only if the text really contains pattern data,
+                                // so the next paste is guaranteed to succeed.
+                                if (rule && *rule != sync.current.rule) {
+                                    sync.set_rule(*rule);
+                                    messenger::set_msg(
+                                        "The header specified a different rule. Paste again for the pattern.");
+                                    return std::nullopt;
+                                }
+
                                 m_paste.emplace(aniso::vecT{.x = (int)w, .y = (int)h});
                                 return m_paste->data();
                             }
