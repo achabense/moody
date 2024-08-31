@@ -429,6 +429,8 @@ class runnerT {
             m_ctrl.timer.set_now();
         }
 
+        bool m_resized = true; // Init ~ resized.
+
     public:
         torusT() {
             assert(m_torus.size() == calc_size(m_torus.size()));
@@ -502,11 +504,16 @@ class runnerT {
             const aniso::vecT n_size = calc_size(size);
             if (m_torus.size() != n_size) {
                 m_torus.resize(n_size);
+                m_resized = true;
                 restart();
                 return true;
             }
             return false;
         }
+        bool resized_since_last_check() { //
+            return std::exchange(m_resized, false);
+        }
+
         void set_ctrl(const auto& fn) { fn(m_ctrl); }
         void set_init(const auto& fn) {
             const initT old_init = m_init;
@@ -567,14 +574,11 @@ public:
     // For example, there are a lot of static variables in `display`, and the keyboard controls are not designed
     // for per-object use.
     void display(sync_point& sync) {
-        // !!TODO: recheck resetting logic. `m_sel` and `m_paste` may need to reset
-        // in more situations. For example, `m_paste` does not make much sense if the rule
-        // is updated / the space is restarted... (or, should it block such operations?)
         const bool rule_changed = m_torus.begin_frame(sync.current.rule);
-        // if (rule_changed) {
-        //     // m_sel.reset();
-        //     m_paste.reset();
-        // }
+        if (rule_changed) {
+            // m_sel.reset();
+            m_paste.reset();
+        }
 
         static bool background = 0;
         static bool auto_fit = false;
@@ -593,8 +597,10 @@ public:
         const ImGuiID canvas_id = ImGui::GetID(canvas_name);
         // The shortcuts are available only when the canvas is hovered or active (which won't happen when the window
         // is blocked by popups).
-        // (Also, `shortcuts::keys_avail` is not true if the canvas is being held, but this does not matter.)
-        const bool enable_shortcuts = (ImGui::GetActiveID() == canvas_id) || (ImGui::GetHoveredID() == canvas_id);
+        // (`keys_avail` is needed in hover case, as the canvas can still be hovered when another text-input is
+        // active. Also, `keys_avail` is not true when the canvas is being held, but this does not matter.)
+        const bool enable_shortcuts =
+            (ImGui::GetActiveID() == canvas_id) || (shortcuts::keys_avail() && (ImGui::GetHoveredID() == canvas_id));
         auto test_shortcut = [enable_shortcuts](ImGuiKey key, bool repeat) {
             return enable_shortcuts && shortcuts::test(key, repeat);
         };
@@ -766,10 +772,7 @@ public:
                     locate_center = true;
                     find_suitable_zoom = true;
 
-                    if (m_torus.resize(size)) {
-                        m_sel.reset();
-                        m_paste.reset();
-                    }
+                    m_torus.resize(size);
                 }
                 input_w[0] = '\0';
                 input_h[0] = '\0';
@@ -782,12 +785,14 @@ public:
             bool auto_fit_next = auto_fit;
             m_coord.zoom.select([&](const bool is_cur, const float z, const char* const s) {
                 ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                if (ImGui::RadioButton((auto_fit && is_cur) ? std::format("[{0}]###{0}", s).c_str() : s, is_cur)) {
-                    auto_fit_next = is_cur ? !auto_fit : true;
-                    return true;
-                }
+                const bool selected =
+                    ImGui::RadioButton((auto_fit && is_cur) ? std::format("[{0}]###{0}", s).c_str() : s, is_cur);
                 if (z == 1) {
                     quick_info("^ Auto full-screen.");
+                }
+                if (selected) {
+                    auto_fit_next = is_cur ? !auto_fit : true;
+                    return true;
                 }
                 return false;
             });
@@ -948,6 +953,7 @@ public:
             const ImVec2 canvas_min = ImGui::GetItemRectMin();
             const ImVec2 canvas_max = ImGui::GetItemRectMax();
             const ImVec2 canvas_size = ImGui::GetItemRectSize();
+            assert(canvas_id == ImGui::GetItemID());
 
             const bool active = ImGui::IsItemActive();
             const bool hovered = ImGui::IsItemHovered();
@@ -960,16 +966,16 @@ public:
             if (auto_fit) {
                 locate_center = true;
                 if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-                    const aniso::vecT size = from_imvec_floor((canvas_size - ImVec2(20, 20)) / m_coord.zoom);
-                    if (m_torus.resize(size)) {
-                        m_sel.reset();
-                        m_paste.reset();
-                    }
+                    m_torus.resize(from_imvec_floor((canvas_size - ImVec2(20, 20)) / m_coord.zoom));
                 }
             }
 
             // `m_torus` won't resize now.
             const aniso::vecT tile_size = m_torus.size();
+            if (m_torus.resized_since_last_check()) {
+                m_sel.reset();
+                m_paste.reset();
+            }
 
             if (find_suitable_zoom) {
                 // (wontfix) Poorly written, but works...
@@ -1220,13 +1226,9 @@ public:
                         "record all mappings. Depending on the setting, the result will replace the current lock "
                         "directly, or will be appended to the current lock like open-capture.");
                     ImGui::SameLine();
-                    if (ImGui::RadioButton("Replace", replace)) {
-                        replace = true;
-                    }
+                    imgui_RadioButton("Replace", &replace, true);
                     ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                    if (ImGui::RadioButton("Append", !replace)) {
-                        replace = false;
-                    }
+                    imgui_RadioButton("Append", &replace, false);
                     ImGui::SameLine();
                     imgui_StrTooltip("(?)", "This affects only closed-capture. See '(...)' for explanation.");
                     term("Capture (open)", "O (repeatable)", ImGuiKey_O, true, _capture_open);
@@ -1249,13 +1251,9 @@ public:
                         ImGui::AlignTextToFramePadding();
                         imgui_Str("Background ~");
                         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                        if (ImGui::RadioButton("0", background == 0)) {
-                            background = 0;
-                        }
+                        imgui_RadioButton("0", &background, 0);
                         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                        if (ImGui::RadioButton("1", background == 1)) {
-                            background = 1;
-                        }
+                        imgui_RadioButton("1", &background, 1);
                         ImGui::SameLine();
                         imgui_StrTooltip(
                             "(?)", "'Clear inside/outside' and 'Cut' will clear the range with the value.\n"
@@ -1402,6 +1400,7 @@ public:
                                     sync.set_rule(*rule);
                                     messenger::set_msg(
                                         "The header specified a different rule. Paste again for the pattern.");
+                                    m_paste.reset();
                                     return std::nullopt;
                                 }
 
@@ -1422,6 +1421,7 @@ public:
             m_torus.pause_for_this_frame();
         }
 
+        assert(!m_torus.resized_since_last_check());
         m_torus.end_frame();
     }
 };
@@ -1445,9 +1445,7 @@ void previewer::configT::_set() {
     imgui_Str("Size ~");
     for (int i = 0; i < Count; ++i) {
         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-        if (ImGui::RadioButton(size_terms[i].str, size == i)) {
-            size = sizeE{i};
-        }
+        imgui_RadioButton(size_terms[i].str, &size, sizeE{i});
     }
     ImGui::SetNextItemWidth(item_width);
     imgui_StepSliderInt("Seed", &seed, 0, 9);

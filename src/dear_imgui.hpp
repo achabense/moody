@@ -125,6 +125,16 @@ struct [[nodiscard]] imgui_ChildWindow {
     explicit operator bool() const { return visible; }
 };
 
+template <class T>
+inline bool imgui_RadioButton(const char* label, T* v, std::type_identity_t<T> c) {
+    assert(v != nullptr);
+    if (ImGui::RadioButton(label, bool(*v == c))) {
+        *v = c;
+        return true;
+    }
+    return false;
+}
+
 // TODO: are there public ways to do this?
 inline bool imgui_TestItemFlag(ImGuiItemFlags_ flag) { //
     return (GImGui->CurrentItemFlags & flag) != 0;

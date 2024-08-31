@@ -670,11 +670,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
             const bool m_avail = subset.contains(*mask_ptrs[m]);
 
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-            guarded_block(m_avail, [&] {
-                if (ImGui::RadioButton(mask_terms[m].label, mask_tag == m)) {
-                    mask_tag = m;
-                }
-            });
+            guarded_block(m_avail, [&] { imgui_RadioButton(mask_terms[m].label, &mask_tag, m); });
 
             imgui_ItemTooltip([&] {
                 if (!m_avail) {

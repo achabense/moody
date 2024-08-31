@@ -31,9 +31,7 @@ public:
             if (do_sameline) {
                 ImGui::SameLine();
             }
-            if (ImGui::RadioButton(label, fps == set)) {
-                fps = set;
-            }
+            imgui_RadioButton(label, &fps, set);
         };
         radio(max_fps, "Auto", false);
         ImGui::SameLine();
