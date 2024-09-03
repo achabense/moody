@@ -85,7 +85,6 @@ inline float wrap_len() {
 
 // TODO: consider using ImGui::Shortcut?
 // Some features cannot easily be satisfied with `ImGui::Shortcut` and `ImGui::SetNextItemShortcut`.
-// !!TODO: whether to focus item/window?
 struct shortcuts {
     static bool global_flag(ImGuiKey key) { //
         return !ImGui::GetIO().WantTextInput && ImGui::IsKeyDown(key);
@@ -136,6 +135,17 @@ struct shortcuts {
             }
         }
         return false;
+    }
+
+    // TODO: reconsider the shortcut designs in the program.
+    // Currently only `sequence::seq` use this. 'W' uses equivalent `SetNextWindowFocus`,
+    // and the space window's shortcuts don't do the focus.
+    static bool focus_window(ImGuiWindow* window = 0) {
+        if (!window) {
+            window = ImGui::GetCurrentWindow();
+        }
+        ImGui::FocusWindow(window);
+        return true;
     }
 };
 
@@ -201,7 +211,7 @@ class sequence {
         bool ret = ImGui::Button(label);
         if (shortcut != ImGuiKey_None && !imgui_TestItemFlag(ImGuiItemFlags_Disabled)) {
             imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_ButtonActive, 1.0f));
-            if (!ret && shortcuts::item_shortcut(shortcut)) {
+            if (!ret && shortcuts::item_shortcut(shortcut) && shortcuts::focus_window()) {
                 ret = true;
             }
         }
