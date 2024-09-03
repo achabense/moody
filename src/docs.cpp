@@ -25,8 +25,8 @@ The program keeps the record for the current rule. You can undo/redo via '<| Pre
 In the right panel, you can right-click to select area and press 'C' (no need for 'Ctrl') to save the pattern as RLE-string to the clipboard, or press 'V' to paste the pattern from the clipboard (left-click to decide where to paste).
 (When pasting patterns to white background, you'd need to set 'Background' to 1 in the 'Range ops' window.)
 
-In these documents, as well as those opened in 'Load file' or 'Clipboard', you can left-click the rule-string to replace the current rule, or right-click to copy the lines to the clipboard (drag to select multiple lines).
-For example, here is an RLE blob (a "rocket" in the Day & Night rule) - you can firstly click the header line to load the rule, and then copy the following lines (from '3bo...' up to the '!' mark) to paste and see the effect.
+In these documents, as well as those opened in 'Load file' or 'Clipboard', you can left-click the rule-string to replace the current rule, or right-click to select lines and press 'C' to copy the text to the clipboard.
+For example, here is an RLE blob (a "rocket" in the Day & Night rule) - you can firstly click the header line to load the rule, and then copy the following lines (from '3bo...' up to the '!' mark) and paste to see the effect.
 x = 7, y = 14, rule = MAPARYBFxZoF34WaBd+aIF+6RZoF35ogX7paIF+6YEX6ZcWaBd+aIF+6WiBfumBF+mXaIF+6YEX6ZeBF+mXF3+Xfw
 3bo3b$2b3o2b$b5ob$ob3obo$2b3o2b$2b3o2b$ob3obo$ob3obo$b5ob$b
 5ob$3bo3b$7b$2b3o2b$2bobo2b!

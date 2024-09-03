@@ -415,11 +415,9 @@ public:
                 // when there are selected lines.
                 assert(false);
                 m_sel.reset(); // Defensive.
-            } else if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) /* From anywhere */) {
-                // TODO: undocumented, and may be subject to changes.
-                messenger::set_msg("Canceled.");
-                m_sel.reset();
             } else if (ImGui::IsMouseReleased(ImGuiMouseButton_Right) /* From anywhere */) {
+                m_sel.reset();
+            } else if (shortcuts::test(ImGuiKey_C) /*Raw test; the interaction will be locked by `m_sel`*/) {
                 const auto [min, max] = m_sel->minmax();
                 std::string str;
                 for (int i = min; i <= max; ++i) {
@@ -431,7 +429,6 @@ public:
                 // (wontfix) `SetClipboardText` will skip contents after '\0' (normally a utf8 text file
                 // should not contain '\0' between the lines).
                 set_clipboard_and_notify(str);
-                m_sel.reset();
             }
         }
 
