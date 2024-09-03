@@ -452,10 +452,6 @@ private:
         const int total = m_rules.size();
 
         if (total != 0) {
-            if (ImGui::Button("Focus")) {
-                n_pos = m_pos.value_or(0);
-            }
-            ImGui::SameLine();
             sequence::seq(
                 "<|", "Prev", "Next", "|>",                                   //
                 [&] { n_pos = 0; },                                           //
@@ -467,6 +463,21 @@ private:
                 ImGui::Text("Total:%d At:%d", total, *m_pos + 1);
             } else {
                 ImGui::Text("Total:%d At:N/A", total);
+            }
+            // TODO: not using `imgui_ItemTooltip`, as when the text get resized (can happen in this case),
+            // `IsItemHovered(ImGuiHoveredFlags_ForTooltip)` will become false and make the tooltip disappear for
+            // some time.
+            // (However, this workaround makes the tooltip appear immediately...)
+            // Related: https://github.com/ocornut/imgui/issues/7945
+            // imgui_ItemTooltip("Right-click to sync.");
+            if (ImGui::IsItemHovered()) {
+                if (ImGui::BeginTooltip()) {
+                    imgui_Str("Right-click to sync.");
+                    ImGui::EndTooltip();
+                }
+            }
+            if (imgui_ItemClickable()) {
+                n_pos = m_pos.value_or(0);
             }
 
             if (m_sel) {
