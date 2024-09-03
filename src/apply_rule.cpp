@@ -526,6 +526,8 @@ class runnerT {
         }
 
         void end_frame() {
+            // TODO: when the window is held by left button, 'N' and 'M' (working by setting `extra_step`)
+            // should still work.
             if (!extra_pause) {
                 const int count = m_ctrl.calc_step_this_frame();
                 for (int c = 0; c < count; ++c) {
@@ -580,7 +582,10 @@ public:
             m_paste.reset();
         }
 
+        // TODO: move settings into a class-local object...
         static bool background = 0;
+        static aniso::blitE paste_mode = aniso::blitE::Copy;
+
         static bool auto_fit = false;
         bool locate_center = false;
         bool find_suitable_zoom = false;
@@ -1124,10 +1129,10 @@ public:
                     m_torus.read_and_maybe_write([&](const aniso::tile_ref tile) {
                         const aniso::tile_ref paste_area = tile.clip({paste_beg, paste_end});
                         aniso::tileT temp(paste_area);
-                        // TODO: redesign pasting behavior. `blit` cannot work for periodic background.
-                        // aniso::copy(paste_area, m_paste->data());
-                        (background == 0 ? aniso::blit<aniso::blitE::Or>
-                                         : aniso::blit<aniso::blitE::And>)(paste_area, m_paste->data());
+                        // An ideal way to copy patterns with arbitrary periodic background will be:
+                        // Detect backgrounds of the pattern and the target area (?not practical?).
+                        // 'copy_diff' only if the backgrounds are the same and aligns properly.
+                        aniso::blit(paste_area, m_paste->data(), paste_mode);
                         texture = make_screen(tile, scale_mode);
                         if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
                             m_paste.reset();
@@ -1257,9 +1262,7 @@ public:
                         ImGui::SameLine();
                         imgui_StrTooltip(
                             "(?)", "'Clear inside/outside' and 'Cut' will clear the range with the value.\n"
-                                   "'Bound' will get the bounding-box for the pattern that consists of !(value).\n"
-                                   "'Paste' will use different pasting modes based on the value. "
-                                   "When pasting into white background you need to set this to 1.");
+                                   "'Bound' will get the bounding-box for the pattern that consists of !(value).");
 
                         // Filling.
                         ImGui::Separator();
@@ -1275,20 +1278,36 @@ public:
                         // Copy/Cut/Paste.
                         ImGui::Separator();
                         set_tag(add_rule, "Rule info",
-                                "Whether to include rule info ('rule = ...') in the header when copying patterns.");
+                                "Whether to include rule info ('rule = ...') in the header when copying patterns.\n\n"
+                                "(This applies to 'Copy' and 'Cut'. 'Identify' will always include rule info.)");
                         ImGui::SameLine();
-                        set_tag(show_result, "Show result", "Whether to display the result when copying patterns.");
+                        set_tag(show_result, "Show result",
+                                "Whether to display the result when copying patterns.\n\n"
+                                "(This applies to 'Copy' and 'Cut'. 'Identify' will always show the result.)");
                         term("Copy", "C", ImGuiKey_C, true, _copy);
                         term("Cut", "X", ImGuiKey_X, true, _cut);
-                        term("Paste", "V", ImGuiKey_V, false, _paste);
-
-                        ImGui::Separator();
                         imgui_StrTooltip("(?)",
                                          "Identify a single oscillator or spaceship in 2*2 periodic background "
                                          "(e.g., pure white, pure black, striped, or checkerboard background), and "
                                          "copy its smallest phase to the clipboard.");
                         ImGui::SameLine();
                         term("Identify", "I (i)", ImGuiKey_I, true, _identify);
+
+                        ImGui::Separator();
+                        ImGui::AlignTextToFramePadding();
+                        imgui_Str("Paste mode ~");
+                        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                        imgui_RadioButton("Copy##M", &paste_mode, aniso::blitE::Copy);
+                        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                        imgui_RadioButton("Or", &paste_mode, aniso::blitE::Or);
+                        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                        imgui_RadioButton("And", &paste_mode, aniso::blitE::And);
+                        ImGui::SameLine();
+                        imgui_StrTooltip("(?)", "Use 'Copy' mode for patterns with unknown or arbitrary (periodic) "
+                                                "background.\n\n"
+                                                "Use 'Or' mode to treat black cells as transparent background. "
+                                                "('And' ~ white background.)");
+                        term("Paste", "V", ImGuiKey_V, false, _paste);
                     } else { // Shortcut only.
                         auto term2 = [&](ImGuiKey key, bool use_sel, operationE op2) {
                             if (checked_shortcut(key, !use_sel || m_sel.has_value())) {

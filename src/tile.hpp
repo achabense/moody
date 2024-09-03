@@ -114,6 +114,17 @@ namespace aniso {
         }
     }
 
+    inline void blit(const tile_ref dest, const tile_const_ref source, blitE mode) {
+        switch (mode) {
+            case blitE::Copy: blit<blitE::Copy>(dest, source); return;
+            case blitE::Or: blit<blitE::Or>(dest, source); return;
+            case blitE::And: blit<blitE::And>(dest, source); return;
+            // case blitE::Xor: blit<blitE::Xor>(dest, source); return;
+            // (Not used in the program.)
+            default: assert(false);
+        }
+    }
+
     // The result will be completely dependent on the state of `rand` and `density`.
     // (`bernoulli_distribution` cannot guarantee this.)
     inline void random_fill(const tile_ref tile, std::mt19937& rand, double density) {
