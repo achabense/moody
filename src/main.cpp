@@ -200,7 +200,7 @@ int main(int, char**) {
 
     // Create window with SDL_Renderer graphics context
     {
-        const char* const window_title = "Moody v 0.9.6";
+        const char* const window_title = "Moody v 0.9.7 (WIP)";
         const SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
         window =
             SDL_CreateWindow(window_title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);

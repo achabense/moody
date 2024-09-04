@@ -475,7 +475,7 @@ class batch_adapter {
     previewer::configT config{previewer::configT::_220_160};
 
 public:
-    void display(std::function<aniso::ruleT()> gen, sync_point& out, const bool bind, ImVec2& min_req_size) {
+    void display(std::function<aniso::ruleT()> gen, sync_point& out, ImVec2& min_req_size) {
         auto calc_page = [&]() -> int { return (rules.size() + page_size - 1) / page_size; };
         auto set_page = [&](int p, bool make_page = false) {
             if (p < 0) {
@@ -492,9 +492,6 @@ public:
             }
         };
 
-        if (bind) {
-            sequence::bind_to(ImGui::GetID(">>>"));
-        }
         sequence::seq(
             "<|", "<<", ">>>", "|>", //
             [&] { set_page(0); }, [&] { set_page(page_no - 1); }, [&] { set_page(page_no + 1, true); },
@@ -598,7 +595,7 @@ static void guarded_block(const bool enable, const char* reason_disabled, const 
     }
 };
 
-void edit_rule(sync_point& sync, bool& bind_undo) {
+void edit_rule(sync_point& sync) {
     // Select subsets.
     static subset_selector selector;
     const aniso::subsetT& subset = selector.select_subset(sync);
@@ -851,7 +848,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                                 return aniso::randomize_p(subset, mask, mold, global_mt19937(), rate);
                             }
                         },
-                        sync, clicked, size_constraint_min);
+                        sync, size_constraint_min);
                 }
             }
         });
@@ -977,14 +974,12 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                         rule[code] = !rule[code];
                     }
                     sync.set_rule(rule);
-                    bind_undo = true;
                 } else if (sync.enable_lock && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
                     aniso::moldT::lockT lock = mold.lock;
                     for (aniso::codeT code : group) {
                         lock[code] = !has_lock;
                     }
                     sync.set_lock(lock);
-                    // bind_undo = true;
                 }
                 ImGui::PopStyleColor(3);
 

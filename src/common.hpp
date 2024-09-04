@@ -45,8 +45,7 @@ class sync_point;
 void load_file(sync_point&);
 void load_clipboard(sync_point&);
 void load_doc(sync_point&);
-// (`bind_undo` is a workaround to allow for binding to undo/redo for certain operations.)
-void edit_rule(sync_point&, bool& bind_undo);
+void edit_rule(sync_point&);
 void static_constraints(sync_point&);
 void apply_rule(sync_point&);
 
@@ -274,7 +273,7 @@ public:
     sequence() = delete;
 
     // `id` should be the same as one of prev/next button.
-    static void bind_to(ImGuiID id) { bound_id = id; }
+    // static void bind_to(ImGuiID id) { bound_id = id; }
 
     static void seq(const char* label_first, const char* label_prev, const char* label_next, const char* label_last,
                     const auto& act_first, const auto& act_prev, const auto& act_next, const auto& act_last,

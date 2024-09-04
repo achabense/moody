@@ -205,7 +205,6 @@ void frame_main() {
                      "To save the current rule, right-click the MAP-string, and it will be copied to the clipboard.");
 
         ImGui::SameLine();
-        const ImGuiID id_prev = ImGui::GetID("Prev"); // For `sequence::bind_to`.
         ImGui::BeginGroup();
         sequence::seq(
             "<|", "Prev", "Next", "|>", //
@@ -273,11 +272,7 @@ void frame_main() {
             ImGui::TableNextColumn();
             // The child window is required here (for stable scrolling).
             if (auto child = imgui_ChildWindow("Edit", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
-                bool bind_undo = false;
-                edit_rule(sync, bind_undo);
-                if (bind_undo) {
-                    sequence::bind_to(id_prev);
-                }
+                edit_rule(sync);
             }
             ImGui::TableNextColumn();
             if (auto child = imgui_ChildWindow("Apply", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
@@ -292,7 +287,6 @@ void frame_main() {
                 ImGui::Separator();
                 ImGui::Checkbox("Static constraints", &show_static);
                 if (show_static) {
-                    // TODO: bind-undo in this case?
                     ImGui::PushID("static");
                     static_constraints(sync);
                     ImGui::PopID();

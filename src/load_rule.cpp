@@ -607,11 +607,7 @@ private:
 
         assert_implies(m_sel, !n_pos);
         assert(!(n_sel.has_value() && n_pos.has_value()));
-        if (n_pos) {
-            assert(*n_pos >= 0 && *n_pos < total);
-            // (Relying on `sequence::seq` to be in the same level in the id-stack.)
-            sequence::bind_to(ImGui::GetID("Next"));
-        }
+        assert_implies(n_pos, *n_pos >= 0 && *n_pos < total);
     }
 };
 
