@@ -5,5 +5,4 @@ MAP7KV6wLHQiAHIPICBCAhlIqKAhAuKAFBoYmCFEAACIUzbAIAsAsCBJoAANhiIBEBSUICEMQiQFgRBg
 
 The new rules ("rulexx.txt") were collected during the development of this project. Some comments in these files are outdated and ignorable, as they were referring to features in the early versions of this program, which may have been removed or heavily redesigned.
 
-To test these rules in the program, the most direct way is to copy some to the clipboard and do `Clipboard/Read clipboard`:
-<img src="../pasting-rule.png" alt="pasting-rule" width="400" />
+To test these rules in the program, the most direct way is to copy some to the clipboard and do `Clipboard/Read clipboard` (the shortcut is 'W'):

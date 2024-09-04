@@ -9,20 +9,18 @@ This program helps to explore a set of cellular automaton rules known as "[MAP r
 - Rules are saved as MAP-strings, so they can be accepted by other programs like Golly. Also, patterns can be saved as RLE-strings.
 - Subset-based rule operations:
     - The program supports many subsets, and can identify which subsets a MAP rule belongs to. Also, you can select multiple subsets to explore rules in their intersection (for example, to explore self-complementary isotropic rules).
-    - The program has access to all rules in any subset. It's very easy to find new rules either by getting random rules in the `Random` window, or by modifying existing ones. With the help of preview mode (`Preview`), it's easy to see where to edit for other interesting rules that are close to the current rule.
+    - The program has access to all rules in any subset. It's very easy to find new rules either by getting random rules in the `Random` window, or by modifying existing ones. With the help of preview mode (`Preview`), it's easy to discover other interesting rules that are close to the current rule.
 - (WIP) The program is able to extract value constraints from patterns, and generate rules under the constraints (for example, rules allowing for gliders).
 
 There are a lot of rules available in the [rules/](rules) folder discovered by this program. You can load these rules from files or the clipboard to have a look.
 
 #### Getting started
-The binary built for Windows 10 is available at the [latest-release](../../releases/latest) page. For usage in other environments, see the [Building](#building) section below. It's recommended to place the program in a separate folder, as it will create an "imgui.ini" file in the same directory.
+The binary built for Windows 10 is available at the [latest-release](https://github.com/achabense/moody/releases/latest) page. For usage in other environments, see the [Building](#building) section below. It's recommended to place the program in a separate folder, as it will create an "imgui.ini" file in the same directory.
 
 In the program: press 'H' to learn about basic operations; check every tooltip; check the `Documents` in the program to get familiar with the concepts and workflow. Here are some basic operations:
 - Saving/undoing rules: right-click the MAP-string (for the current rule) to save to the clipboard; use `<| Prev/Next |>` on its left for undoing/redoing.
 - Saving patterns: right-click to select area and press 'C' to save the pattern to the clipboard (as RLE-string).
-- Pasting rules: open the `Clipboard` window and click `Read clipboard` to load rules from the clipboard.
-
-<img src="pasting-rule.png" alt="pasting-rule" width="400" />
+- Pasting rules: open the `Clipboard` window and click `Read clipboard` to load rules from the clipboard. (The shortcut is 'W'.)
 
 #### Building
 The project is written in C++20 using [ImGui](https://github.com/ocornut/imgui) and [SDL2](https://github.com/libsdl-org/SDL) libraries, and uses CMake for building. ImGui is included in this project, and SDL2 will be fetched automatically by CMake.

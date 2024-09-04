@@ -3,7 +3,7 @@
 // TODO: add a section to explain 'Identify' and 'Paste' with examples.
 
 const char* const doc_about =
-    R"(In these documents (as well as the ones opened in 'Load file' or 'Clipboard'), you can left-click the rules to load them, or right-click the lines to copy the text (drag to select multiple lines).
+    R"(In these documents (as well as the ones opened in 'Load file' or 'Clipboard'), you can left-click the rules to load them, or right-click to select lines and press 'C' to copy the text .
 
 This program is for exploring "MAP rules". The project originated from a trivial program I made in 2021, which was poorly written and never made public. Still, I managed to find some interesting discoveries with it (by looking through many, many random rules). Here are two of them.
 
