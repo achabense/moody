@@ -863,7 +863,7 @@ public:
                 step_str += std::format(" -> {}", ctrl.actual_step());
             }
 
-            // !!TODO: recheck this design... Ideally these sliders should use locally-defined `item_shortcut`.
+            // TODO: recheck this design... Ideally these sliders should use locally-defined `item_shortcut`.
             imgui_StepSliderShortcuts::set(ImGuiKey_1, ImGuiKey_2, enable_shortcuts);
             imgui_StepSliderInt("Step", &ctrl.step, ctrl.step_min, ctrl.step_max, step_str.c_str());
             imgui_StepSliderShortcuts::reset();
@@ -1353,6 +1353,7 @@ public:
                     }
                 }();
 
+                // TODO: disable some operations if `m_paste.has_value`?
                 if (op == _capture_closed && m_sel) {
                     auto lock = capture_closed(m_torus.read_only(m_sel->to_range()), sync.current.rule);
                     if (!replace) {
@@ -1417,8 +1418,8 @@ public:
                                 // so the next paste is guaranteed to succeed.
                                 if (rule && *rule != sync.current.rule) {
                                     sync.set_rule(*rule);
-                                    messenger::set_msg(
-                                        "The header specified a different rule. Paste again for the pattern.");
+                                    messenger::set_msg("Loaded a different rule specified by the header. Paste again "
+                                                       "for the pattern.");
                                     m_paste.reset();
                                     return std::nullopt;
                                 }
@@ -1482,7 +1483,7 @@ void previewer::configT::_set() {
     global_config::timer.slide_interval("Interval", 0, 400, timerT::default_unit);
     // imgui_StepSliderShortcuts::reset();
     ImGui::SameLine();
-    imgui_StrTooltip("(?)", "This setting is shared by all preview windows.");
+    imgui_StrTooltip("(?)", "This setting is shared by all preview windows in different places.");
 }
 
 void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT& rule, bool interactive,

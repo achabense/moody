@@ -1,10 +1,11 @@
-// TODO: rewrite some parts.
-// TODO: add a section to record all operations in the program?
+// TODO: many parts are outdated and need to be rewritten.
+// TODO: add a section to record all shortcuts in the program.
+// TODO: add a section to explain 'Identify' and 'Paste' with examples.
 
 const char* const doc_about =
     R"(In these documents (as well as the ones opened in 'Load file' or 'Clipboard'), you can left-click the rules to load them, or right-click the lines to copy the text (drag to select multiple lines).
 
-This program is for exploring "MAP rules". The project originated from a trivial program I made in 2021, which was poorly written and never made public. Still, I managed to find some interesting discoveries with it (by looking through many, many randomized rules). Here are two of them.
+This program is for exploring "MAP rules". The project originated from a trivial program I made in 2021, which was poorly written and never made public. Still, I managed to find some interesting discoveries with it (by looking through many, many random rules). Here are two of them.
 
 MAP+sQSUIzICkiQgAiAEKBAhrIGFgAUbAAA4AChgnAAAw6CAkAIgKCAlASgIACgIQBbqCqhEQAAkFQAARIDAQQRBA
 MAP7KV6wLHQiAHIPICBCAhlIqKAhAuKAFBoYmCFEAACIUzbAIAsAsCBJoAANhiIBEBSUICEMQiQFgRBgAJKgAA4gA
@@ -14,8 +15,6 @@ The project was then abandoned for many years. Last year I felt an urgency to br
 
 // TODO: about MAP rules...
 // TODO: about the lock & capture feature...
-// !!TODO: 'Randomize' is renamed... (many parts should be rewritten in this version...)
-// !!TODO: about identify...
 const char* const doc_overview =
     R"(At any time, the program has a rule shown in the right panel (which is an editable torus space; the operations are recorded in the tooltips (...)). This is later called the "current rule". As you see, it is the Game of Life rule initially.
 
@@ -36,8 +35,8 @@ The subsets that the current rule belongs to will be marked with light-green bor
 You need to firstly specify a "working set", which is the set you are going to explore. You can select multiple subsets - the program will calculate the intersection of them as the working set. For example, if you select 'All' (isotropic rules; selected by default) and 'S.c.' (self-complementary rules), you are going to explore the rules that are both isotropic and self-complementary.
 Then you need to select a "mask" (masking rule) to guide how to observe the current rule and generate new rules.
 To modify the current rule:
-'Randomize' generates random rules in the working set with specified "distance" (number of groups where two rules have different values) to the masking rule.
-'<00.. Prev/Next 11..>' generates rules based on the mask and current rule, so that the current rule will iterate through the whole working set - firstly the masking rule, then all rules with distance = 1 to the masking rule, then 2, ..., until max distance.
+'Random' window generates random rules in the working set with specified "distance" (number of groups where two rules have different values) to the masking rule.
+'<00.. Prev/Next 11..>' generates rules based on the mask and current rule, so that the current rule will iterate through the entire working set - firstly the masking rule, then all rules with distance = 1 to the masking rule, then 2, ..., until max distance.
 (The current rule should belong to the working set to enable 'Prev/Next'.)
 In the random-access section, the values of the current rule are viewed through the mask and grouped by the working set. By clicking a group you will flip all values of the current rule in that group. By turning on 'Preview' you are able to see the effect without replacing the current rule.
 
@@ -70,18 +69,18 @@ MAPARYXfhbofugWaH7oaIDogDZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAA
 MAPARYXfhZofugWan7oaIDogBZofuhogOiAaIDogIgAgAAWaH7oeIDogGiA6ICAAIAAaMDogIAAgACAAIAAAAAAAA
 MAPARYXfhZofugWaH7oaIDogBZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6YSAAIQAaIDogIAAgACAAIQAAAAAAA
 
-Obviously the whole MAP ruleset can be composed in the same way. And finally, it can be proven that, the intersection (&) of such subsets must be of the same structure (if not empty). Therefore, the above conclusions apply to any combination of these sets, and in the program you can combine different subsets freely.
+Obviously the entire MAP ruleset can be composed in the same way. And finally, it can be proven that, the intersection (&) of such subsets must be of the same structure (if not empty). Therefore, the above conclusions apply to any combination of these sets, and in the program you can combine different subsets freely.
 
 
 With these backgrounds, it will be much clearer to explain what happens in the program:
-1. For the selected subsets, the program will firstly calculate their intersection (with the whole MAP set) as the working set W = (M, P).
+1. For the selected subsets, the program will firstly calculate their intersection (with the entire MAP set) as the working set W = (M, P).
 (If nothing is selected, the working set is the MAP set itself.)
 2. Then you need to decide a rule M' in W (called "mask") to guide how to "observe" the current rule and generate new rules.
 (W.M is immutable, but is exposed as 'Native', so that there is at least one viable mask.)
 (If the current rule already belongs to W, it can serve as a valid mask (M') via '<< Cur'.)
 
 For the current rule C:
-3. 'Randomize' generates random rules in W with specified distance to M'.
+3. 'Random' window generates random rules in W with specified distance to M'.
 4. '<00.. Prev/Next 11..>' generates new rules based on C and M', in such a way that C will iterate through all rules in W:
 '<00..' sets C to M', and '11..>' sets C to the rule with values different from M' in all cases.
 'Next' generates rules based on C and M', so that C will become the "next" rule in such a sequence: starting from M' ('<00..'), then all rules having distance = 1 to M', then distance = 2, ..., until '11..>'. 'Prev' does the same thing reversely.
@@ -95,13 +94,13 @@ For the current rule C:
 Here are some use cases.
 
 If the working set is small enough (having only a few groups), the most direct way to explore the set is to check every rule in it.
-Take 'S.c. & Tot(+s)' (the self-complementary and inner-totalistic rules) for example. There are only 5 groups ~ 2^5=32 rules in the set, so it's fairly reasonable to check all of them. Typically, it does not matter which rule serves as the mask if you decide to iterate through the whole working set. However, in this case, neither 'Zero' nor 'Identity' works, so you'd need to stick to the 'Native' mask. By clicking '<00..' you will start from M', which happens to be the "voting" rule:
+Take 'S.c. & Tot(+s)' (the self-complementary and inner-totalistic rules) for example. There are only 5 groups ~ 2^5=32 rules in the set, so it's fairly reasonable to check all of them. Typically, it does not matter which rule serves as the mask if you decide to iterate through the entire working set. However, in this case, neither 'Zero' nor 'Identity' works, so you'd need to stick to the 'Native' mask. By clicking '<00..' you will start from M', which happens to be the "voting" rule:
 MAPAAAAAQABARcAAQEXARcXfwABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf3//f////w
 Then you can click 'Next' to iterate. (For convenience, after clicking '<00..', the left/right arrow keys will be bound to 'Prev/Next'.) The next rule will be:
 MAPgAAAAQABARcAAQEXARcXfwABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf3//f////g
 
-If the working set is large, then it's infeasible to test all rules. In these cases, aside from getting random rules ('Randomize' with arbitrary distance), if there are interesting/promising rules known to belong to the set, you can try to inspect rules that are close to them. Based on the current rule, this can be done in three ways:
-1. (After '<< Cur') 'Randomize' with a small distance.
+If the working set is large, then it's infeasible to test all rules. In these cases, aside from getting arbitrary random rules (with 'Random' window), if there are interesting/promising rules known to belong to the set, you can try to inspect rules that are close to them. Based on the current rule, this can be done in three ways:
+1. (After '<< Cur') Getting random rules with a small distance.
 2. (After '<< Cur') 'Next' still works - the iteration will start from the nearest rules (those with distance = 1).
 3. (Random-access) 'Preview' provides a direct view of all rules with distance = 1 to the current rule.
 
@@ -278,7 +277,7 @@ const char* const doc_random_access =
     R"(This section covers more aspects about random-access editing (as explained in 'Subset, mask and rule operations'). To recap, for the current rule C and working set W = (M, P), the operation flips all the values in a group in W.P, and therefore, the result belongs to S' = (C, W.P), which is W itself if C already belongs to W.
 
 For the sets in the form of (M, P), if a set S1 is a subset of another set S2, its partition must be strictly "coarser" than that of S2. In other words, each group in S1.P must fully cover one or several groups in S2.P. For example, the isotropic set is a subset of '-', '|', ..., 'C4' etc, so its partition is strictly coarser than theirs.
-(In the program, the working set is a subset of the ones that turn dull-blue, and any set is a subset of the whole MAP set.)
+(In the program, the working set is a subset of the ones that turn dull-blue, and any set is a subset of the entire MAP set.)
 
 Based on this, when performing random-access editing in W, suppose the current rule belongs to S != W:
 1. If S is a strict subset of W (for example, the current rule is totalistic, while W is the isotropic set):
@@ -292,7 +291,7 @@ The result may not belong to W (as the current rule may not belong to W), but mu
 
 Case 1 is especially useful.
 
-Here is the same hex-C6 rule shown in the 'Rules in different subsets' section. Hex-C6 is a subset of hex-C2, which is a subset of native-C2, which is further a subset of the whole MAP set.
+Here is the same hex-C6 rule shown in the 'Rules in different subsets' section. Hex-C6 is a subset of hex-C2, which is a subset of native-C2, which is further a subset of the entire MAP set.
 The later rules are all "refined" from this rule. (You can easily find such rules with the help of preview mode.) Before moving on, I'd recommend setting it as the masking rule ('<< Cur'), and setting a large step for the preview windows (in 'Settings') as well as the main window (as the dynamics of these rules are complex and relatively slow).
 MAPEUQRVSLdM4gRRBFVIt0ziCK7IswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHMRIiqIpnMEQ
 

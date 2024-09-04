@@ -235,9 +235,10 @@ public:
         }
     }
 
+    // TODO: redesign, and consider supporting recently-opened files as well.
     void select_history() {
-        ImGui::SetNextItemWidth(item_width);
-        imgui_StepSliderInt("Limit", &max_record, 5, 15);
+        // ImGui::SetNextItemWidth(item_width);
+        // imgui_StepSliderInt("Limit", &max_record, 5, 15);
         imgui_Str("Recently opened folders");
         if (m_record.size() > max_record) {
             m_record.resize(max_record);
@@ -248,7 +249,7 @@ public:
                 imgui_StrDisabled("None");
             }
             const pathT* sel = nullptr;
-            for (bool f = true; pathT & p : m_record) {
+            for (bool f = true; const pathT& p : m_record) {
                 const bool is_current = std::exchange(f, false) && p == m_current;
                 if (ImGui::Selectable(clip_path(p, ImGui::GetContentRegionAvail().x).c_str(), is_current)) {
                     sel = &p;
@@ -668,7 +669,7 @@ void load_file(sync_point& out) {
             nav.refresh_if_valid();
         }
         ImGui::SameLine();
-        const bool clicked = ImGui::SmallButton("...");
+        const bool clicked = ImGui::SmallButton("Recent");
         // `BeginPopup` will consume the settings, even if not opened.
         ImGui::SetNextWindowSize({300, 200}, ImGuiCond_Always);
         if (begin_popup_for_item(clicked)) {
@@ -691,7 +692,7 @@ void load_file(sync_point& out) {
             // Won't reset scroll.
         }
         ImGui::SameLine();
-        const bool clicked = ImGui::SmallButton("...");
+        const bool clicked = ImGui::SmallButton("Select");
         ImGui::SetNextWindowSize({300, 200}, ImGuiCond_Always);
         if (begin_popup_for_item(clicked)) {
             std::optional<pathT> sel = std::nullopt;
@@ -764,7 +765,7 @@ void load_doc(sync_point& out) {
     } else {
         const bool close = ImGui::SmallButton("Close");
         ImGui::SameLine();
-        const bool clicked = ImGui::SmallButton("...");
+        const bool clicked = ImGui::SmallButton("Select");
         if (begin_popup_for_item(clicked)) {
             select();
             ImGui::EndPopup();

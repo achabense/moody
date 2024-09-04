@@ -206,7 +206,7 @@ namespace aniso {
         explicit subsetT(const maskT& mask, const partitionT& par) { m_set.emplace(mask, par); }
 
         explicit subsetT() : m_set{std::nullopt} {}
-        // The whole MAP set:
+        // The entire MAP set:
         static subsetT universal() { return subsetT{maskT{}, equivT{}}; }
 
         bool empty() const { return !m_set.has_value(); }

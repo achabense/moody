@@ -129,8 +129,7 @@ void frame_main() {
         }
 
         // This is a workaround to support shortcut for clipboard-reading.
-        // !!TODO: using 'W' to avoid conflicts with pattern-pasting; not quite conventional...
-        // !!TODO: document the shortcut...
+        // TODO: using 'W' to avoid conflicts with pattern-pasting; not quite conventional...
         if (&flag == &show_clipboard) {
             if (shortcuts::keys_avail_and_window_hoverable() && shortcuts::test(ImGuiKey_W)) {
                 flag = true;
@@ -160,6 +159,9 @@ void frame_main() {
         load_rule(show_file, "Load file", load_file);
         ImGui::SameLine();
         load_rule(show_clipboard, "Clipboard", load_clipboard);
+        quick_info("^ Pasting rules. Shortcut: 'W'.");
+        // TODO: this does not look like a good place to record the shortcut...
+        // Need to unify the ways to record the shortcuts in the future...
         ImGui::SameLine();
         load_rule(show_doc, "Documents", load_doc);
         quick_info("< Concepts, example rules, etc.");
@@ -210,7 +212,7 @@ void frame_main() {
             [&] { freeze = true, recorder.set_first(); }, [&] { freeze = true, recorder.set_prev(); },
             [&] { freeze = true, recorder.set_next(); }, [&] { freeze = true, recorder.set_last(); });
         ImGui::EndGroup();
-        quick_info("v For undo/redo.");
+        quick_info("^ For undo/redo.");
 
         ImGui::SameLine();
         ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1 /* [1, size()] */);

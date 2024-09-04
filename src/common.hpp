@@ -149,6 +149,7 @@ struct shortcuts {
     }
 };
 
+// TODO: what's the role of these messages? What's their differences with normal tooltips?
 inline void quick_info(std::string_view msg) {
     if (shortcuts::global_flag(ImGuiKey_H) && ImGui::IsItemVisible()) {
         imgui_ItemRect(IM_COL32_WHITE);
@@ -485,8 +486,8 @@ public:
                 ImGui::Separator();
                 _set();
             });
-            // !!TODO: 'ctrl + right-click' is an important convenience improvement.
-            // Should record this feature in 'Documents' as well.
+            // TODO: 'ctrl + right-click' is an important convenience improvement.
+            // Should record this feature in 'Documents' as well...
         }
     };
 

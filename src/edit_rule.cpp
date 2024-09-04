@@ -208,7 +208,7 @@ public:
         terms_totalistic.emplace_back(
             "Tot", &native_tot_exc_s,
             "Outer-totalistic MAP rules. That is, the values are dependent on 's' and 'q+w+e+a+d+z+x+c'.\n\n"
-            "(This is where the B/S notation applies.)");
+            "(This is also known as life-like rules, and is where the B/S notation applies.)");
         terms_totalistic.emplace_back(
             "Tot(+s)", &native_tot_inc_s,
             "Inner-totalistic MAP rules. That is, the values are only dependent on "
@@ -222,9 +222,12 @@ public:
         // a s d ~ a s d
         // - x c    x c
         terms_hex.emplace_back("All", &hex_isotropic,
-                               "Rules that emulate isotropic hexagonal rules.\n\n"
-                               "(Remember to unselect native-symmetry terms when working with this line.)");
-        // !!TODO: elaborate...
+                               "Rules that emulate isotropic hexagonal rules. "
+                               "You can hover on the displaying windows for such rules and press '6' to "
+                               "better view the symmetries in the corresponding hexagonal space.\n\n"
+                               "(Remember to unselect native-symmetry terms when working with this line. "
+                               "These subsets have no direct relation with native symmetries, and their "
+                               "intersection with native-symmetry terms will typically be very small.)");
         terms_hex.emplace_back(
             "a-d", &hex_refl_asd,
             "Rules that emulate reflection symmetry in the hexagonal tiling, taking the axis from 'a' to 'd'.");
@@ -315,26 +318,26 @@ public:
                     imgui_Str(desc);
                 };
 
-                // !!TODO: should be rewritten....
-                imgui_Str(
-                    "The following terms represent subsets of MAP rules. You can select these terms freely - "
-                    "the program will calculate the intersection of selected subsets (with the whole MAP set), and "
-                    "help you explore rules in it.\n"
-                    "This set is later called \"working set\". For example, \"the rule belongs to the working set\" "
-                    "has the same meaning as \"the rule belongs to every selected subset\". If nothing is selected, "
-                    "the working set will be the whole MAP set.");
+                imgui_Str("The following terms represent subsets of MAP rules. You can select these terms freely - "
+                          "the program will calculate the common set (the intersection) of selected subsets (with "
+                          "the entire MAP set), and help you explore rules in the set.\n\n"
+                          "This set is later called \"working set\". For example, if a rule is said to belong to the "
+                          "working set, it should also belong to every selected subset. If nothing is selected, the "
+                          "working set will be the entire MAP set.");
                 ImGui::Separator();
                 imgui_Str("The ring color reflects the relation between the subset and the current rule:");
                 explain(Contained, None, "The rule belongs to this subset.");
                 if (!target.enable_lock) {
                     explain(Compatible, None, "The rule does not belong to this subset.");
                 } else {
+                    // TODO: this is quite user-unfriendly... (Cannot improve unless the subset system is
+                    // extended to incorporate value constraints.)
                     explain(
                         Compatible, None,
                         "The rule does not belong to this subset, but there exist rules in the subset that meet the "
                         "constraints (locked values) posed by rule-lock pair.\n"
-                        "(Notice that the [intersection] of such subsets may still contain no rules that satisfy the "
-                        "constraints. )");
+                        "(Notice that even though some subsets may meet this condition individually, their "
+                        "intersection may still contain no rules that satisfy the constraints.)");
                     explain(
                         Incompatible, None,
                         "The rule does not belong to this subset, and the constraints cannot be satisfied by any rule "
@@ -342,13 +345,14 @@ public:
                 }
 
                 ImGui::Separator();
-                imgui_Str("The center color reflects the selection details:");
+                imgui_Str("The center color is irrelevant to the ring color, and reflects the selection details:");
                 explain(Compatible, None, "Not selected.");
                 explain(Compatible, Selected, "Selected.");
                 explain(Compatible, Including,
                         "Not selected, but the working set already belongs to this subset, so it will behave "
                         "as if this is selected too.");
-                explain(Compatible, Disabled, "Not selectable, otherwise the working set will be empty.");
+                explain(Compatible, Disabled,
+                        "Not selectable. (If selected, the resulting working set will be empty.)");
             });
             ImGui::SameLine();
             imgui_Str("Working set ~");
@@ -357,7 +361,8 @@ public:
                      : aniso::compatible(current, mold) ? Compatible
                                                         : Incompatible,
                      None, nullptr, false);
-            imgui_ItemTooltip("See '(...)' for explanation.");
+            imgui_ItemTooltip("This will be light green if the current rule belongs to the selected "
+                              "subsets. See '(...)' for details.");
 
             // TODO: `static` for convenience. This must be refactored when there are to be multiple instances.
             static bool hide_details = false;
@@ -773,7 +778,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
         });
         ImGui::SameLine();
         imgui_StrTooltip("(?)",
-                         "Iterate through the whole working set, by firstly iterating through all rules with "
+                         "Iterate through the entire working set, by firstly iterating through all rules with "
                          "distance = 1 to the masking rule, then 2, 3, ..., until max distance.\n\n"
                          "For example, suppose the current rule belongs to the working set. To iterate through all "
                          "rules with distance = 1 to the current rule, you can:\n"
@@ -833,12 +838,9 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                         "(Also, suppose the current rule belongs to the working set, you can set it to "
                         "the custom mask, and generate in a low distance to get random rules that are \"close\" "
                         "to it.)");
-                    // TODO: whether (and where) to add these tips?
+                    // TODO: where to record these tips?
                     // 1. left/right arrow key will be bound to '<</>>>' when the window is toggled open.
-                    // 2. further operations are supported via '>> Cur'. For example to save a rule the user needs
-                    // to firstly set it as the current rule.
-                    // !!TODO: the window can be auto-resized if resize border or corner is double clicked. Document
-                    // somewhere.
+                    // 2. the window can be resized to fit the page by double-clicking the resize border.
 
                     static batch_adapter batch;
                     batch.display(
@@ -877,7 +879,7 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
                 imgui_Str("The current rule does not belong to the working set.\n\n"
                           "Check the dull-blue groups for details - no matter which mask is selected, for any rule in "
                           "the working set, the masked values should be all the same in any group.\n\n"
-                          "You can get rules in the working set with '<00..', '11..>', or 'Randomize'. Or "
+                          "You can get rules in the working set with '<00..', '11..>', or 'Random'. Or "
                           "optionally, you can right-click this '(?)' to get the following rule in the working set.");
                 ImGui::Separator();
                 imgui_Str("Preview:");
@@ -895,6 +897,8 @@ void edit_rule(sync_point& sync, bool& bind_undo) {
         }
     }
 
+    // TODO: by default, the program should not allow random-access edit for rules not included in
+    // the working set. (This should still be supported, but should be an opt-in feature...)
     ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32_GREY(24, 255));
     if (auto child = imgui_ChildWindow("Groups")) {
         // TODO: document the behavior.
