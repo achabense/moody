@@ -467,55 +467,12 @@ static int fit_count(int avail, int size, int spacing) { //
     return std::max(1, (avail + spacing) / (size + spacing));
 }
 
-class batch_adapter {
-    std::vector<aniso::ruleT> rules{};
+struct page_adapter {
     int page_size = 6, perline = 3;
-    int page_no = 0;
 
-    previewer::configT config{previewer::configT::_220_160};
-
-public:
-    void display(std::function<aniso::ruleT()> gen, sync_point& out, ImVec2& min_req_size) {
-        auto calc_page = [&]() -> int { return (rules.size() + page_size - 1) / page_size; };
-        auto set_page = [&](int p, bool make_page = false) {
-            if (p < 0) {
-                return;
-            } else if (p < calc_page()) {
-                page_no = p;
-            } else if (make_page) {
-                const int count = (rules.size() / page_size) * page_size + page_size - rules.size();
-                for (int i = 0; i < count; ++i) {
-                    rules.push_back(gen());
-                }
-                assert((rules.size() % page_size) == 0);
-                page_no = (rules.size() / page_size) - 1;
-            }
-        };
-
-        sequence::seq(
-            "<|", "<<", ">>>", "|>", //
-            [&] { set_page(0); }, [&] { set_page(page_no - 1); }, [&] { set_page(page_no + 1, true); },
-            [&] { set_page(rules.empty() ? 0 : calc_page() - 1); });
-        ImGui::SameLine();
-        if (!rules.empty()) {
-            // TODO: will this be confusing when the page is resized?
-            ImGui::Text("Pages:%d At:%d", calc_page(), page_no + 1);
-        } else {
-            ImGui::Text("Pages:%d At:N/A", calc_page());
-        }
-        imgui_ItemTooltip("Right-click to clear.");
-        // (Using the same style as in `frame_main`.)
-        if (begin_popup_for_item(imgui_ItemClickable(), "")) {
-            if (ImGui::Selectable("Clear all pages") && !rules.empty()) {
-                rules = std::vector<aniso::ruleT>{};
-                page_no = 0;
-            }
-            ImGui::EndPopup();
-        }
-
-        ImGui::SameLine(0, 16);
-        config.set("Preview settings");
-
+    // `page_resized` should be able to access *this someway.
+    void display(const previewer::configT& config, sync_point& out, ImVec2& min_req_size,
+                 std::function<void()> page_resized, std::function<const aniso::ruleT*(int)> access) {
         const ImVec2 avail_size = ImGui::GetContentRegionAvail();
 
         // Background
@@ -533,10 +490,10 @@ public:
 
             const int xc = fit_count(avail_size.x, group_size_x, 16 /*SameLine(0, 16)*/);
             const int yc = fit_count(avail_size.y, group_size_y, item_spacing_y);
-            if (page_size != xc * yc || perline != xc) {
+            perline = xc;
+            if (page_size != xc * yc) {
                 page_size = xc * yc;
-                perline = xc;
-                set_page(rules.empty() ? 0 : calc_page() - 1);
+                page_resized();
             }
         }
 
@@ -547,21 +504,20 @@ public:
                 ImGui::Separator();
             }
 
-            const int r = page_no * page_size + j;
             ImGui::BeginGroup();
-            if (r >= rules.size()) {
+            if (const aniso::ruleT* rule = access(j); rule != nullptr) {
+                ImGui::PushID(j);
+                if (ImGui::Button(">> Cur")) {
+                    out.set_rule(*rule);
+                }
+                ImGui::PopID();
+                previewer::preview(j, config, *rule);
+            } else {
                 ImGui::BeginDisabled();
                 ImGui::Button(">> Cur");
                 ImGui::EndDisabled();
-                imgui_ItemTooltip("Empty. ('>>>' to generate rules.)");
+                imgui_ItemTooltip("Empty.");
                 previewer::dummy(config, IM_COL32_BLACK);
-            } else {
-                ImGui::PushID(j);
-                if (ImGui::Button(">> Cur")) {
-                    out.set_rule(rules[r]);
-                }
-                ImGui::PopID();
-                previewer::preview(j, config, rules[r]);
             }
             ImGui::EndGroup();
 
@@ -835,20 +791,66 @@ void edit_rule(sync_point& sync) {
                         "(Also, suppose the current rule belongs to the working set, you can set it to "
                         "the custom mask, and generate in a low distance to get random rules that are \"close\" "
                         "to it.)");
-                    // TODO: where to record these tips?
-                    // 1. left/right arrow key will be bound to '<</>>>' when the window is toggled open.
-                    // 2. the window can be resized to fit the page by double-clicking the resize border.
+                    // TODO: where to record this?
+                    // The window can be resized to fit the page size by double-clicking the resize border.
 
-                    static batch_adapter batch;
-                    batch.display(
-                        [&]() -> aniso::ruleT {
-                            if (exact_mode) {
-                                return aniso::randomize_c(subset, mask, mold, global_mt19937(), free_dist);
-                            } else {
-                                return aniso::randomize_p(subset, mask, mold, global_mt19937(), rate);
+                    static std::vector<aniso::ruleT> rules{};
+                    static page_adapter adapter{};
+                    static int page_no = 0;
+                    static previewer::configT config{previewer::configT::_220_160};
+
+                    auto calc_page = [&]() -> int {
+                        return (rules.size() + adapter.page_size - 1) / adapter.page_size;
+                    };
+                    auto set_page = [&](int p, bool make_page = false) {
+                        if (p < 0) {
+                            return;
+                        } else if (p < calc_page()) {
+                            page_no = p;
+                        } else if (make_page) {
+                            const int count = (rules.size() / adapter.page_size) * adapter.page_size +
+                                              adapter.page_size - rules.size();
+                            for (int i = 0; i < count; ++i) {
+                                rules.push_back(
+                                    exact_mode ? aniso::randomize_c(subset, mask, mold, global_mt19937(), free_dist)
+                                               : aniso::randomize_p(subset, mask, mold, global_mt19937(), rate));
                             }
-                        },
-                        sync, size_constraint_min);
+                            assert((rules.size() % adapter.page_size) == 0);
+                            page_no = (rules.size() / adapter.page_size) - 1;
+                        }
+                    };
+                    auto set_last_page = [&] { set_page(rules.empty() ? 0 : calc_page() - 1); };
+
+                    sequence::seq(
+                        "<|", "<<", ">>>", "|>", //
+                        [&] { set_page(0); }, [&] { set_page(page_no - 1); }, [&] { set_page(page_no + 1, true); },
+                        set_last_page);
+                    ImGui::SameLine();
+                    if (!rules.empty()) {
+                        // TODO: will this be confusing when the page is resized?
+                        ImGui::Text("Pages:%d At:%d", calc_page(), page_no + 1);
+                    } else {
+                        ImGui::Text("Pages:%d At:N/A", calc_page());
+                    }
+                    imgui_ItemTooltip("Right-click to clear.");
+                    // (Using the same style as in `frame_main`.)
+                    if (begin_popup_for_item(imgui_ItemClickable(), "")) {
+                        if (ImGui::Selectable("Clear all pages") && !rules.empty()) {
+                            rules = std::vector<aniso::ruleT>{};
+                            page_no = 0;
+                        }
+                        ImGui::EndPopup();
+                    }
+
+                    ImGui::SameLine(0, 16);
+                    config.set("Preview settings");
+
+                    // TODO: reconsider page-resized logic (seeking to the last page may still be confusing).
+                    adapter.display(config, sync, size_constraint_min, set_last_page, [&](int j) {
+                        const int r = page_no * adapter.page_size + j;
+                        assert(r >= 0);
+                        return r < rules.size() ? &rules[r] : nullptr;
+                    });
                 }
             }
         });
