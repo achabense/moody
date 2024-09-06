@@ -160,31 +160,9 @@ namespace aniso {
         });
     }
 
-    // `lockT`, together with the associated rule, captures the idea that the locked values in the rule
-    // are the "cause" for something to happen.
-    // For example, suppose we find an oscillator in a rule. It is likely to only invoke a subset of all
-    // codeT during all of its phases. We can record these invocations and say that's why the oscillator exists
-    // in this rule.
-    // The program uses `moldT` ~ (lockT, ruleT) pair as a constraint for generating new rules.
-    struct moldT {
-        using lockT = codeT::map_to<bool>;
-
-        ruleT rule{};
-        lockT lock{};
-
-        // Test whether `r` has the same values for all locked codes.
-        bool compatible(const ruleT& r) const {
-            return for_each_code_all_of([&](codeT code) { //
-                return !lock[code] || rule[code] == r[code];
-            });
-        }
-
-        friend bool operator==(const moldT&, const moldT&) = default;
-    };
-
-    // (Program-specific)
-    // The program stores `moldT` in a way compatible with normal MAP rules, see `to_MAP_str`
-    // and `extract_MAP_str` for details.
+    // Serves as a subset of all situT cases. The program may want to use some "locked" parts of a rule
+    // when generating new rules.
+    using lockT = codeT::map_to<bool>;
 
     namespace _misc {
         inline char to_base64(uint8_t b6) {
@@ -267,33 +245,46 @@ namespace aniso {
     } // namespace _misc
 
     // Convert ruleT to a "MAP string".
-    inline std::string to_MAP_str(const ruleT& rule) {
+    inline std::string to_MAP_str(const ruleT& rule, const lockT* lock = nullptr) {
         std::string str = "MAP";
         _misc::to_MAP(str, rule);
+        if (lock) {
+            str += " [";
+            _misc::to_MAP(str, *lock);
+            str += "]";
+        }
         return str;
     }
 
-    inline std::string to_MAP_str(const moldT& mold) {
-        std::string str = "MAP";
-        _misc::to_MAP(str, mold.rule);
-        str += " [";
-        _misc::to_MAP(str, mold.lock);
-        str += "]";
-        return str;
-    }
-
+    // Extract ruleT (optionally with lockT) from text.
     struct extrT {
-        // Acts as a variant for ruleT/moldT.
-        struct valT {
-            ruleT rule;
-            std::optional<moldT::lockT> lock;
-        };
+        std::string_view prefix{};
+        std::string_view rule_str{};
+        std::string_view lock_str{};
+        std::string_view suffix{};
 
-        std::optional<valT> val;
-        std::string_view prefix{}, suffix{};
+        bool has_rule() const { return !rule_str.empty(); }
+
+        bool has_lock() const {
+            assert_implies(rule_str.empty(), lock_str.empty());
+            return !lock_str.empty();
+        }
+
+        ruleT get_rule() const {
+            assert(has_rule());
+            ruleT rule{};
+            _misc::from_MAP(rule_str, rule);
+            return rule;
+        }
+
+        lockT get_lock() const {
+            assert(has_lock());
+            lockT lock{};
+            _misc::from_MAP(lock_str, lock);
+            return lock;
+        }
     };
 
-    // Extract ruleT or moldT from text.
     inline extrT extract_MAP_str(std::span<const char> data) {
         const char* begin = data.data();
         const char* end = data.data() + data.size();
@@ -309,13 +300,12 @@ namespace aniso {
             extr.prefix = {match.prefix().first, match.prefix().second};
             extr.suffix = {match.suffix().first, match.suffix().second};
 
-            _misc::from_MAP({match[1].first, match[1].second}, extr.val.emplace().rule);
+            extr.rule_str = {match[1].first, match[1].second};
             if (match[3].matched) {
-                _misc::from_MAP({match[3].first, match[3].second}, extr.val->lock.emplace());
+                extr.lock_str = {match[3].first, match[3].second};
             }
         } else {
-            extr.prefix = {begin, end};
-            extr.suffix = {};
+            extr.prefix = {begin, end}; // .suffix ~ {}
         }
 
         return extr;
@@ -326,10 +316,9 @@ namespace aniso {
         inline const testT test_MAP_str = [] {
             {
                 const std::string_view str = "...";
-                const auto [val, prefix, suffix] = extract_MAP_str(str);
-                assert(!val);
-                assert(prefix == "...");
-                assert(suffix == "");
+                const auto extr = extract_MAP_str(str);
+                assert(extr.prefix == "..." && extr.suffix == "");
+                assert(!extr.has_rule() && !extr.has_lock());
             }
 
             {
@@ -341,33 +330,31 @@ namespace aniso {
                 const ruleT gol = game_of_life();
                 assert(to_MAP_str(gol) == gol_str);
 
-                const auto [val, prefix, suffix] = extract_MAP_str(gol_str);
-                assert(prefix == "");
-                assert(suffix == "");
-                assert(val);
-                assert(val->rule == gol);
-                assert(!val->lock);
+                const auto extr = extract_MAP_str(gol_str);
+                assert(extr.prefix == "" && extr.suffix == "");
+                assert(extr.get_rule() == gol);
+                assert(!extr.has_lock());
             }
 
             {
-                moldT mold{};
+                ruleT rule{};
+                lockT lock{};
                 for_each_code([&](codeT code) {
-                    mold.rule[code] = testT::rand() & 1;
-                    mold.lock[code] = testT::rand() & 1;
+                    rule[code] = testT::rand() & 1;
+                    lock[code] = testT::rand() & 1;
                 });
-                const std::string rule_only = "(prefix)" + to_MAP_str(mold.rule) + "(suffix)";
-                const std::string whole = "(prefix)" + to_MAP_str(mold) + "(suffix)";
+                const std::string rule_only = "(prefix)" + to_MAP_str(rule) + "(suffix)";
+                const std::string with_lock = "(prefix)" + to_MAP_str(rule, &lock) + "(suffix)";
 
-                const auto [val1, prefix1, suffix1] = extract_MAP_str(rule_only);
-                const auto [val2, prefix2, suffix2] = extract_MAP_str(whole);
+                const auto extr1 = extract_MAP_str(rule_only);
+                const auto extr2 = extract_MAP_str(with_lock);
 
-                assert(prefix1 == "(prefix)" && prefix2 == "(prefix)");
-                assert(suffix1 == "(suffix)" && suffix2 == "(suffix)");
-                assert(val1 && val2);
-                assert(val1->rule == mold.rule);
-                assert(!val1->lock);
-                assert(val2->rule == mold.rule);
-                assert(val2->lock == mold.lock);
+                assert(extr1.prefix == "(prefix)" && extr2.prefix == "(prefix)");
+                assert(extr1.suffix == "(suffix)" && extr2.suffix == "(suffix)");
+                assert(extr1.get_rule() == rule);
+                assert(extr2.get_rule() == rule);
+                assert(!extr1.has_lock());
+                assert(extr2.get_lock() == lock);
             }
         };
     }  // namespace _tests

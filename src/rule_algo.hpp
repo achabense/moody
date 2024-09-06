@@ -4,6 +4,26 @@
 
 // TODO: add summary about this header, especially subsetT.
 namespace aniso {
+    // `lockT`, together with the associated rule, captures the idea that the locked values in the rule
+    // are the "cause" for something to happen.
+    // For example, suppose we find an oscillator in a rule. It is likely to only invoke a subset of all
+    // codeT during all of its phases. We can record these invocations and say that's why the oscillator exists
+    // in this rule.
+    // The program uses `moldT` ~ (lockT, ruleT) pair as a constraint for generating new rules.
+    struct moldT {
+        ruleT rule{};
+        lockT lock{};
+
+        // Test whether `r` has the same values for all locked codes.
+        bool compatible(const ruleT& r) const {
+            return for_each_code_all_of([&](codeT code) { //
+                return !lock[code] || rule[code] == r[code];
+            });
+        }
+
+        friend bool operator==(const moldT&, const moldT&) = default;
+    };
+
     // TODO: defining `maskT` to emphasis which rule serves as the mask; it might be more
     // convenient to use `ruleT` directly.
 
@@ -66,7 +86,7 @@ namespace aniso {
         }
 
         // Test whether `r` has the same value for locked codes in each group.
-        bool test(const ruleT_masked& r, const moldT::lockT& lock) const {
+        bool test(const ruleT_masked& r, const lockT& lock) const {
             codeT::map_to<int> record;
             record.fill(-1);
 
@@ -175,7 +195,7 @@ namespace aniso {
         }
 
         bool test(const ruleT_masked& r) const { return m_eq.test(r); }
-        bool test(const ruleT_masked& r, const moldT::lockT& lock) const { return m_eq.test(r, lock); }
+        bool test(const ruleT_masked& r, const lockT& lock) const { return m_eq.test(r, lock); }
 
         bool is_refinement_of(const partitionT& other) const { return other.m_eq.has_eq(m_eq); }
 
@@ -368,18 +388,18 @@ namespace aniso {
         return res;
     }
 
-    inline bool any_locked(const moldT::lockT& lock, const groupT& group) {
+    inline bool any_locked(const lockT& lock, const groupT& group) {
         return std::ranges::any_of(group, [&lock](codeT code) { return lock[code]; });
     }
 
-    inline bool none_locked(const moldT::lockT& lock, const groupT& group) {
+    inline bool none_locked(const lockT& lock, const groupT& group) {
         return std::ranges::none_of(group, [&lock](codeT code) { return lock[code]; });
     }
 
-    inline moldT::lockT enhance_lock(const subsetT& subset, const moldT& mold) {
+    inline lockT enhance_lock(const subsetT& subset, const moldT& mold) {
         assert(subset.contains(mold.rule));
 
-        moldT::lockT lock{};
+        lockT lock{};
         subset.get_par().for_each_group([&](const groupT& group) {
             if (any_locked(mold.lock, group)) {
                 for (codeT code : group) {

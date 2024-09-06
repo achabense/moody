@@ -108,16 +108,9 @@ void frame_main() {
 
     messenger::display();
 
-    // TODO: the constraint model (constraint = {recorder.current(), lock}) is very fragile now.
-    // The meaning of the constraint may be changed unexpectedly when:
-    // 1. `recorder.set_xx` switches to a !compatible rule.
-    // 2. `load_fn` loads a !compatible rule.
-    // 3. the rule is modified during `!enable_lock`.
     static recorderT recorder;
-    static aniso::moldT::lockT lock;
-    static bool enable_lock = false;
     bool freeze = false;
-    sync_point sync(recorder.current(), lock, enable_lock);
+    sync_point sync = recorder.current();
 
     // TODO: add a way to specify the contents for the left panel. These loading windows can fit well.
     static bool show_file = false;
@@ -176,8 +169,6 @@ void frame_main() {
         }
 #endif // SET_FRAME_RATE
 
-        ImGui::SameLine(0, wide_spacing);
-        ImGui::Checkbox("Lock & capture", &sync.enable_lock_next);
 #ifndef NDEBUG
         ImGui::SameLine();
         imgui_Str("  (Debug mode)");
@@ -225,13 +216,13 @@ void frame_main() {
 
         ImGui::SameLine();
         if (ImGui::Button("Rev")) {
-            sync.set_mold(rule_algo::trans_reverse(sync.current));
+            sync.set(rule_algo::trans_reverse(sync.rule));
         }
         imgui_ItemTooltip([&] {
             imgui_Str("Get the 0/1 reversal dual of the current rule.");
             ImGui::Separator();
-            const aniso::ruleT rev = rule_algo::trans_reverse(sync.current).rule;
-            if (rev != sync.current.rule) {
+            const aniso::ruleT rev = rule_algo::trans_reverse(sync.rule);
+            if (rev != sync.rule) {
                 imgui_Str("Preview:");
                 ImGui::SameLine();
                 previewer::preview(-1, previewer::configT::_220_160, rev, false);
@@ -241,6 +232,11 @@ void frame_main() {
             }
         });
 
+        ImGui::SameLine();
+        imgui_StrCopyable(aniso::to_MAP_str(sync.rule), imgui_Str, set_clipboard_and_notify);
+
+        // v (Preserved for reference.)
+#if 0 
         {
             if (!sync.enable_lock) {
                 ImGui::SameLine();
@@ -264,6 +260,7 @@ void frame_main() {
                 }
             }
         }
+#endif
 
         ImGui::Separator();
 
@@ -280,29 +277,9 @@ void frame_main() {
             }
             ImGui::EndTable();
         }
-
-        sync.display_if_enable_lock([&](bool visible) {
-            if (visible) {
-                static bool show_static = false;
-                ImGui::Separator();
-                ImGui::Checkbox("Static constraints", &show_static);
-                if (show_static) {
-                    ImGui::PushID("static");
-                    static_constraints(sync);
-                    ImGui::PopID();
-                }
-            }
-        });
     }
 
-    enable_lock = sync.enable_lock_next;
-    if (!freeze) {
-        if (sync.out_rule) {
-            recorder.update(*sync.out_rule);
-        }
-        if (sync.out_lock) {
-            assert(sync.enable_lock);
-            lock = *sync.out_lock;
-        }
+    if (!freeze && sync.out_rule) {
+        recorder.update(*sync.out_rule);
     }
 }

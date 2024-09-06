@@ -135,8 +135,8 @@ static bool want_hex_mode(const aniso::ruleT& rule) {
 // This is only good at capturing simple, "self-contained" patterns (oscillators/spaceships).
 // For more complex situations, the program has "open-capture" (`fake_apply`) to record
 // areas frame-by-frame.
-static aniso::moldT::lockT capture_closed(const aniso::tile_const_ref tile, const aniso::ruleT& rule) {
-    aniso::moldT::lockT lock{};
+static aniso::lockT capture_closed(const aniso::tile_const_ref tile, const aniso::ruleT& rule) {
+    aniso::lockT lock{};
     aniso::tileT torus(tile);
 
     // (wontfix) It's possible that the loop fails to catch all invocations in very rare cases,
@@ -576,7 +576,7 @@ public:
     // For example, there are a lot of static variables in `display`, and the keyboard controls are not designed
     // for per-object use.
     void display(sync_point& sync) {
-        const bool rule_changed = m_torus.begin_frame(sync.current.rule);
+        const bool rule_changed = m_torus.begin_frame(sync.rule);
         if (rule_changed) {
             // m_sel.reset();
             m_paste.reset();
@@ -723,7 +723,7 @@ public:
 
                     static timerT timer{200};
                     if (timer.test()) {
-                        curr.run_torus(sync.current.rule);
+                        curr.run_torus(sync.rule);
                     }
                 }
 
@@ -1048,7 +1048,7 @@ public:
                 if (!m_paste && (!active || !r_down)) {
                     if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip) && cel_pos.both_gteq({-10, -10}) &&
                         cel_pos.both_lt(tile_size.plus(10, 10))) {
-                        hex_mode = want_hex_mode(sync.current.rule);
+                        hex_mode = want_hex_mode(sync.rule);
                         if (hex_mode || m_coord.zoom <= 1) {
                             zoom_center = cel_pos;
                         }
@@ -1184,8 +1184,8 @@ public:
                 static bool show_result = true; // Copy / cut.
                 auto copy_sel = [&] {
                     if (m_sel) {
-                        std::string rle_str = aniso::to_RLE_str(m_torus.read_only(m_sel->to_range()),
-                                                                add_rule ? &sync.current.rule : nullptr);
+                        std::string rle_str =
+                            aniso::to_RLE_str(m_torus.read_only(m_sel->to_range()), add_rule ? &sync.rule : nullptr);
                         ImGui::SetClipboardText(rle_str.c_str());
 
                         if (show_result) {
@@ -1218,6 +1218,8 @@ public:
                     }
                 };
 
+                // v (Preserved for reference.)
+#if 0
                 // Pattern capturing.
                 sync.display_if_enable_lock([&](bool /* visible */) {
                     ImGui::Separator();
@@ -1244,6 +1246,7 @@ public:
                     }
                     term("Capture (closed)", "P", ImGuiKey_P, true, _capture_closed);
                 });
+#endif
 
                 auto range_operations = [&](const bool display) {
                     if (display) {
@@ -1355,15 +1358,11 @@ public:
 
                 // TODO: disable some operations if `m_paste.has_value`?
                 if (op == _capture_closed && m_sel) {
-                    auto lock = capture_closed(m_torus.read_only(m_sel->to_range()), sync.current.rule);
-                    if (!replace) {
-                        aniso::for_each_code([&](aniso::codeT c) { lock[c] = lock[c] || sync.current.lock[c]; });
-                    }
-                    sync.set_lock(lock);
+                    // capture_closed;
+                    assert(false); // TODO: temporarily preserved.
                 } else if (op == _capture_open && m_sel) {
-                    auto lock = sync.current.lock;
-                    aniso::fake_apply(m_torus.read_only(m_sel->to_range()), lock);
-                    sync.set_lock(lock);
+                    // aniso::fake_apply;
+                    assert(false); // TODO: temporarily preserved.
                 } else if (op == _random_fill && m_sel) {
                     // TODO: or `random_flip`?
                     aniso::random_fill(m_torus.write_only(m_sel->to_range()), global_mt19937(), fill_den.get());
@@ -1416,8 +1415,8 @@ public:
                             } else {
                                 // Set the rule only if the text really contains pattern data,
                                 // so the next paste is guaranteed to succeed.
-                                if (rule && *rule != sync.current.rule) {
-                                    sync.set_rule(*rule);
+                                if (rule && *rule != sync.rule) {
+                                    sync.set(*rule);
                                     messenger::set_msg("Loaded a different rule specified by the header. Paste again "
                                                        "for the pattern.");
                                     m_paste.reset();
@@ -1430,7 +1429,7 @@ public:
                         });
                     }
                 } else if (op == _identify) {
-                    identify(m_torus.read_only(m_sel->to_range()), sync.current.rule);
+                    identify(m_torus.read_only(m_sel->to_range()), sync.rule);
                 }
             }
 

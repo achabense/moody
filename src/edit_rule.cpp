@@ -99,8 +99,9 @@ namespace aniso {
 
 // `aniso::trans_reverse` cannot be directly declared and called in other TUs, as "the definition of
 // an inline function must be reachable in the translation unit where it is accessed".
-aniso::moldT rule_algo::trans_reverse(const aniso::moldT& mold) { //
-    return aniso::trans_reverse(mold);
+aniso::ruleT rule_algo::trans_reverse(const aniso::ruleT& rule) { //
+    // TODO: temporarily going through a useless moldT.
+    return aniso::trans_reverse({rule, {}}).rule;
 }
 
 bool rule_algo::is_hexagonal_rule(const aniso::ruleT& rule) { //
@@ -247,8 +248,8 @@ public:
     }
 
     const aniso::subsetT& select_subset(const sync_point& target) {
-        assert_implies(!target.enable_lock, target.current.lock == aniso::moldT::lockT{});
-        const aniso::moldT& mold = target.current;
+        // TODO: temporarily preserved.
+        const aniso::moldT mold{target.rule, {}};
 
         enum ringE { Contained, Compatible, Incompatible };
         enum centerE { Selected, Including, Disabled, None }; // TODO: add "equals" relation?
@@ -327,22 +328,20 @@ public:
                 ImGui::Separator();
                 imgui_Str("The ring color reflects the relation between the subset and the current rule:");
                 explain(Contained, None, "The rule belongs to this subset.");
-                if (!target.enable_lock) {
-                    explain(Compatible, None, "The rule does not belong to this subset.");
-                } else {
-                    // TODO: this is quite user-unfriendly... (Cannot improve unless the subset system is
-                    // extended to incorporate value constraints.)
-                    explain(
-                        Compatible, None,
+                explain(Compatible, None, "The rule does not belong to this subset.");
+                // v (Preserved for reference.)
+#if 0
+                // TODO: this is quite user-unfriendly... (Cannot improve unless the subset system is
+                // extended to incorporate value constraints.)
+                explain(Compatible, None,
                         "The rule does not belong to this subset, but there exist rules in the subset that meet the "
                         "constraints (locked values) posed by rule-lock pair.\n"
                         "(Notice that even though some subsets may meet this condition individually, their "
                         "intersection may still contain no rules that satisfy the constraints.)");
-                    explain(
-                        Incompatible, None,
+                explain(Incompatible, None,
                         "The rule does not belong to this subset, and the constraints cannot be satisfied by any rule "
                         "in this subset.");
-                }
+#endif
 
                 ImGui::Separator();
                 imgui_Str("The center color is irrelevant to the ring color, and reflects the selection details:");
@@ -508,7 +507,7 @@ struct page_adapter {
             if (const aniso::ruleT* rule = access(j); rule != nullptr) {
                 ImGui::PushID(j);
                 if (ImGui::Button(">> Cur")) {
-                    out.set_rule(*rule);
+                    out.set(*rule);
                 }
                 ImGui::PopID();
                 previewer::preview(j, config, *rule);
@@ -557,7 +556,8 @@ void edit_rule(sync_point& sync) {
     const aniso::subsetT& subset = selector.select_subset(sync);
     assert(!subset.empty());
 
-    const aniso::moldT& mold = sync.current;
+    // TODO: temporarily preserved.
+    const aniso::moldT mold = {sync.rule, {}};
     const bool compatible = aniso::compatible(subset, mold);
     const bool contained = subset.contains(mold.rule);
     assert_implies(contained, compatible);
@@ -657,6 +657,8 @@ void edit_rule(sync_point& sync) {
 
     ImGui::Separator();
 
+    // v (Preserved for reference.)
+#if 0
     sync.display_if_enable_lock([&](bool visible) {
         if (!visible) {
             return;
@@ -685,6 +687,7 @@ void edit_rule(sync_point& sync) {
         aniso::for_each_code([&](aniso::codeT code) { count += sync.current.lock[code]; });
         ImGui::Text("Locked: %d/512", count);
     });
+#endif
 
     const aniso::partitionT& par = subset.get_par();
     const auto scanlist = aniso::scanT::scanlist(par, mask, mold);
@@ -723,10 +726,10 @@ void edit_rule(sync_point& sync) {
         guarded_block(compatible, "Incompatible.", [&] {
             sequence::seq(
                 "<00..", "Prev", "Next", "11..>", //
-                [&] { sync.set_rule(aniso::seq_mixed::first(subset, mask, mold)); },
-                [&] { sync.set_rule(aniso::seq_mixed::prev(subset, mask, mold)); },
-                [&] { sync.set_rule(aniso::seq_mixed::next(subset, mask, mold)); },
-                [&] { sync.set_rule(aniso::seq_mixed::last(subset, mask, mold)); },
+                [&] { sync.set(aniso::seq_mixed::first(subset, mask, mold)); },
+                [&] { sync.set(aniso::seq_mixed::prev(subset, mask, mold)); },
+                [&] { sync.set(aniso::seq_mixed::next(subset, mask, mold)); },
+                [&] { sync.set(aniso::seq_mixed::last(subset, mask, mold)); },
                 contained ? nullptr : "The current rule does not belong to the working set.");
         });
         ImGui::SameLine();
@@ -886,7 +889,7 @@ void edit_rule(sync_point& sync) {
                 previewer::preview(-1, previewer::configT::_220_160, aniso::approximate(subset, mold), false);
             });
             if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
-                sync.set_rule(aniso::approximate(subset, mold));
+                sync.set(aniso::approximate(subset, mold));
             }
         } else {
             ImGui::Text("Groups:%d !compatible", c_group);
@@ -975,13 +978,7 @@ void edit_rule(sync_point& sync) {
                     for (aniso::codeT code : group) {
                         rule[code] = !rule[code];
                     }
-                    sync.set_rule(rule);
-                } else if (sync.enable_lock && ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
-                    aniso::moldT::lockT lock = mold.lock;
-                    for (aniso::codeT code : group) {
-                        lock[code] = !has_lock;
-                    }
-                    sync.set_lock(lock);
+                    sync.set(rule);
                 }
                 ImGui::PopStyleColor(3);
 
@@ -1007,8 +1004,7 @@ void edit_rule(sync_point& sync) {
                 }
 
                 if (show_group && ImGui::BeginTooltip()) {
-                    imgui_Str(sync.enable_lock ? "Left-click to flip the values.\nRight-click to toggle the lock."
-                                               : "Left-click to flip the values.");
+                    imgui_Str("Left-click to flip the values.");
                     ImGui::Separator();
                     ImGui::Text("Group size: %d", (int)group.size());
                     const int max_to_show = 48;
@@ -1041,8 +1037,9 @@ void edit_rule(sync_point& sync) {
     ImGui::PopStyleColor();
 }
 
+// TODO: temporarily preserved.
 // TODO: move to "apply_rule.cpp"? (as this is a special type of capture...)
-void static_constraints(sync_point& out) {
+static void static_constraints(aniso::moldT& out) {
     enum stateE { Any_background, O, I, O_background, I_background };
 
     // (Follows `ImGui::Dummy` or `ImGui::InvisibleButton`.)
@@ -1211,6 +1208,6 @@ void static_constraints(sync_point& out) {
                 }
             }
         }
-        out.set_mold(mold);
+        out = mold;
     }
 }

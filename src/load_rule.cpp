@@ -357,7 +357,7 @@ class textT {
     };
 
     std::vector<lineT> m_lines{};
-    std::vector<aniso::extrT::valT> m_rules{};
+    std::vector<aniso::ruleT> m_rules{};
     std::optional<int> m_pos = std::nullopt; // `display` returned m_rules[*m_pos] last time.
 
     struct selT {
@@ -399,9 +399,8 @@ public:
     void append(std::string_view str) {
         for (const auto& l : std::views::split(str, '\n')) {
             lineT& line = m_lines.emplace_back(std::string(l.data(), l.size()));
-            const auto val = aniso::extract_MAP_str(l).val;
-            if (val.has_value()) {
-                m_rules.push_back(*val);
+            if (const auto extr = aniso::extract_MAP_str(l); extr.has_rule()) {
+                m_rules.push_back(extr.get_rule());
                 line.id = m_rules.size() - 1;
             }
         }
@@ -436,17 +435,17 @@ public:
         std::optional<int> n_pos = std::nullopt;
         std::optional<selT> n_sel = std::nullopt;
 
-        display_const(n_pos, n_sel, out.enable_lock);
+        display_const(n_pos, n_sel);
         if (n_sel) {
             m_sel = *n_sel;
         } else if (n_pos) {
-            out.set_val(m_rules[*n_pos]);
+            out.set(m_rules[*n_pos]);
             m_pos = *n_pos;
         }
     }
 
 private:
-    void display_const(std::optional<int>& n_pos, std::optional<selT>& n_sel, const bool show_lock) const {
+    void display_const(std::optional<int>& n_pos, std::optional<selT>& n_sel) const {
         const int total = m_rules.size();
 
         if (total != 0) {
@@ -550,8 +549,8 @@ private:
                 if (id.has_value()) {
                     assert(*id >= 0 && *id < total);
 
-                    // Pretend there is no lock if `!show_lock`.
-                    const bool has_lock = show_lock && m_rules[*id].lock.has_value();
+                    // TODO: temporarily preserved.
+                    constexpr bool has_lock = false;
 
                     if (*id == m_pos) {
                         drawlist->AddRectFilled(str_min, str_max, IM_COL32(has_lock ? 196 : 0, 255, 0, 60));
@@ -567,10 +566,10 @@ private:
                     if (preview_mode) {
                         imgui_StrDisabled("-: ");
                         ImGui::SameLine();
-                        if (*id != 0 && m_rules[*id].rule == m_rules[*id - 1].rule) {
+                        if (*id != 0 && m_rules[*id] == m_rules[*id - 1]) {
                             imgui_StrDisabled("The same as the last rule.");
                         } else {
-                            previewer::preview(*id, config, m_rules[*id].rule);
+                            previewer::preview(*id, config, m_rules[*id]);
                         }
                         ImGui::EndGroup();
                     }

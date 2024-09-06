@@ -387,9 +387,9 @@ namespace aniso {
             const auto size = line_size(text);
             if (rule) {
                 // (Not interested in whether the header has correct format.)
-                const auto extr = extract_MAP_str(text.substr(0, size)).val;
-                if (extr) {
-                    *rule = extr->rule;
+                const auto extr = extract_MAP_str(text.substr(0, size));
+                if (extr.has_rule()) {
+                    rule->emplace(extr.get_rule());
                 }
             }
             text.remove_prefix(size);
@@ -626,7 +626,7 @@ namespace aniso {
         apply_rule_torus(rule, tile, tile);
     }
 
-    inline void fake_apply(const tile_const_ref tile, moldT::lockT& lock) {
+    inline void fake_apply(const tile_const_ref tile, lockT& lock) {
         if (tile.size.x <= 2 || tile.size.y <= 2) {
             return;
         }
