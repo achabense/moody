@@ -234,6 +234,10 @@ namespace aniso {
         bool includes(const subsetT& other) const { return other.empty() || (m_set && m_set->includes(*other.m_set)); }
         bool equals(const subsetT& other) const { return includes(other) && other.includes(*this); }
 
+        friend bool operator==(const subsetT& a, const subsetT& b) { //
+            return (a.empty() && b.empty()) || (a.includes(b) && b.includes(a));
+        }
+
         const maskT& get_mask() const {
             assert(!empty());
             return m_set->mask;
@@ -243,7 +247,7 @@ namespace aniso {
             return m_set->par;
         }
 
-        // Look for a rule that both a and b contains.
+        // Look for a rule that belongs to both a and b.
         static std::optional<maskT> common_rule(const subsetT& a_, const subsetT& b_) {
             if (a_.empty() || b_.empty()) {
                 return std::nullopt;
@@ -350,6 +354,17 @@ namespace aniso {
         }
     };
 
+    inline int distance(const subsetT& subset, const ruleT& a, const ruleT& b) {
+        assert(subset.contains(a) && subset.contains(b));
+        int d = 0;
+        subset.get_par().for_each_group([&](const groupT& group) {
+            if (a[group[0]] != b[group[0]]) {
+                ++d;
+            }
+        });
+        return d;
+    }
+
     // Test whether there exists any rule that belongs to both `subset` and `mold`.
     // (subset.contains(rule) && mold.compatible(rule))
     inline bool compatible(const subsetT& subset, const moldT& mold) {
@@ -361,7 +376,8 @@ namespace aniso {
         return subset.get_par().test(r, mold.lock);
     }
 
-    // Return a rule that belongs to `subset` and `mold` and is closest to `mold.rule`.
+    // Return a rule that belongs to `subset` and `mold` and is closest to `mold.rule` (as measured by
+    // the MAP set.)
     // (If `mold.rule` already belongs to `subset`, the result will be exactly `mold.rule`.)
     inline ruleT approximate(const subsetT& subset, const moldT& mold) {
         assert(compatible(subset, mold));

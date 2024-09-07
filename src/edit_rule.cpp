@@ -1,3 +1,5 @@
+#include <deque>
+
 #include "rule_algo.hpp"
 
 #include "common.hpp"
@@ -550,6 +552,7 @@ static void guarded_block(const bool enable, const char* reason_disabled, const 
     }
 };
 
+// TODO: rename some variables for better clarity. (e.g. `subset` -> `working_set`)
 void edit_rule(sync_point& sync) {
     // Select subsets.
     static subset_selector selector;
@@ -558,7 +561,9 @@ void edit_rule(sync_point& sync) {
 
     // TODO: temporarily preserved.
     const aniso::moldT mold = {sync.rule, {}};
+    // TODO: `compatible` has become useless too.
     const bool compatible = aniso::compatible(subset, mold);
+    assert(compatible);
     const bool contained = subset.contains(mold.rule);
     assert_implies(contained, compatible);
 
@@ -577,7 +582,7 @@ void edit_rule(sync_point& sync) {
             "(The exact workings are more complex than explained here. For details see the 'Subset, mask ...' "
             "section in 'Documents'.)";
 
-        static aniso::maskT mask_custom{{}};
+        static aniso::maskT mask_custom{aniso::game_of_life()};
 
         enum maskE { Zero, Identity, Native, Custom }; // TODO: better name for 'Native'?
         struct termT {
@@ -655,6 +660,21 @@ void edit_rule(sync_point& sync) {
         return *mask_ptrs[mask_tag];
     }();
 
+    const bool working_set_or_mask_is_changed = [&] {
+        static aniso::subsetT cmp_set{};
+        static aniso::maskT cmp_mask{};
+        bool changed = false;
+        if (cmp_set != subset) {
+            changed = true;
+            cmp_set = subset;
+        }
+        if (cmp_mask != mask) {
+            changed = true;
+            cmp_mask = mask;
+        }
+        return changed;
+    }();
+
     ImGui::Separator();
 
     // v (Preserved for reference.)
@@ -723,24 +743,150 @@ void edit_rule(sync_point& sync) {
         assert(contained == (c_x == 0));
         assert(compatible == (c_locked_x == 0));
 
-        guarded_block(compatible, "Incompatible.", [&] {
-            sequence::seq(
-                "<00..", "Prev", "Next", "11..>", //
-                [&] { sync.set(aniso::seq_mixed::first(subset, mask, mold)); },
-                [&] { sync.set(aniso::seq_mixed::prev(subset, mask, mold)); },
-                [&] { sync.set(aniso::seq_mixed::next(subset, mask, mold)); },
-                [&] { sync.set(aniso::seq_mixed::last(subset, mask, mold)); },
-                contained ? nullptr : "The current rule does not belong to the working set.");
-        });
-        ImGui::SameLine();
-        imgui_StrTooltip("(?)",
-                         "Iterate through the entire working set, by firstly iterating through all rules with "
-                         "distance = 1 to the masking rule, then 2, 3, ..., until max distance.\n\n"
-                         "For example, suppose the current rule belongs to the working set. To iterate through all "
-                         "rules with distance = 1 to the current rule, you can:\n"
-                         "1. '<< Cur' to set it as the custom mask.\n"
-                         "2. 'Next' to iterate. The left/right arrow key will be bound to 'Prev/Next' after you "
-                         "click the button.");
+        {
+            static bool show_trav = false;
+
+            const bool clicked = ImGui::Checkbox("Traverse", &show_trav);
+            if (clicked && show_trav) {
+                ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
+                ImGui::SetNextWindowPos(ImGui::GetItemRectMax() + ImVec2(30, -120), ImGuiCond_FirstUseEver);
+            }
+
+            if (show_trav) {
+                static ImVec2 size_constraint_min{};
+                ImGui::SetNextWindowSizeConstraints(size_constraint_min, ImVec2(FLT_MAX, FLT_MAX));
+                // !!TODO: better title...
+                if (auto window = imgui_Window("Traverse the working set", &show_trav,
+                                               ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar)) {
+                    static std::deque<aniso::ruleT> page;
+                    static page_adapter adapter;
+                    static previewer::configT config{previewer::configT::_220_160};
+
+                    auto fill_next = [&](int size) {
+                        assert(!page.empty());
+                        for (int i = 0; i < size; ++i) {
+                            const aniso::ruleT rule = aniso::seq_mixed::next(subset, mask, {page.back(), mold.lock});
+                            if (rule == page.back()) {
+                                break;
+                            }
+                            page.push_back(rule);
+                        }
+                    };
+
+                    auto fill_prev = [&](int size) {
+                        assert(!page.empty());
+                        for (int i = 0; i < size; ++i) {
+                            const aniso::ruleT rule = aniso::seq_mixed::prev(subset, mask, {page.front(), mold.lock});
+                            if (rule == page.front()) {
+                                break;
+                            }
+                            page.push_front(rule);
+                        }
+                    };
+
+                    if (working_set_or_mask_is_changed && !page.empty()) {
+                        // !!TODO: whether to show message here?
+                        page.clear();
+                    }
+
+                    // !!TODO: not clear enough...
+                    ImGui::AlignTextToFramePadding();
+                    imgui_StrTooltip(
+                        "(...)",
+                        "Iterate through the entire working set, by firstly iterating through all rules with "
+                        "distance = 1 to the masking rule, then 2, 3, ..., until max distance.\n\n"
+                        "For example, suppose the current rule belongs to the working set. To iterate through all "
+                        "rules with distance = 1 to the current rule, you can:\n"
+                        "1. '<< Cur' to set it as the custom mask.\n"
+                        "2. 'Next' to iterate. The left/right arrow key will be bound to 'Prev/Next' after you "
+                        "click the button.");
+                    ImGui::SameLine();
+
+                    ImGui::BeginDisabled(!contained);
+                    if (ImGui::Button("Locate")) {
+                        assert(subset.contains(sync.rule));
+                        page.clear();
+                        page.push_back(sync.rule);
+                        fill_next(adapter.page_size - 1);
+                    }
+                    ImGui::EndDisabled();
+                    imgui_ItemTooltip([contained] {
+                        if (!contained) {
+                            imgui_Str("The current rule does not belong to the working set.");
+                            ImGui::Separator();
+                        }
+                        imgui_Str("Seek to the position where the current rule belongs.");
+                    });
+                    ImGui::SameLine();
+                    sequence::seq(
+                        "<00..", "Prev", "Next", "11..>",
+                        [&] {
+                            page.clear();
+                            page.push_back(aniso::seq_mixed::first(subset, mask, mold));
+                            fill_next(adapter.page_size - 1);
+                        },
+                        [&] {
+                            fill_prev(adapter.page_size);
+                            while (page.size() > adapter.page_size) {
+                                page.pop_back();
+                            }
+                        },
+                        [&] {
+                            fill_next(adapter.page_size);
+                            while (page.size() > adapter.page_size) {
+                                page.pop_front();
+                            }
+                        },
+                        [&] {
+                            page.clear();
+                            page.push_back(aniso::seq_mixed::last(subset, mask, mold));
+                            fill_prev(adapter.page_size - 1);
+                        },
+                        page.empty() ? "!!TODO..." : nullptr);
+                    ImGui::SameLine();
+                    if (page.empty()) {
+                        imgui_Str("Dist:N/A");
+                    } else {
+                        const int min_dist = aniso::distance(subset, mask, page.front());
+                        const int max_dist = aniso::distance(subset, mask, page.back());
+                        assert(min_dist <= max_dist);
+                        if (min_dist == max_dist) {
+                            ImGui::Text("Dist:%d", min_dist);
+                        } else {
+                            ImGui::Text("Dist:%d~%d", min_dist, max_dist);
+                        }
+                    }
+                    imgui_ItemTooltip("Right-click to reset.");
+                    // (Using the same style as in `frame_main`.)
+                    if (begin_popup_for_item(imgui_ItemClickable(), "")) {
+                        if (ImGui::Selectable("Reset")) {
+                            page.clear();
+                        }
+                        ImGui::EndPopup();
+                    }
+
+                    ImGui::SameLine(0, 16);
+                    config.set("Preview settings");
+
+                    adapter.display(
+                        config, sync, size_constraint_min,
+                        [&] {
+                            if (page.size() > adapter.page_size) {
+                                while (page.size() > adapter.page_size) {
+                                    page.pop_back();
+                                }
+                            } else if (page.size() < adapter.page_size) {
+                                fill_next(adapter.page_size - page.size());
+                                // (This may happen when the page reaches the end of the sequence.)
+                                if (page.size() < adapter.page_size) [[unlikely]] {
+                                    fill_prev(adapter.page_size - page.size());
+                                }
+                            }
+                        },
+                        [](int j) { return j < page.size() ? &page[j] : nullptr; });
+                }
+            }
+        }
 
         ImGui::SameLine();
 
@@ -754,9 +900,7 @@ void edit_rule(sync_point& sync) {
             if (clicked && show_rand) {
                 assert(compatible); // Otherwise, the checkbox should be disabled.
                 ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
-                if (ImGui::IsMousePosValid()) {
-                    ImGui::SetNextWindowPos(ImGui::GetMousePos() + ImVec2(40, -100), ImGuiCond_FirstUseEver);
-                }
+                ImGui::SetNextWindowPos(ImGui::GetItemRectMax() + ImVec2(30, -120), ImGuiCond_FirstUseEver);
             }
 
             // TODO: ideally, !compatible should only disable generation ('>>>' at last page).
@@ -881,8 +1025,8 @@ void edit_rule(sync_point& sync) {
                 imgui_Str("The current rule does not belong to the working set.\n\n"
                           "Check the dull-blue groups for details - no matter which mask is selected, for any rule in "
                           "the working set, the masked values should be all the same in any group.\n\n"
-                          "You can get rules in the working set with '<00..', '11..>', or 'Random'. Or "
-                          "optionally, you can right-click this '(?)' to get the following rule in the working set.");
+                          "You can get rules in the working set with 'Traverse' or 'Random'. Or optionally, "
+                          "you can right-click this '(?)' to get the following rule in the working set.");
                 ImGui::Separator();
                 imgui_Str("Preview:");
                 ImGui::SameLine();
