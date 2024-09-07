@@ -135,6 +135,8 @@ struct shortcuts {
         return false;
     }
 
+#if 0
+    // (Outdated)
     // TODO: reconsider the shortcut designs in the program.
     // Currently only `sequence::seq` use this. 'W' uses equivalent `SetNextWindowFocus`,
     // and the space window's shortcuts don't do the focus.
@@ -144,6 +146,12 @@ struct shortcuts {
         }
         ImGui::FocusWindow(window);
         return true;
+    }
+#endif
+
+    // ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows | ImGuiFocusedFlags_NoPopupHierarchy)
+    static bool window_focused() { //
+        return GImGui->NavWindow->RootWindow == ImGui::GetCurrentWindowRead()->RootWindow;
     }
 };
 
@@ -178,9 +186,7 @@ inline void quick_info(std::string_view msg) {
 
 // There is intended to be at most one call to this function in each window hierarchy.
 inline void set_scroll_by_up_down(float dy) {
-    // TODO: are there easy ways to query "is current window or its parent windows focused"?
-    const ImGuiFocusedFlags flags = ImGuiFocusedFlags_RootAndChildWindows | ImGuiFocusedFlags_NoPopupHierarchy;
-    if (shortcuts::keys_avail() && ImGui::IsWindowFocused(flags)) {
+    if (shortcuts::keys_avail() && shortcuts::window_focused()) {
         if (shortcuts::test(ImGuiKey_DownArrow, true)) {
             ImGui::SetScrollY(ImGui::GetScrollY() + dy);
             shortcuts::highlight(ImGui::GetWindowScrollbarID(ImGui::GetCurrentWindowRead(), ImGuiAxis_Y));
@@ -205,12 +211,13 @@ inline bool begin_popup_for_item(bool open, const char* str_id = nullptr) {
                                        ImGuiWindowFlags_NoSavedSettings);
 }
 
+// !!TODO: currently under-documented...
 class sequence {
     static bool button_with_shortcut(const char* label, ImGuiKey shortcut = ImGuiKey_None) {
         bool ret = ImGui::Button(label);
         if (shortcut != ImGuiKey_None && !imgui_TestItemFlag(ImGuiItemFlags_Disabled)) {
             imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_ButtonActive, 1.0f));
-            if (!ret && shortcuts::item_shortcut(shortcut) && shortcuts::focus_window()) {
+            if (!ret && shortcuts::item_shortcut(shortcut)) {
                 ret = true;
             }
         }
@@ -220,10 +227,16 @@ class sequence {
     enum tagE { None, First, Prev, Next, Last };
 
     inline static ImGuiID bound_id = 0;
+    inline static ImU32 last_valid_frame = 0;
 
     // (`disable` is a workaround for a sequence in `edit_rule`...)
     static tagE seq(const char* label_first, const char* label_prev, const char* label_next, const char* label_last,
                     const char* const disable) {
+        const ImU32 this_frame = ImGui::GetFrameCount();
+        if (this_frame != last_valid_frame && this_frame != last_valid_frame + 1) {
+            bound_id = 0;
+        }
+
         tagE tag = None;
 
         if (ImGui::Button(label_first)) {
@@ -235,11 +248,19 @@ class sequence {
             ImGui::BeginDisabled();
             ImGui::BeginGroup();
         }
+
         const ImGuiID id_prev = ImGui::GetID(label_prev);
-        const ImGuiID id_next = ImGui::GetID(label_next);
-        assert(id_prev != 0 && id_next != 0 && id_prev != id_next);
-        const bool disabled = imgui_TestItemFlag(ImGuiItemFlags_Disabled);
-        const bool bound = !disabled && (bound_id == id_prev || bound_id == id_next);
+        assert(id_prev != 0);
+
+        // If !bound due to !window_focused or pair_disabled, `last_valid_frame` will not be updated,
+        // and `bound_id` will become 0 at next frame.
+        const bool window_focused = shortcuts::window_focused();
+        const bool pair_disabled = imgui_TestItemFlag(ImGuiItemFlags_Disabled);
+        const bool bound = bound_id == id_prev && window_focused && !pair_disabled;
+        if (bound) {
+            last_valid_frame = ImGui::GetFrameCount();
+        }
+
         const ImGuiKey shortcut_prev = bound ? ImGuiKey_LeftArrow : ImGuiKey_None;
         const ImGuiKey shortcut_next = bound ? ImGuiKey_RightArrow : ImGuiKey_None;
         if (button_with_shortcut(label_prev, shortcut_prev)) {
@@ -262,17 +283,17 @@ class sequence {
             tag = Last;
         }
 
-        if (tag != None) {
+        if ((tag != None) || (bound_id == 0 && window_focused && !pair_disabled &&
+                              (shortcuts::test(ImGuiKey_LeftArrow) || shortcuts::test(ImGuiKey_RightArrow)))) {
             bound_id = id_prev;
+            last_valid_frame = ImGui::GetFrameCount();
         }
+
         return tag;
     }
 
 public:
     sequence() = delete;
-
-    // `id` should be the same as one of prev/next button.
-    // static void bind_to(ImGuiID id) { bound_id = id; }
 
     static void seq(const char* label_first, const char* label_prev, const char* label_next, const char* label_last,
                     const auto& act_first, const auto& act_prev, const auto& act_next, const auto& act_last,
