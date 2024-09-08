@@ -875,7 +875,7 @@ void edit_rule(sync_point& sync) {
                                 while (page.size() > adapter.page_size) {
                                     page.pop_back();
                                 }
-                            } else if (page.size() < adapter.page_size) {
+                            } else if (!page.empty() && page.size() < adapter.page_size) {
                                 fill_next(adapter.page_size - page.size());
                                 // (This may happen when the page reaches the end of the sequence.)
                                 if (page.size() < adapter.page_size) [[unlikely]] {
