@@ -660,21 +660,6 @@ void edit_rule(sync_point& sync) {
         return *mask_ptrs[mask_tag];
     }();
 
-    const bool working_set_or_mask_is_changed = [&] {
-        static aniso::subsetT cmp_set{};
-        static aniso::maskT cmp_mask{};
-        bool changed = false;
-        if (cmp_set != subset) {
-            changed = true;
-            cmp_set = subset;
-        }
-        if (cmp_mask != mask) {
-            changed = true;
-            cmp_mask = mask;
-        }
-        return changed;
-    }();
-
     ImGui::Separator();
 
     // v (Preserved for reference.)
@@ -783,6 +768,22 @@ void edit_rule(sync_point& sync) {
                             page.push_front(rule);
                         }
                     };
+
+                    // (Moved from outer scope to avoid missing the change when this window is closed.)
+                    const bool working_set_or_mask_is_changed = [&] {
+                        static aniso::subsetT cmp_set{};
+                        static aniso::maskT cmp_mask{};
+                        bool changed = false;
+                        if (cmp_set != subset) {
+                            changed = true;
+                            cmp_set = subset;
+                        }
+                        if (cmp_mask != mask) {
+                            changed = true;
+                            cmp_mask = mask;
+                        }
+                        return changed;
+                    }();
 
                     if (working_set_or_mask_is_changed && !page.empty()) {
                         // !!TODO: whether to show message here?
