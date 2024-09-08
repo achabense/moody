@@ -5,43 +5,6 @@
 
 #include "common.hpp"
 
-namespace {
-    // (This is put in unnamed namespace to avoid potential conflict with another `timerT` in "frame_main.cpp")
-    // Related (odr): https://stackoverflow.com/questions/69642941
-    class timerT {
-        using clockT = std::chrono::steady_clock;
-
-        int interval; // ms.
-        clockT::time_point last = {};
-
-    public:
-        explicit timerT(int interval_ms) : interval(interval_ms) {}
-
-        void set_now() { last = clockT::now(); }
-
-        bool test() {
-            const clockT::time_point now = clockT::now();
-            if (last + std::chrono::milliseconds(interval) <= now) {
-                last = now;
-                return true;
-            }
-            return false;
-        }
-
-        void add_interval(int delta_ms, int min_ms, int max_ms) { //
-            interval = std::clamp(interval + delta_ms, min_ms, max_ms);
-        }
-        void slide_interval(const char* label, int min_ms, int max_ms, int ms_per_unit) {
-            int units = interval / ms_per_unit;
-            imgui_StepSliderInt(label, &units, min_ms / ms_per_unit, max_ms / ms_per_unit,
-                                std::format("{} ms", units * ms_per_unit).c_str());
-            interval = units * ms_per_unit;
-        }
-
-        static constexpr int default_unit = 25;
-    };
-} // namespace
-
 static ImVec2 to_imvec(const aniso::vecT& vec) { return ImVec2(vec.x, vec.y); }
 
 static aniso::vecT from_imvec_floor(const ImVec2& vec) { return {.x = int(floor(vec.x)), .y = int(floor(vec.y))}; }
@@ -402,19 +365,8 @@ class runnerT {
         }
 
         bool pause = false;
-
         int extra_step = 0;
-        timerT timer{timerT::default_unit};
-
-        int calc_step_this_frame() {
-            if (extra_step > 0) {
-                timer.set_now();
-                return std::exchange(extra_step, 0);
-            } else if (!pause && timer.test()) {
-                return actual_step();
-            }
-            return 0;
-        }
+        global_timer::timerT timer{global_timer::min_nonzero_interval};
     };
 
     class torusT {
@@ -424,10 +376,7 @@ class runnerT {
         int m_gen = 0;
 
         bool extra_pause = false;
-        void mark_written() {
-            extra_pause = true;
-            m_ctrl.timer.set_now();
-        }
+        bool skip_next = false;
 
         bool m_resized = true; // Init ~ resized.
 
@@ -454,25 +403,26 @@ class runnerT {
         void restart() {
             m_gen = 0;
             m_init.initialize(m_torus);
-            mark_written();
+            skip_next = true;
         }
         void pause_for_this_frame() { extra_pause = true; }
+        void skip_next_run() { skip_next = true; }
 
         aniso::tile_const_ref read_only() const { return m_torus.data(); }
         aniso::tile_const_ref read_only(const aniso::rangeT& range) const { return m_torus.data().clip(range); }
 
         aniso::tile_ref write_only() {
-            mark_written();
+            skip_next = true;
             return m_torus.data();
         }
         aniso::tile_ref write_only(const aniso::rangeT& range) {
-            mark_written();
+            skip_next = true;
             return m_torus.data().clip(range);
         }
 
         void read_and_maybe_write(const std::invocable<aniso::tile_ref> auto& fn) {
             if (fn(m_torus.data())) {
-                mark_written();
+                skip_next = true;
             }
         }
 
@@ -526,14 +476,21 @@ class runnerT {
         }
 
         void end_frame() {
-            // TODO: when the window is held by left button, 'N' and 'M' (working by setting `extra_step`)
-            // should still work.
-            if (!extra_pause) {
-                const int count = m_ctrl.calc_step_this_frame();
-                for (int c = 0; c < count; ++c) {
-                    m_torus.run_torus(m_ctrl.rule);
-                    ++m_gen;
+            if (skip_next) {
+                // Intentionally not affected by (extra_)pause.
+                if (m_ctrl.extra_step || m_ctrl.timer.test()) {
+                    skip_next = false;
                 }
+                return;
+            }
+
+            int count = m_ctrl.extra_step;
+            if (count == 0 && !m_ctrl.pause && !extra_pause && m_ctrl.timer.test()) {
+                count = m_ctrl.actual_step();
+            }
+            for (int c = 0; c < count; ++c) {
+                m_torus.run_torus(m_ctrl.rule);
+                ++m_gen;
             }
         }
     };
@@ -721,7 +678,7 @@ public:
                     ImGui::Image(make_screen(curr.data(), scaleE::Nearest), to_imvec(curr.size() * demo_zoom));
                     imgui_ItemRect(IM_COL32_GREY(160, 255));
 
-                    static timerT timer{200};
+                    static global_timer::timerT timer{200};
                     if (timer.test()) {
                         curr.run_torus(sync.rule);
                     }
@@ -877,7 +834,7 @@ public:
 
             const int min_ms = 0, max_ms = 400;
             imgui_StepSliderShortcuts::set(ImGuiKey_3, ImGuiKey_4, enable_shortcuts);
-            ctrl.timer.slide_interval("Interval", min_ms, max_ms, timerT::default_unit);
+            ctrl.timer.slide_interval("Interval", min_ms, max_ms);
             imgui_StepSliderShortcuts::reset();
         });
         ImGui::EndGroup();
@@ -1437,7 +1394,7 @@ public:
         }
 
         if (m_paste) {
-            m_torus.pause_for_this_frame();
+            m_torus.skip_next_run();
         }
 
         assert(!m_torus.resized_since_last_check());
@@ -1453,10 +1410,8 @@ void apply_rule(sync_point& sync) {
 // TODO: support zoom = 0.5, 1, 2?
 // TODO: apply initT? (notice background poses extra size requirements...)
 
-// TODO: support setting step/interval with shortcuts when the preview window is hovered?
-// (The problem is, when to assign shortcuts to the main window?)
 struct global_config {
-    inline static timerT timer{timerT::default_unit};
+    inline static global_timer::timerT timer{global_timer::min_nonzero_interval};
 };
 
 void previewer::configT::_set() {
@@ -1479,7 +1434,7 @@ void previewer::configT::_set() {
     // imgui_StepSliderShortcuts::reset();
     ImGui::SetNextItemWidth(item_width);
     // imgui_StepSliderShortcuts::set(ImGuiKey_3, ImGuiKey_4);
-    global_config::timer.slide_interval("Interval", 0, 400, timerT::default_unit);
+    global_config::timer.slide_interval("Interval", 0, 400);
     // imgui_StepSliderShortcuts::reset();
     ImGui::SameLine();
     imgui_StrTooltip("(?)", "This setting is shared by all preview windows in different places.");

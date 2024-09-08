@@ -577,3 +577,57 @@ inline std::string_view read_clipboard() {
     }
     return str;
 }
+
+class global_timer {
+    static constexpr int time_unit = 25;                // ms.
+    static constexpr int min_time = 0, max_time = 1000; // ms.
+    static_assert(max_time % time_unit == 0);
+
+    using clockT = std::chrono::steady_clock;
+    struct termT {
+        clockT::time_point last;   // = {};
+        bool active_at_this_frame; // = false; (Will cause trouble when building with gcc or clang...)
+    };
+    inline static termT terms[1 + (max_time / time_unit)]{};
+
+    // TODO: what's the most suitable place to call this?
+    friend void frame_main();
+    static void begin_frame() {
+        const clockT::time_point now = clockT::now();
+        for (int i = 0; i < std::size(terms); ++i) {
+            const int dur = i * time_unit;
+            if (terms[i].last + std::chrono::milliseconds(dur) <= now) {
+                terms[i].last = now;
+                terms[i].active_at_this_frame = true;
+            } else {
+                terms[i].active_at_this_frame = false;
+            }
+        }
+    }
+
+public:
+    // 0: will return true every frame.
+    static constexpr int min_nonzero_interval = time_unit;
+
+    // `timerT` with the same interval will always be activated at the same frame.
+    struct timerT {
+        int i; // terms[i].
+
+    public:
+        bool test() const { return terms[i].active_at_this_frame; }
+
+        timerT(int ms) {
+            assert(min_time <= ms && ms <= max_time);
+            assert(ms % time_unit == 0);
+            i = std::clamp(ms, min_time, max_time) / time_unit;
+        }
+
+        void slide_interval(const char* label, int min_ms, int max_ms) {
+            assert(min_time <= min_ms && min_ms <= max_ms && max_ms <= max_time);
+            assert(min_ms % time_unit == 0);
+            assert(max_ms % time_unit == 0);
+            imgui_StepSliderInt(label, &i, min_ms / time_unit, max_ms / time_unit,
+                                std::format("{} ms", i * time_unit).c_str());
+        }
+    };
+};

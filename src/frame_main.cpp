@@ -106,6 +106,7 @@ void frame_main() {
     timer.wait();
 #endif // SET_FRAME_RATE
 
+    global_timer::begin_frame();
     messenger::display();
 
     static recorderT recorder;
