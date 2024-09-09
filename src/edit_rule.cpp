@@ -783,6 +783,7 @@ void edit_rule(sync_point& sync) {
                         return changed;
                     }();
 
+                    // !!TODO: it's not a good idea to clear without confirmation...
                     if (working_set_or_mask_is_changed && !page.empty()) {
                         // !!TODO: whether to show message here?
                         page.clear();
@@ -801,7 +802,23 @@ void edit_rule(sync_point& sync) {
                         "click the button.");
                     ImGui::SameLine();
 
-                    // !!TODO: provide a way to seek to the position with certain distance to the mask...
+                    // TODO: improve...
+                    static input_int input_dist{};
+                    imgui_Str("Seek to dist ~ ");
+                    ImGui::SameLine(0, 0);
+                    ImGui::SetNextItemWidth(ImGui::CalcTextSize("Max:0000").x + ImGui::GetStyle().FramePadding.x * 2);
+                    if (const auto dist = input_dist.input("##Seek", std::format("Max:{}", c_group).c_str())) {
+                        page.clear();
+                        page.push_back(aniso::seq_mixed::seek_n(subset, mask, mold, *dist));
+                        fill_next(adapter.page_size - 1);
+                        // TODO: whether to try to fill the page in this (and other similar) case?
+                        if (page.size() < adapter.page_size) {
+                            fill_prev(adapter.page_size - page.size());
+                        }
+                    }
+                    ImGui::SameLine();
+                    imgui_StrTooltip("(?)", "The max distance is the number of groups in the working set.");
+
                     ImGui::BeginDisabled(!contained);
                     if (ImGui::Button("Locate")) {
                         assert(subset.contains(sync.rule));
@@ -1025,7 +1042,7 @@ void edit_rule(sync_point& sync) {
                 imgui_Str("The current rule does not belong to the working set.\n\n"
                           "Check the dull-blue groups for details - no matter which mask is selected, for any rule in "
                           "the working set, the masked values should be all the same in any group.\n\n"
-                          "You can get rules in the working set with 'Traverse' or 'Random'. Or optionally, "
+                          "You can get rules in the working set from the 'Traverse' or 'Random' window. Or optionally, "
                           "you can right-click this '(?)' to get the following rule in the working set.");
                 ImGui::Separator();
                 imgui_Str("Preview:");

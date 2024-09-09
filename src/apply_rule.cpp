@@ -699,45 +699,28 @@ public:
         };
 
         auto input_size = [&] {
-            static char input_w[6]{}, input_h[6]{};
+            static input_int input_x{}, input_y{};
 
             const float inner_spacing = imgui_ItemInnerSpacingX();
-            const auto input_flags = ImGuiInputTextFlags_CallbackCharFilter | ImGuiInputTextFlags_EnterReturnsTrue;
-            const auto input_filter = [](ImGuiInputTextCallbackData* data) -> int {
-                return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
-            };
-
-            aniso::vecT size = m_torus.size();
+            const aniso::vecT size = m_torus.size();
 
             // TODO: whether / how to add hint ('enter' to resize)?
-            bool resize = false;
             ImGui::SetNextItemWidth(floor((item_width - inner_spacing) / 2));
-            if (ImGui::InputTextWithHint("##Width", std::format("Width:{}", size.x).c_str(), input_w,
-                                         std::size(input_w), input_flags, input_filter)) {
-                resize = true;
-            }
+            const auto ix = input_x.input("##Width", std::format("Width:{}", size.x).c_str());
             ImGui::SameLine(0, inner_spacing);
             ImGui::SetNextItemWidth(ceil((item_width - inner_spacing) / 2));
-            if (ImGui::InputTextWithHint("##Height", std::format("Height:{}", size.y).c_str(), input_h,
-                                         std::size(input_h), input_flags, input_filter)) {
-                resize = true;
-            }
+            const auto iy = input_y.input("##Height", std::format("Height:{}", size.y).c_str());
             ImGui::SameLine(0, inner_spacing);
             imgui_Str("Space size");
 
-            if (resize) {
-                const bool has_w = std::from_chars(input_w, std::end(input_w), size.x).ec == std::errc{};
-                const bool has_h = std::from_chars(input_h, std::end(input_h), size.y).ec == std::errc{};
-                // ~ the value is unmodified if `from_chars` fails.
-                if (has_w || has_h) {
-                    auto_fit = false;
-                    locate_center = true;
-                    find_suitable_zoom = true;
+            if (ix || iy) {
+                auto_fit = false;
+                locate_center = true;
+                find_suitable_zoom = true;
 
-                    m_torus.resize(size);
-                }
-                input_w[0] = '\0';
-                input_h[0] = '\0';
+                // Both values will be flushed if either receives the enter key.
+                m_torus.resize({.x = ix.value_or(input_x.flush().value_or(size.x)),
+                                .y = iy.value_or(input_y.flush().value_or(size.y))});
             }
         };
 

@@ -636,3 +636,34 @@ public:
         }
     };
 };
+
+// TODO: the name is too casual but I cannot think of a very suitable one...
+class input_int {
+    char buf[6]{}; // 5 digits.
+
+public:
+    std::optional<int> flush() {
+        if (buf[0] != '\0') {
+            int v = 0;
+            const bool has_val = std::from_chars(buf, std::end(buf), v).ec == std::errc{};
+            buf[0] = '\0';
+            if (has_val) {
+                return v;
+            }
+        }
+        return std::nullopt;
+    }
+
+    std::optional<int> input(const char* label, const char* hint = nullptr) {
+        constexpr auto input_flags = ImGuiInputTextFlags_CallbackCharFilter | ImGuiInputTextFlags_EnterReturnsTrue;
+        constexpr auto input_filter = [](ImGuiInputTextCallbackData* data) -> int {
+            return (data->EventChar >= '0' && data->EventChar <= '9') ? 0 : 1;
+        };
+
+        if (hint ? ImGui::InputTextWithHint(label, hint, buf, std::size(buf), input_flags, input_filter)
+                 : ImGui::InputText(label, buf, std::size(buf), input_flags, input_filter)) {
+            return flush();
+        }
+        return std::nullopt;
+    }
+};

@@ -469,7 +469,7 @@ namespace aniso {
     inline ruleT randomize_c(const subsetT& subset, const maskT& mask, const moldT& mold, std::mt19937& rand,
                              int count) {
         return transform(subset, mask, mold, [&rand, count](bool* begin, bool* end) {
-            int c = std::clamp(count, 0, int(end - begin));
+            const int c = std::clamp(count, 0, int(end - begin));
             std::fill_n(begin, c, 1);
             std::fill(begin + c, end, 0);
             std::shuffle(begin, end, rand);
@@ -491,6 +491,15 @@ namespace aniso {
 
         static ruleT last(const subsetT& subset, const maskT& mask, const moldT& mold) {
             return transform(subset, mask, mold, [](bool* begin, bool* end) { std::fill(begin, end, 1); });
+        }
+
+        // The result will be the first rule with distance = n to the mask in the sequence.
+        static ruleT seek_n(const subsetT& subset, const maskT& mask, const moldT& mold, int n) {
+            return transform(subset, mask, mold, [n](bool* begin, bool* end) {
+                const int c = std::clamp(n, 0, int(end - begin));
+                std::fill_n(begin, c, 1);
+                std::fill(begin + c, end, 0);
+            });
         }
 
         static ruleT next(const subsetT& subset, const maskT& mask, const moldT& mold) {
