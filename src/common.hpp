@@ -150,8 +150,13 @@ struct shortcuts {
 #endif
 
     // ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows | ImGuiFocusedFlags_NoPopupHierarchy)
-    static bool window_focused() { //
-        return GImGui->NavWindow->RootWindow == ImGui::GetCurrentWindowRead()->RootWindow;
+    static bool window_focused() {
+        if (const ImGuiWindow* focused = GImGui->NavWindow) {
+            const ImGuiWindow* current = ImGui::GetCurrentWindowRead();
+            assert(current);
+            return current->RootWindow == focused->RootWindow;
+        }
+        return false;
     }
 };
 
