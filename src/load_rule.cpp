@@ -361,7 +361,7 @@ class textT {
     std::optional<int> m_pos = std::nullopt; // `display` returned m_rules[*m_pos] last time.
 
     struct selT {
-        int beg = 0, end = 0;
+        int beg = 0, end = 0; // []
         bool contains(int l) const {
             if (beg < end) {
                 return beg <= l && l <= end;
@@ -417,7 +417,8 @@ public:
                 m_sel.reset(); // Defensive.
             } else if (ImGui::IsMouseReleased(ImGuiMouseButton_Right) /* From anywhere */) {
                 m_sel.reset();
-            } else if (shortcuts::test(ImGuiKey_C) /*Raw test; the interaction will be locked by `m_sel`*/) {
+            } else if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) /* From anywhere */ ||
+                       shortcuts::test(ImGuiKey_C) /*Raw test; the interaction will be locked by `m_sel`*/) {
                 const auto [min, max] = m_sel->minmax();
                 std::string str;
                 for (int i = min; i <= max; ++i) {

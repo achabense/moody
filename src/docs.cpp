@@ -1,30 +1,43 @@
+// For better clang-format result. Inspired by:
+// https://stackoverflow.com/questions/24879417/avoiding-the-first-newline-in-a-c11-raw-string-literal
+static constexpr const char* skip_nl(const char* str) {
+    while (*str == '\r' || *str == '\n') {
+        ++str;
+    }
+    return str;
+}
+
 // TODO: many parts are outdated and need to be rewritten.
 // TODO: add a section to record all shortcuts in the program.
 // TODO: add a section to explain 'Identify' and 'Paste' with examples.
 
-const char* const doc_about =
-    R"(In these documents (as well as the ones opened in 'Load file' or 'Clipboard'), you can left-click the rules to load them, or right-click to select lines and press 'C' to copy the text .
+constexpr const char* doc_about = R"(
+In these documents (as well as the ones opened in 'Load file' or 'Clipboard'), you can left-click the rules to load them, or right-click to select lines and left-click (or press 'C') to copy the text.
 
-This program is for exploring "MAP rules". The project originated from a trivial program I made in 2021, which was poorly written and never made public. Still, I managed to find some interesting discoveries with it (by looking through many, many random rules). Here are two of them.
+This program is for exploring "MAP rules". In short, MAP rules are 2-state rules in the range-1 Moore neighborhood. They are a superset of isotropic rules and life-like rules (the most famous one being Conway's Game of Life).
 
+Here are two examples. The first one is an isotropic rule, while the second rule only satisfies "C4" symmetry (4-fold rotational symmetry).
 MAP+sQSUIzICkiQgAiAEKBAhrIGFgAUbAAA4AChgnAAAw6CAkAIgKCAlASgIACgIQBbqCqhEQAAkFQAARIDAQQRBA
 MAP7KV6wLHQiAHIPICBCAhlIqKAhAuKAFBoYmCFEAACIUzbAIAsAsCBJoAANhiIBEBSUICEMQiQFgRBgAJKgAA4gA
 
-The project was then abandoned for many years. Last year I felt an urgency to bring it to completion. Thankfully it's mostly finished now.
+TODO: the background of this project...
 )";
 
-// TODO: about MAP rules...
-// TODO: about the lock & capture feature...
-const char* const doc_overview =
-    R"(At any time, the program has a rule shown in the right panel (which is an editable torus space; the operations are recorded in the tooltips (...)). This is later called the "current rule". As you see, it is the Game of Life rule initially.
+// The project originated from a trivial program I made in 2021, which was poorly written and never made public. Still,
+// I managed to find some interesting discoveries with it (by looking through many, many random rules). The project was
+// then abandoned for many years. Last year I felt an urgency to bring it to completion. Thankfully it's mostly finished
+// now.
 
-The MAP-string for the current rule is shown at the top taking up a single line. You can right-click the text to save to the clipboard. The paths in the 'Load file' window can be copied in the same way.
-The program keeps the record for the current rule. You can undo/redo via '<| Prev/Next |>' (above the MAP-string). The program manages several sequences of rules in the form of 'First Prev/Next Last'. When a sequence is activated, the left/right arrow keys will be bound to its 'Prev/Next' for convenience.
+constexpr const char* doc_overview = R"(
+At any time, the program has a rule shown in the right panel (which is an editable torus space; the operations are recorded in the tooltips (...)). This is called the "current rule" in the program. As you see, it is the Game of Life rule initially.
+
+The '<| Prev/Next |>' at the top (not the one in this window) represents the record for the current rule. You can switch to previously tested rules with it. The program manages several sequences of rules all in the form of 'First Prev/Next Last'. When a sequence is activated, the left/right arrow keys will be bound to its 'Prev/Next' for convenience.
+The MAP-string for the current rule is shown after the sequence. You can right-click the text to save to the clipboard. The paths in the 'Load file' window can be copied in the same way.
 
 In the right panel, you can right-click to select area and press 'C' (no need for 'Ctrl') to save the pattern as RLE-string to the clipboard, or press 'V' to paste the pattern from the clipboard (left-click to decide where to paste).
-(When pasting patterns to white background, you'd need to set 'Background' to 1 in the 'Range ops' window.)
+(When pasting patterns, there are several pasting modes to select in the 'Range ops' window. For example, if the pattern should be pasted in the white background, you'd need to set 'Paste mode' to 'Copy' or 'And'.)
 
-In these documents, as well as those opened in 'Load file' or 'Clipboard', you can left-click the rule-string to replace the current rule, or right-click to select lines and press 'C' to copy the text to the clipboard.
+In these documents, as well as those opened in 'Load file' or 'Clipboard', you can left-click the rule-string to replace the current rule, or right-click to select lines and left-click (or press 'C') to copy the text to the clipboard.
 For example, here is an RLE blob (a "rocket" in the Day & Night rule) - you can firstly click the header line to load the rule, and then copy the following lines (from '3bo...' up to the '!' mark) and paste to see the effect.
 x = 7, y = 14, rule = MAPARYBFxZoF34WaBd+aIF+6RZoF35ogX7paIF+6YEX6ZcWaBd+aIF+6WiBfumBF+mXaIF+6YEX6ZeBF+mXF3+Xfw
 3bo3b$2b3o2b$b5ob$ob3obo$2b3o2b$2b3o2b$ob3obo$ob3obo$b5ob$b
@@ -45,8 +58,8 @@ MAPARYSZhYAPEgSaBCgCAAAgABAEsAIAIgASIDgAIAAgAASQAIAaACggACAAICAAIAASICogIAAAACAA
 See the 'Lock and capture' section for details.
 )";
 
-const char* const doc_workings =
-    R"(This section describes the exact workings of subsets, masks and major rule operations. If you are not familiar with this program, I'd recommend firstly checking the 'Rules in different subsets' section to get some sense about what can be found with this program.
+constexpr const char* doc_workings = R"(
+This section describes the exact workings of subsets, masks and major rule operations. If you are not familiar with this program, I'd recommend firstly checking the 'Rules in different subsets' section to get some sense about what can be found with this program.
 
 The program works with a series of subsets, each representing certain properties. For example, a rule is isotropic iff it belongs to the isotropic subset ('Native symmetry/All').
 These subsets can uniformly be composed in the form of:
@@ -112,7 +125,7 @@ Once you find another interesting rule, you can move on starting from it instead
 x = 5, y = 27, rule = MAP+sASUIjICmiAgAiAEKBAhrIGFiAUbCCAoAChgnAAAw6AAkAIgKCAlAQgIAAgIQBboCqhEQAAkFQAARIDAQQRBA
 2ob2o$obobo$b3ob$obobo$2ob2o$5o$5o$5o$5o$5o$5o$5o$5o$5o$5o$
 5o$5o$5o$5o$5o$5o$5o$2ob2o$obobo$b3ob$obobo$2ob2o!
-(The pattern is to be pasted into white background. To enable this, set 'Background' to 1 in the 'Range ops' window. The pattern will split into two huge spaceships.)
+(The pattern is to be pasted into white background, and will split into two huge spaceships.)
 
 By "wandering" in the working set in this way, you can collect a series of rules that are close from each other.
 
@@ -120,8 +133,8 @@ By "wandering" in the working set in this way, you can collect a series of rules
 Sometimes you may also want to jump outside of the predefined subsets. This can be done via random-access editing, and may lead to surprising discoveries. See the 'More about random-access editing' section for more info.
 )";
 
-const char* const doc_rules =
-    R"(The following rules are selected from different subsets. You can click a rule and then 'Match' to select all the subsets the rule belongs to.
+constexpr const char* doc_rules = R"(
+The following rules are selected from different subsets. You can click a rule and then 'Match' to select all the subsets the rule belongs to.
 (Notice that 'Match' cannot reflect the relations between different subsets.)
 
 
@@ -273,8 +286,8 @@ MAPEgASAAEJAQk1bzVvHVYdVlVFVUUZERkR9hH2EX1/fX8BQQFBd5B3kHdnd2ddVV1VlUeVRwlTCVNvf
 Finally, it's possible to get non-trivial rules that do not belong to any well-defined subsets (no symmetries, no independencies). See the next section ('More about random-access editing') for details.
 )";
 
-const char* const doc_random_access =
-    R"(This section covers more aspects about random-access editing (as explained in 'Subset, mask and rule operations'). To recap, for the current rule C and working set W = (M, P), the operation flips all the values in a group in W.P, and therefore, the result belongs to S' = (C, W.P), which is W itself if C already belongs to W.
+constexpr const char* doc_random_access = R"(
+This section covers more aspects about random-access editing (as explained in 'Subset, mask and rule operations'). To recap, for the current rule C and working set W = (M, P), the operation flips all the values in a group in W.P, and therefore, the result belongs to S' = (C, W.P), which is W itself if C already belongs to W.
 
 For the sets in the form of (M, P), if a set S1 is a subset of another set S2, its partition must be strictly "coarser" than that of S2. In other words, each group in S1.P must fully cover one or several groups in S2.P. For example, the isotropic set is a subset of '-', '|', ..., 'C4' etc, so its partition is strictly coarser than theirs.
 (In the program, the working set is a subset of the ones that turn dull-blue, and any set is a subset of the entire MAP set.)
@@ -307,7 +320,8 @@ After all, the subsets supported in the program take up only an extremely small 
 )";
 
 #if 0
-const char* const doc_lock_and_capture = R"(The program has a way to ...
+constexpr const char* doc_lock_and_capture = R"(
+The program has a way to ...
 All of the following features are controlled by the 'Lock & capture' tag.
 
 A constraint is a "lock" associated with a MAP rule, that marks some parts of the rule as components... if a rule implies all possible patterns...
@@ -358,13 +372,13 @@ Lock-enhancement
 This is a feature similar to "Capture" to help find still-life patterns...
 )";
 #else
-const char* const doc_lock_and_capture = "This section is not finished yet :(";
+constexpr const char* doc_lock_and_capture = "This section is not finished yet :(";
 #endif
 
-extern const char* const docs[][2]{{"About this program", doc_about},
-                                   {"Overview", doc_overview},
-                                   {"Subset, mask and rule operations", doc_workings},
-                                   {"Rules in different subsets", doc_rules},
-                                   {"More about random-access editing", doc_random_access},
-                                   {"Lock and capture", doc_lock_and_capture},
-                                   {/* null terminator */}};
+extern constexpr const char* docs[][2]{{"About this program", skip_nl(doc_about)},
+                                       {"Overview", skip_nl(doc_overview)},
+                                       {"Subset, mask and rule operations", skip_nl(doc_workings)},
+                                       {"Rules in different subsets", skip_nl(doc_rules)},
+                                       {"More about random-access editing", skip_nl(doc_random_access)},
+                                       {"Lock and capture", skip_nl(doc_lock_and_capture)},
+                                       {/* null terminator */}};

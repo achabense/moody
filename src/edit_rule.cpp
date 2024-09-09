@@ -579,8 +579,7 @@ void edit_rule(sync_point& sync) {
             "natural interpretations.\n"
             "If a rule belongs to the working set, its distance to the masking rule can be defined as the number "
             "of groups where they have different values.\n\n"
-            "(The exact workings are more complex than explained here. For details see the 'Subset, mask ...' "
-            "section in 'Documents'.)";
+            "(For the exact workings see the 'Subset, mask ...' section in 'Documents'.)";
 
         static aniso::maskT mask_custom{aniso::game_of_life()};
 
@@ -606,8 +605,7 @@ void edit_rule(sync_point& sync) {
             {"Native",
              "A rule calculated by the program that belongs to the working set. Depending on what subsets "
              "are selected, it may be the same as zero-rule, or identity-rule, or just an ordinary rule in the set.\n"
-             "It's recommended you try this only when there are no other rules known to belong to the working "
-             "set (neither 'Zero' nor 'Identity' works, and there are no existing rules to serve as custom mask).",
+             "This is provided in case there are no other rules known to belong to the working set.",
              'o', 'i'},
 
             {"Custom",
@@ -803,6 +801,7 @@ void edit_rule(sync_point& sync) {
                         "click the button.");
                     ImGui::SameLine();
 
+                    // !!TODO: provide a way to seek to the position with certain distance to the mask...
                     ImGui::BeginDisabled(!contained);
                     if (ImGui::Button("Locate")) {
                         assert(subset.contains(sync.rule));
