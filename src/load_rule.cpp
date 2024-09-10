@@ -533,7 +533,8 @@ private:
                 imgui_StrWrapped(text, item_width);
                 const ImVec2 str_min = ImGui::GetItemRectMin();
                 const ImVec2 str_max = ImGui::GetItemRectMax();
-                const bool line_hovered = test_hover && mouse_pos.y >= str_min.y && mouse_pos.y <= str_max.y;
+                const bool line_hovered = test_hover && mouse_pos.y >= str_min.y && mouse_pos.y < str_max.y;
+                // `line_hovered` may become true for two adjacent lines if using `mouse_pos.y <= str_max.y`.
 
                 if (!locate && line_hovered) {
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
@@ -557,11 +558,21 @@ private:
                         drawlist->AddRectFilled(str_min, str_max, IM_COL32(has_lock ? 196 : 0, 255, 0, 60));
                     }
                     if (!m_sel && !n_sel &&
-                        (line_hovered && mouse_pos.x >= str_min.x && mouse_pos.x <= str_max.x /*str-hovered*/)) {
+                        (line_hovered && mouse_pos.x >= str_min.x && mouse_pos.x < str_max.x /*str-hovered*/)) {
                         drawlist->AddRectFilled(str_min, str_max, IM_COL32(has_lock ? 196 : 0, 255, 0, 30));
                         if (!locate && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
                             n_pos = *id;
                         }
+
+#if 0
+                        // TODO: the effect is preferable (lacks tooltip delay though), but it interacts
+                        // poorly with right-click selection...
+                        if (!preview_mode && ImGui::BeginTooltip()) {
+                            previewer::preview(-1, previewer::configT::_220_160, m_rules[*id], false);
+
+                            ImGui::EndTooltip();
+                        }
+#endif
                     }
 
                     if (preview_mode) {
