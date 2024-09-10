@@ -583,7 +583,7 @@ void edit_rule(sync_point& sync) {
 
         static aniso::maskT mask_custom{aniso::game_of_life()};
 
-        enum maskE { Zero, Identity, Native, Custom }; // TODO: better name for 'Native'?
+        enum maskE { Zero, Identity, Backup, Custom };
         struct termT {
             const char* label;
             const char* desc;
@@ -602,7 +602,7 @@ void edit_rule(sync_point& sync) {
              "and the distance to this rule reflects how \"volatile\" a rule is.",
              '.', 'f'},
 
-            {"Native",
+            {"Backup",
              "A rule calculated by the program that belongs to the working set. Depending on what subsets "
              "are selected, it may be the same as zero-rule, or identity-rule, or just an ordinary rule in the set.\n"
              "This is provided in case there are no other rules known to belong to the working set.",
@@ -620,14 +620,15 @@ void edit_rule(sync_point& sync) {
                                               &mask_custom};
 
         if (!subset.contains(*mask_ptrs[mask_tag])) {
-            mask_tag = Native;
+            assert(mask_tag != Backup);
+            mask_tag = Backup;
         }
 
         ImGui::AlignTextToFramePadding();
         imgui_StrTooltip("(...)", about_mask);
         ImGui::SameLine();
         imgui_Str("Mask ~");
-        for (const maskE m : {Zero, Identity, Native, Custom}) {
+        for (const maskE m : {Zero, Identity, Backup, Custom}) {
             const bool m_avail = subset.contains(*mask_ptrs[m]);
 
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
@@ -642,15 +643,22 @@ void edit_rule(sync_point& sync) {
                 imgui_Str(mask_terms[m].desc);
                 previewer::preview(-1, previewer::configT::_220_160, *mask_ptrs[m], false);
             });
-        }
 
-        ImGui::SameLine();
-        guarded_block(contained, "The current rule does not belong to the working set.", [&] {
-            if (ImGui::Button("<< Cur")) {
-                mask_custom = {mold.rule};
-                mask_tag = Custom;
+            if (m == Custom) {
+                ImGui::SameLine();
+                const int radio_id = ImGui::GetItemID();
+                guarded_block(contained, "The current rule does not belong to the working set.", [&] {
+                    if (ImGui::Button("<< Cur")) {
+                        mask_custom = {mold.rule};
+                        mask_tag = Custom;
+
+                        // It will be strange to call a shortcut function here.
+                        // shortcuts::highlight(radio_id);
+                        ImGui::NavHighlightActivated(radio_id);
+                    }
+                });
             }
-        });
+        }
 
         chr_0 = mask_terms[mask_tag].chr_0;
         chr_1 = mask_terms[mask_tag].chr_1;
