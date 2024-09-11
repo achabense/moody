@@ -1123,6 +1123,13 @@ void edit_rule(sync_point& sync) {
 
                 const bool incompatible = scanlist[j].locked_0 != 0 && scanlist[j].locked_1 != 0;
                 const aniso::codeT head = group[0];
+                const auto get_adjacent_rule = [&] {
+                    aniso::ruleT rule = sync.rule;
+                    for (aniso::codeT code : group) {
+                        rule[code] = !rule[code];
+                    }
+                    return rule;
+                };
 
                 // TODO: better color... (will be ugly if using green colors...)
                 // _ButtonHovered: ImVec4(0.26f, 0.59f, 0.98f, 1.00f)
@@ -1143,11 +1150,7 @@ void edit_rule(sync_point& sync) {
                 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, button_color[1]);
                 ImGui::PushStyleColor(ImGuiCol_ButtonActive, button_color[2]);
                 if (code_button(head, zoom)) {
-                    aniso::ruleT rule = mold.rule;
-                    for (aniso::codeT code : group) {
-                        rule[code] = !rule[code];
-                    }
-                    sync.set(rule);
+                    sync.set(get_adjacent_rule());
                 }
                 ImGui::PopStyleColor(3);
 
@@ -1162,13 +1165,7 @@ void edit_rule(sync_point& sync) {
                 }
 
                 if (preview_mode) {
-                    previewer::preview(j, config, [&] {
-                        aniso::ruleT rule = mold.rule;
-                        for (aniso::codeT code : group) {
-                            rule[code] = !rule[code];
-                        }
-                        return rule;
-                    });
+                    previewer::preview(j, config, get_adjacent_rule /*()*/);
                     ImGui::EndGroup();
                 }
 
