@@ -4,26 +4,6 @@
 
 // TODO: add summary about this header, especially subsetT.
 namespace aniso {
-    // `lockT`, together with the associated rule, captures the idea that the locked values in the rule
-    // are the "cause" for something to happen.
-    // For example, suppose we find an oscillator in a rule. It is likely to only invoke a subset of all
-    // codeT during all of its phases. We can record these invocations and say that's why the oscillator exists
-    // in this rule.
-    // The program uses `moldT` ~ (lockT, ruleT) pair as a constraint for generating new rules.
-    struct moldT {
-        ruleT rule{};
-        lockT lock{};
-
-        // Test whether `r` has the same values for all locked codes.
-        bool compatible(const ruleT& r) const {
-            return for_each_code_all_of([&](codeT code) { //
-                return !lock[code] || rule[code] == r[code];
-            });
-        }
-
-        friend bool operator==(const moldT&, const moldT&) = default;
-    };
-
     // TODO: defining `maskT` to emphasis which rule serves as the mask; it might be more
     // convenient to use `ruleT` directly.
 
@@ -325,6 +305,179 @@ namespace aniso {
         return subsetT{};
     }
 
+    inline bool has_common(const subsetT& a, const subsetT& b) { //
+        return subsetT::common_rule(a, b).has_value();
+    }
+
+    inline int distance(const subsetT& subset, const ruleT& a, const ruleT& b) {
+        assert(subset.contains(a) && subset.contains(b));
+        int d = 0;
+        subset.get_par().for_each_group([&](const groupT& group) {
+            if (a[group[0]] != b[group[0]]) {
+                ++d;
+            }
+        });
+        return d;
+    }
+
+    struct scanT {
+        int c_0 = 0; // Same.
+        int c_1 = 0; // Different.
+
+        bool pure() const { return c_0 == 0 || c_1 == 0; }
+
+        scanT() = default;
+        scanT(const groupT& group, const maskT& mask, const ruleT& rule) {
+            for (const codeT code : group) {
+                mask[code] == rule[code] ? ++c_0 : ++c_1;
+            }
+        }
+
+        static std::vector<scanT> scanlist(const partitionT& par, const maskT& mask, const ruleT& rule) {
+            std::vector<scanT> vec(par.k());
+            par.for_each_group([&](int j, const groupT& group) { vec[j] = scanT(group, mask, rule); });
+            return vec;
+        }
+    };
+
+    // Return a rule in the subset that is closest to `rule` (as measured by the MAP set).
+    // (If the rule already belongs to `subset`, the result will be exactly `rule`.)
+    inline ruleT approximate(const subsetT& subset, const ruleT& rule) {
+        const maskT& mask = subset.get_mask();
+        const partitionT& par = subset.get_par();
+
+        ruleT res{};
+        par.for_each_group([&](const groupT& group) {
+            const scanT scan(group, mask, rule);
+            // v -> 0 (same as mask): resulting dist = c_1.
+            // v -> 1 (different): resulting dist = c_0.
+            // So if c_0 > c_1, selecting 0 can make the distance smaller (c_1).
+            const bool v = scan.c_0 > scan.c_1 ? 0 : 1;
+            for (const codeT code : group) {
+                res[code] = mask[code] ^ v;
+            }
+        });
+
+        assert_implies(subset.contains(rule), res == rule);
+        return res;
+    }
+
+    // Firstly get approximate(subset, rule), then transform the rule to another one.
+    // The groups are listed as a sequence of values (relative to `mask`) and re-assigned by `fn`.
+    inline ruleT transform(const subsetT& subset, const maskT& mask, const ruleT& rule,
+                           const std::invocable<bool*, bool*> auto& fn) {
+        assert(subset.contains(mask));
+
+        const partitionT& par = subset.get_par();
+        ruleT_masked r = mask ^ approximate(subset, rule);
+
+        // `seq` is not a codeT::map_to<bool>.
+        assert(par.k() <= 512);
+        std::array<bool, 512> seq{};
+        int z = 0;
+        par.for_each_group([&](const groupT& group) { seq[z++] = r[group[0]]; });
+
+        fn(seq.data(), seq.data() + z);
+
+        z = 0;
+        par.for_each_group([&](const groupT& group) {
+            const bool seqz = seq[z++];
+            for (const codeT code : group) {
+                r[code] = seqz;
+            }
+        });
+
+        const ruleT res = mask ^ r;
+        assert(subset.contains(res));
+        return res;
+    }
+
+    inline ruleT randomize_c(const subsetT& subset, const maskT& mask, std::mt19937& rand, int count) {
+        return transform(subset, mask, {}, [&rand, count](bool* begin, bool* end) {
+            const int c = std::clamp(count, 0, int(end - begin));
+            std::fill_n(begin, c, 1);
+            std::fill(begin + c, end, 0);
+            std::shuffle(begin, end, rand);
+        });
+    }
+
+    inline ruleT randomize_p(const subsetT& subset, const maskT& mask, std::mt19937& rand, double p) {
+        return transform(subset, mask, {}, [&rand, p](bool* begin, bool* end) {
+            std::bernoulli_distribution dist(std::clamp(p, 0.0, 1.0));
+            std::generate(begin, end, [&] { return dist(rand); });
+        });
+    }
+
+    struct seq_mixed {
+        static ruleT first(const subsetT& subset, const maskT& mask) {
+            return transform(subset, mask, {}, [](bool* begin, bool* end) { std::fill(begin, end, 0); });
+        }
+
+        static ruleT last(const subsetT& subset, const maskT& mask) {
+            return transform(subset, mask, {}, [](bool* begin, bool* end) { std::fill(begin, end, 1); });
+        }
+
+        // The result will be the first rule with distance = n to the mask in the sequence.
+        static ruleT seek_n(const subsetT& subset, const maskT& mask, int n) {
+            return transform(subset, mask, {}, [n](bool* begin, bool* end) {
+                const int c = std::clamp(n, 0, int(end - begin));
+                std::fill_n(begin, c, 1);
+                std::fill(begin + c, end, 0);
+            });
+        }
+
+        static ruleT next(const subsetT& subset, const maskT& mask, const ruleT& rule) {
+            assert(subset.contains(rule));
+
+            return transform(subset, mask, rule, [](bool* begin, bool* end) {
+                if (!std::next_permutation(begin, end, std::greater<>{})) {
+                    // 1100... -> 1110..., or stop at 000... (first())
+                    bool* first_0 = std::find(begin, end, 0);
+                    if (first_0 != end) {
+                        *first_0 = 1;
+                    }
+                }
+            });
+        }
+
+        static ruleT prev(const subsetT& subset, const maskT& mask, const ruleT& rule) {
+            assert(subset.contains(rule));
+
+            return transform(subset, mask, rule, [](bool* begin, bool* end) {
+                if (!std::prev_permutation(begin, end, std::greater<>{})) {
+                    // ...0111 -> ...0011, or stop at 111... (last())
+                    bool* first_1 = std::find(begin, end, 1);
+                    if (first_1 != end) {
+                        *first_1 = 0;
+                    }
+                }
+            });
+        }
+    };
+
+    // !!TODO: all the `moldT` related functions should be redesigned...
+
+    // `lockT`, together with the associated rule, captures the idea that the locked values in the rule
+    // are the "cause" for something to happen.
+    // For example, suppose we find an oscillator in a rule. It is likely to only invoke a subset of all
+    // codeT during all of its phases. We can record these invocations and say that's why the oscillator exists
+    // in this rule.
+    // The program uses `moldT` ~ (lockT, ruleT) pair as a constraint for generating new rules.
+    struct moldT {
+        ruleT rule{};
+        lockT lock{};
+
+        // Test whether `r` has the same values for all locked codes.
+        bool compatible(const ruleT& r) const {
+            return for_each_code_all_of([&](codeT code) { //
+                return !lock[code] || rule[code] == r[code];
+            });
+        }
+
+        friend bool operator==(const moldT&, const moldT&) = default;
+    };
+
+#if 0
     struct scanT {
         int free_0 = 0, free_1 = 0;
         int locked_0 = 0, locked_1 = 0; // 0/1 means masked value.
@@ -353,17 +506,6 @@ namespace aniso {
             return vec;
         }
     };
-
-    inline int distance(const subsetT& subset, const ruleT& a, const ruleT& b) {
-        assert(subset.contains(a) && subset.contains(b));
-        int d = 0;
-        subset.get_par().for_each_group([&](const groupT& group) {
-            if (a[group[0]] != b[group[0]]) {
-                ++d;
-            }
-        });
-        return d;
-    }
 
     // Test whether there exists any rule that belongs to both `subset` and `mold`.
     // (subset.contains(rule) && mold.compatible(rule))
@@ -530,6 +672,7 @@ namespace aniso {
             });
         }
     };
+#endif
 
     // rule ^ mask_zero -> the masked values are identical to rule's.
     inline const maskT mask_zero{{}};

@@ -152,7 +152,7 @@ class subset_selector {
         assert(!current.empty());
 
         for_each_term([&](termT& t) { //
-            t.disabled = !aniso::subsetT::common_rule(*t.set, current);
+            t.disabled = !aniso::has_common(*t.set, current);
         });
     }
 
@@ -250,12 +250,8 @@ public:
     }
 
     const aniso::subsetT& select_subset(const sync_point& target) {
-        // TODO: temporarily preserved.
-        const aniso::moldT mold{target.rule, {}};
-
-        enum ringE { Contained, Compatible, Incompatible };
         enum centerE { Selected, Including, Disabled, None }; // TODO: add "equals" relation?
-        auto put_term = [size = square_size()](ringE ring, centerE center, const char* title /* Optional */,
+        auto put_term = [size = square_size()](bool contained, centerE center, const char* title /* Optional */,
                                                bool interactive) -> bool {
             ImGui::Dummy(size);
             const bool hit = interactive && center != Disabled && ImGui::IsItemClicked(ImGuiMouseButton_Left);
@@ -263,9 +259,8 @@ public:
             const ImU32 cent_col = center == Selected    ? IM_COL32(65, 150, 255, 255) // Roughly _ButtonHovered
                                    : center == Including ? IM_COL32(25, 60, 100, 255)  // Roughly _Button
                                                          : IM_COL32_BLACK_TRANS;
-            const ImU32 ring_col = ring == Contained    ? IM_COL32(0, 255, 0, 255)   // Light green
-                                   : ring == Compatible ? IM_COL32(0, 100, 0, 255)   // Dull green
-                                                        : IM_COL32(200, 45, 0, 255); // Red
+            const ImU32 ring_col = contained ? IM_COL32(0, 255, 0, 255)  // Light green
+                                             : IM_COL32(0, 100, 0, 255); // Dull green
             ImU32 title_col = IM_COL32_WHITE;
             if (center == Disabled) {
                 title_col = IM_COL32_GREY(150, 255);
@@ -292,9 +287,7 @@ public:
             return hit;
         };
         auto check = [&](termT& term, bool show_title = false) -> void {
-            if (put_term(term.set->contains(mold.rule)        ? Contained
-                         : aniso::compatible(*term.set, mold) ? Compatible
-                                                              : Incompatible,
+            if (put_term(term.set->contains(target.rule),
                          term.selected                 ? Selected
                          : term.set->includes(current) ? Including
                          : term.disabled               ? Disabled
@@ -312,8 +305,8 @@ public:
         {
             ImGui::AlignTextToFramePadding();
             imgui_StrTooltip("(...)", [&] {
-                auto explain = [&](ringE ring, centerE center, const char* desc) {
-                    put_term(ring, center, nullptr, false);
+                auto explain = [&](bool contained, centerE center, const char* desc) {
+                    put_term(contained, center, nullptr, false);
                     ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                     ImGui::AlignTextToFramePadding(); // `Dummy` does not align automatically.
                     imgui_Str(": ");
@@ -329,8 +322,8 @@ public:
                           "working set will be the entire MAP set.");
                 ImGui::Separator();
                 imgui_Str("The ring color reflects the relation between the subset and the current rule:");
-                explain(Contained, None, "The rule belongs to this subset.");
-                explain(Compatible, None, "The rule does not belong to this subset.");
+                explain(true, None, "The rule belongs to this subset.");
+                explain(false, None, "The rule does not belong to this subset.");
                 // v (Preserved for reference.)
 #if 0
                 // TODO: this is quite user-unfriendly... (Cannot improve unless the subset system is
@@ -347,21 +340,17 @@ public:
 
                 ImGui::Separator();
                 imgui_Str("The center color is irrelevant to the ring color, and reflects the selection details:");
-                explain(Compatible, None, "Not selected.");
-                explain(Compatible, Selected, "Selected.");
-                explain(Compatible, Including,
+                explain(false, None, "Not selected.");
+                explain(false, Selected, "Selected.");
+                explain(false, Including,
                         "Not selected, but the working set already belongs to this subset, so it will behave "
                         "as if this is selected too.");
-                explain(Compatible, Disabled,
-                        "Not selectable. (If selected, the resulting working set will be empty.)");
+                explain(false, Disabled, "Not selectable. (If selected, the resulting working set will be empty.)");
             });
             ImGui::SameLine();
             imgui_Str("Working set ~");
             ImGui::SameLine();
-            put_term(current.contains(mold.rule)        ? Contained
-                     : aniso::compatible(current, mold) ? Compatible
-                                                        : Incompatible,
-                     None, nullptr, false);
+            put_term(current.contains(target.rule), None, nullptr, false);
             imgui_ItemTooltip("This will be light green if the current rule belongs to the selected "
                               "subsets. See '(...)' for details.");
 
@@ -380,7 +369,7 @@ public:
             if (ImGui::Button("Match")) {
                 for_each_term([&](termT& t) {
                     t.disabled = false; // Will be updated by `update_current`.
-                    t.selected = t.set->contains(mold.rule);
+                    t.selected = t.set->contains(target.rule);
                 });
                 update_current();
             }
@@ -559,13 +548,7 @@ void edit_rule(sync_point& sync) {
     const aniso::subsetT& subset = selector.select_subset(sync);
     assert(!subset.empty());
 
-    // TODO: temporarily preserved.
-    const aniso::moldT mold = {sync.rule, {}};
-    // TODO: `compatible` has become useless too.
-    const bool compatible = aniso::compatible(subset, mold);
-    assert(compatible);
-    const bool contained = subset.contains(mold.rule);
-    assert_implies(contained, compatible);
+    const bool contained = subset.contains(sync.rule);
 
     ImGui::Separator();
 
@@ -649,7 +632,7 @@ void edit_rule(sync_point& sync) {
                 const int radio_id = ImGui::GetItemID();
                 guarded_block(contained, "The current rule does not belong to the working set.", [&] {
                     if (ImGui::Button("<< Cur")) {
-                        mask_custom = {mold.rule};
+                        mask_custom = {sync.rule};
                         mask_tag = Custom;
 
                         // It will be strange to call a shortcut function here.
@@ -701,38 +684,16 @@ void edit_rule(sync_point& sync) {
 #endif
 
     const aniso::partitionT& par = subset.get_par();
-    const auto scanlist = aniso::scanT::scanlist(par, mask, mold);
+    const auto scanlist = aniso::scanT::scanlist(par, mask, sync.rule);
 
     static bool preview_mode = false;
     static previewer::configT config{previewer::configT::_220_160};
     {
         const int c_group = par.k();
-        int c_0 = 0, c_1 = 0, c_x = 0;
-        int c_free = 0;
-        int c_locked_0 = 0, c_locked_1 = 0, c_locked_x = 0;
-        for (const auto& scan : scanlist) {
-            if (scan.all_0()) {
-                ++c_0;
-            } else if (scan.all_1()) {
-                ++c_1;
-            } else {
-                ++c_x; // Number of groups that make `mold.rule` uncontained.
-            }
 
-            if (!scan.locked_0 && !scan.locked_1) {
-                ++c_free;
-            } else if (!scan.locked_0 && scan.locked_1) {
-                ++c_locked_1;
-            } else if (scan.locked_0 && !scan.locked_1) {
-                ++c_locked_0;
-            } else {
-                ++c_locked_x; // Number of groups that make `mold` incompatible.
-            }
-        }
-        const bool has_lock = c_free != c_group;
-
-        assert(contained == (c_x == 0));
-        assert(compatible == (c_locked_x == 0));
+        // TODO: temporarily preserved.
+        const int c_free = c_group;
+        const bool has_lock = false;
 
         {
             static bool show_trav = false;
@@ -756,7 +717,7 @@ void edit_rule(sync_point& sync) {
                     auto fill_next = [&](int size) {
                         assert(!page.empty());
                         for (int i = 0; i < size; ++i) {
-                            const aniso::ruleT rule = aniso::seq_mixed::next(subset, mask, {page.back(), mold.lock});
+                            const aniso::ruleT rule = aniso::seq_mixed::next(subset, mask, page.back());
                             if (rule == page.back()) {
                                 break;
                             }
@@ -767,7 +728,7 @@ void edit_rule(sync_point& sync) {
                     auto fill_prev = [&](int size) {
                         assert(!page.empty());
                         for (int i = 0; i < size; ++i) {
-                            const aniso::ruleT rule = aniso::seq_mixed::prev(subset, mask, {page.front(), mold.lock});
+                            const aniso::ruleT rule = aniso::seq_mixed::prev(subset, mask, page.front());
                             if (rule == page.front()) {
                                 break;
                             }
@@ -817,7 +778,7 @@ void edit_rule(sync_point& sync) {
                     ImGui::SetNextItemWidth(ImGui::CalcTextSize("Max:0000").x + ImGui::GetStyle().FramePadding.x * 2);
                     if (const auto dist = input_dist.input("##Seek", std::format("Max:{}", c_group).c_str())) {
                         page.clear();
-                        page.push_back(aniso::seq_mixed::seek_n(subset, mask, mold, *dist));
+                        page.push_back(aniso::seq_mixed::seek_n(subset, mask, *dist));
                         fill_next(adapter.page_size - 1);
                         // TODO: whether to try to fill the page in this (and other similar) case?
                         if (page.size() < adapter.page_size) {
@@ -847,7 +808,7 @@ void edit_rule(sync_point& sync) {
                         "<00..", "Prev", "Next", "11..>",
                         [&] {
                             page.clear();
-                            page.push_back(aniso::seq_mixed::first(subset, mask, mold));
+                            page.push_back(aniso::seq_mixed::first(subset, mask));
                             fill_next(adapter.page_size - 1);
                         },
                         [&] {
@@ -864,7 +825,7 @@ void edit_rule(sync_point& sync) {
                         },
                         [&] {
                             page.clear();
-                            page.push_back(aniso::seq_mixed::last(subset, mask, mold));
+                            page.push_back(aniso::seq_mixed::last(subset, mask));
                             fill_prev(adapter.page_size - 1);
                         },
                         page.empty() ? "!!TODO..." : nullptr);
@@ -915,28 +876,21 @@ void edit_rule(sync_point& sync) {
 
         ImGui::SameLine();
 
-        guarded_block(compatible, "Incompatible", [&] {
+        {
             static bool show_rand = false;
-            if (!compatible) {
-                show_rand = false;
-            }
 
             const bool clicked = ImGui::Checkbox("Random", &show_rand);
             if (clicked && show_rand) {
-                assert(compatible); // Otherwise, the checkbox should be disabled.
                 ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
                 ImGui::SetNextWindowPos(ImGui::GetItemRectMax() + ImVec2(30, -120), ImGuiCond_FirstUseEver);
             }
 
-            // TODO: ideally, !compatible should only disable generation ('>>>' at last page).
             if (show_rand) {
-                assert(compatible);
                 static ImVec2 size_constraint_min{};
                 ImGui::SetNextWindowSizeConstraints(size_constraint_min, ImVec2(FLT_MAX, FLT_MAX));
                 if (auto window = imgui_Window("Random rules", &show_rand,
                                                ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar)) {
                     // `dist`: The "distance" to the masking rule the randomization want to achieve.
-                    // (which does not make sense when !compatible)
                     static double rate = 0.29;
                     int free_dist = round(rate * c_free);
 
@@ -947,8 +901,7 @@ void edit_rule(sync_point& sync) {
                     quick_info("< Around / Exactly.");
                     ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                     ImGui::SetNextItemWidth(item_width);
-                    if (imgui_StepSliderInt("##Dist", &free_dist, 0, c_free,
-                                            compatible ? (has_lock ? "(Free) %d" : "%d") : "N/A") &&
+                    if (imgui_StepSliderInt("##Dist", &free_dist, 0, c_free, has_lock ? "(Free) %d" : "%d") &&
                         c_free != 0) {
                         rate = double(free_dist) / c_free;
                         assert(round(rate * c_free) == free_dist);
@@ -983,9 +936,9 @@ void edit_rule(sync_point& sync) {
                             const int count = (rules.size() / adapter.page_size) * adapter.page_size +
                                               adapter.page_size - rules.size();
                             for (int i = 0; i < count; ++i) {
-                                rules.push_back(
-                                    exact_mode ? aniso::randomize_c(subset, mask, mold, global_mt19937(), free_dist)
-                                               : aniso::randomize_p(subset, mask, mold, global_mt19937(), rate));
+                                rules.push_back(exact_mode
+                                                    ? aniso::randomize_c(subset, mask, global_mt19937(), free_dist)
+                                                    : aniso::randomize_p(subset, mask, global_mt19937(), rate));
                             }
                             assert((rules.size() % adapter.page_size) == 0);
                             page_no = (rules.size() / adapter.page_size) - 1;
@@ -1025,7 +978,7 @@ void edit_rule(sync_point& sync) {
                     });
                 }
             }
-        });
+        }
 
         ImGui::SameLine();
         ImGui::Checkbox("Preview", &preview_mode);
@@ -1036,14 +989,19 @@ void edit_rule(sync_point& sync) {
         }
 
         if (contained) {
-            std::string str = std::format("Groups:{} ({}:{} {}:{})", c_group, chr_1, c_1, chr_0, c_0);
+            const int dist = aniso::distance(subset, mask, sync.rule);
+            std::string str = std::format("Groups:{} ({}:{} {}:{})", c_group, chr_1, dist, chr_0, c_group - dist);
+
+            // v (Preserved for reference.)
+#if 0
             if (c_free != c_group) {
                 const int c_free_1 = c_1 - c_locked_1, c_free_0 = c_0 - c_locked_0;
                 str += std::format(" Free:{} ({}:{} {}:{}) Locked:{} ({}:{} {}:{})", c_free, chr_1, c_free_1, chr_0,
                                    c_free_0, c_locked_1 + c_locked_0, chr_1, c_locked_1, chr_0, c_locked_0);
             }
+#endif
             imgui_Str(str);
-        } else if (compatible) {
+        } else {
             ImGui::Text("Groups:%d !contained", c_group);
             ImGui::SameLine();
             imgui_StrTooltip("(?)", [&] {
@@ -1055,17 +1013,22 @@ void edit_rule(sync_point& sync) {
                 ImGui::Separator();
                 imgui_Str("Preview:");
                 ImGui::SameLine();
-                previewer::preview(-1, previewer::configT::_220_160, aniso::approximate(subset, mold), false);
+                previewer::preview(-1, previewer::configT::_220_160, aniso::approximate(subset, sync.rule), false);
             });
             if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
-                sync.set(aniso::approximate(subset, mold));
+                sync.set(aniso::approximate(subset, sync.rule));
             }
-        } else {
+        }
+
+        // v (Preserved for reference.)
+#if 0
+        else {
             ImGui::Text("Groups:%d !compatible", c_group);
             ImGui::SameLine();
             imgui_StrTooltip("(?)", "There don't exist rules in the working set that have the same locked "
                                     "values as the current rule. (Check the red groups for details.)");
         }
+#endif
     }
 
     // TODO: by default, the program should not allow random-access edit for rules not included in
@@ -1078,7 +1041,7 @@ void edit_rule(sync_point& sync) {
         const char labels_normal[2][3]{{'-', chr_0, '\0'}, {'-', chr_1, '\0'}};
         const char labels_preview[2][9]{{'-', chr_0, ' ', '-', '>', ' ', chr_1, ':', '\0'},
                                         {'-', chr_1, ' ', '-', '>', ' ', chr_0, ':', '\0'}};
-        const aniso::ruleT_masked masked = mask ^ mold.rule;
+        const aniso::ruleT_masked masked = mask ^ sync.rule;
 
         // Precise vertical alignment:
         // https://github.com/ocornut/imgui/issues/2064
@@ -1103,17 +1066,24 @@ void edit_rule(sync_point& sync) {
         int n = 0;
         assert(par.k() <= 512);
         std::array<bool, 512> shown{};
+
+        // v (Preserved for reference.)
+#if 0
         for (const auto select : {+[](const aniso::scanT& c) { return !c.all_0() && !c.all_1(); }, //
                                   +[](const aniso::scanT& c) { return !c.any_locked(); },          //
                                   +[](const aniso::scanT& c) { return c.any_locked(); }}) {
+#else
+        for (const auto select : {+[](const aniso::scanT& c) { return !c.pure(); }, //
+                                  +[](const aniso::scanT& c) { return c.pure(); }}) {
+#endif
             par.for_each_group([&](const int j, const aniso::groupT& group) {
                 if (shown[j] || !select(scanlist[j])) {
                     return;
                 }
                 shown[j] = true;
 
-                const bool has_lock = scanlist[j].any_locked();
-                const bool pure = scanlist[j].all_0() || scanlist[j].all_1();
+                const bool has_lock = false; // TODO: temporarily preserved.
+                const bool pure = scanlist[j].pure();
                 if (n % perline != 0) {
                     ImGui::SameLine(0, spacing);
                 } else {
@@ -1121,7 +1091,6 @@ void edit_rule(sync_point& sync) {
                 }
                 ++n;
 
-                const bool incompatible = scanlist[j].locked_0 != 0 && scanlist[j].locked_1 != 0;
                 const aniso::codeT head = group[0];
                 const auto get_adjacent_rule = [&] {
                     aniso::ruleT rule = sync.rule;
@@ -1138,10 +1107,7 @@ void edit_rule(sync_point& sync) {
                     {0.26f, 0.59f, 0.98f, 0.70f}, {0.26f, 0.59f, 0.98f, 0.85f}, {0.26f, 0.59f, 0.98f, 1.00f}};
                 static const ImVec4 button_col_impure[3]{
                     {0.26f, 0.59f, 0.98f, 0.30f}, {0.26f, 0.59f, 0.98f, 0.40f}, {0.26f, 0.59f, 0.98f, 0.50f}};
-                static const ImVec4 button_col_incompatible[3]{{0.6f, 0, 0, 1}, {0.8f, 0, 0, 1}, {0.9f, 0, 0, 1}};
-                const ImVec4* const button_color = pure            ? button_col_normal
-                                                   : !incompatible ? button_col_impure
-                                                                   : button_col_incompatible;
+                const ImVec4* const button_color = pure ? button_col_normal : button_col_impure;
 
                 if (preview_mode) {
                     ImGui::BeginGroup();
@@ -1160,8 +1126,7 @@ void edit_rule(sync_point& sync) {
                 align_text(ImGui::GetItemRectSize().y);
                 imgui_Str(preview_mode ? labels_preview[masked[head]] : labels_normal[masked[head]]);
                 if (has_lock) {
-                    const ImU32 col = scanlist[j].all_locked() ? IM_COL32_WHITE : IM_COL32_GREY(128, 255);
-                    imgui_ItemRect(col, ImVec2(-2, -2));
+                    imgui_ItemRect(IM_COL32_WHITE, ImVec2(-2, -2));
                 }
 
                 if (preview_mode) {
@@ -1182,9 +1147,6 @@ void edit_rule(sync_point& sync) {
                         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                         align_text(ImGui::GetItemRectSize().y);
                         imgui_Str(labels_normal[masked[code]]);
-                        if (mold.lock[code]) {
-                            imgui_ItemRect(IM_COL32_WHITE, ImVec2(-2, -2));
-                        }
                         if (x == max_to_show) {
                             break;
                         }
