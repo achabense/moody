@@ -200,10 +200,10 @@ public:
                                   "(This is equal to the intersection of the following subsets in this line.)",
                                   true /* Selected */);
         terms_native.emplace_back("|", &native_refl_wsx,
-                                  "Rules that preserve reflection symmetry, taking `|` as the axis.");
-        terms_native.emplace_back("-", &native_refl_asd, "Ditto, the reflection axis is `-`.");
-        terms_native.emplace_back("\\", &native_refl_qsc, "Ditto, the reflection axis is `\\`.");
-        terms_native.emplace_back("/", &native_refl_esz, "Ditto, the reflection axis is `/`.");
+                                  "Rules that preserve reflection symmetry, taking '|' as the axis.");
+        terms_native.emplace_back("-", &native_refl_asd, "Ditto, the reflection axis is '-'.");
+        terms_native.emplace_back("\\", &native_refl_qsc, "Ditto, the reflection axis is '\\'.");
+        terms_native.emplace_back("/", &native_refl_esz, "Ditto, the reflection axis is '/'.");
         terms_native.emplace_back("C2", &native_C2, "Rules that preserve C2 symmetry (2-fold rotational symmetry).");
         terms_native.emplace_back("C4", &native_C4,
                                   "C4 symmetry (4-fold rotational symmetry). This is a strict subset of C2.");
@@ -315,12 +315,13 @@ public:
                     imgui_Str(desc);
                 };
 
-                imgui_Str("The following terms represent subsets of MAP rules. You can select these terms freely - "
-                          "the program will calculate the common set (the intersection) of selected subsets (with "
-                          "the entire MAP set), and help you explore rules in the set.\n\n"
-                          "This set is later called \"working set\". For example, if a rule is said to belong to the "
-                          "working set, it should also belong to every selected subset. If nothing is selected, the "
-                          "working set will be the entire MAP set.");
+                imgui_Str(
+                    "The buttons represent subsets of MAP rules. You can select them freely - the program "
+                    "will calculate the intersection of selected subsets (with the entire MAP set), "
+                    "and help you explore rules in it.\n\n"
+                    "The intersection is later called \"working set\". For example, if a rule is said to belong to the "
+                    "working set, it should also belong to every selected subset. If nothing is selected, the "
+                    "working set will be the entire MAP set.");
                 ImGui::Separator();
                 imgui_Str("The ring color reflects the relation between the subset and the current rule:");
                 explain(true, None, "The rule belongs to this subset.");
@@ -352,8 +353,8 @@ public:
             imgui_Str("Working set ~");
             ImGui::SameLine();
             put_term(current.contains(target.rule), None, nullptr, false);
-            imgui_ItemTooltip("This will be light green if the current rule belongs to the selected "
-                              "subsets. See '(...)' for details.");
+            imgui_ItemTooltip("This will be light green if the current rule belongs to every selected "
+                              "subset. See '(...)' for details.");
 
             // TODO: `static` for convenience. This must be refactored when there are to be multiple instances.
             static bool hide_details = false;
@@ -556,14 +557,16 @@ void edit_rule(sync_point& sync) {
     // Select mask.
     char chr_0 = '0', chr_1 = '1';
     const aniso::maskT& mask = [&]() -> const aniso::maskT& {
-        // TODO: rewrite these descriptions...
+        // TODO: improve...
         const char* const about_mask =
-            "A mask is an arbitrary rule (in the working set) to perform XOR masking for other rules.\n\n"
-            "Some rules are special enough (for example, 'Zero/Identity'), so that the values masked by them have "
-            "natural interpretations.\n"
-            "If a rule belongs to the working set, its distance to the masking rule can be defined as the number "
-            "of groups where they have different values.\n\n"
-            "(For the exact workings see the 'Subset, mask ...' section in 'Documents'.)";
+            "The working set divides all cases into different groups. For any two rules in the working set, "
+            "they must have either all-the-same or all-the-different values in each group.\n\n"
+            "A mask is an arbitrary rule in the working set to compare with other rules (XOR masking). The values "
+            "of the current rule are viewed through the mask in the random-access section. The 'Zero' and 'Identity' "
+            "masks are special in the sense that the values masked by them have natural interpretations.\n\n"
+            "When talking about the \"distance\" between two rules (in the working set), it means the number of "
+            "groups where they have different values.\n\n"
+            "(For more details see the 'Subset, mask ...' section in 'Documents'.)";
 
         static aniso::maskT mask_custom{aniso::game_of_life()};
 
@@ -575,28 +578,35 @@ void edit_rule(sync_point& sync) {
         };
         static const termT mask_terms[]{
             {"Zero",
-             "The all-zero rule.\n"
-             "The masked values show actual values (different:'1' ~ 1, same:'0' ~ 0), and the distance "
-             "to this rule shows how many groups return 1.",
+             "The all-zero rule. (Every cell will become 0, regardless of its neighbors.)\n\n"
+             "The distance to this rule are equal to the number of groups that returns 1, and the masked "
+             "values can directly represent the actual values of the rule:\n"
+             "Different:'1' ~ the cell will become 1 in this case.\n"
+             "Same:'0' ~ the cell will become 0 in this case.",
              '0', '1'},
 
             {"Identity",
-             "The rule that preserves the value of the center cell in all situations.\n"
-             "The masked values show whether the cell will \"flip\" (different:'f' ~ flip, same:'.' ~ won't flip), "
-             "and the distance to this rule reflects how \"volatile\" a rule is.",
+             "The rule that preserves the values in all cases. (Every cell will stay unchanged, "
+             "regardless of its neighbors.)\n\n"
+             "Masked value:\n"
+             "Different:'f' ~ the cell will \"flip\" in this case.\n"
+             "Same:'.' ~ the cell will stay unchanged in this case.",
              '.', 'f'},
 
             {"Backup",
              "A rule calculated by the program that belongs to the working set. Depending on what subsets "
              "are selected, it may be the same as zero-rule, or identity-rule, or just an ordinary rule in the set.\n"
-             "This is provided in case there are no other rules known to belong to the working set.",
+             "This is provided in case there are no other rules known to belong to the working set. It will not "
+             "change unless the working set is updated.\n\n"
+             "Masked value: different:'i', same:'o'.",
              'o', 'i'},
 
             {"Custom",
-             "Custom masking rule. You can click '<< Cur' to set this to the current rule.\n"
-             "Different:'i', same:'o'. This is a useful tool to help find interesting rules based on existing ones. "
-             "For example, the smaller the distance is, the more likely that the rule behaves similar to the masking "
-             "rule.",
+             "You can click '<< Cur' to set this to the current rule.\n\n"
+             "This is initially the Game of Life rule, and will not change until you click '<< Cur' next time. "
+             "So for example, if you want to get some random rules with a small distance to the current rule, you "
+             "can do '<< Cur' and generate random rules with a low distance in the 'Random' window.\n\n"
+             "Masked value: different:'i', same:'o'.",
              'o', 'i'}};
 
         static maskE mask_tag = Zero;
