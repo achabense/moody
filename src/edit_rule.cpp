@@ -200,7 +200,7 @@ public:
                                   "(This is equal to the intersection of the following subsets in this line.)",
                                   true /* Selected */);
         terms_native.emplace_back("|", &native_refl_wsx,
-                                  "Rules that preserve reflection symmetry, taking '|' as the axis.");
+                                  "Rules that preserve reflection symmetry, taking `|` as the axis.");
         terms_native.emplace_back("-", &native_refl_asd, "Ditto, the reflection axis is `-`.");
         terms_native.emplace_back("\\", &native_refl_qsc, "Ditto, the reflection axis is `\\`.");
         terms_native.emplace_back("/", &native_refl_esz, "Ditto, the reflection axis is `/`.");
@@ -210,12 +210,13 @@ public:
 
         terms_totalistic.emplace_back(
             "Tot", &native_tot_exc_s,
-            "Outer-totalistic MAP rules. That is, the values are dependent on 's' and 'q+w+e+a+d+z+x+c'.\n\n"
+            "Outer-totalistic MAP rules. That is, the values are dependent on 's' and the sum of other cells "
+            "('q+w+...').\n\n"
             "(This is also known as life-like rules, and is where the B/S notation applies.)");
         terms_totalistic.emplace_back(
             "Tot(+s)", &native_tot_inc_s,
-            "Inner-totalistic MAP rules. That is, the values are only dependent on "
-            "'q+w+e+a+s+d+z+x+c' (including 's'). This is a strict subset of outer-totalistic rules.");
+            "Inner-totalistic MAP rules. That is, the values are only dependent on the sum "
+            "of all cells (including 's'). This is a strict subset of outer-totalistic rules.");
         terms_totalistic.emplace_back("Hex", &hex_tot_exc_s, "Outer-totalistic hexagonal rules.");
         terms_totalistic.emplace_back("Hex(+s)", &hex_tot_inc_s, "Inner-totalistic hexagonal rules.");
         terms_totalistic.emplace_back("Von", &von_tot_exc_s, "Outer-totalistic von-Neumann rules.");

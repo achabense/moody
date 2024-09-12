@@ -546,6 +546,7 @@ public:
         static bool auto_fit = false;
         bool locate_center = false;
         bool find_suitable_zoom = false;
+        bool highlight_canvas = false;
         {
             // Could be `ImGui::GetFrameCount() == 1`, but that looks unstable.
             static bool first = true;
@@ -764,6 +765,9 @@ public:
                                       "-/+ Interval: 3/4 (repeatable)\n\n"
                                       "These shortcuts are available only when the space window is hovered or held "
                                       "by mouse button.");
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
+                highlight_canvas = true;
+            }
             quick_info("< Keyboard shortcuts.");
             ImGui::SameLine();
             if (ImGui::Button("Restart") || item_shortcut(ImGuiKey_R, false)) {
@@ -849,6 +853,9 @@ public:
                      "left-drag' to \"rotate\" the space, or drag with right button to select area.\n"
                      "3. Otherwise, left-click to decide where to paste. To move the window you can drag with "
                      "right button. Rotating and selecting are not available in this case.");
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
+            highlight_canvas = true;
+        }
         quick_info("v Mouse operations.");
 
         ImGui::SameLine();
@@ -864,6 +871,9 @@ public:
         ImGui::SameLine();
         imgui_StrDisabled("(?)");
         const bool show_range_window_in_tooltip = ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip);
+        if (show_range_window_in_tooltip) {
+            highlight_canvas = true;
+        }
 
         ImGui::SameLine(0, 0);
         ImGui::Text("  Generation:%d", m_torus.gen());
@@ -1101,6 +1111,19 @@ public:
                 drawlist->PopClipRect();
             }
 
+            {
+                // `skip` is a workaround to make the highlight appear in the same frame with the tooltip.
+                // (Tooltips will be hidden for one extra frame before appearing.)
+                static bool skip = true;
+                if (highlight_canvas) {
+                    if (!std::exchange(skip, false)) {
+                        imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_Separator));
+                    }
+                } else {
+                    skip = true;
+                }
+            }
+
             // Range operations.
             {
                 enum operationE {
@@ -1285,8 +1308,8 @@ public:
                         }
                     }
                     if (show_range_window_in_tooltip && ImGui::BeginTooltip()) {
-                        imgui_StrWrapped("The shortcuts are available only when the space window is hovered or held "
-                                         "by mouse button.",
+                        imgui_StrWrapped("The shortcuts (including 'V' for pasting) are available only when the space window "
+                                         "is hovered or held by mouse button.",
                                          ImGui::CalcItemWidth());
                         ImGui::Separator();
                         range_operations(true /* display */);
