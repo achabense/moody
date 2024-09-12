@@ -27,19 +27,20 @@ public:
     }
 
     void set_fps() {
-        auto radio = [&](int set, const char* label, bool do_sameline = true) {
-            if (do_sameline) {
-                ImGui::SameLine();
-            }
-            imgui_RadioButton(label, &fps, set);
-        };
-        radio(max_fps, "Auto", false);
+        imgui_RadioButton("Auto", &fps, max_fps);
         ImGui::SameLine();
         imgui_StrTooltip("(?)", "Typically limited by VSync.");
-        radio(50, "50 fps");
-        radio(40, "40 fps");
+
+        ImGui::SameLine();
+        imgui_RadioButton("50 fps", &fps, 50);
+        ImGui::SameLine();
+        imgui_RadioButton("40 fps", &fps, 40);
+
 #ifndef NDEBUG
-        radio(15, "15 fps");
+        ImGui::SameLine();
+        imgui_RadioButton("10 fps", &fps, 10);
+        ImGui::SameLine();
+        imgui_RadioButton("5 fps", &fps, 5);
 #endif // !NDEBUG
     }
 };
@@ -100,6 +101,24 @@ private:
     void set_pos(int pos) { m_pos = std::clamp(pos, 0, size() - 1); }
 };
 
+static void get_reversal_dual(const bool button_result, sync_point& sync) {
+    if (button_result) {
+        sync.set(rule_algo::trans_reverse(sync.rule));
+    }
+    imgui_ItemTooltip([&] {
+        imgui_Str("Get the 0/1 reversal dual of the current rule.");
+        ImGui::Separator();
+        const aniso::ruleT rev = rule_algo::trans_reverse(sync.rule);
+        if (rev != sync.rule) {
+            imgui_Str("Preview:");
+            ImGui::SameLine();
+            previewer::preview(-1, previewer::configT::_220_160, rev, false);
+        } else {
+            imgui_Str("(The result will be the same as the current rule, as the current rule is self-complementary.)");
+        }
+    });
+}
+
 void frame_main() {
 #ifdef SET_FRAME_RATE
     static timerT timer;
@@ -117,27 +136,27 @@ void frame_main() {
     static bool show_file = false;
     static bool show_clipboard = false;
     static bool show_doc = false;
-    auto load_rule = [&](bool& flag, const char* title, void (*load_fn)(sync_point&)) {
-        if (ImGui::Checkbox(title, &flag) && flag) {
+    auto load_rule = [&](bool& open, const char* title, void (*load_fn)(sync_point&)) {
+        if (ImGui::Checkbox(title, &open) && open) {
             ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
         }
 
         // This is a workaround to support shortcut for clipboard-reading.
         // TODO: using 'W' to avoid conflicts with pattern-pasting; not quite conventional...
-        if (&flag == &show_clipboard) {
+        if (&open == &show_clipboard) {
             if (shortcuts::keys_avail_and_window_hoverable() && shortcuts::test(ImGuiKey_W)) {
-                flag = true;
+                open = true;
                 ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
                 ImGui::SetNextWindowFocus();
             }
         }
 
-        if (flag) {
+        if (open) {
             ImGui::SetNextWindowPos(ImGui::GetItemRectMin() + ImVec2(0, ImGui::GetFrameHeight() + 4),
                                     ImGuiCond_FirstUseEver);
             ImGui::SetNextWindowSize({600, 400}, ImGuiCond_FirstUseEver);
             ImGui::SetNextWindowSizeConstraints(ImVec2(400, 300), ImVec2(FLT_MAX, FLT_MAX));
-            if (auto window = imgui_Window(title, &flag, ImGuiWindowFlags_NoSavedSettings)) {
+            if (auto window = imgui_Window(title, &open, ImGuiWindowFlags_NoSavedSettings)) {
                 load_fn(sync);
             }
         }
@@ -216,52 +235,10 @@ void frame_main() {
         }
 
         ImGui::SameLine();
-        if (ImGui::Button("Rev")) {
-            sync.set(rule_algo::trans_reverse(sync.rule));
-        }
-        imgui_ItemTooltip([&] {
-            imgui_Str("Get the 0/1 reversal dual of the current rule.");
-            ImGui::Separator();
-            const aniso::ruleT rev = rule_algo::trans_reverse(sync.rule);
-            if (rev != sync.rule) {
-                imgui_Str("Preview:");
-                ImGui::SameLine();
-                previewer::preview(-1, previewer::configT::_220_160, rev, false);
-            } else {
-                imgui_Str(
-                    "(The result will be the same as the current rule, as the current rule is self-complementary.)");
-            }
-        });
+        get_reversal_dual(ImGui::Button("Rev"), sync);
 
         ImGui::SameLine();
         imgui_StrCopyable(aniso::to_MAP_str(sync.rule), imgui_Str, set_clipboard_and_notify);
-
-        // v (Preserved for reference.)
-#if 0 
-        {
-            if (!sync.enable_lock) {
-                ImGui::SameLine();
-            }
-
-            static bool hover_lock = false;
-            if (sync.enable_lock && hover_lock) {
-                imgui_StrCopyable(aniso::to_MAP_str(sync.current), imgui_Str, set_clipboard_and_notify);
-                hover_lock = ImGui::IsItemHovered();
-            } else {
-                imgui_StrCopyable(aniso::to_MAP_str(sync.current.rule), imgui_Str, set_clipboard_and_notify);
-                if (sync.enable_lock) {
-                    ImGui::SameLine(0, ImGui::CalcTextSize(" ").x - 1 /* For correct alignment */);
-                    std::string lock_str = "[";
-                    aniso::_misc::to_MAP(lock_str, sync.current.lock);
-                    lock_str += "]";
-                    imgui_StrDisabled(lock_str);
-                    hover_lock = ImGui::IsItemHovered();
-                } else {
-                    hover_lock = false;
-                }
-            }
-        }
-#endif
 
         ImGui::Separator();
 

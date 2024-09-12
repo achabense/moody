@@ -1308,9 +1308,10 @@ public:
                         }
                     }
                     if (show_range_window_in_tooltip && ImGui::BeginTooltip()) {
-                        imgui_StrWrapped("The shortcuts (including 'V' for pasting) are available only when the space window "
-                                         "is hovered or held by mouse button.",
-                                         ImGui::CalcItemWidth());
+                        imgui_StrWrapped(
+                            "The shortcuts (including 'V' for pasting) are available only when the space window "
+                            "is hovered or held by mouse button.",
+                            ImGui::CalcItemWidth());
                         ImGui::Separator();
                         range_operations(true /* display */);
                         ImGui::EndTooltip();
