@@ -110,6 +110,30 @@ bool rule_algo::is_hexagonal_rule(const aniso::ruleT& rule) { //
     return aniso::_subsets::ignore_hex.contains(rule);
 }
 
+// (Not using trailing "reason" parameter, as the clang-format result will be very ugly...)
+static void guarded_block(const bool enable, const auto& fn /*, const char* reason = nullptr*/) {
+    if (!enable) {
+        ImGui::BeginDisabled();
+        ImGui::BeginGroup();
+    }
+    fn();
+    if (!enable) {
+        ImGui::EndGroup();
+        ImGui::EndDisabled();
+    }
+};
+
+static void guarded_block(const bool enable, const char* reason_disabled, const auto& fn) {
+    ::guarded_block(enable, fn);
+    if (!enable) {
+        imgui_ItemTooltip(reason_disabled);
+    }
+};
+
+static int fit_count(int avail, int size, int spacing) { //
+    return std::max(1, (avail + spacing) / (size + spacing));
+}
+
 // `subsetT` (and `mapperT` pair) are highly customizable. However, for sanity there is no plan to
 // support user-defined subsets in the gui part.
 class subset_selector {
@@ -119,8 +143,11 @@ class subset_selector {
         const char* const title;
         const aniso::subsetT* const set;
         const char* const description;
+
         bool selected = false;
-        bool disabled = false; // current & set -> empty.
+
+        bool including = false; // set.includes(current).
+        bool disabled = false;  // current & set -> empty.
     };
 
     using termT_list = std::vector<termT>;
@@ -152,7 +179,11 @@ class subset_selector {
         assert(!current.empty());
 
         for_each_term([&](termT& t) { //
+            t.including = t.set->includes(current);
             t.disabled = !aniso::has_common(*t.set, current);
+
+            assert_implies(t.selected, t.including);
+            assert_implies(t.disabled, !t.selected);
         });
     }
 
@@ -250,162 +281,132 @@ public:
         update_current();
     }
 
-    const aniso::subsetT& select_subset(const sync_point& target) {
-        enum centerE { Selected, Including, Disabled, None }; // TODO: add "equals" relation?
-        auto put_term = [size = square_size()](bool contained, centerE center, const char* title /* Optional */,
-                                               bool interactive) -> bool {
-            ImGui::Dummy(size);
-            const bool hit = interactive && center != Disabled && ImGui::IsItemClicked(ImGuiMouseButton_Left);
+private:
+    enum centerE { Selected, Including, Disabled, None }; // TODO: add "equals" relation?
+    static bool put_term(bool contained, centerE center, const char* title /* Optional */, bool interactive) {
+        const ImVec2 size = square_size();
+        ImGui::Dummy(size);
+        const bool hit = interactive && center != Disabled && ImGui::IsItemClicked(ImGuiMouseButton_Left);
 
-            const ImU32 cent_col = center == Selected    ? IM_COL32(65, 150, 255, 255) // Roughly _ButtonHovered
-                                   : center == Including ? IM_COL32(25, 60, 100, 255)  // Roughly _Button
-                                                         : IM_COL32_BLACK_TRANS;
-            const ImU32 ring_col = contained ? IM_COL32(0, 255, 0, 255)  // Light green
-                                             : IM_COL32(0, 100, 0, 255); // Dull green
-            ImU32 title_col = IM_COL32_WHITE;
-            if (center == Disabled) {
-                title_col = IM_COL32_GREY(150, 255);
-                if (!title) {
-                    title = "-";
-                }
+        const ImU32 cent_col = center == Selected    ? IM_COL32(65, 150, 255, 255) // Roughly _ButtonHovered
+                               : center == Including ? IM_COL32(25, 60, 100, 255)  // Roughly _Button
+                                                     : IM_COL32_BLACK_TRANS;
+        const ImU32 ring_col = contained ? IM_COL32(0, 255, 0, 255)  // Light green
+                                         : IM_COL32(0, 100, 0, 255); // Dull green
+        ImU32 title_col = IM_COL32_WHITE;
+        if (center == Disabled) {
+            title_col = IM_COL32_GREY(150, 255);
+            if (!title) {
+                title = "-";
             }
+        }
 
-            imgui_ItemRectFilled(IM_COL32_BLACK);
-            if (title && (center == None || center == Disabled)) {
-                const ImVec2 min = ImGui::GetItemRectMin();
-                const ImVec2 sz = ImGui::CalcTextSize(title, title + 1);
-                const ImVec2 pos(min.x + floor((size.x - sz.x) / 2),
-                                 min.y + floor((size.y - sz.y) / 2) - 1 /* -1 for better visual effect */);
-                ImGui::GetWindowDrawList()->AddText(pos, title_col, title, title + 1);
-            } else {
-                imgui_ItemRectFilled(cent_col, ImVec2(4, 4));
-            }
-            imgui_ItemRect(ring_col);
-            if (interactive && center != Disabled && ImGui::IsItemHovered()) {
-                imgui_ItemRectFilled(IM_COL32_GREY(255, 45));
-            }
+        imgui_ItemRectFilled(IM_COL32_BLACK);
+        if (title && (center == None || center == Disabled)) {
+            const ImVec2 min = ImGui::GetItemRectMin();
+            const ImVec2 sz = ImGui::CalcTextSize(title, title + 1);
+            const ImVec2 pos(min.x + floor((size.x - sz.x) / 2),
+                             min.y + floor((size.y - sz.y) / 2) - 1 /* -1 for better visual effect */);
+            ImGui::GetWindowDrawList()->AddText(pos, title_col, title, title + 1);
+        } else {
+            imgui_ItemRectFilled(cent_col, ImVec2(4, 4));
+        }
+        imgui_ItemRect(ring_col);
+        if (interactive && center != Disabled && ImGui::IsItemHovered()) {
+            imgui_ItemRectFilled(IM_COL32_GREY(255, 45));
+        }
 
-            return hit;
+        return hit;
+    }
+
+public:
+    // Mainly about `select`.
+    // TODO: some descriptions rely too much on "current rule"...
+    static void about() {
+        auto explain = [&](bool contained, centerE center, const char* desc) {
+            put_term(contained, center, nullptr, false);
+            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+            ImGui::AlignTextToFramePadding(); // `Dummy` does not align automatically.
+            imgui_Str(": ");
+            ImGui::SameLine(0, 0);
+            imgui_Str(desc);
         };
-        auto check = [&](termT& term, bool show_title = false) -> void {
-            if (put_term(term.set->contains(target.rule),
-                         term.selected                 ? Selected
-                         : term.set->includes(current) ? Including
-                         : term.disabled               ? Disabled
-                                                       : None,
-                         show_title ? term.title : nullptr, true)) {
-                assert(!term.disabled);
-                term.selected = !term.selected;
-                update_current();
-            }
 
-            imgui_ItemTooltip(term.description);
-        };
-
-        bool enter_tooltip = false;
-        {
-            ImGui::AlignTextToFramePadding();
-            imgui_StrTooltip("(...)", [&] {
-                auto explain = [&](bool contained, centerE center, const char* desc) {
-                    put_term(contained, center, nullptr, false);
-                    ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                    ImGui::AlignTextToFramePadding(); // `Dummy` does not align automatically.
-                    imgui_Str(": ");
-                    ImGui::SameLine(0, 0);
-                    imgui_Str(desc);
-                };
-
-                imgui_Str(
-                    "The buttons represent subsets of MAP rules. You can select them freely - the program "
-                    "will calculate the intersection of selected subsets (with the entire MAP set), "
-                    "and help you explore rules in it.\n\n"
-                    "The intersection is later called \"working set\". For example, if a rule is said to belong to the "
-                    "working set, it should also belong to every selected subset. If nothing is selected, the "
-                    "working set will be the entire MAP set.");
-                ImGui::Separator();
-                imgui_Str("The ring color reflects the relation between the subset and the current rule:");
-                explain(true, None, "The rule belongs to this subset.");
-                explain(false, None, "The rule does not belong to this subset.");
-                // v (Preserved for reference.)
+        imgui_Str("The buttons represent subsets of MAP rules. You can select them freely - the program "
+                  "will calculate the intersection of selected subsets (with the entire MAP set), "
+                  "and help you explore rules in it.\n\n"
+                  "The intersection is later called \"working set\". For example, if a rule is said to belong to the "
+                  "working set, it should also belong to every selected subset. If nothing is selected, the "
+                  "working set will be the entire MAP set.");
+        ImGui::Separator();
+        imgui_Str("The ring color reflects the relation between the subset and the current rule:");
+        explain(true, None, "The rule belongs to this subset.");
+        explain(false, None, "The rule does not belong to this subset.");
+        // v (Preserved for reference.)
 #if 0
-                // TODO: this is quite user-unfriendly... (Cannot improve unless the subset system is
-                // extended to incorporate value constraints.)
-                explain(Compatible, None,
-                        "The rule does not belong to this subset, but there exist rules in the subset that meet the "
-                        "constraints (locked values) posed by rule-lock pair.\n"
-                        "(Notice that even though some subsets may meet this condition individually, their "
-                        "intersection may still contain no rules that satisfy the constraints.)");
-                explain(Incompatible, None,
-                        "The rule does not belong to this subset, and the constraints cannot be satisfied by any rule "
-                        "in this subset.");
+        // TODO: this is quite user-unfriendly... (Cannot improve unless the subset system is
+        // extended to incorporate value constraints.)
+        explain(Compatible, None,
+                "The rule does not belong to this subset, but there exist rules in the subset that meet the "
+                "constraints (locked values) posed by rule-lock pair.\n"
+                "(Notice that even though some subsets may meet this condition individually, their "
+                "intersection may still contain no rules that satisfy the constraints.)");
+        explain(Incompatible, None,
+                "The rule does not belong to this subset, and the constraints cannot be satisfied by any rule "
+                "in this subset.");
 #endif
 
-                ImGui::Separator();
-                imgui_Str("The center color is irrelevant to the ring color, and reflects the selection details:");
-                explain(false, None, "Not selected.");
-                explain(false, Selected, "Selected.");
-                explain(false, Including,
-                        "Not selected, but the working set already belongs to this subset, so it will behave "
-                        "as if this is selected too.");
-                explain(false, Disabled, "Not selectable. (If selected, the resulting working set will be empty.)");
-            });
-            ImGui::SameLine();
-            imgui_Str("Working set ~");
-            ImGui::SameLine();
-            put_term(current.contains(target.rule), None, nullptr, false);
-            imgui_ItemTooltip("This will be light green if the current rule belongs to every selected "
-                              "subset. See '(...)' for details.");
+        ImGui::Separator();
+        imgui_Str("The center color is irrelevant to the ring color, and reflects the selection details:");
+        explain(false, None, "Not selected.");
+        explain(false, Selected, "Selected.");
+        explain(false, Including,
+                "Not selected, but the working set already belongs to this subset, so it will behave "
+                "as if this is selected too.");
+        explain(false, Disabled, "Not selectable. (If selected, the resulting working set will be empty.)");
+    }
 
-            // TODO: `static` for convenience. This must be refactored when there are to be multiple instances.
-            static bool hide_details = false;
-            const bool hide_details_this_frame = hide_details;
-            if (hide_details_this_frame) {
-                ImGui::BeginDisabled();
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Clear")) {
-                for_each_term([&](termT& t) { t.disabled = t.selected = false; });
-                update_current();
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Match")) {
-                for_each_term([&](termT& t) {
-                    t.disabled = false; // Will be updated by `update_current`.
-                    t.selected = t.set->contains(target.rule);
-                });
-                update_current();
-            }
-            if (!hide_details_this_frame) {
-                imgui_ItemTooltip("Select every subset that contains the current rule.");
-            } else {
-                ImGui::EndDisabled();
-            }
-            ImGui::SameLine();
-            ImGui::Checkbox("Hide details", &hide_details);
-            if (hide_details_this_frame) {
-                ImGui::SameLine();
-                imgui_StrDisabled("(?)");
-                enter_tooltip = ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip);
-            }
+    const aniso::subsetT& get() const {
+        assert(!current.empty());
+        return current;
+    }
 
-            assert_implies(enter_tooltip, hide_details_this_frame);
-            if (hide_details_this_frame && !enter_tooltip) {
-                return current;
-            }
-        }
+    void clear() {
+        for_each_term([&](termT& t) { t.selected = false; });
+        update_current();
+    }
 
-        if (enter_tooltip) {
-            ImGui::BeginTooltip();
-        }
-        ImGui::Separator(); // Needed in both cases (`!enter_tooltip` or `enter_tooltip`).
+    void match(const sync_point& target) {
+        for_each_term([&](termT& t) {
+            t.disabled = false; // Will be updated by `update_current`.
+            t.selected = t.set->contains(target.rule);
+        });
+        update_current();
+    }
+
+    void show_working(const sync_point& target) {
+        imgui_Str("Working set ~");
+        ImGui::SameLine();
+        put_term(current.contains(target.rule), None, nullptr, false);
+        imgui_ItemTooltip("This will be light green if the current rule belongs to every selected "
+                          "subset. See '(...)' for details.");
+    }
+
+    void select(const sync_point& target) {
         if (ImGui::BeginTable("Checklists", 2, ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit)) {
-            auto put_row = [](const char* l_str, const auto& r_logic) {
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                imgui_Str(l_str);
+            auto check = [&](termT& term, bool show_title = false) {
+                if (put_term(term.set->contains(target.rule),
+                             term.selected    ? Selected
+                             : term.including ? Including
+                             : term.disabled  ? Disabled
+                                              : None,
+                             show_title ? term.title : nullptr, true)) {
+                    assert(!term.disabled);
+                    term.selected = !term.selected;
+                    update_current();
+                }
 
-                ImGui::TableNextColumn();
-                r_logic();
+                imgui_ItemTooltip(term.description);
             };
 
             auto checklist = [&](termT_list& terms) {
@@ -418,6 +419,15 @@ public:
                     check(t);
                     ImGui::EndGroup();
                 }
+            };
+
+            auto put_row = [](const char* l_str, const auto& r_logic) {
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                imgui_Str(l_str);
+
+                ImGui::TableNextColumn();
+                r_logic();
             };
 
             put_row("Neighborhood\n/ Misc", [&] {
@@ -446,18 +456,119 @@ public:
 
             ImGui::EndTable();
         }
-        if (enter_tooltip) {
-            ImGui::EndTooltip();
-        }
-
-        assert(!current.empty());
-        return current;
     }
 };
 
-static int fit_count(int avail, int size, int spacing) { //
-    return std::max(1, (avail + spacing) / (size + spacing));
-}
+class mask_selector {
+    enum maskE { Zero, Identity, Backup, Custom };
+
+    struct termT {
+        const char* label;
+        const char* desc;
+        char chr_0, chr_1;
+    };
+    static constexpr termT mask_terms[]{
+        {"Zero",
+         "The all-zero rule. (Every cell will become 0, regardless of its neighbors.)\n\n"
+         "The distance to this rule are equal to the number of groups that returns 1, and the masked "
+         "values can directly represent the actual values of the rule:\n"
+         "Different:'1' ~ the cell will become 1 in this case.\n"
+         "Same:'0' ~ the cell will become 0 in this case.",
+         '0', '1'},
+
+        {"Identity",
+         "The rule that preserves the values in all cases. (Every cell will stay unchanged, "
+         "regardless of its neighbors.)\n\n"
+         "Masked value:\n"
+         "Different:'f' ~ the cell will \"flip\" in this case.\n"
+         "Same:'.' ~ the cell will stay unchanged in this case.",
+         '.', 'f'},
+
+        {"Backup",
+         "A rule calculated by the program that belongs to the working set. Depending on what subsets "
+         "are selected, it may be the same as zero-rule, or identity-rule, or just an ordinary rule in the set.\n"
+         "This is provided in case there are no other rules known to belong to the working set. It will not "
+         "change unless the working set is updated.\n\n"
+         "Masked value: different:'i', same:'o'.",
+         'o', 'i'},
+
+        {"Custom",
+         "You can click '<< Cur' to set this to the current rule.\n\n"
+         "This is initially the Game of Life rule, and will not change until you click '<< Cur' next time. "
+         "So for example, if you want to get some random rules with a small distance to the current rule, you "
+         "can do '<< Cur' and generate random rules with a low distance in the 'Random' window.\n\n"
+         "Masked value: different:'i', same:'o'.",
+         'o', 'i'}};
+
+    aniso::maskT mask_custom{aniso::game_of_life()};
+    maskE mask_tag = Zero;
+
+public:
+    // TODO: improve...
+    static void about() {
+        imgui_Str(
+            "The working set divides all cases into different groups. For any two rules in the working set, "
+            "they must have either all-the-same or all-the-different values in each group.\n\n"
+            "A mask is an arbitrary rule in the working set to compare with other rules (XOR masking). The values "
+            "of the current rule are viewed through the mask in the random-access section. The 'Zero' and 'Identity' "
+            "rules are special in the sense that the values masked by them have natural interpretations.\n\n"
+            "When talking about the \"distance\" between two rules (in the working set), it means the number of "
+            "groups where they have different values.\n\n"
+            "(For more details see the 'Subset, mask ...' section in 'Documents'.)");
+    }
+
+    // `subset` must not be a temporary.
+    const aniso::maskT& select(const aniso::subsetT& subset, const sync_point& sync) {
+        const aniso::maskT* const mask_ptrs[]{&aniso::mask_zero, &aniso::mask_identity, &subset.get_mask(),
+                                              &mask_custom};
+
+        if (!subset.contains(*mask_ptrs[mask_tag])) {
+            assert(mask_tag != Backup);
+            mask_tag = Backup;
+        }
+
+        imgui_Str("Mask ~");
+        for (const maskE m : {Zero, Identity, Backup, Custom}) {
+            const bool m_avail = subset.contains(*mask_ptrs[m]);
+
+            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+            guarded_block(m_avail, [&] { imgui_RadioButton(mask_terms[m].label, &mask_tag, m); });
+
+            imgui_ItemTooltip([&] {
+                if (!m_avail) {
+                    imgui_Str("This rule does not belong to the working set.");
+                    ImGui::Separator();
+                }
+
+                imgui_Str(mask_terms[m].desc);
+                previewer::preview(-1, previewer::configT::_220_160, *mask_ptrs[m], false);
+            });
+
+            if (m == Custom) {
+                ImGui::SameLine();
+                const int radio_id = ImGui::GetItemID();
+                // TODO: this can be provided outside...
+                guarded_block(subset.contains(sync.rule), "The current rule does not belong to the working set.", [&] {
+                    if (ImGui::Button("<< Cur")) {
+                        mask_custom = {sync.rule};
+                        mask_tag = Custom;
+
+                        // It will be strange to call a shortcut function here.
+                        // shortcuts::highlight(radio_id);
+                        ImGui::NavHighlightActivated(radio_id);
+                    }
+                });
+            }
+        }
+
+        assert(subset.contains(*mask_ptrs[mask_tag]));
+        return *mask_ptrs[mask_tag];
+    }
+
+    std::array<char, 2> masked_char() const { //
+        return {mask_terms[mask_tag].chr_0, mask_terms[mask_tag].chr_1};
+    }
+};
 
 struct page_adapter {
     int page_size = 6, perline = 3;
@@ -523,142 +634,56 @@ struct page_adapter {
     }
 };
 
-// (Not using trailing "reason" parameter, as the clang-format result will be very ugly...)
-static void guarded_block(const bool enable, const auto& fn /*, const char* reason = nullptr*/) {
-    if (!enable) {
-        ImGui::BeginDisabled();
-        ImGui::BeginGroup();
-    }
-    fn();
-    if (!enable) {
-        ImGui::EndGroup();
-        ImGui::EndDisabled();
-    }
-};
-
-static void guarded_block(const bool enable, const char* reason_disabled, const auto& fn) {
-    ::guarded_block(enable, fn);
-    if (!enable) {
-        imgui_ItemTooltip(reason_disabled);
-    }
-};
-
 // TODO: rename some variables for better clarity. (e.g. `subset` -> `working_set`)
 void edit_rule(sync_point& sync) {
     // Select subsets.
-    static subset_selector selector;
-    const aniso::subsetT& subset = selector.select_subset(sync);
-    assert(!subset.empty());
+    static subset_selector select_set;
+    {
+        ImGui::AlignTextToFramePadding();
+        imgui_StrTooltip("(...)", subset_selector::about);
+        ImGui::SameLine();
+        select_set.show_working(sync);
 
+        static bool hide_details = false;
+        const bool hide_details_this_frame = hide_details;
+        ImGui::BeginDisabled(hide_details_this_frame);
+        ImGui::SameLine();
+        if (ImGui::Button("Clear")) {
+            select_set.clear();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Match")) {
+            select_set.match(sync);
+        }
+        if (!hide_details_this_frame) {
+            imgui_ItemTooltip("Select every subset that contains the current rule.");
+        }
+        ImGui::EndDisabled();
+
+        ImGui::SameLine();
+        ImGui::Checkbox("Hide details", &hide_details);
+        if (hide_details_this_frame) {
+            ImGui::SameLine();
+            imgui_StrTooltip("(?)", [&] { select_set.select(sync); });
+        }
+
+        ImGui::Separator();
+        if (!hide_details_this_frame) {
+            select_set.select(sync);
+            ImGui::Separator();
+        }
+    }
+    const aniso::subsetT& subset = select_set.get();
+    assert(!subset.empty());
     const bool contained = subset.contains(sync.rule);
 
-    ImGui::Separator();
-
     // Select mask.
-    char chr_0 = '0', chr_1 = '1';
-    const aniso::maskT& mask = [&]() -> const aniso::maskT& {
-        // TODO: improve...
-        const char* const about_mask =
-            "The working set divides all cases into different groups. For any two rules in the working set, "
-            "they must have either all-the-same or all-the-different values in each group.\n\n"
-            "A mask is an arbitrary rule in the working set to compare with other rules (XOR masking). The values "
-            "of the current rule are viewed through the mask in the random-access section. The 'Zero' and 'Identity' "
-            "masks are special in the sense that the values masked by them have natural interpretations.\n\n"
-            "When talking about the \"distance\" between two rules (in the working set), it means the number of "
-            "groups where they have different values.\n\n"
-            "(For more details see the 'Subset, mask ...' section in 'Documents'.)";
-
-        static aniso::maskT mask_custom{aniso::game_of_life()};
-
-        enum maskE { Zero, Identity, Backup, Custom };
-        struct termT {
-            const char* label;
-            const char* desc;
-            char chr_0, chr_1;
-        };
-        static const termT mask_terms[]{
-            {"Zero",
-             "The all-zero rule. (Every cell will become 0, regardless of its neighbors.)\n\n"
-             "The distance to this rule are equal to the number of groups that returns 1, and the masked "
-             "values can directly represent the actual values of the rule:\n"
-             "Different:'1' ~ the cell will become 1 in this case.\n"
-             "Same:'0' ~ the cell will become 0 in this case.",
-             '0', '1'},
-
-            {"Identity",
-             "The rule that preserves the values in all cases. (Every cell will stay unchanged, "
-             "regardless of its neighbors.)\n\n"
-             "Masked value:\n"
-             "Different:'f' ~ the cell will \"flip\" in this case.\n"
-             "Same:'.' ~ the cell will stay unchanged in this case.",
-             '.', 'f'},
-
-            {"Backup",
-             "A rule calculated by the program that belongs to the working set. Depending on what subsets "
-             "are selected, it may be the same as zero-rule, or identity-rule, or just an ordinary rule in the set.\n"
-             "This is provided in case there are no other rules known to belong to the working set. It will not "
-             "change unless the working set is updated.\n\n"
-             "Masked value: different:'i', same:'o'.",
-             'o', 'i'},
-
-            {"Custom",
-             "You can click '<< Cur' to set this to the current rule.\n\n"
-             "This is initially the Game of Life rule, and will not change until you click '<< Cur' next time. "
-             "So for example, if you want to get some random rules with a small distance to the current rule, you "
-             "can do '<< Cur' and generate random rules with a low distance in the 'Random' window.\n\n"
-             "Masked value: different:'i', same:'o'.",
-             'o', 'i'}};
-
-        static maskE mask_tag = Zero;
-        const aniso::maskT* const mask_ptrs[]{&aniso::mask_zero, &aniso::mask_identity, &subset.get_mask(),
-                                              &mask_custom};
-
-        if (!subset.contains(*mask_ptrs[mask_tag])) {
-            assert(mask_tag != Backup);
-            mask_tag = Backup;
-        }
-
-        ImGui::AlignTextToFramePadding();
-        imgui_StrTooltip("(...)", about_mask);
-        ImGui::SameLine();
-        imgui_Str("Mask ~");
-        for (const maskE m : {Zero, Identity, Backup, Custom}) {
-            const bool m_avail = subset.contains(*mask_ptrs[m]);
-
-            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-            guarded_block(m_avail, [&] { imgui_RadioButton(mask_terms[m].label, &mask_tag, m); });
-
-            imgui_ItemTooltip([&] {
-                if (!m_avail) {
-                    imgui_Str("This rule does not belong to the working set.");
-                    ImGui::Separator();
-                }
-
-                imgui_Str(mask_terms[m].desc);
-                previewer::preview(-1, previewer::configT::_220_160, *mask_ptrs[m], false);
-            });
-
-            if (m == Custom) {
-                ImGui::SameLine();
-                const int radio_id = ImGui::GetItemID();
-                guarded_block(contained, "The current rule does not belong to the working set.", [&] {
-                    if (ImGui::Button("<< Cur")) {
-                        mask_custom = {sync.rule};
-                        mask_tag = Custom;
-
-                        // It will be strange to call a shortcut function here.
-                        // shortcuts::highlight(radio_id);
-                        ImGui::NavHighlightActivated(radio_id);
-                    }
-                });
-            }
-        }
-
-        chr_0 = mask_terms[mask_tag].chr_0;
-        chr_1 = mask_terms[mask_tag].chr_1;
-        assert(subset.contains(*mask_ptrs[mask_tag]));
-        return *mask_ptrs[mask_tag];
-    }();
+    static mask_selector select_mask;
+    ImGui::AlignTextToFramePadding();
+    imgui_StrTooltip("(...)", mask_selector::about);
+    ImGui::SameLine();
+    const aniso::maskT& mask = select_mask.select(subset, sync);
+    const auto [chr_0, chr_1] = select_mask.masked_char();
 
     ImGui::Separator();
 
