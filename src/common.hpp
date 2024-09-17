@@ -217,6 +217,7 @@ inline bool begin_popup_for_item(bool open, const char* str_id = nullptr) {
 }
 
 // Looks like a common popup, and Will appear like a menu (but with more consistent closing behavior).
+// (Not meant to be used recursively; should end with `ImGui::EndPopup` instead of `EndMenu`.)
 inline bool begin_menu_for_item() {
     const ImGuiID id = ImGui::GetItemID();
     assert(id != 0); // Mainly designed for buttons.
