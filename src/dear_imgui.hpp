@@ -10,15 +10,21 @@
 // calculated at compile time, especially in debug mode.
 consteval ImU32 IM_COL32_GREY(ImU8 v, ImU8 alpha) { return IM_COL32(v, v, v, alpha); }
 
+inline ImRect imgui_GetItemRect() { return GImGui->LastItemData.Rect; }
+
+inline ImRect imgui_GetWindowRect() {
+    const ImVec2 window_min = ImGui::GetWindowPos(), window_max = window_min + ImGui::GetWindowSize();
+    return {window_min, window_max};
+}
+
+// These names are somewhat misleading after the introduction of `imgui_GetItemRect`...
 inline void imgui_ItemRect(ImU32 col, ImVec2 off_min = {0, 0}) {
-    const ImVec2 pos_min = ImGui::GetItemRectMin();
-    const ImVec2 pos_max = ImGui::GetItemRectMax();
+    const auto [pos_min, pos_max] = GImGui->LastItemData.Rect;
     ImGui::GetWindowDrawList()->AddRect(pos_min + off_min, pos_max - off_min, col);
 }
 
 inline void imgui_ItemRectFilled(ImU32 col, ImVec2 off_min = {0, 0}) {
-    const ImVec2 pos_min = ImGui::GetItemRectMin();
-    const ImVec2 pos_max = ImGui::GetItemRectMax();
+    const auto [pos_min, pos_max] = GImGui->LastItemData.Rect;
     ImGui::GetWindowDrawList()->AddRectFilled(pos_min + off_min, pos_max - off_min, col);
 }
 

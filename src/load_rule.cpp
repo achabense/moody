@@ -486,8 +486,8 @@ private:
             const float w = [&] {
                 float w = ImGui::GetFrameHeight() + imgui_ItemInnerSpacingX() + ImGui::CalcTextSize("Preview").x;
                 if (preview_mode) {
-                    w += 2 * imgui_ItemSpacingX() + 2 * ImGui::GetStyle().FramePadding.x +
-                         ImGui::CalcTextSize("Settings(?)").x;
+                    w +=
+                        imgui_ItemSpacingX() + 2 * ImGui::GetStyle().FramePadding.x + ImGui::CalcTextSize("Settings").x;
                 }
                 return w;
             }();
@@ -676,10 +676,10 @@ void load_file(sync_point& out) {
             nav.refresh_if_valid();
         }
         ImGui::SameLine();
-        const bool clicked = ImGui::SmallButton("Recent");
+        ImGui::SmallButton("Recent");
         // `BeginPopup` will consume the settings, even if not opened.
         ImGui::SetNextWindowSize({300, 200}, ImGuiCond_Always);
-        if (begin_popup_for_item(clicked)) {
+        if (begin_menu_for_item()) {
             nav.select_history();
             ImGui::EndPopup();
         }
@@ -699,9 +699,9 @@ void load_file(sync_point& out) {
             // Won't reset scroll.
         }
         ImGui::SameLine();
-        const bool clicked = ImGui::SmallButton("Select");
+        ImGui::SmallButton("Select");
         ImGui::SetNextWindowSize({300, 200}, ImGuiCond_Always);
-        if (begin_popup_for_item(clicked)) {
+        if (begin_menu_for_item()) {
             std::optional<pathT> sel = std::nullopt;
             nav.select_file(&*path, sel);
             if (sel && try_load(*sel)) {
@@ -772,8 +772,8 @@ void load_doc(sync_point& out) {
     } else {
         const bool close = ImGui::SmallButton("Close");
         ImGui::SameLine();
-        const bool clicked = ImGui::SmallButton("Select");
-        if (begin_popup_for_item(clicked)) {
+        ImGui::SmallButton("Select");
+        if (begin_menu_for_item()) {
             select();
             ImGui::EndPopup();
         }

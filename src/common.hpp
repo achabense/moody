@@ -216,12 +216,47 @@ inline bool begin_popup_for_item(bool open, const char* str_id = nullptr) {
                                        ImGuiWindowFlags_NoSavedSettings);
 }
 
+// Looks like a common popup, and Will appear like a menu (but with more consistent closing behavior).
+inline bool begin_menu_for_item() {
+    const ImGuiID id = ImGui::GetItemID();
+    assert(id != 0); // Mainly designed for buttons.
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
+        ImGui::OpenPopupEx(id, ImGuiPopupFlags_NoReopen);
+    }
+
+    const ImRect item_rect = imgui_GetItemRect();
+    ImGui::SetNextWindowPos(item_rect.GetTR(), ImGuiCond_Appearing); // Like a menu.
+
+    // Using modal popup for better closing behavior, while mimicking the visual style of normal popups.
+    // https://github.com/ocornut/imgui/issues/2491
+    ImGui::PushStyleColor(ImGuiCol_ModalWindowDimBg, IM_COL32_BLACK_TRANS);
+    const bool ret = ImGui::BeginPopupEx(id, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar |
+                                                 ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_Modal);
+    ImGui::PopStyleColor();
+
+    if (ret) {
+        ImGui::NavHighlightActivated(id);
+
+        // Workaround to mimic normal popup behavior. (Found when checking `RenderWindowDecorations`.)
+        ImGuiWindow* window = ImGui::GetCurrentWindow();
+        window->RootWindowForTitleBarHighlight = window->ParentWindow;
+
+        const ImVec2 mouse_pos = ImGui::GetMousePos();
+        const ImVec2 pad = square_size() * 3;
+        if (!item_rect.ContainsWithPad(mouse_pos, pad) && !imgui_GetWindowRect().ContainsWithPad(mouse_pos, pad)) {
+            ImGui::CloseCurrentPopup();
+        }
+    }
+    return ret;
+}
+
 // !!TODO: currently under-documented...
+// TODO: whether to preserve the binding when the window is blocked by a popup?
 class sequence {
     static bool button_with_shortcut(const char* label, ImGuiKey shortcut = ImGuiKey_None) {
         bool ret = ImGui::Button(label);
         if (shortcut != ImGuiKey_None && !imgui_TestItemFlag(ImGuiItemFlags_Disabled)) {
-            imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_ButtonActive, 1.0f));
+            imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_ButtonActive));
             if (!ret && shortcuts::item_shortcut(shortcut)) {
                 ret = true;
             }
@@ -496,22 +531,11 @@ public:
         ImVec2 size_imvec() const { return ImVec2(size_terms[size].w, size_terms[size].h); }
 
         void set(const char* label) {
-            const bool clicked = ImGui::Button(label);
-            if (begin_popup_for_item(clicked)) {
+            ImGui::Button(label);
+            if (begin_menu_for_item()) {
                 _set();
                 ImGui::EndPopup();
             }
-            ImGui::SameLine();
-            imgui_StrTooltip("(?)", [&] {
-                imgui_Str("Press 'T' to restart all preview windows.\n\n"
-                          "For individual windows:\n"
-                          "Right-click to restart, left-click and hold to pause.\n"
-                          "'Ctrl + right-click' to copy the rule.");
-                ImGui::Separator();
-                _set();
-            });
-            // TODO: 'ctrl + right-click' is an important convenience improvement.
-            // Should record this feature in 'Documents' as well...
         }
     };
 

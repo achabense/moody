@@ -465,14 +465,17 @@ class runnerT {
         }
 
         void set_ctrl(const auto& fn) { fn(m_ctrl); }
-        void set_init(const auto& fn) {
+        bool set_init(const auto& fn) {
             const initT old_init = m_init;
-            if (fn(m_init) || old_init != m_init) {
+            if (fn(m_init, m_ctrl.pause) || old_init != m_init) {
                 const bool restarted = resize(m_torus.size()); // In case the background is resized.
                 if (!restarted) {
                     restart();
                 }
+                m_ctrl.pause = true;
+                return true;
             }
+            return false;
         }
 
         void end_frame() {
@@ -568,26 +571,19 @@ public:
             return enable_shortcuts && shortcuts::test(key, repeat);
         };
 
-        auto set_init_state = [&](const bool tooltip_mode) {
-            if (!tooltip_mode) {
-                m_sel.reset();
-                m_paste.reset();
-            }
+        auto set_init_state = [&]() {
+            // !!TODO: the control flow is awkwardly convoluted...
+            const bool restarted = m_torus.set_init([&](initT& init, bool& pause) {
+                bool force_restart = false;
 
-            m_torus.set_init([&](initT& init) {
-                bool force_restart = !tooltip_mode && ImGui::IsWindowAppearing();
-
-                if (!tooltip_mode) {
-                    // m_torus.pause_for_this_frame();
-
-                    ImGui::Button("Click and hold to test effect");
-                    if (!ImGui::IsItemActive()) {
-                        m_torus.pause_for_this_frame();
-                    }
-                    if (ImGui::IsItemDeactivated()) {
-                        force_restart = true;
-                    }
+                if (ImGui::Button("Restart")) {
+                    force_restart = true;
                 }
+                ImGui::SameLine();
+                ImGui::Checkbox("Pause", &pause);
+                ImGui::SameLine();
+                // !!TODO: record the resetting behavior here.
+                imgui_StrTooltip("(?)", "!!TODO ('restart' will...)");
 
                 ImGui::PushItemWidth(item_width);
                 imgui_StepSliderInt("Seed", &init.seed, 0, 29);
@@ -666,11 +662,12 @@ public:
                     imgui_ItemRect(IM_COL32_GREY(160, 255));
 
                     static aniso::tileT init, curr;
-                    // `rule_updated` will be true when the function works in the tooltip, while the user changes the
-                    // current rule with a shortcut.
-                    if (rule_changed || ImGui::IsWindowAppearing() || init != demo) {
+                    static bool skip_next = false;
+                    if (rule_changed // Defensive, won't actually happen now.
+                        || ImGui::IsWindowAppearing() || init != demo) {
                         init = aniso::tileT(demo);
                         curr = aniso::tileT(demo);
+                        skip_next = true;
                     }
 
                     ImGui::SameLine(0, 0);
@@ -680,23 +677,25 @@ public:
                     imgui_ItemRect(IM_COL32_GREY(160, 255));
 
                     static global_timer::timerT timer{200};
-                    if (timer.test()) {
+                    if (timer.test() && !std::exchange(skip_next, false)) {
                         curr.run_torus(sync.rule);
                     }
                 }
 
                 if (resize && init.background.size() != *resize) {
-                    assert(!tooltip_mode);
                     aniso::tileT resized(*resize); // Already 0-filled.
                     const aniso::vecT common = aniso::min(resized.size(), init.background.size());
                     aniso::copy(resized.data().clip({{}, common}), init.background.data().clip({{}, common}));
                     init.background.swap(resized);
                 }
 
-                assert_implies(tooltip_mode, !force_restart);
-                assert_implies(!tooltip_mode, !m_sel && !m_paste);
                 return force_restart;
             });
+
+            if (restarted) {
+                m_sel.reset();
+                m_paste.reset();
+            }
         };
 
         auto input_size = [&] {
@@ -827,13 +826,12 @@ public:
         ImGui::EndGroup();
         ImGui::SameLine(floor(1.5 * item_width));
         ImGui::BeginGroup();
-        if (begin_popup_for_item(ImGui::Button("Init state"))) {
-            set_init_state(false /*!tooltip-mode*/);
+        ImGui::Button("Init state");
+        if (begin_menu_for_item()) {
+            set_init_state();
             ImGui::EndPopup();
         }
         quick_info("< Seed, density and area.");
-        ImGui::SameLine();
-        imgui_StrTooltip("(?)", [&] { set_init_state(true /*tooltip-mode*/); });
 
         ImGui::Spacing(); // To align with the separator.
 
@@ -883,7 +881,7 @@ public:
             ImGui::Text("  Selected:%d*%d", m_sel->width(), m_sel->height());
             if (!m_sel->active) {
                 ImGui::SameLine();
-                if (ImGui::Button("Drop##S")) {
+                if (ImGui::Button("Drop##S")) { // TODO: right-click to clear?
                     m_sel.reset();
                 }
             }
@@ -896,7 +894,7 @@ public:
             const aniso::vecT size = m_paste->size();
             ImGui::Text("  Paste:%d*%d", size.x, size.y);
             ImGui::SameLine();
-            if (ImGui::Button("Drop##P")) {
+            if (ImGui::Button("Drop##P")) { // TODO: right-click to clear?
                 m_paste.reset();
             }
         }
@@ -1422,6 +1420,14 @@ struct global_config {
 };
 
 void previewer::configT::_set() {
+    // TODO: 'ctrl + right-click' is an important convenience improvement.
+    // Should record this feature in 'Documents' as well...
+    imgui_StrTooltip("(...)", "Press 'T' to restart all preview windows.\n\n"
+                              "For individual windows:\n"
+                              "Right-click to restart, left-click and hold to pause.\n"
+                              "'Ctrl + right-click' to copy the rule.");
+    ImGui::Separator();
+
     ImGui::AlignTextToFramePadding();
     imgui_Str("Size ~");
     for (int i = 0; i < Count; ++i) {
@@ -1435,6 +1441,9 @@ void previewer::configT::_set() {
 
     // TODO: whether to enable shortcuts in this case?
     // (These shortcuts won't conflict with main-canvas's.)
+    // (Update: currently not working when shown in modal popup.)
+    // Modal popup will always set `WantCaptureKeyboard`, so `shortcuts::keys_avail` will become false.
+    // https://github.com/ocornut/imgui/issues/744
     ImGui::SetNextItemWidth(item_width);
     // imgui_StepSliderShortcuts::set(ImGuiKey_1, ImGuiKey_2);
     imgui_StepSliderInt("Step", &step, 1, 16);
@@ -1447,6 +1456,7 @@ void previewer::configT::_set() {
     imgui_StrTooltip("(?)", "This setting is shared by all preview windows in different places.");
 }
 
+// TODO: is skip-next behavior needed for preview windows?
 void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT& rule, bool interactive,
                          ImU32& border_col) {
     struct termT {

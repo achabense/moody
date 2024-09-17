@@ -644,39 +644,41 @@ void edit_rule(sync_point& sync) {
         ImGui::SameLine();
         select_set.show_working(sync);
 
-        static bool hide_details = false;
-        const bool hide_details_this_frame = hide_details;
-        ImGui::BeginDisabled(hide_details_this_frame);
+        static bool collapse = false;
         ImGui::SameLine();
-        if (ImGui::Button("Clear")) {
-            select_set.clear();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Match")) {
-            select_set.match(sync);
-        }
-        if (!hide_details_this_frame) {
-            imgui_ItemTooltip("Select every subset that contains the current rule.");
-        }
-        ImGui::EndDisabled();
+        ImGui::Checkbox("Collapse", &collapse);
 
-        ImGui::SameLine();
-        ImGui::Checkbox("Hide details", &hide_details);
-        if (hide_details_this_frame) {
+        auto select = [&] {
+            if (ImGui::Button("Clear")) {
+                select_set.clear();
+            }
             ImGui::SameLine();
-            imgui_StrTooltip("(?)", [&] { select_set.select(sync); });
-        }
+            if (ImGui::Button("Match")) {
+                select_set.match(sync);
+            }
+            imgui_ItemTooltip("Select every subset that contains the current rule.");
 
-        ImGui::Separator();
-        if (!hide_details_this_frame) {
-            select_set.select(sync);
             ImGui::Separator();
+            select_set.select(sync);
+        };
+
+        if (!collapse) {
+            ImGui::SameLine();
+            select();
+        } else {
+            ImGui::SameLine();
+            ImGui::Button("Select");
+            if (begin_menu_for_item()) {
+                select();
+                ImGui::EndPopup();
+            }
         }
     }
     const aniso::subsetT& subset = select_set.get();
     assert(!subset.empty());
     const bool contained = subset.contains(sync.rule);
 
+    ImGui::Separator();
     // Select mask.
     static mask_selector select_mask;
     ImGui::AlignTextToFramePadding();
