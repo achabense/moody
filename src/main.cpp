@@ -284,9 +284,7 @@ int main(int, char**) {
         screen_textures::begin_frame();
 
         // Make collapsed windows obvious to see. Set outside of `frame_main` for convenience.
-        // TODO: the collapse and close buttons always take ImGuiCol_ButtonXXX (bright-blue) and
-        // look strange in the reddish background.
-        ImGui::PushStyleColor(ImGuiCol_TitleBgCollapsed, IM_COL32(180, 0, 120, 128));
+        ImGui::PushStyleColor(ImGuiCol_TitleBgCollapsed, ImGui::GetColorU32(ImGuiCol_TitleBgActive, 0.8));
         frame_main();
         ImGui::PopStyleColor();
 

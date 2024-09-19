@@ -135,20 +135,6 @@ struct shortcuts {
         return false;
     }
 
-#if 0
-    // (Outdated)
-    // TODO: reconsider the shortcut designs in the program.
-    // Currently only `sequence::seq` use this. 'W' uses equivalent `SetNextWindowFocus`,
-    // and the space window's shortcuts don't do the focus.
-    static bool focus_window(ImGuiWindow* window = 0) {
-        if (!window) {
-            window = ImGui::GetCurrentWindow();
-        }
-        ImGui::FocusWindow(window);
-        return true;
-    }
-#endif
-
     // ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows | ImGuiFocusedFlags_NoPopupHierarchy)
     static bool window_focused() {
         if (const ImGuiWindow* focused = GImGui->NavWindow) {
@@ -221,12 +207,12 @@ inline bool begin_popup_for_item(bool open, const char* str_id = nullptr) {
 inline bool begin_menu_for_item() {
     const ImGuiID id = ImGui::GetItemID();
     assert(id != 0); // Mainly designed for buttons.
+    const ImRect item_rect = imgui_GetItemRect();
+
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
         ImGui::OpenPopupEx(id, ImGuiPopupFlags_NoReopen);
+        ImGui::SetNextWindowPos(item_rect.GetTR(), ImGuiCond_Appearing); // Like a menu.
     }
-
-    const ImRect item_rect = imgui_GetItemRect();
-    ImGui::SetNextWindowPos(item_rect.GetTR(), ImGuiCond_Appearing); // Like a menu.
 
     // Using modal popup for better closing behavior, while mimicking the visual style of normal popups.
     // https://github.com/ocornut/imgui/issues/2491
@@ -243,8 +229,9 @@ inline bool begin_menu_for_item() {
         window->RootWindowForTitleBarHighlight = window->ParentWindow;
 
         const ImVec2 mouse_pos = ImGui::GetMousePos();
-        const ImVec2 pad = square_size() * 3;
-        if (!item_rect.ContainsWithPad(mouse_pos, pad) && !imgui_GetWindowRect().ContainsWithPad(mouse_pos, pad)) {
+        const ImVec2 pad = square_size();
+        if (!item_rect.ContainsWithPad(mouse_pos, pad * 2) &&
+            !imgui_GetWindowRect().ContainsWithPad(mouse_pos, pad * 3)) {
             ImGui::CloseCurrentPopup();
         }
     }
@@ -252,19 +239,7 @@ inline bool begin_menu_for_item() {
 }
 
 // !!TODO: currently under-documented...
-// TODO: whether to preserve the binding when the window is blocked by a popup?
 class sequence {
-    static bool button_with_shortcut(const char* label, ImGuiKey shortcut = ImGuiKey_None) {
-        bool ret = ImGui::Button(label);
-        if (shortcut != ImGuiKey_None && !imgui_TestItemFlag(ImGuiItemFlags_Disabled)) {
-            imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_ButtonActive));
-            if (!ret && shortcuts::item_shortcut(shortcut)) {
-                ret = true;
-            }
-        }
-        return ret;
-    }
-
     enum tagE { None, First, Prev, Next, Last };
 
     inline static ImGuiID bound_id = 0;
@@ -293,22 +268,32 @@ class sequence {
         const ImGuiID id_prev = ImGui::GetID(label_prev);
         assert(id_prev != 0);
 
-        // If !bound due to !window_focused or pair_disabled, `last_valid_frame` will not be updated,
-        // and `bound_id` will become 0 at next frame.
         const bool window_focused = shortcuts::window_focused();
         const bool pair_disabled = imgui_TestItemFlag(ImGuiItemFlags_Disabled);
-        const bool bound = bound_id == id_prev && window_focused && !pair_disabled;
-        if (bound) {
+        // The binding will be preserved if the window is blocked by its popups.
+        // (Note: popups from other windows will still disable the binding.)
+        const bool shortcut_avail =
+            bound_id == id_prev && !pair_disabled &&
+            ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows /*Including popup hierarchy*/);
+        if (shortcut_avail) { // Otherwise, `bound_id` will become 0 at next frame.
             last_valid_frame = ImGui::GetFrameCount();
         }
+        auto button_with_shortcut = [shortcut_avail, window_focused](const char* label, ImGuiKey shortcut) {
+            bool ret = ImGui::Button(label);
+            if (shortcut_avail) {
+                imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_ButtonActive));
+                if (!ret && window_focused && shortcuts::item_shortcut(shortcut)) {
+                    ret = true;
+                }
+            }
+            return ret;
+        };
 
-        const ImGuiKey shortcut_prev = bound ? ImGuiKey_LeftArrow : ImGuiKey_None;
-        const ImGuiKey shortcut_next = bound ? ImGuiKey_RightArrow : ImGuiKey_None;
-        if (button_with_shortcut(label_prev, shortcut_prev)) {
+        if (button_with_shortcut(label_prev, ImGuiKey_LeftArrow)) {
             tag = Prev;
         }
         ImGui::SameLine(0, 0), imgui_Str("/"), ImGui::SameLine(0, 0);
-        if (button_with_shortcut(label_next, shortcut_next)) {
+        if (button_with_shortcut(label_next, ImGuiKey_RightArrow)) {
             tag = Next;
         }
         if (disable) {

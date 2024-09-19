@@ -126,7 +126,7 @@ namespace aniso {
         }
 
     public:
-        // ~ "user-declared" to avoid implicit moving (to avoid `m_data` being emptied):
+        // ~ "user-declared" to avoid implicit moving (to avoid `m_groups` being emptied):
         partitionT(const partitionT&) = default;
         partitionT& operator=(const partitionT&) = default;
 

@@ -461,7 +461,7 @@ public:
 };
 
 class mask_selector {
-    enum maskE { Zero, Identity, Backup, Custom };
+    enum maskE { Zero, Identity, Fallback, Custom };
 
     struct termT {
         const char* label;
@@ -471,7 +471,7 @@ class mask_selector {
     static constexpr termT mask_terms[]{
         {"Zero",
          "The all-zero rule. (Every cell will become 0, regardless of its neighbors.)\n\n"
-         "The distance to this rule are equal to the number of groups that returns 1, and the masked "
+         "The distance to this rule is equal to the number of groups that returns 1, and the masked "
          "values can directly represent the actual values of the rule:\n"
          "Different:'1' ~ the cell will become 1 in this case.\n"
          "Same:'0' ~ the cell will become 0 in this case.",
@@ -485,7 +485,7 @@ class mask_selector {
          "Same:'.' ~ the cell will stay unchanged in this case.",
          '.', 'f'},
 
-        {"Backup",
+        {"Fallback",
          "A rule calculated by the program that belongs to the working set. Depending on what subsets "
          "are selected, it may be the same as zero-rule, or identity-rule, or just an ordinary rule in the set.\n"
          "This is provided in case there are no other rules known to belong to the working set. It will not "
@@ -524,13 +524,13 @@ public:
                                               &mask_custom};
 
         if (!subset.contains(*mask_ptrs[mask_tag])) {
-            assert(mask_tag != Backup);
-            mask_tag = Backup;
+            assert(mask_tag != Fallback);
+            mask_tag = Fallback;
         }
 
         ImGui::AlignTextToFramePadding();
         imgui_Str("Mask ~");
-        for (const maskE m : {Zero, Identity, Backup, Custom}) {
+        for (const maskE m : {Zero, Identity, Fallback, Custom}) {
             const bool m_avail = subset.contains(*mask_ptrs[m]);
 
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
@@ -1095,6 +1095,27 @@ void edit_rule(sync_point& sync) {
                     }
                     return rule;
                 };
+                const auto show_group = [&] {
+                    imgui_Str("Left-click to flip the values.");
+                    ImGui::Separator();
+                    ImGui::Text("Group size: %d", (int)group.size());
+                    const int max_to_show = 48;
+                    for (int x = 0; const aniso::codeT code : group) {
+                        if (x++ % 8 != 0) {
+                            ImGui::SameLine();
+                        }
+                        code_image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
+                        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                        align_text(ImGui::GetItemRectSize().y);
+                        imgui_Str(labels_normal[masked[code]]);
+                        if (x == max_to_show) {
+                            break;
+                        }
+                    }
+                    if (group.size() > max_to_show) {
+                        imgui_Str("...");
+                    }
+                };
 
                 // TODO: better color... (will be ugly if using green colors...)
                 // _ButtonHovered: ImVec4(0.26f, 0.59f, 0.98f, 1.00f)
@@ -1115,8 +1136,7 @@ void edit_rule(sync_point& sync) {
                     sync.set(get_adjacent_rule());
                 }
                 ImGui::PopStyleColor(3);
-
-                const bool show_group = ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip);
+                imgui_ItemTooltip(show_group);
 
                 ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                 align_text(ImGui::GetItemRectSize().y);
@@ -1128,29 +1148,6 @@ void edit_rule(sync_point& sync) {
                 if (preview_mode) {
                     previewer::preview(j, config, get_adjacent_rule /*()*/);
                     ImGui::EndGroup();
-                }
-
-                if (show_group && ImGui::BeginTooltip()) {
-                    imgui_Str("Left-click to flip the values.");
-                    ImGui::Separator();
-                    ImGui::Text("Group size: %d", (int)group.size());
-                    const int max_to_show = 48;
-                    for (int x = 0; const aniso::codeT code : group) {
-                        if (x++ % 8 != 0) {
-                            ImGui::SameLine();
-                        }
-                        code_image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
-                        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                        align_text(ImGui::GetItemRectSize().y);
-                        imgui_Str(labels_normal[masked[code]]);
-                        if (x == max_to_show) {
-                            break;
-                        }
-                    }
-                    if (group.size() > max_to_show) {
-                        imgui_Str("...");
-                    }
-                    ImGui::EndTooltip();
                 }
             });
         }

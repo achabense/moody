@@ -705,13 +705,14 @@ public:
             const aniso::vecT size = m_torus.size();
 
             // TODO: whether / how to add hint ('enter' to resize)?
+            ImGui::AlignTextToFramePadding();
+            imgui_Str("Size ~");
+            ImGui::SameLine(0, inner_spacing);
             ImGui::SetNextItemWidth(floor((item_width - inner_spacing) / 2));
             const auto ix = input_x.input("##Width", std::format("Width:{}", size.x).c_str());
             ImGui::SameLine(0, inner_spacing);
             ImGui::SetNextItemWidth(ceil((item_width - inner_spacing) / 2));
             const auto iy = input_y.input("##Height", std::format("Height:{}", size.y).c_str());
-            ImGui::SameLine(0, inner_spacing);
-            imgui_Str("Space size");
 
             if (ix || iy) {
                 auto_fit = false;

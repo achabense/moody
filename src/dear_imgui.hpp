@@ -56,8 +56,7 @@ inline bool imgui_ItemClickable(ImGuiMouseButton_ mouse_button = ImGuiMouseButto
     }
     const bool clicked = ImGui::IsMouseClicked(mouse_button);
     const ImU32 col = clicked ? IM_COL32_WHITE : IM_COL32_GREY(128, 255);
-    const ImVec2 pos_min = ImGui::GetItemRectMin();
-    const ImVec2 pos_max = ImGui::GetItemRectMax();
+    const auto [pos_min, pos_max] = GImGui->LastItemData.Rect;
     ImGui::GetWindowDrawList()->AddLine({pos_min.x, pos_max.y - 1}, {pos_max.x, pos_max.y - 1}, col);
     return clicked;
 }
