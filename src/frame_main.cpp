@@ -33,9 +33,6 @@ public:
 
         ImGui::SameLine();
         imgui_RadioButton("50 fps", &fps, 50);
-        ImGui::SameLine();
-        imgui_RadioButton("40 fps", &fps, 40);
-
 #ifndef NDEBUG
         ImGui::SameLine();
         imgui_RadioButton("10 fps", &fps, 10);
@@ -182,8 +179,9 @@ void frame_main() {
         ImGui::SameLine(0, wide_spacing);
         ImGui::Text("(%d FPS)", (int)round(ImGui::GetIO().Framerate));
 #ifdef SET_FRAME_RATE
-        imgui_ItemTooltip("Right-click to set frame rate.");
-        if (begin_popup_for_item(imgui_ItemClickable(), "0")) {
+        ImGui::SameLine();
+        ImGui::SmallButton("Set");
+        if (begin_menu_for_item()) {
             timer.set_fps();
             ImGui::EndPopup();
         }
@@ -214,6 +212,7 @@ void frame_main() {
                      "To clear the record, right-click 'Total:.. At:..' and then click 'Clear' in the "
                      "popup to confirm.\n\n"
                      "To save the current rule, right-click the MAP-string, and it will be copied to the clipboard.");
+        // !!TODO: outdated.
 
         ImGui::SameLine();
         ImGui::BeginGroup();
@@ -226,12 +225,9 @@ void frame_main() {
 
         ImGui::SameLine();
         ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1 /* [1, size()] */);
-        imgui_ItemTooltip("Right-click to clear.");
-        if (begin_popup_for_item(imgui_ItemClickable(), "1")) {
-            if (ImGui::Selectable("Clear (except the current rule)")) {
-                freeze = true, recorder.clear();
-            }
-            ImGui::EndPopup();
+        if (imgui_ItemClickableDouble()) {
+            freeze = true, recorder.clear();
+            // messenger::set_msg("Cleared.");
         }
 
         ImGui::SameLine();

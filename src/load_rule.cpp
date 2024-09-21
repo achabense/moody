@@ -99,7 +99,7 @@ static void display_path(const pathT& p, float avail_w) {
     if (clipped) {
         imgui_ItemTooltip([&] { imgui_Str(cpp17_u8string(p)); });
     }
-    if (imgui_ItemClickable()) {
+    if (imgui_ItemClickableSingle()) {
         set_clipboard_and_notify(cpp17_u8string(p));
     }
 }
@@ -107,7 +107,7 @@ static void display_path(const pathT& p, float avail_w) {
 static void display_filename(const pathT& p) {
     imgui_Str(std::string("...") + char(pathT::preferred_separator) + cpp17_u8string(p.filename()));
     imgui_ItemTooltip([&] { imgui_Str(cpp17_u8string(p)); });
-    if (imgui_ItemClickable()) {
+    if (imgui_ItemClickableSingle()) {
         set_clipboard_and_notify(cpp17_u8string(p));
     }
 }
@@ -474,7 +474,7 @@ private:
                     ImGui::EndTooltip();
                 }
             }
-            if (imgui_ItemClickable()) {
+            if (imgui_ItemClickableDouble()) {
                 n_pos = m_pos.value_or(0);
             }
 

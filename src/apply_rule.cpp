@@ -874,30 +874,31 @@ public:
             highlight_canvas = true;
         }
 
-        ImGui::SameLine(0, 0);
-        ImGui::Text("  Generation:%d", m_torus.gen());
+        const int wide_spacing = ImGui::CalcTextSize(" ").x * 2;
+        ImGui::SameLine(0, wide_spacing);
+        ImGui::Text("Generation:%d", m_torus.gen());
 
-        ImGui::SameLine(0, 0);
+        ImGui::SameLine(0, wide_spacing);
         if (m_sel) {
-            ImGui::Text("  Selected:%d*%d", m_sel->width(), m_sel->height());
-            if (!m_sel->active) {
-                ImGui::SameLine();
-                if (ImGui::Button("Drop##S")) { // TODO: right-click to clear?
-                    m_sel.reset();
-                }
-            }
+            ImGui::Text("Selected:%d*%d", m_sel->width(), m_sel->height());
         } else {
-            imgui_Str("  Selected:N/A");
+            imgui_Str("Selected:N/A");
+        }
+        if (imgui_ItemClickableDouble()) {
+            m_sel.reset();
+            // messenger::set_msg("Cleared.");
         }
 
+        ImGui::SameLine(0, wide_spacing);
         if (m_paste) {
-            ImGui::SameLine(0, 0);
             const aniso::vecT size = m_paste->size();
-            ImGui::Text("  Paste:%d*%d", size.x, size.y);
-            ImGui::SameLine();
-            if (ImGui::Button("Drop##P")) { // TODO: right-click to clear?
-                m_paste.reset();
-            }
+            ImGui::Text("Paste:%d*%d", size.x, size.y);
+        } else {
+            imgui_Str("Paste:N/A");
+        }
+        if (imgui_ItemClickableDouble()) {
+            m_paste.reset();
+            // messenger::set_msg("Cleared.");
         }
 
         {

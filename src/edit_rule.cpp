@@ -776,13 +776,9 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
                 ImGui::Text("Dist:%d~%d", min_dist, max_dist);
             }
         }
-        imgui_ItemTooltip("Right-click to reset.");
-        // (Using the same style as in `frame_main`.)
-        if (begin_popup_for_item(imgui_ItemClickable(), "")) {
-            if (ImGui::Selectable("Reset")) {
-                page.clear();
-            }
-            ImGui::EndPopup();
+        if (imgui_ItemClickableDouble()) {
+            page.clear();
+            // messenger::set_msg("Cleared.");
         }
 
         ImGui::SameLine(0, 16);
@@ -818,9 +814,8 @@ static void random_rule_window(bool& show_rand, sync_point& sync, const aniso::s
         const int c_free = c_group; // TODO: temporarily preserved.
         const bool has_lock = false;
 
-        // `dist`: The "distance" to the masking rule the randomization want to achieve.
         static double rate = 0.29;
-        int free_dist = round(rate * c_free);
+        int free_dist = round(rate * c_free); // Intended distance.
 
         static bool exact_mode = false;
         if (ImGui::Button(exact_mode ? "Exactly###Mode" : "Around ###Mode")) {
@@ -828,7 +823,7 @@ static void random_rule_window(bool& show_rand, sync_point& sync, const aniso::s
         }
         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
         ImGui::SetNextItemWidth(item_width);
-        if (imgui_StepSliderInt("##Dist", &free_dist, 0, c_free, has_lock ? "(Free) %d" : "%d") && c_free != 0) {
+        if (imgui_StepSliderInt("Dist", &free_dist, 0, c_free, has_lock ? "(Free) %d" : "%d") && c_free != 0) {
             rate = double(free_dist) / c_free;
             assert(round(rate * c_free) == free_dist);
         }
@@ -878,13 +873,10 @@ static void random_rule_window(bool& show_rand, sync_point& sync, const aniso::s
         } else {
             ImGui::Text("Pages:%d At:N/A", calc_page());
         }
-        // (Using the same style as in `frame_main`.)
-        if (begin_popup_for_item(imgui_ItemClickable(), "")) {
-            if (ImGui::Selectable("Clear all pages") && !rules.empty()) {
-                rules = std::vector<aniso::ruleT>{};
-                page_no = 0;
-            }
-            ImGui::EndPopup();
+        if (imgui_ItemClickableDouble()) {
+            rules = std::vector<aniso::ruleT>{};
+            page_no = 0;
+            // messenger::set_msg("Cleared.");
         }
 
         ImGui::SameLine(0, 16);
@@ -1015,13 +1007,13 @@ void edit_rule(sync_point& sync) {
                           "Check the dull-blue groups for details - no matter which mask is selected, for any rule in "
                           "the working set, the masked values should be all the same in any group.\n\n"
                           "You can get rules in the working set from the 'Traverse' or 'Random' window. Or optionally, "
-                          "you can right-click this '(?)' to get the following rule in the working set.");
+                          "you can double-right-click this '(?)' to get the following rule in the working set.");
                 ImGui::Separator();
                 imgui_Str("Preview:");
                 ImGui::SameLine();
                 previewer::preview(-1, previewer::configT::_220_160, aniso::approximate(subset, sync.rule), false);
             });
-            if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+            if (imgui_ItemClickableDouble()) {
                 sync.set(aniso::approximate(subset, sync.rule));
             }
         }

@@ -188,6 +188,7 @@ inline void set_scroll_by_up_down(float dy) {
     }
 }
 
+#if 0
 // (Referring to ImGui::BeginPopupContextItem().)
 inline bool begin_popup_for_item(bool open, const char* str_id = nullptr) {
     if (GImGui->CurrentWindow->SkipItems) {
@@ -201,6 +202,7 @@ inline bool begin_popup_for_item(bool open, const char* str_id = nullptr) {
     return ImGui::BeginPopupEx(id, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar |
                                        ImGuiWindowFlags_NoSavedSettings);
 }
+#endif
 
 // Looks like a common popup, and Will appear like a menu (but with more consistent closing behavior).
 // (Not meant to be used recursively; should end with `ImGui::EndPopup` instead of `EndMenu`.)

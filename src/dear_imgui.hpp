@@ -50,16 +50,24 @@ inline void imgui_ItemTooltip(std::string_view desc) {
     imgui_ItemTooltip([desc] { ImGui::TextUnformatted(desc.data(), desc.data() + desc.size()); });
 }
 
-inline bool imgui_ItemClickable(ImGuiMouseButton_ mouse_button = ImGuiMouseButton_Right) {
+inline bool imgui_ItemClickable(bool double_click) {
     if (!ImGui::IsItemHovered()) {
         return false;
     }
-    const bool clicked = ImGui::IsMouseClicked(mouse_button);
+    const bool clicked = double_click ? ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Right)
+                                      : ImGui::IsMouseClicked(ImGuiMouseButton_Right);
     const ImU32 col = clicked ? IM_COL32_WHITE : IM_COL32_GREY(128, 255);
     const auto [pos_min, pos_max] = GImGui->LastItemData.Rect;
     ImGui::GetWindowDrawList()->AddLine({pos_min.x, pos_max.y - 1}, {pos_max.x, pos_max.y - 1}, col);
+    if (double_click && clicked) {
+        ImGui::FocusWindow(ImGui::GetCurrentWindow());
+    }
     return clicked;
 }
+
+inline bool imgui_ItemClickableSingle() { return imgui_ItemClickable(false); }
+
+inline bool imgui_ItemClickableDouble() { return imgui_ItemClickable(true); }
 
 // Unlike ImGui::Text(Wrapped/...), these functions take unformatted string as the argument.
 inline void imgui_Str(std::string_view str) { //
@@ -85,10 +93,9 @@ inline void imgui_StrDisabled(std::string_view str) {
 // TODO: the name is outdated now...
 // Using std::string as `SetClipboardText` requires C-style string.
 inline void imgui_StrCopyable(const std::string& str, void (*str_func)(std::string_view),
-                              void (*copy_func)(const std::string&),
-                              ImGuiMouseButton_ mouse_button = ImGuiMouseButton_Right) {
+                              void (*copy_func)(const std::string&)) {
     str_func(str);
-    if (imgui_ItemClickable(mouse_button)) {
+    if (imgui_ItemClickableSingle()) {
         copy_func(str);
     }
 }
