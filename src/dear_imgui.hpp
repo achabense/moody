@@ -33,16 +33,49 @@ inline bool imgui_ItemFullyVisible() { //
     return GImGui->CurrentWindow->ClipRect.Contains(GImGui->LastItemData.Rect);
 }
 
+// Workaround to provide stable result for some cases.
+// Related: https://github.com/ocornut/imgui/issues/7984 and 7945
+inline bool imgui_ItemHoveredForTooltip(const char* str_id = nullptr) { //
+    if (!str_id) {
+        return ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip);
+    } else {
+        const ImGuiID using_id = ImGui::GetID(str_id);
+
+        // HoverFlagsForTooltipMouse ~ Stationary | DelayShort | AllowWhenDisabled
+        if (!ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+            return false;
+        }
+
+        ImGuiContext& g = *GImGui;
+        // if (g.HoverItemDelayIdPreviousFrame != using_id) { // ImGuiHoveredFlags_NoSharedDelay
+        //     g.HoverItemDelayTimer = 0.0f;
+        // }
+        g.HoverItemDelayId = using_id;
+        if (g.HoverItemUnlockedStationaryId != using_id) { // ImGuiHoveredFlags_Stationary
+            return false;
+        }
+        if (g.HoverItemDelayTimer < g.Style.HoverDelayShort) { // ImGuiHoveredFlags_DelayShort
+            return false;
+        }
+        return true;
+    }
+}
+
+inline const char* imgui_ItemTooltip_StrID = nullptr;
+
 inline void imgui_ItemTooltip(const std::invocable<> auto& desc) {
+    const char* str_id = std::exchange(imgui_ItemTooltip_StrID, nullptr);
     if (GImGui->CurrentWindow->SkipItems) {
         return;
     }
-    if (ImGui::BeginItemTooltip()) {
-        // The same as the one in `HelpMarker` in "imgui_demo.cpp".
-        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
-        desc();
-        ImGui::PopTextWrapPos();
-        ImGui::EndTooltip();
+    if (imgui_ItemHoveredForTooltip(str_id)) {
+        if (ImGui::BeginTooltip()) {
+            // The same as the one in `HelpMarker` in "imgui_demo.cpp".
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+            desc();
+            ImGui::PopTextWrapPos();
+            ImGui::EndTooltip();
+        }
     }
 }
 

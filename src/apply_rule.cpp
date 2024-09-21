@@ -581,9 +581,6 @@ public:
                 }
                 ImGui::SameLine();
                 ImGui::Checkbox("Pause", &pause);
-                ImGui::SameLine();
-                // !!TODO: record the resetting behavior here.
-                imgui_StrTooltip("(?)", "!!TODO ('restart' will...)");
 
                 ImGui::PushItemWidth(item_width);
                 imgui_StepSliderInt("Seed", &init.seed, 0, 29);
@@ -733,9 +730,6 @@ public:
                 ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                 const bool selected =
                     ImGui::RadioButton((auto_fit && is_cur) ? std::format("[{0}]###{0}", s).c_str() : s, is_cur);
-                if (z == 1) {
-                    quick_info("^ Auto full-screen.");
-                }
                 if (selected) {
                     auto_fit_next = is_cur ? !auto_fit : true;
                     return true;
@@ -745,10 +739,11 @@ public:
             auto_fit = auto_fit_next;
             ImGui::SameLine();
             imgui_StrTooltip("(?)",
-                             "Click to enter auto-resizing mode.\n\n"
+                             "Click a button to enter auto-resizing mode.\n\n"
                              "The window will be automatically resized to full-screen. Dragging and scrolling are "
                              "not available, but you can still rotate the space with 'Ctrl + drag'.\n\n"
                              "(Click the same button to quit this mode.)");
+            guide_mode::highlight();
         };
 
         ImGui::PushItemWidth(item_width);
@@ -765,10 +760,10 @@ public:
                                       "-/+ Interval: 3/4 (repeatable)\n\n"
                                       "These shortcuts are available only when the space window is hovered or held "
                                       "by mouse button.");
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
+            if (imgui_ItemHoveredForTooltip()) {
                 highlight_canvas = true;
             }
-            quick_info("< Keyboard shortcuts.");
+            guide_mode::highlight();
             ImGui::SameLine();
             if (ImGui::Button("Restart") || item_shortcut(ImGuiKey_R, false)) {
                 m_torus.restart();
@@ -817,6 +812,7 @@ public:
                                  "As the current rule has '000...->1' and '111...->0', the step will be adjusted "
                                  "to 2*n to avoid bad visual effect (flashing pure-color background).\n\n"
                                  "(You can change the parity of generation with the '+1' button.)");
+                guide_mode::highlight();
             }
 
             const int min_ms = 0, max_ms = 400;
@@ -832,7 +828,6 @@ public:
             set_init_state();
             ImGui::EndPopup();
         }
-        quick_info("< Seed, density and area.");
 
         ImGui::Spacing(); // To align with the separator.
 
@@ -852,24 +847,25 @@ public:
                      "left-drag' to \"rotate\" the space, or drag with right button to select area.\n"
                      "3. Otherwise, left-click to decide where to paste. To move the window you can drag with "
                      "right button. Rotating and selecting are not available in this case.");
-        if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
+        if (imgui_ItemHoveredForTooltip()) {
             highlight_canvas = true;
         }
-        quick_info("v Mouse operations.");
+        guide_mode::highlight();
 
         ImGui::SameLine();
         if (ImGui::Button("Center")) {
             locate_center = true;
             find_suitable_zoom = true;
         }
+        guide_mode::item_tooltip("Center the window with suitable zoom.");
 
         ImGui::SameLine();
         static bool show_range_window = false;
         ImGui::Checkbox("Range ops", &show_range_window);
-        quick_info("^ Copy, paste, clear, etc.\nv Drag with right button to select area.");
         ImGui::SameLine();
         imgui_StrDisabled("(?)");
-        const bool show_range_window_in_tooltip = ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip);
+        guide_mode::highlight();
+        const bool show_range_window_in_tooltip = imgui_ItemHoveredForTooltip();
         if (show_range_window_in_tooltip) {
             highlight_canvas = true;
         }
@@ -888,6 +884,8 @@ public:
             m_sel.reset();
             // messenger::set_msg("Cleared.");
         }
+        imgui_ItemTooltip_StrID = "Clear##Sel";
+        guide_mode::item_tooltip("Double right-click to clear.");
 
         ImGui::SameLine(0, wide_spacing);
         if (m_paste) {
@@ -900,6 +898,8 @@ public:
             m_paste.reset();
             // messenger::set_msg("Cleared.");
         }
+        imgui_ItemTooltip_StrID = "Clear##Paste";
+        guide_mode::item_tooltip("Double right-click to clear.");
 
         {
             // (Values of GetContentRegionAvail() can be negative...)
@@ -996,7 +996,7 @@ public:
 
                 // (`want_hex_mode` should be tested only when the zoom window is really going to be shown.)
                 if (!m_paste && (!active || !r_down)) {
-                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip) && cel_pos.both_gteq({-10, -10}) &&
+                    if (imgui_ItemHoveredForTooltip() && cel_pos.both_gteq({-10, -10}) &&
                         cel_pos.both_lt(tile_size.plus(10, 10))) {
                         hex_mode = want_hex_mode(sync.rule);
                         if (hex_mode || m_coord.zoom <= 1) {
@@ -1428,6 +1428,7 @@ void previewer::configT::_set() {
                               "For individual windows:\n"
                               "Right-click to restart, left-click and hold to pause.\n"
                               "'Ctrl + right-click' to copy the rule.");
+    guide_mode::highlight();
     ImGui::Separator();
 
     ImGui::AlignTextToFramePadding();

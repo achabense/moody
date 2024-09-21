@@ -123,6 +123,8 @@ void frame_main() {
 #endif // SET_FRAME_RATE
 
     global_timer::begin_frame();
+    guide_mode::begin_frame();
+
     messenger::display();
 
     static recorderT recorder;
@@ -166,15 +168,15 @@ void frame_main() {
     ImGui::SetNextWindowPos(viewport->WorkPos);
     ImGui::SetNextWindowSize(viewport->WorkSize);
     if (auto window = imgui_Window("Main", nullptr, flags)) {
-        load_rule(show_file, "Load file", load_file);
+        load_rule(show_file, "Files", load_file);
+        guide_mode::item_tooltip("Load rules from files.");
         ImGui::SameLine();
         load_rule(show_clipboard, "Clipboard", load_clipboard);
-        quick_info("^ Pasting rules. Shortcut: 'W'.");
-        // TODO: this does not look like a good place to record the shortcut...
-        // Need to unify the ways to record the shortcuts in the future...
+        guide_mode::item_tooltip("Load rules from the clipboard. Shortcut: 'W'.\n\n"
+                                 "('V' is for pasting patterns in the right panel.)");
         ImGui::SameLine();
         load_rule(show_doc, "Documents", load_doc);
-        quick_info("< Concepts, example rules, etc.");
+        guide_mode::item_tooltip("Concepts, example rules, etc.");
         const int wide_spacing = ImGui::CalcTextSize(" ").x * 3;
         ImGui::SameLine(0, wide_spacing);
         ImGui::Text("(%d FPS)", (int)round(ImGui::GetIO().Framerate));
@@ -221,7 +223,8 @@ void frame_main() {
             [&] { freeze = true, recorder.set_first(); }, [&] { freeze = true, recorder.set_prev(); },
             [&] { freeze = true, recorder.set_next(); }, [&] { freeze = true, recorder.set_last(); });
         ImGui::EndGroup();
-        quick_info("^ For undo/redo.");
+        imgui_ItemTooltip_StrID = "Seq##Record";
+        guide_mode::item_tooltip("You can switch to previously tested rules with this.");
 
         ImGui::SameLine();
         ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1 /* [1, size()] */);
@@ -229,12 +232,15 @@ void frame_main() {
             freeze = true, recorder.clear();
             // messenger::set_msg("Cleared.");
         }
+        imgui_ItemTooltip_StrID = "Clear##Rec";
+        guide_mode::item_tooltip("Double right-click to clear the record (except the current rule).");
 
         ImGui::SameLine();
         get_reversal_dual(ImGui::Button("Rev"), sync);
 
         ImGui::SameLine();
         imgui_StrCopyable(aniso::to_MAP_str(sync.rule), imgui_Str, set_clipboard_and_notify);
+        guide_mode::item_tooltip("Right-click to copy.");
 
         ImGui::Separator();
 

@@ -110,6 +110,7 @@ bool rule_algo::is_hexagonal_rule(const aniso::ruleT& rule) { //
     return aniso::_subsets::ignore_hex.contains(rule);
 }
 
+#if 0
 // (Not using trailing "reason" parameter, as the clang-format result will be very ugly...)
 static void guarded_block(const bool enable, const auto& fn /*, const char* reason = nullptr*/) {
     if (!enable) {
@@ -123,12 +124,14 @@ static void guarded_block(const bool enable, const auto& fn /*, const char* reas
     }
 };
 
+// It seems that, the tooltip shown within the group will be hidden by the outer one.
 static void guarded_block(const bool enable, const char* reason_disabled, const auto& fn) {
     ::guarded_block(enable, fn);
     if (!enable) {
         imgui_ItemTooltip(reason_disabled);
     }
 };
+#endif
 
 static int fit_count(int avail, int size, int spacing) { //
     return std::max(1, (avail + spacing) / (size + spacing));
@@ -389,8 +392,8 @@ public:
         imgui_Str("Working set ~");
         ImGui::SameLine();
         put_term(current.contains(target.rule), None, nullptr, false);
-        imgui_ItemTooltip("This will be light green if the current rule belongs to every selected "
-                          "subset. See '(...)' for details.");
+        guide_mode::item_tooltip("This will be light green if the current rule belongs to every selected "
+                                 "subset. See '(...)' for details.");
     }
 
     void select(const sync_point& target) {
@@ -534,7 +537,9 @@ public:
             const bool m_avail = subset.contains(*mask_ptrs[m]);
 
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-            guarded_block(m_avail, [&] { imgui_RadioButton(mask_terms[m].label, &mask_tag, m); });
+            ImGui::BeginDisabled(!m_avail);
+            imgui_RadioButton(mask_terms[m].label, &mask_tag, m);
+            ImGui::EndDisabled();
 
             imgui_ItemTooltip([&] {
                 if (!m_avail) {
@@ -549,17 +554,23 @@ public:
             if (m == Custom) {
                 ImGui::SameLine();
                 const int radio_id = ImGui::GetItemID();
-                // TODO: share `subset.contains(sync.rule)` with `edit_rule`?
-                guarded_block(subset.contains(sync.rule), "The current rule does not belong to the working set.", [&] {
-                    if (ImGui::Button("<< Cur")) {
-                        mask_custom = {sync.rule};
-                        mask_tag = Custom;
+                // TODO: share with `edit_rule`?
+                const bool contained = subset.contains(sync.rule);
+                ImGui::BeginDisabled(!contained);
+                if (ImGui::Button("<< Cur")) {
+                    mask_custom = {sync.rule};
+                    mask_tag = Custom;
 
-                        // It will be strange to call a shortcut function here.
-                        // shortcuts::highlight(radio_id);
-                        ImGui::NavHighlightActivated(radio_id);
-                    }
-                });
+                    // It will be strange to call a shortcut function here.
+                    // shortcuts::highlight(radio_id);
+                    ImGui::NavHighlightActivated(radio_id);
+                }
+                ImGui::EndDisabled();
+                guide_mode::item_tooltip("Set the custom masking rule to the current rule.");
+                if (!contained) {
+                    imgui_ItemTooltip(guide_mode::enabled() ? "\n(The current rule does not belong to the working set.)"
+                                                            : "The current rule does not belong to the working set.");
+                }
             }
         }
 
@@ -718,7 +729,7 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
             }
         }
         ImGui::SameLine();
-        imgui_StrTooltip("(?)", "The max distance is the number of groups in the working set.");
+        imgui_StrTooltip("(?)", "The max distance is actually the number of groups in the working set.");
 
         // TODO: share with `edit_rule`?
         const bool contained = subset.contains(sync.rule);
@@ -730,13 +741,11 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
             fill_next(adapter.page_size - 1);
         }
         ImGui::EndDisabled();
-        imgui_ItemTooltip([contained] {
-            if (!contained) {
-                imgui_Str("The current rule does not belong to the working set.");
-                ImGui::Separator();
-            }
-            imgui_Str("Seek to the position where the current rule belongs.");
-        });
+        guide_mode::item_tooltip("Seek to the position where the current rule belongs.");
+        if (!contained) {
+            imgui_ItemTooltip(guide_mode::enabled() ? "\n(The current rule does not belong to the working set.)"
+                                                    : "The current rule does not belong to the working set.");
+        }
         ImGui::SameLine();
         sequence::seq(
             "<00..", "Prev", "Next", "11..>",
@@ -762,7 +771,9 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
                 page.push_back(aniso::seq_mixed::last(subset, mask));
                 fill_prev(adapter.page_size - 1);
             },
-            page.empty() ? "!!TODO..." : nullptr);
+            page.empty() ? "Click 'Locate', '<00..' or '11..>' to get somewhere in the sequence." : nullptr);
+        // TODO: add guide-tooltip.
+
         ImGui::SameLine();
         if (page.empty()) {
             imgui_Str("Dist:N/A");
@@ -780,6 +791,8 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
             page.clear();
             // messenger::set_msg("Cleared.");
         }
+        imgui_ItemTooltip_StrID = "Clear";
+        guide_mode::item_tooltip("Double right-click to clear.");
 
         ImGui::SameLine(0, 16);
         config.set("Preview settings");
@@ -821,6 +834,7 @@ static void random_rule_window(bool& show_rand, sync_point& sync, const aniso::s
         if (ImGui::Button(exact_mode ? "Exactly###Mode" : "Around ###Mode")) {
             exact_mode = !exact_mode;
         }
+        guide_mode::item_tooltip("Click to switch between 'Around' / 'Exactly'.");
         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
         ImGui::SetNextItemWidth(item_width);
         if (imgui_StepSliderInt("Dist", &free_dist, 0, c_free, has_lock ? "(Free) %d" : "%d") && c_free != 0) {
@@ -866,6 +880,7 @@ static void random_rule_window(bool& show_rand, sync_point& sync, const aniso::s
         sequence::seq(
             "<|", "<<", ">>>", "|>", //
             [&] { set_page(0); }, [&] { set_page(page_no - 1); }, [&] { set_page(page_no + 1, true); }, set_last_page);
+        // TODO: add guide-tooltip
         ImGui::SameLine();
         if (!rules.empty()) {
             // TODO: will this be confusing when the page is resized?
@@ -878,6 +893,8 @@ static void random_rule_window(bool& show_rand, sync_point& sync, const aniso::s
             page_no = 0;
             // messenger::set_msg("Cleared.");
         }
+        imgui_ItemTooltip_StrID = "Clear";
+        guide_mode::item_tooltip("Double right-click to clear all pages.");
 
         ImGui::SameLine(0, 16);
         config.set("Preview settings");
@@ -906,14 +923,15 @@ void edit_rule(sync_point& sync) {
         ImGui::Checkbox("Collapse", &collapse);
 
         auto select = [&] {
-            if (ImGui::Button("Clear")) {
+            if (ImGui::Button("Clear##Sets")) {
                 select_set.clear();
             }
+            guide_mode::item_tooltip("Unselect the subsets. The resulting working set will be the entire MAP set.");
             ImGui::SameLine();
             if (ImGui::Button("Match")) {
                 select_set.match(sync);
             }
-            imgui_ItemTooltip("Select every subset that contains the current rule.");
+            guide_mode::item_tooltip("Select every subset that contains the current rule.");
 
             ImGui::Separator();
             select_set.select(sync);
@@ -956,6 +974,7 @@ void edit_rule(sync_point& sync) {
     static previewer::configT config{previewer::configT::_220_160};
     {
         const bool clicked = ImGui::Checkbox("Traverse", &show_trav);
+        guide_mode::item_tooltip("Iterate through all rules in the working set.");
         if (clicked && show_trav) {
             ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
             ImGui::SetNextWindowPos(ImGui::GetItemRectMax() + ImVec2(30, -120), ImGuiCond_FirstUseEver);
@@ -967,6 +986,7 @@ void edit_rule(sync_point& sync) {
     ImGui::SameLine();
     {
         const bool clicked = ImGui::Checkbox("Random", &show_rand);
+        guide_mode::item_tooltip("Get random rules in the working set.");
         if (clicked && show_rand) {
             ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
             ImGui::SetNextWindowPos(ImGui::GetItemRectMax() + ImVec2(30, -120), ImGuiCond_FirstUseEver);
@@ -977,7 +997,7 @@ void edit_rule(sync_point& sync) {
     }
     ImGui::SameLine();
     ImGui::Checkbox("Preview", &preview_mode);
-    quick_info("^ Try this!");
+    guide_mode::item_tooltip("Try this!");
     if (preview_mode) {
         ImGui::SameLine();
         config.set("Settings");
@@ -1007,15 +1027,17 @@ void edit_rule(sync_point& sync) {
                           "Check the dull-blue groups for details - no matter which mask is selected, for any rule in "
                           "the working set, the masked values should be all the same in any group.\n\n"
                           "You can get rules in the working set from the 'Traverse' or 'Random' window. Or optionally, "
-                          "you can double-right-click this '(?)' to get the following rule in the working set.");
+                          "you can double right-click this '(?)' to get the following rule in the working set.");
                 ImGui::Separator();
                 imgui_Str("Preview:");
                 ImGui::SameLine();
                 previewer::preview(-1, previewer::configT::_220_160, aniso::approximate(subset, sync.rule), false);
             });
+            // TODO: maybe it's better just to remove this feature...
             if (imgui_ItemClickableDouble()) {
                 sync.set(aniso::approximate(subset, sync.rule));
             }
+            guide_mode::highlight();
         }
     }
 

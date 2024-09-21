@@ -146,7 +146,7 @@ struct shortcuts {
     }
 };
 
-// TODO: what's the role of these messages? What's their differences with normal tooltips?
+#if 0
 inline void quick_info(std::string_view msg) {
     if (shortcuts::global_flag(ImGuiKey_H) && ImGui::IsItemVisible()) {
         imgui_ItemRect(IM_COL32_WHITE);
@@ -174,6 +174,43 @@ inline void quick_info(std::string_view msg) {
         drawlist->AddText(msg_min + padding, IM_COL32_WHITE, text_beg, text_end);
     }
 }
+#endif
+
+class guide_mode {
+    inline static bool enable_tooltip = false;
+
+    friend void frame_main();
+
+    static void begin_frame() {
+        // (Using `WantTextInput`, as `keys_avail` does not work in the modal popups for now.)
+        if (!ImGui::GetIO().WantTextInput && shortcuts::test(ImGuiKey_H)) {
+            enable_tooltip = !enable_tooltip;
+        }
+    }
+
+    static void _highlight() { //
+        imgui_ItemRectFilled(ImGui::GetColorU32(ImGuiCol_PlotHistogram, 0.3f));
+    }
+
+public:
+    // For use in combination with other tooltips.
+    static bool enabled() { return enable_tooltip; }
+
+    static void highlight() {
+        if (enable_tooltip) {
+            _highlight();
+        }
+    }
+
+    static void item_tooltip(const std::string_view tooltip) {
+        if (enable_tooltip) {
+            _highlight();
+            imgui_ItemTooltip(tooltip);
+        } else {
+            imgui_ItemTooltip_StrID = nullptr;
+        }
+    }
+};
 
 // There is intended to be at most one call to this function in each window hierarchy.
 inline void set_scroll_by_up_down(float dy) {
@@ -211,7 +248,7 @@ inline bool begin_menu_for_item() {
     assert(id != 0); // Mainly designed for buttons.
     const ImRect item_rect = imgui_GetItemRect();
 
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
+    if (imgui_ItemHoveredForTooltip()) {
         ImGui::OpenPopupEx(id, ImGuiPopupFlags_NoReopen);
         ImGui::SetNextWindowPos(item_rect.GetTR(), ImGuiCond_Appearing); // Like a menu.
     }

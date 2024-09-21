@@ -102,6 +102,7 @@ static void display_path(const pathT& p, float avail_w) {
     if (imgui_ItemClickableSingle()) {
         set_clipboard_and_notify(cpp17_u8string(p));
     }
+    guide_mode::item_tooltip(clipped ? "\n(Right-click to copy.)" : "Right-click to copy.");
 }
 
 static void display_filename(const pathT& p) {
@@ -110,6 +111,7 @@ static void display_filename(const pathT& p) {
     if (imgui_ItemClickableSingle()) {
         set_clipboard_and_notify(cpp17_u8string(p));
     }
+    guide_mode::item_tooltip("\n(Right-click to copy.)");
 }
 
 static pathT home_path{};
@@ -462,21 +464,12 @@ private:
             } else {
                 ImGui::Text("Total:%d At:N/A", total);
             }
-            // TODO: not using `imgui_ItemTooltip`, as when the text get resized (can happen in this case),
-            // `IsItemHovered(ImGuiHoveredFlags_ForTooltip)` will become false and make the tooltip disappear for
-            // some time.
-            // (However, this workaround makes the tooltip appear immediately...)
-            // Related: https://github.com/ocornut/imgui/issues/7945
-            // imgui_ItemTooltip("Right-click to sync.");
-            if (ImGui::IsItemHovered()) {
-                if (ImGui::BeginTooltip()) {
-                    imgui_Str("Right-click to sync.");
-                    ImGui::EndTooltip();
-                }
-            }
             if (imgui_ItemClickableDouble()) {
                 n_pos = m_pos.value_or(0);
             }
+            imgui_ItemTooltip_StrID = "Sync";
+            guide_mode::item_tooltip("Double right-click to sync.");
+            // TODO: "sync" may be confusing to users...
 
             if (m_sel) {
                 n_pos.reset();
@@ -766,6 +759,7 @@ void load_doc(sync_point& out) {
         imgui_Str("The latest version is available at: ");
         ImGui::SameLine(0, 0);
         imgui_StrCopyable("https://github.com/achabense/moody", imgui_Str, set_clipboard_and_notify);
+        guide_mode::item_tooltip("Right-click to copy.");
 
         ImGui::Separator();
         select();
