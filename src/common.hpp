@@ -88,9 +88,9 @@ struct shortcuts {
         return !ImGui::GetIO().WantTextInput && ImGui::IsKeyDown(key);
     }
 
-    static bool keys_avail() {
-        // (`!IsAnyItemActive` seems to be implied by `!WantCaptureKeyboard`; added anyway.)
-        return !ImGui::GetIO().WantCaptureKeyboard && !ImGui::IsAnyItemActive();
+    static bool keys_avail() { //
+        // (Modal popups will set `WantCaptureKeyboard` unconditionally.)
+        return !ImGui::GetIO().WantTextInput && !ImGui::IsAnyItemActive();
     }
 
     static bool keys_avail_and_window_hoverable() { // Not blocked by popup.
@@ -182,8 +182,7 @@ class guide_mode {
     friend void frame_main();
 
     static void begin_frame() {
-        // (Using `WantTextInput`, as `keys_avail` does not work in the modal popups for now.)
-        if (!ImGui::GetIO().WantTextInput && shortcuts::test(ImGuiKey_H)) {
+        if (shortcuts::keys_avail() && shortcuts::test(ImGuiKey_H)) {
             enable_tooltip = !enable_tooltip;
         }
     }
@@ -348,7 +347,7 @@ class sequence {
             tag = Last;
         }
 
-        if ((tag != None) || (bound_id == 0 && window_focused && !pair_disabled &&
+        if ((tag != None) || (bound_id == 0 && window_focused && !pair_disabled && shortcuts::keys_avail() &&
                               (shortcuts::test(ImGuiKey_LeftArrow) || shortcuts::test(ImGuiKey_RightArrow)))) {
             bound_id = id_prev;
             last_valid_frame = ImGui::GetFrameCount();

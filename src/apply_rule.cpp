@@ -1411,16 +1411,16 @@ void apply_rule(sync_point& sync) {
 // TODO: apply initT? (notice background poses extra size requirements...)
 
 struct global_config {
+    // TODO: this can easily be made object-local.
     inline static global_timer::timerT timer{global_timer::min_nonzero_interval};
 };
 
 void previewer::configT::_set() {
-    // TODO: 'ctrl + right-click' is an important convenience improvement.
-    // Should record this feature in 'Documents' as well...
     imgui_StrTooltip("(...)", "Press 'T' to restart all preview windows.\n\n"
                               "For individual windows:\n"
-                              "Right-click to restart, left-click and hold to pause.\n"
-                              "'Ctrl + right-click' to copy the rule.");
+                              "Right-click to copy the rule.\n"
+                              "Left-click and hold to pause.\n"
+                              "Hover and press 'R' to restart.");
     guide_mode::highlight();
     ImGui::Separator();
 
@@ -1435,39 +1435,28 @@ void previewer::configT::_set() {
     imgui_Str("Density ~ 0.5, area ~ 1.0, background ~ default");
     ImGui::Separator();
 
-    // TODO: whether to enable shortcuts in this case?
-    // (These shortcuts won't conflict with main-canvas's.)
-    // (Update: currently not working when shown in modal popup.)
-    // Modal popup will always set `WantCaptureKeyboard`, so `shortcuts::keys_avail` will become false.
-    // https://github.com/ocornut/imgui/issues/744
     ImGui::SetNextItemWidth(item_width);
-    // imgui_StepSliderShortcuts::set(ImGuiKey_1, ImGuiKey_2);
     imgui_StepSliderInt("Step", &step, 1, 16);
-    // imgui_StepSliderShortcuts::reset();
     ImGui::SetNextItemWidth(item_width);
-    // imgui_StepSliderShortcuts::set(ImGuiKey_3, ImGuiKey_4);
     global_config::timer.slide_interval("Interval", 0, 400);
-    // imgui_StepSliderShortcuts::reset();
     ImGui::SameLine();
     imgui_StrTooltip("(?)", "This setting is shared by all preview windows in different places.");
 }
 
-// TODO: is skip-next behavior needed for preview windows?
+// TODO: allow setting the step and interval with shortcuts when the window is hovered?
 void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT& rule, bool interactive,
                          ImU32& border_col) {
     struct termT {
         bool active = false;
+        bool skip_run = false;
         int seed = {};
         aniso::ruleT rule = {};
         aniso::tileT tile = {};
     };
     static std::unordered_map<uint64_t, termT> terms;
-    static bool run_this_frame = false;
 
     static unsigned latest = ImGui::GetFrameCount();
     if (const unsigned frame = ImGui::GetFrameCount(); frame != latest) {
-        run_this_frame = global_config::timer.test();
-
         if (latest + 1 != frame) {
             terms.clear();
         } else {
@@ -1492,10 +1481,10 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
     }
     term.active = true;
 
-    const bool ctrl = ImGui::GetIO().KeyCtrl;
-    // TODO: whether to support batch restart ('T') after all?
+    const bool hovered = interactive && ImGui::IsItemHovered();
+    const bool l_down = ImGui::IsMouseDown(ImGuiMouseButton_Left);
     const bool restart = (shortcuts::keys_avail() && shortcuts::test(ImGuiKey_T)) ||
-                         (interactive && !ctrl && ImGui::IsItemClicked(ImGuiMouseButton_Right)) ||
+                         (hovered && (l_down || shortcuts::keys_avail()) && shortcuts::test(ImGuiKey_R)) ||
                          term.tile.size() != size || term.seed != config.seed || term.rule != rule;
     if (restart) {
         term.tile.resize(size);
@@ -1503,11 +1492,12 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
         term.rule = rule;
         std::mt19937 rand(config.seed);
         aniso::random_fill(term.tile.data(), rand, 0.5);
+        term.skip_run = true;
     }
 
     // (`IsItemActive` does not work as preview-window is based on `Dummy`.)
-    const bool pause = interactive && ImGui::IsItemHovered() && ImGui::IsMouseDown(ImGuiMouseButton_Left);
-    if (!pause && (restart || run_this_frame)) {
+    const bool pause = hovered && l_down;
+    if (!pause && (restart || (global_config::timer.test() && !std::exchange(term.skip_run, false)))) {
         const int p = config.step + ((config.step % 2 == 1) && strobing(rule));
         for (int i = 0; i < p; ++i) {
             term.tile.run_torus(rule);
@@ -1538,13 +1528,8 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
         ImGui::PopStyleVar();
     }
 
-    if (interactive && ctrl) {
-        if (ImGui::IsItemHovered()) {
-            imgui_ItemRectFilled(IM_COL32_GREY(128, 48));
-        }
-        if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
-            set_clipboard_and_notify(aniso::to_MAP_str(rule));
-            border_col = IM_COL32_WHITE;
-        }
+    if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+        border_col = IM_COL32_WHITE;
+        set_clipboard_and_notify(aniso::to_MAP_str(rule));
     }
 }
