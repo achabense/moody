@@ -857,7 +857,7 @@ public:
             locate_center = true;
             find_suitable_zoom = true;
         }
-        guide_mode::item_tooltip("Center the window with suitable zoom.");
+        guide_mode::item_tooltip("Center the window and select suitable zoom for it.");
 
         ImGui::SameLine();
         static bool show_range_window = false;
@@ -1143,17 +1143,14 @@ public:
 
                 static bool replace = true;     // Closed-capture.
                 static percentT fill_den = 0.5; // Random-fill.
-                static bool add_rule = true;
-                static bool show_result = true; // Copy / cut.
+                static bool add_rule = true;    // Copy / cut.
                 auto copy_sel = [&] {
                     if (m_sel) {
                         std::string rle_str =
                             aniso::to_RLE_str(m_torus.read_only(m_sel->to_range()), add_rule ? &sync.rule : nullptr);
                         ImGui::SetClipboardText(rle_str.c_str());
 
-                        if (show_result) {
-                            messenger::set_msg(std::move(rle_str));
-                        }
+                        messenger::set_msg(std::move(rle_str));
                     }
                 };
 
@@ -1244,12 +1241,8 @@ public:
                         // Copy/Cut/Paste.
                         ImGui::Separator();
                         set_tag(add_rule, "Rule info",
-                                "Whether to include rule info ('rule = ...') in the header when copying patterns.\n\n"
+                                "Whether to include rule info ('rule = ...') in the header for the patterns.\n\n"
                                 "(This applies to 'Copy' and 'Cut'. 'Identify' will always include rule info.)");
-                        ImGui::SameLine();
-                        set_tag(show_result, "Show result",
-                                "Whether to display the result when copying patterns.\n\n"
-                                "(This applies to 'Copy' and 'Cut'. 'Identify' will always show the result.)");
                         term("Copy", "C", ImGuiKey_C, true, _copy);
                         term("Cut", "X", ImGuiKey_X, true, _cut);
                         imgui_StrTooltip("(?)",
@@ -1524,7 +1517,7 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
     // Intentionally display after running for better visual effect (the initial state of the tile won't be displayed).
     const ImTextureID texture = make_screen(term.tile.data(), scaleE::Nearest);
     ImGui::GetWindowDrawList()->AddImage(texture, ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
-    if (interactive && ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip)) {
+    if (interactive && imgui_ItemHoveredForTooltip()) {
         assert(ImGui::IsMousePosValid());
         const ImVec2 pos = ImGui::GetMousePos() - ImGui::GetItemRectMin();
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});

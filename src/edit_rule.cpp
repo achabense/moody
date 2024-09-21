@@ -771,7 +771,8 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
                 page.push_back(aniso::seq_mixed::last(subset, mask));
                 fill_prev(adapter.page_size - 1);
             },
-            page.empty() ? "Click 'Locate', '<00..' or '11..>' to get somewhere in the sequence." : nullptr);
+            page.empty() ? "Click 'Locate', '<00..' or '11..>', or input a distance to get somewhere in the sequence."
+                         : nullptr);
         // TODO: add guide-tooltip.
 
         ImGui::SameLine();
@@ -850,6 +851,7 @@ static void random_rule_window(bool& show_rand, sync_point& sync, const aniso::s
                          "(Also, suppose the current rule belongs to the working set, you can set it to "
                          "the custom mask, and generate in a low distance to get random rules that are \"close\" "
                          "to it.)");
+        guide_mode::highlight();
         // TODO: where to record this?
         // The window can be resized to fit the page size by double-clicking the resize border.
 
