@@ -745,7 +745,7 @@ void load_doc(sync_point& out) {
     static auto select = []() {
         for (int i = 0; docs[i][0] != nullptr; ++i) {
             const auto [title, contents] = docs[i];
-            if (ImGui::Selectable(title, doc_id == i, ImGuiSelectableFlags_DontClosePopups) && doc_id != i) {
+            if (ImGui::Selectable(title, doc_id == i, ImGuiSelectableFlags_NoAutoClosePopups) && doc_id != i) {
                 text.clear();
                 text.append(contents);
                 text.reset_scroll();
@@ -758,6 +758,7 @@ void load_doc(sync_point& out) {
         imgui_Str("A toy for exploring MAP rules, by GitHub user 'achabense'.");
         imgui_Str("The latest version is available at: ");
         ImGui::SameLine(0, 0);
+        // ImGui::TextLinkOpenURL("https://github.com/achabense/moody");
         imgui_StrCopyable("https://github.com/achabense/moody", imgui_Str, set_clipboard_and_notify);
         guide_mode::item_tooltip("Right-click to copy.");
 

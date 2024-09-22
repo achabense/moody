@@ -229,13 +229,22 @@ int main(int, char**) {
     // Currently the controls of the program work poorly with navigation mode.
     assert(!(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_NavEnableKeyboard));
     assert(!(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_NavEnableGamepad));
+#ifdef NDEBUG
+    ImGui::GetIO().ConfigDebugHighlightIdConflicts = false;
+#endif
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
 
     // Setup Platform/Renderer backends
+#ifdef NDEBUG
+    const auto default_open = ImGui::GetPlatformIO().Platform_OpenInShellFn;
+#endif
     ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
     ImGui_ImplSDLRenderer2_Init(renderer);
+#ifdef NDEBUG
+    ImGui::GetPlatformIO().Platform_OpenInShellFn = default_open; // So `ImGui_ImplSDL2_Init` makes no difference.
+#endif
 
 #if 0
     // Test-only.

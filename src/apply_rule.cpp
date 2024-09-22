@@ -614,18 +614,22 @@ public:
                 const aniso::tile_ref data = init.background.data();
                 ImGui::BeginGroup();
                 ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {0, 0});
-                for (int y = 0; y < max_period.y; ++y) {
+                for (int y = 0, id = 0; y < max_period.y; ++y) {
                     for (int x = 0; x < max_period.x; ++x) {
                         if (x != 0) {
                             ImGui::SameLine();
                         }
                         const bool in_range = x < data.size.x && y < data.size.y;
 
-                        // (No need for unique ID here.)
+                        // To get things work, there is no need for unique ID here. Added to avoid
+                        // "conflicting id" message in debug mode.
+                        // (Ideally, this can be totally avoided by using one single invisible button.)
+                        ImGui::PushID(id++);
                         ImGui::InvisibleButton(
                             "##Invisible", cell_button_size,
                             ImGuiButtonFlags_MouseButtonLeft |
                                 ImGuiButtonFlags_MouseButtonRight); // So right-click can activate the button.
+                        ImGui::PopID();
                         imgui_ItemRectFilled(in_range ? (data.at(x, y) ? IM_COL32_WHITE : IM_COL32_BLACK)
                                                       : IM_COL32_GREY(60, 255));
                         imgui_ItemRect(IM_COL32_GREY(160, 255));
@@ -772,7 +776,7 @@ public:
             if (!ImGui::Checkbox("Pause", &ctrl.pause) && item_shortcut(ImGuiKey_Space, false)) {
                 ctrl.pause = !ctrl.pause;
             }
-            ImGui::PushButtonRepeat(true);
+            ImGui::PushItemFlag(ImGuiItemFlags_ButtonRepeat, true);
             ImGui::SameLine();
             if (ImGui::Button("+s") || item_shortcut(ImGuiKey_N, true)) {
                 ctrl.extra_step = ctrl.pause ? ctrl.actual_step() : 0;
@@ -782,7 +786,7 @@ public:
             if (ImGui::Button("+1") || item_shortcut(ImGuiKey_M, true)) {
                 ctrl.extra_step = 1;
             }
-            ImGui::PopButtonRepeat();
+            ImGui::PopItemFlag(); // ImGuiItemFlags_ButtonRepeat
             ImGui::SameLine();
             imgui_StrTooltip("(?)", [] {
                 imgui_Str("+s: ");

@@ -181,7 +181,7 @@ inline bool imgui_RadioButton(const char* label, T* v, std::type_identity_t<T> c
 }
 
 // TODO: are there public ways to do this?
-inline bool imgui_TestItemFlag(ImGuiItemFlags_ flag) { //
+inline bool imgui_TestItemFlag(ImGuiItemFlags flag) { //
     return (GImGui->CurrentItemFlags & flag) != 0;
 }
 
@@ -189,7 +189,11 @@ inline bool imgui_IsWindowHoverable(ImGuiHoveredFlags flags = 0) { //
     return ImGui::IsWindowContentHoverable(ImGui::GetCurrentWindowRead(), flags);
 }
 
-inline float imgui_ContentRegionMaxAbsX() { return ImGui::GetContentRegionMaxAbs().x; }
+inline float imgui_ContentRegionMaxAbsX() {
+    ImGuiContext& g = *GImGui;
+    ImGuiWindow* window = g.CurrentWindow;
+    return (window->DC.CurrentColumns || g.CurrentTable) ? window->WorkRect.Max.x : window->ContentRegionRect.Max.x;
+}
 
 inline float imgui_ItemSpacingX() { return ImGui::GetStyle().ItemSpacing.x; }
 

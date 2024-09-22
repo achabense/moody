@@ -630,7 +630,9 @@ struct page_adapter {
                 previewer::preview(j, config, *rule);
             } else {
                 ImGui::BeginDisabled();
+                ImGui::PushID(j);
                 ImGui::Button(">> Cur");
+                ImGui::PopID();
                 ImGui::EndDisabled();
                 imgui_ItemTooltip("Empty.");
                 previewer::dummy(config, IM_COL32_BLACK);

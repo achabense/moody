@@ -406,7 +406,7 @@ inline bool imgui_StepSliderInt(const char* label, int* v, int v_min, int v_max,
     ImGui::PushID(label);
     ImGui::SetNextItemWidth(std::max(1.0f, ImGui::CalcItemWidth() - 2 * (r + s)));
     ImGui::SliderInt("", &v2, v_min, v_max, format, ImGuiSliderFlags_NoInput);
-    ImGui::PushButtonRepeat(true);
+    ImGui::PushItemFlag(ImGuiItemFlags_ButtonRepeat, true);
     ImGui::SameLine(0, s);
     // (`InputScalar` makes .FramePadding.x = y for these buttons, not added here.)
     if (ImGui::Button("-", ImVec2(r, r)) ||
@@ -418,7 +418,7 @@ inline bool imgui_StepSliderInt(const char* label, int* v, int v_min, int v_max,
         shortcuts::item_shortcut(imgui_StepSliderShortcuts::plus, true, imgui_StepSliderShortcuts::cond)) {
         ++v2;
     }
-    ImGui::PopButtonRepeat();
+    ImGui::PopItemFlag(); // ImGuiItemFlags_ButtonRepeat
     const char* label_end = ImGui::FindRenderedTextEnd(label);
     if (label != label_end) {
         ImGui::SameLine(0, s);
