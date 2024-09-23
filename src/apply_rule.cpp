@@ -536,7 +536,8 @@ public:
     // For example, there are a lot of static variables in `display`, and the keyboard controls are not designed
     // for per-object use.
     void display(sync_point& sync) {
-        const bool rule_changed = m_torus.begin_frame(sync.rule);
+        const bool rule_changed =
+            m_torus.begin_frame(sync_point_override::want_test_run ? sync_point_override::rule : sync.rule);
         if (rule_changed) {
             // m_sel.reset();
             m_paste.reset();
@@ -1115,6 +1116,11 @@ public:
                 drawlist->PopClipRect();
             }
 
+            if (sync_point_override::want_test_run) {
+                imgui_ItemRectFilled(IM_COL32(0, 128, 255, 16));
+                imgui_ItemRect(IM_COL32(0, 128, 255, 255));
+            }
+
             {
                 // `skip` is a workaround to make the highlight appear in the same frame with the tooltip.
                 // (Tooltips will be hidden for one extra frame before appearing.)
@@ -1122,6 +1128,7 @@ public:
                 if (highlight_canvas) {
                     if (!std::exchange(skip, false)) {
                         imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_Separator));
+                        // imgui_ItemRect(IM_COL32(0, 128, 255, 255));
                     }
                 } else {
                     skip = true;
@@ -1420,11 +1427,16 @@ struct global_config {
 };
 
 void previewer::configT::_set() {
-    imgui_StrTooltip("(...)", "Press 'T' to restart all preview windows.\n\n"
-                              "For individual windows:\n"
-                              "Right-click to copy the rule.\n"
-                              "Left-click and hold to pause.\n"
-                              "Hover and press 'R' to restart.");
+    imgui_StrTooltip(
+        "(...)",
+        "Press 'T' to restart all preview windows.\n\n"
+        "For individual windows:\n"
+        "- Right-click to copy the rule.\n"
+        "- Left-click and hold to pause.\n"
+        "- Hover and press 'R' to restart.\n"
+        "- Hover and press 'Z' to see which subsets the previewed rule belongs to in the subset table.\n"
+        "- Hover and press 'X' to temporarily override the current rule with the previewed one in the space window. The previewed rule will not be recorded in this case.\n\n"
+        "If the rule belongs to 'Hex' subset, you can also hover and press '6' to see the projected view in the real hexagonal space. (This also applies to the space window.)");
     guide_mode::highlight();
     ImGui::Separator();
 
@@ -1530,6 +1542,14 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
             ImGui::EndTooltip();
         }
         ImGui::PopStyleVar();
+    }
+
+    if (hovered) {
+        if (sync_point_override::set(term.rule, shortcuts::global_flag(ImGuiKey_Z) /*test-set*/,
+                                     shortcuts::global_flag(ImGuiKey_X) /*test-run*/)) {
+            imgui_ItemRectFilled(IM_COL32(0, 128, 255, 16));
+            border_col = IM_COL32(0, 128, 255, 255);
+        }
     }
 
     if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {

@@ -280,6 +280,9 @@ inline bool begin_menu_for_item() {
 class sequence {
     enum tagE { None, First, Prev, Next, Last };
 
+    // Workaround to avoid the current rule being changed in override mode.
+    static bool extra_cond() { return !ImGui::IsKeyDown(ImGuiKey_Z) && !ImGui::IsKeyDown(ImGuiKey_X); }
+
     inline static ImGuiID bound_id = 0;
     inline static ImU32 last_valid_frame = 0;
 
@@ -320,7 +323,7 @@ class sequence {
             bool ret = ImGui::Button(label);
             if (shortcut_avail) {
                 imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_ButtonActive));
-                if (!ret && window_focused && shortcuts::item_shortcut(shortcut)) {
+                if (!ret && window_focused && extra_cond() && shortcuts::item_shortcut(shortcut)) {
                     ret = true;
                 }
             }
@@ -347,8 +350,9 @@ class sequence {
             tag = Last;
         }
 
-        if ((tag != None) || (bound_id == 0 && window_focused && !pair_disabled && shortcuts::keys_avail() &&
-                              (shortcuts::test(ImGuiKey_LeftArrow) || shortcuts::test(ImGuiKey_RightArrow)))) {
+        if ((tag != None) ||
+            (bound_id == 0 && window_focused && !pair_disabled && shortcuts::keys_avail() && extra_cond() &&
+             (shortcuts::test(ImGuiKey_LeftArrow) || shortcuts::test(ImGuiKey_RightArrow)))) {
             bound_id = id_prev;
             last_valid_frame = ImGui::GetFrameCount();
         }
@@ -609,6 +613,46 @@ public:
     const aniso::ruleT rule;
 
     void set(const aniso::ruleT& rule) { out_rule.emplace(rule); }
+};
+
+// TODO: ideally this should attach to a `sync_point` object.
+// (Would require previewer::preview to take `sync_point` parameter.)
+// However, as there is only one `sync_point` in the program, it makes no actual difference for now.
+struct sync_point_override {
+    inline static aniso::ruleT rule{};
+    inline static bool want_test_set = false;
+    inline static bool want_test_run = false;
+
+    static bool set(const aniso::ruleT& r, bool test_set, bool test_run) {
+        want_test_set_next = test_set;
+        want_test_run_next = test_run;
+        if (want_test_set_next || want_test_run_next) {
+            rule_next = r;
+            return true;
+        }
+        return false;
+    }
+
+    static bool begin_frame(const aniso::ruleT* clear_if_same = nullptr) {
+        bool same = false;
+        if (clear_if_same && (want_test_set_next || want_test_run_next) && *clear_if_same == rule_next) {
+            want_test_set_next = false;
+            want_test_run_next = false;
+            same = true;
+        }
+
+        want_test_set = std::exchange(want_test_set_next, false);
+        want_test_run = std::exchange(want_test_run_next, false);
+        if (want_test_set || want_test_run) {
+            rule = rule_next;
+        }
+        return same;
+    }
+
+private:
+    inline static aniso::ruleT rule_next{};
+    inline static bool want_test_set_next = false;
+    inline static bool want_test_run_next = false;
 };
 
 inline void set_clipboard_and_notify(const char* c_str) {

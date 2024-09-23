@@ -397,9 +397,11 @@ public:
     }
 
     void select(const sync_point& target) {
+        ImGui::BeginGroup();
         if (ImGui::BeginTable("Checklists", 2, ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit)) {
             auto check = [&](termT& term, bool show_title = false) {
-                if (put_term(term.set->contains(target.rule),
+                if (put_term(term.set->contains(sync_point_override::want_test_set ? sync_point_override::rule
+                                                                                   : target.rule),
                              term.selected    ? Selected
                              : term.including ? Including
                              : term.disabled  ? Disabled
@@ -459,6 +461,11 @@ public:
                     [&] { checklist(terms_hex); });
 
             ImGui::EndTable();
+        }
+        ImGui::EndGroup();
+        if (sync_point_override::want_test_set) {
+            imgui_ItemRectFilled(IM_COL32(0, 128, 255, 16));
+            imgui_ItemRect(IM_COL32(0, 128, 255, 255));
         }
     }
 };
@@ -925,6 +932,14 @@ void edit_rule(sync_point& sync) {
         static bool collapse = false;
         ImGui::SameLine();
         ImGui::Checkbox("Collapse", &collapse);
+
+        // (Cannot un-collapse directly in this case, as the previewer may come from random-access table
+        // and its position will be affect by the table.)
+        if (collapse && sync_point_override::want_test_set) {
+            imgui_ItemRectFilled(IM_COL32(0, 128, 255, 16));
+            imgui_ItemRect(IM_COL32(0, 128, 255, 255));
+            messenger::set_msg("The subset table is collapsed.");
+        }
 
         auto select = [&] {
             if (ImGui::Button("Clear##Sets")) {

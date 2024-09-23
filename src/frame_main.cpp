@@ -130,6 +130,9 @@ void frame_main() {
     static recorderT recorder;
     bool freeze = false;
     sync_point sync = recorder.current();
+    if (sync_point_override::begin_frame(&sync.rule)) {
+        messenger::set_msg("This is the same as the current rule.");
+    }
 
     // TODO: add a way to specify the contents for the left panel. These loading windows can fit well.
     static bool show_file = false;
