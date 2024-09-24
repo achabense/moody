@@ -286,11 +286,9 @@ public:
 
 private:
     enum centerE { Selected, Including, Disabled, None }; // TODO: add "equals" relation?
-    static bool put_term(bool contained, centerE center, const char* title /* Optional */, bool interactive) {
-        const ImVec2 size = square_size();
-        ImGui::Dummy(size);
-        const bool hit = interactive && center != Disabled && ImGui::IsItemClicked(ImGuiMouseButton_Left);
 
+    // (Follows `ImGui::Dummy` or `ImGui::InvisibleButton`.)
+    static void put_term(bool contained, centerE center, const char* title /* Optional */, bool button_mode) {
         const ImU32 cent_col = center == Selected    ? IM_COL32(65, 150, 255, 255) // Roughly _ButtonHovered
                                : center == Including ? IM_COL32(25, 60, 100, 255)  // Roughly _Button
                                                      : IM_COL32_BLACK_TRANS;
@@ -307,6 +305,7 @@ private:
         imgui_ItemRectFilled(IM_COL32_BLACK);
         if (title && (center == None || center == Disabled)) {
             const ImVec2 min = ImGui::GetItemRectMin();
+            const ImVec2 size = ImGui::GetItemRectSize();
             const ImVec2 sz = ImGui::CalcTextSize(title, title + 1);
             const ImVec2 pos(min.x + floor((size.x - sz.x) / 2),
                              min.y + floor((size.y - sz.y) / 2) - 1 /* -1 for better visual effect */);
@@ -315,11 +314,10 @@ private:
             imgui_ItemRectFilled(cent_col, ImVec2(4, 4));
         }
         imgui_ItemRect(ring_col);
-        if (interactive && center != Disabled && ImGui::IsItemHovered()) {
-            imgui_ItemRectFilled(IM_COL32_GREY(255, 45));
+        if (button_mode && center != Disabled && ImGui::IsItemHovered() &&
+            (!ImGui::IsAnyItemActive() || ImGui::IsItemActive())) {
+            imgui_ItemRectFilled(ImGui::IsItemActive() ? IM_COL32_GREY(255, 55) : IM_COL32_GREY(255, 45));
         }
-
-        return hit;
     }
 
 public:
@@ -327,6 +325,7 @@ public:
     // TODO: some descriptions rely too much on "current rule"...
     static void about() {
         auto explain = [&](bool contained, centerE center, const char* desc) {
+            ImGui::Dummy(square_size());
             put_term(contained, center, nullptr, false);
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
             ImGui::AlignTextToFramePadding(); // `Dummy` does not align automatically.
@@ -391,6 +390,7 @@ public:
         ImGui::AlignTextToFramePadding();
         imgui_Str("Working set ~");
         ImGui::SameLine();
+        ImGui::Dummy(square_size());
         put_term(current.contains(target.rule), None, nullptr, false);
         guide_mode::item_tooltip("This will be light green if the current rule belongs to every selected "
                                  "subset. See '(...)' for details.");
@@ -399,19 +399,22 @@ public:
     void select(const sync_point& target) {
         ImGui::BeginGroup();
         if (ImGui::BeginTable("Checklists", 2, ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit)) {
-            auto check = [&](termT& term, bool show_title = false) {
-                if (put_term(term.set->contains(sync_point_override::want_test_set ? sync_point_override::rule
-                                                                                   : target.rule),
-                             term.selected    ? Selected
-                             : term.including ? Including
-                             : term.disabled  ? Disabled
-                                              : None,
-                             show_title ? term.title : nullptr, true)) {
-                    assert(!term.disabled);
+            auto check = [&, id = 0](termT& term, bool show_title = false) mutable {
+                ImGui::PushID(id++);
+                ImGui::BeginDisabled(term.disabled);
+                if (ImGui::InvisibleButton("##Invisible", square_size()) && !term.disabled) {
                     term.selected = !term.selected;
                     update_current();
                 }
-
+                ImGui::EndDisabled();
+                ImGui::PopID();
+                put_term(
+                    term.set->contains(sync_point_override::want_test_set ? sync_point_override::rule : target.rule),
+                    term.selected    ? Selected
+                    : term.including ? Including
+                    : term.disabled  ? Disabled
+                                     : None,
+                    show_title ? term.title : nullptr, true);
                 imgui_ItemTooltip(term.description);
             };
 
@@ -933,8 +936,8 @@ void edit_rule(sync_point& sync) {
         ImGui::SameLine();
         ImGui::Checkbox("Collapse", &collapse);
 
-        // (Cannot un-collapse directly in this case, as the previewer may come from random-access table
-        // and its position will be affect by the table.)
+        // (Cannot un-collapse directly in this case, as the previewer may come from random-access section
+        // and its position will be affect by the subset table.)
         if (collapse && sync_point_override::want_test_set) {
             imgui_ItemRectFilled(IM_COL32(0, 128, 255, 16));
             imgui_ItemRect(IM_COL32(0, 128, 255, 255));
