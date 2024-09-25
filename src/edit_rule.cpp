@@ -1063,8 +1063,6 @@ void edit_rule(sync_point& sync) {
         }
     }
 
-    // TODO: by default, the program should not allow random-access edit for rules not included in
-    // the working set. (This should still be supported, but should be an opt-in feature...)
     ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32_GREY(24, 255));
     if (auto child = imgui_ChildWindow("Groups")) {
         // TODO: document the behavior.
@@ -1132,7 +1130,11 @@ void edit_rule(sync_point& sync) {
                     return rule;
                 };
                 const auto show_group = [&] {
-                    imgui_Str("Left-click to flip the values.");
+                    imgui_Str("Click to flip the values in this group.");
+                    if (!contained) {
+                        imgui_Str(
+                            "\n(The current rule does not belong to the working set;\npress 'Ctrl' to enable flipping anyway.)");
+                    }
                     ImGui::Separator();
                     ImGui::Text("Group size: %d", (int)group.size());
                     const int max_to_show = 48;
@@ -1168,8 +1170,16 @@ void edit_rule(sync_point& sync) {
                 ImGui::PushStyleColor(ImGuiCol_Button, button_color[0]);
                 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, button_color[1]);
                 ImGui::PushStyleColor(ImGuiCol_ButtonActive, button_color[2]);
+                const bool enable_edit = contained || ImGui::GetIO().KeyCtrl;
+                if (!enable_edit) {
+                    // Not using ImGui::BeginDisabled(), so the button color will not be affected.
+                    ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+                }
                 if (code_button(head, zoom)) {
                     sync.set(get_adjacent_rule());
+                }
+                if (!enable_edit) {
+                    ImGui::PopItemFlag();
                 }
                 ImGui::PopStyleColor(3);
                 imgui_ItemTooltip(show_group);
