@@ -552,7 +552,6 @@ public:
         bool find_suitable_zoom = false;
         bool highlight_canvas = false;
         {
-            // Could be `ImGui::GetFrameCount() == 1`, but that looks unstable.
             static bool first = true;
             if (std::exchange(first, false)) {
                 locate_center = true;

@@ -204,3 +204,20 @@ inline bool imgui_MouseScrolling() { return ImGui::GetIO().MouseWheel != 0; }
 inline bool imgui_MouseScrollingDown() { return ImGui::GetIO().MouseWheel < 0; }
 
 inline bool imgui_MouseScrollingUp() { return ImGui::GetIO().MouseWheel > 0; }
+
+inline float imgui_CalcButtonSizeX(const char* label) { //
+    return ImGui::CalcTextSize(label, nullptr, true).x + ImGui::GetStyle().FramePadding.x * 2;
+}
+
+// TODO: workaround to set min column width for tables. Highly dependent on impl details.
+// See: `ImGui::TableUpdateLayout`, `table->MinColumnWidth` and `ImGui::TableNextRow`.
+// Are there public ways to do similar things?
+inline void imgui_LockTableLayoutWithMinColumnWidth(const float min_column_width) {
+    ImGuiTable* table = GImGui->CurrentTable;
+    assert(table && !table->IsLayoutLocked);
+    ImGui::PushStyleVarX(ImGuiStyleVar_FramePadding, min_column_width);
+    ImGui::TableUpdateLayout(table);
+    ImGui::PopStyleVar();
+    assert(table->MinColumnWidth == min_column_width);
+    table->IsLayoutLocked = true;
+}

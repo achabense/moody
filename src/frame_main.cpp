@@ -248,15 +248,30 @@ void frame_main() {
         ImGui::Separator();
 
         if (ImGui::BeginTable("Layout", 2, ImGuiTableFlags_Resizable)) {
+            const char* const label_hidden = "H\ni\nd\nd\ne\nn";
+            const float min_w = imgui_CalcButtonSizeX(label_hidden);
+            imgui_LockTableLayoutWithMinColumnWidth(min_w);
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             // The child window is required here (for stable scrolling).
             if (auto child = imgui_ChildWindow("Edit", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
-                edit_rule(sync);
+                if (ImGui::GetContentRegionAvail().x == min_w) { // TODO: working, but looks fragile...
+                    ImGui::BeginDisabled();
+                    ImGui::Button(label_hidden, ImGui::GetContentRegionAvail());
+                    ImGui::EndDisabled();
+                } else {
+                    edit_rule(sync);
+                }
             }
             ImGui::TableNextColumn();
             if (auto child = imgui_ChildWindow("Apply", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
-                apply_rule(sync);
+                if (ImGui::GetContentRegionAvail().x == min_w) {
+                    ImGui::BeginDisabled();
+                    ImGui::Button(label_hidden, ImGui::GetContentRegionAvail());
+                    ImGui::EndDisabled();
+                } else {
+                    apply_rule(sync);
+                }
             }
             ImGui::EndTable();
         }

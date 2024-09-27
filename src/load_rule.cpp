@@ -277,6 +277,7 @@ public:
         std::optional<pathT> target = std::nullopt;
 
         if (ImGui::BeginTable("##Table", 2, ImGuiTableFlags_Resizable)) {
+            imgui_LockTableLayoutWithMinColumnWidth(140); // TODO: improve...
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             {
@@ -475,21 +476,13 @@ private:
                 n_pos.reset();
             }
 
-            // I feel uncomfortable about this...
-            const float w = [&] {
-                float w = ImGui::GetFrameHeight() + imgui_ItemInnerSpacingX() + ImGui::CalcTextSize("Preview").x;
-                if (preview_mode) {
-                    w +=
-                        imgui_ItemSpacingX() + 2 * ImGui::GetStyle().FramePadding.x + ImGui::CalcTextSize("Settings").x;
-                }
-                return w;
-            }();
-            if (ImGui::GetItemRectMax().x + 16 + w <= imgui_ContentRegionMaxAbsX()) {
-                ImGui::SameLine(0, 16);
-            }
+            ImGui::SameLine(0, 16);
             ImGui::Checkbox("Preview", &preview_mode);
             if (preview_mode) {
-                ImGui::SameLine();
+                if (ImGui::GetItemRectMax().x + imgui_ItemSpacingX() + imgui_CalcButtonSizeX("Settings") <=
+                    imgui_ContentRegionMaxAbsX()) {
+                    ImGui::SameLine();
+                }
                 config.set("Settings");
             }
         } else {
