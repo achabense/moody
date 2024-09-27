@@ -1178,8 +1178,11 @@ public:
 
                 auto term = [&](const char* label, const char* shortcut, ImGuiKey key, bool use_sel, operationE op2) {
                     const bool valid = !use_sel || m_sel.has_value();
-                    if (ImGui::MenuItem(label, shortcut, nullptr, valid) ||
-                        (checked_shortcut(key, valid) && shortcuts::highlight())) {
+                    // Was `ImGui::MenuItem(label, shortcut, nullptr, valid)`.
+                    ImGui::BeginDisabled(!valid);
+                    const bool clicked = imgui_SelectableStyledButton(label, false, shortcut);
+                    ImGui::EndDisabled();
+                    if (clicked || (checked_shortcut(key, valid) && shortcuts::highlight())) {
                         assert(valid);
                         op = op2;
                     }
@@ -1255,12 +1258,12 @@ public:
                                 "(This applies to 'Copy' and 'Cut'. 'Identify' will always include rule info.)");
                         term("Copy", "C", ImGuiKey_C, true, _copy);
                         term("Cut", "X", ImGuiKey_X, true, _cut);
-                        imgui_StrTooltip("(?)",
-                                         "Identify a single oscillator or spaceship in 2*2 periodic background "
-                                         "(e.g., pure white, pure black, striped, or checkerboard background), and "
-                                         "copy its smallest phase to the clipboard.");
-                        ImGui::SameLine();
                         term("Identify", "I (i)", ImGuiKey_I, true, _identify);
+                        guide_mode::item_tooltip(
+                            "Identify a single oscillator or spaceship in 2*2 periodic background "
+                            "(e.g., pure white, pure black, striped, or checkerboard background), and "
+                            "copy its smallest phase to the clipboard.");
+                        // !!TODO: improve compatibility with 'There is no selected area' message...
 
                         ImGui::Separator();
                         ImGui::AlignTextToFramePadding();

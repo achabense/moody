@@ -1,6 +1,8 @@
 #include "common.hpp"
 
-// #define SET_FRAME_RATE
+#ifndef NDEBUG
+#define SET_FRAME_RATE
+#endif
 
 #ifdef SET_FRAME_RATE
 #include <thread>
@@ -33,12 +35,8 @@ public:
 
         ImGui::SameLine();
         imgui_RadioButton("50 fps", &fps, 50);
-#ifndef NDEBUG
         ImGui::SameLine();
         imgui_RadioButton("10 fps", &fps, 10);
-        ImGui::SameLine();
-        imgui_RadioButton("5 fps", &fps, 5);
-#endif // !NDEBUG
     }
 };
 #endif

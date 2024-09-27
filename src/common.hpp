@@ -240,7 +240,7 @@ inline bool begin_popup_for_item(bool open, const char* str_id = nullptr) {
 }
 #endif
 
-// Looks like a common popup, and Will appear like a menu (but with more consistent closing behavior).
+// Looks like a common popup, and will appear like a menu (but with more consistent closing behavior).
 // (Not meant to be used recursively; should end with `ImGui::EndPopup` instead of `EndMenu`.)
 inline bool begin_menu_for_item() {
     const ImGuiID id = ImGui::GetItemID();
@@ -273,6 +273,55 @@ inline bool begin_menu_for_item() {
             ImGui::CloseCurrentPopup();
         }
     }
+    return ret;
+}
+
+// Looks like `ImGui::Selectable` but behaves like a button (not designed for tables).
+// (`menu_shortcut` is a workaround to mimic `MenuItem` in the range-ops window. Ideally, that window
+// should be redesigned.)
+inline bool imgui_SelectableStyledButton(const char* label, const bool selected = false,
+                                         const char* menu_shortcut = nullptr) {
+    assert(!ImGui::GetCurrentWindowRead()->DC.IsSameLine);
+
+    if (!selected) {
+        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32_BLACK_TRANS);
+    }
+    static ImGuiID prev_id = 0;
+    if (prev_id != 0 && prev_id == ImGui::GetItemID()) {
+        // As if the last call used `ImGui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, 0)`.
+        // (PushStyleVar-ItemSpacing affects the spacing to the next item. See `ImGui::ItemSize` for details.)
+        ImGui::GetCurrentWindow()->DC.CursorPos.y -= std::round(ImGui::GetStyle().ItemSpacing.y);
+    }
+
+    const float frame_padding_y = 2;
+    ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, {0, 0});
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {0, frame_padding_y});
+
+    bool ret = false;
+    if (!menu_shortcut) {
+        const ImVec2 label_size = ImGui::CalcTextSize(label, nullptr, true);
+        const ImVec2 button_size = {std::max(ImGui::GetContentRegionAvail().x, label_size.x),
+                                    label_size.y + 2 * frame_padding_y};
+        ret = ImGui::Button(label, button_size);
+    } else {
+        // The label should fit in {ImGui::CalcItemWidth(), ImGui::GetFrameHeight()}. Not checked.
+        const float w_before_shortcut = ImGui::CalcItemWidth() + imgui_ItemInnerSpacingX();
+        const ImVec2 shortcut_size = ImGui::CalcTextSize(menu_shortcut);
+        assert(shortcut_size.y == ImGui::GetFontSize()); // Single-line.
+        const ImVec2 button_size = {std::max(ImGui::GetContentRegionAvail().x, w_before_shortcut + shortcut_size.x),
+                                    ImGui::GetFrameHeight()};
+        ret = ImGui::Button(label, button_size);
+        const ImVec2 min = ImGui::GetItemRectMin();
+        ImGui::GetWindowDrawList()->AddText({min.x + w_before_shortcut, min.y + frame_padding_y},
+                                            ImGui::GetColorU32(ImGuiCol_TextDisabled), menu_shortcut);
+    }
+
+    ImGui::PopStyleVar(2);
+    prev_id = ImGui::GetItemID();
+    if (!selected) {
+        ImGui::PopStyleColor();
+    }
+
     return ret;
 }
 

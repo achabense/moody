@@ -223,7 +223,8 @@ public:
                     has = true;
                     const bool selected = current_file && *current_file == entry.path();
                     // (`Selectable` will not close the popup from child-window.)
-                    if (ImGui::Selectable(str.c_str(), selected)) {
+                    // if (ImGui::Selectable(str.c_str(), selected)) {
+                    if (imgui_SelectableStyledButton(str.c_str(), selected)) {
                         target = entry.path();
                     }
                     if (selected && ImGui::IsWindowAppearing()) {
@@ -253,7 +254,8 @@ public:
             const pathT* sel = nullptr;
             for (bool f = true; const pathT& p : m_record) {
                 const bool is_current = std::exchange(f, false) && p == m_current;
-                if (ImGui::Selectable(clip_path(p, ImGui::GetContentRegionAvail().x).c_str(), is_current)) {
+                // if (ImGui::Selectable(clip_path(p, ImGui::GetContentRegionAvail().x).c_str(), is_current)) {
+                if (imgui_SelectableStyledButton(clip_path(p, ImGui::GetContentRegionAvail().x).c_str(), is_current)) {
                     sel = &p;
                 }
             }
@@ -311,14 +313,17 @@ public:
                     buf_path[0] = '\0';
                 }
                 ImGui::Separator();
-                // (Using `ImGuiSelectableFlags_NoPadWithHalfSpacing` for the same visual effect as
-                // those in _ChildWindow("Folders").)
+                // TODO: instead of hiding this entry, should explicitly notify it's not available.
                 if (!home_path.empty()) {
-                    if (ImGui::Selectable("Home", false, ImGuiSelectableFlags_NoPadWithHalfSpacing)) {
+                    // (Using `ImGuiSelectableFlags_NoPadWithHalfSpacing` for the same visual effect as
+                    // those in _ChildWindow("Folders").)
+                    // if (ImGui::Selectable("Home", false, ImGuiSelectableFlags_NoPadWithHalfSpacing)) {
+                    if (imgui_SelectableStyledButton("Home")) {
                         set_current(home_path);
                     }
                 }
-                if (ImGui::Selectable("..", false, ImGuiSelectableFlags_NoPadWithHalfSpacing)) {
+                // if (ImGui::Selectable("..", false, ImGuiSelectableFlags_NoPadWithHalfSpacing)) {
+                if (imgui_SelectableStyledButton("..")) {
                     set_current(m_current.parent_path());
                 }
                 ImGui::Separator();
@@ -330,7 +335,8 @@ public:
                     for (const entryT& entry : m_dirs) {
                         // TODO: cache str?
                         const std::string str = cpp17_u8string(entry.path().filename());
-                        if (ImGui::Selectable(str.c_str())) {
+                        // if (ImGui::Selectable(str.c_str())) {
+                        if (imgui_SelectableStyledButton(str.c_str())) {
                             sel = &entry;
                         }
                     }
@@ -738,7 +744,8 @@ void load_doc(sync_point& out) {
     static auto select = []() {
         for (int i = 0; docs[i][0] != nullptr; ++i) {
             const auto [title, contents] = docs[i];
-            if (ImGui::Selectable(title, doc_id == i, ImGuiSelectableFlags_NoAutoClosePopups) && doc_id != i) {
+            // if (ImGui::Selectable(title, doc_id == i, ImGuiSelectableFlags_NoAutoClosePopups) && doc_id != i) {
+            if (imgui_SelectableStyledButton(title, doc_id == i) && doc_id != i) {
                 text.clear();
                 text.append(contents);
                 text.reset_scroll();
