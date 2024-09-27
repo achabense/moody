@@ -485,10 +485,7 @@ private:
             ImGui::SameLine(0, 16);
             ImGui::Checkbox("Preview", &preview_mode);
             if (preview_mode) {
-                if (ImGui::GetItemRectMax().x + imgui_ItemSpacingX() + imgui_CalcButtonSizeX("Settings") <=
-                    imgui_ContentRegionMaxAbsX()) {
-                    ImGui::SameLine();
-                }
+                ImGui::SameLine();
                 config.set("Settings");
             }
         } else {

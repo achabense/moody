@@ -1,0 +1,41 @@
+MAPE1VINQ8XJwET3JgRSQwgCQQQAIgCAMAB2/RC0QCCABATScIgzkQDQSDQAYWKzIUA2wAYAK6QiwLbiATUwICO6A
+MAPBSgggWAygRJgQQEV8AAxGky8gB3mk0cBACACZkSwQtooqgEjCQAHUqAiBHEwASsFAAwQGCCiPNqAQUntCSTtJQ
+
+
+MAPgAEAAAEXAAEBFwABF38BFwEXAAEXfwEXF38BF3//F34BFwABF38BFxd/ARd//xd+F38BF3//F35//xd+//5+6Q
+Nearby rules (iso):
+MAPklESQAsXCAUBlwSBF30BFwEXAAEXfwEFl/2RF333F14BFwQBl2+BFxd/SRd//xf+l2+DF++/F15//xd+//9+6Q
+->
+MAPklESQAsXCAUAkwSBF30BFwEXAAEXfwEFl/2RF333F14AFwQBk2+BFxc/SRd3/xf+l2+DF++/F143/xd+//9+6Q
+
+MAPgAEggAEXgAEBFwEEF38BFwEXgAEXfwEXF38BF3//F34BFwEBF38EFxd/AVd//x9+F38BF3//F35//18+//526Q
+
+
+MAPl39//3/+//5////+//7+qH///v7//v7o/+7+6P7o6IB////+//7+4P/+/uj+6OiA//7+6Pzo6ID+6MiA6ACAAA
+-> strange...
+MAPl39//3/+//5////+//7+qH///v7//v7o/+7+6P7o6IB////+//7+4P/+/uj+6OiE//7+6Pzo6ID+6MmA6ACAAA
+
+
+!!! iso & wadx
+MAPBQWgoAUFoKBfXwAAX18AAAUFoKAFBaCgX18AAF9fAABfXwAAX18AAP//AAD//wAAX18AAF9fAAD//wAA//8AAA
+~
+~~ some random nearby rules in iso
+MAPBQWAAAUFAIBfXwAAXV8AIAUFIAIFBRBoX1cAAFtfIABfTwAAX18AIP/9AADv/wAAX1sAIB9fAAD//wAA//8AAA
+MAPBRUgoAcEoKBfXwIIX18IAAUFoKAFBaCgX88IAF9fBABfXxBAX19AAP/+AAL+/xAAX19ABN1fAAD/+wAA+38AAA
+MAPBQUgoAUFoKBfXAACX18AAAUFoKAFBaCgX18AAFNfCABfXwAATl8QAP/9AADv/wAAXxsAQF9fAAD/vwAA9/8AAA
+MAPBQ2y4UUFqbJ/XgiQz08AQE0AobAABaKgX1+AYB8fAIB/3UAAXl2CCP/fAADf/wAAX1eAAF9XKID/nyCA1/+AAA
+MAPBSWggSUFgaBfXwQQT08QAAWAoCSABSSyX18AQB8fRCBfXQQCX10CAP/fTSbf/zQBX1cADF9XCCD/3wSB3/+BBA
+MAPJYWgoIUFoKBfXwAAX18BAIUFoKAFBaCgX18ABF9fAABfXwABX18AAP//ABD//wIAX18AAF9fBAD//wAI//9AAA
+!!^ will evolve to amazing periodic background (needs some time), and there do exist oscillators in the background (period >2*2, cannot identify yet)
+
+Copied area; should be an oscillator (the background period is large so it's harder to align correctly)
+~
+x = 29, y = 22, rule = MAPJYWgoIUFoKBfXwAAX18BAIUFoKAFBaCgX18ABF9fAABfXwABX18AAP//ABD//wIAX18AAF9fBAD//wAI//9AAA
+3bobo5bobo5bobo5bob$obo5bobo5bobo5bobo$5bobo5bobo5bobo$2bob
+o5bobo5bobo5bobo$bo5bobo5bobo5bobo$4bobo5bobo5bobo5bo$bobo5b
+obo5bobo5bobo$o5bobo5b4o4bobo$3bobo5bobobo2b2obo5bo$obo5bob
+o2b2ob3o2bo2bobo$5bobo10bob2obo$2bobo5bob2ob2obo4bo2bobo$bo
+5bobo2b5ob2obobobo$4bobo5b2ob2o2bo2bo5bo$bobo5bobo2bob2o7bo
+bo$o5bobo5bobo5bobo$3bobo5bobo5bobo5bo$obo5bobo5bobo5bobo$5b
+obo5bobo5bobo$2bobo5bobo5bobo5bobo$bo5bobo5bobo5bobo$4bobo5b
+obo5bobo5bo!

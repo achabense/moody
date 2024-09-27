@@ -155,7 +155,7 @@ void frame_main() {
             ImGui::SetNextWindowPos(ImGui::GetItemRectMin() + ImVec2(0, ImGui::GetFrameHeight() + 4),
                                     ImGuiCond_FirstUseEver);
             ImGui::SetNextWindowSize({600, 400}, ImGuiCond_FirstUseEver);
-            ImGui::SetNextWindowSizeConstraints(ImVec2(400, 300), ImVec2(FLT_MAX, FLT_MAX));
+            ImGui::SetNextWindowSizeConstraints(ImVec2(450, 300), ImVec2(FLT_MAX, FLT_MAX));
             if (auto window = imgui_Window(title, &open, ImGuiWindowFlags_NoSavedSettings)) {
                 load_fn(sync);
             }

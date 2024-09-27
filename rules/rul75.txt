@@ -1,0 +1,48 @@
+MAP//yAAO4BAADwwAAAgAAAAMiAAACAAAAAwJAAAAAAAACqgAAAiAAAAICAAACAAAABiAAAAIIAAACAAAABAIABBA
+-> wtf is this?
+MAP//yAAO4BAAD4wAAAgAAAAMiAAACAAAAAwJAAAAAAAADqgAAAiAAAAICAAACAAAABiAAAAIIAAACAAAABAIABBA
+
+(iso & self-complementrary)
+MAPoIX/6oXe+PsSGe7pSvj7obcT/v4TSP7bemioPSDA5bcSWPz7Q+rpoSSA7TeAgDcSeiDgrWiIZ7cg4IReqABe+g
+->
+MAPoIX/6oXe+PsSGe7pSvj7obcT/v4TSP77emioPSDA5bcSWPz7Q+rpoSCA7TeAgDcSeiDgrWiIZ7cg4IReqABe+g
+strange texture...
+MAPgAX/6gVe+PsSGe7pSvj7oRcT/v4TaP77emioPSDA5bcSWPz7Q+rpoSCA6TeAgDcXeiDgrWiIZ7cg4IVfqABf/g
+
+MAPASEXfiFofiQGW37oW4DoThakTeikgOiAKEzbgkwAgggUW37oW4DoXGgz6IAzAIDMYEzbkEwAkECAzLMAzAAAAA
+ 
+!! has a lot of fish-like spaceships...
+MAPF0QEAAwSACBRxEYIBRQJBQARACADJCC2xSQJBRDCESYLBRxBjAZABZPcyBDObAJ6jQJBAySYBTTfKBIaYABSSA
+~~ (taken from a nearby rule)
+#C Spaceship. Period:24. Offset(x,y):(24,0).
+x = 48, y = 17, rule = MAPF0QEAAwSACBRxEYIBRQJBQARACADJCC2xSQJBRDCESYLBRxBjAZABZPcyBDObAJ6jQJBAySYBTTfKBIaYAFSSA
+obobobobobobobobobobobobobobobobobobobobobobobob$obobobobob
+obobobobobobobobobobobobobobobobobobo$obobobobobobobobo3bob
+obobobo3bobobobobobobobo$obobobobobo3bobobobobobobobo3bobob
+obobobobobo$obobobo13bo3bobo7bo3bobobobobo$obobobobo15bobo3b
+obobobobobobobobo$obobobobo29bobobobobo$obobobobo11bobo3bo11b
+obobobobo$obobobo39bo$obobo23bo3bo7bo4b2o$obo3bo5bo33bo$obo
+7bo3bo3bo7bo5bo3bobo3bobobo$o7bobobobobo13bo3bo7bobobo$o7bo
+bobobobobobo7bo3bo3bobobobobobo$obobobobobobobobobobo7bobob
+o3bobobobobobo$obobobobobobobobobobobobobobobobobobobobobob
+obo$obobobobobobobobobobobobobobobobobobobobobobobob!
+
+MAPIZ3/78fo/V8wUv//4tv/rP8p3t5hoN57Ysv/fApL7bciuP//Gtv/5CCA+/+AAf/fOFD/7dlZbregsd/Po17dtw
+
+MAPACl+wWEAifsgEM+fggp/30iAtz2AAGe2AkqvfwIJX+8gkN1/AlDX3wAA/34AAH56EBD1X1hBf/0AgH76gBL62w
+->
+MAPADl+wWMAifsgEM+fggp/30iAtz2AAGe2AsqvfwIJX+8gkN1/AlDX3wAA/34AAH56EBD1X9hBf/0AgH76gBL62w
+-> wow nice
+MAPADleQWMACfsgEM+fggp/30iANz2AAGe2AsqvfwIJX+8gkN1/AlDX3wAA/34AAH56EBD1X9hBf/0AgH76gBL62w
+
+MAPSCKz/zCB/36AIDn3AA+k3SDA2/mIEuu3AxP34YIpnfWAAGOkIFW/zwABF84BSdz/EZC/xxNhqa8SFf/zB9+7fw
+->
+MAPSCKz/zCB/36AIDn3AA+knSDA2vmIEuu3AxP34YIpnfWAAGOkIFW/xwABF84BSdz/EZC/xxNhqa8SFd/zB9+7fw
+
+MAPAApNO1AWc/okIOt+xAD4/UxQf/8KBP/bFCAr4ZCA7PEkjPnqIAB+73oIoWdAoD1NBoJx7CCAqasAAP+1AACnfw
+
+MAPEFIWaDRoLIAHLGiASoDEABbgLIBogAgAaAjEAIAAiAAWaGiA4ICAAGiAgAAIAAAA4ICAAIAAAAAIAAAAAAAAAA
+~~
+#C Spaceship. Period:172. Offset(x,y):(86,86).
+x = 11, y = 11, rule = MAPEFIWaDRoLIAHLGiASoDEABbgLIBogAgAaAjEAIAAiAAWaGiA4ICAAGiAgAAIAAAA4ICAAIAAAAAIAAAAAAAAAA
+11b2$6bo$6bobo$4bo2b2o$3bobo2bo$2bo4b2o$6b2o$6bo2$11b!
