@@ -284,10 +284,9 @@ public:
             ImGui::TableNextColumn();
             {
                 ImGui::SetNextItemWidth(std::min(ImGui::CalcItemWidth(), (float)item_width));
-                const bool enter = ImGui::InputTextWithHint("##Path", "Folder or file path", buf_path,
-                                                            std::size(buf_path), ImGuiInputTextFlags_EnterReturnsTrue);
-                ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                if ((ImGui::Button("Open") || enter) && buf_path[0] != '\0') {
+                if (ImGui::InputTextWithHint("Open", "Folder or file path", buf_path, std::size(buf_path),
+                                             ImGuiInputTextFlags_EnterReturnsTrue) &&
+                    buf_path[0] != '\0') {
                     const bool succ = [&]() -> bool {
                         std::error_code ec{};
                         const pathT p = m_current / cpp17_u8path(buf_path);
@@ -614,10 +613,9 @@ private:
 static const int max_size = 1024 * 256;
 
 // For error message.
-static std::string too_long(uintmax_t size, int max_size) {
+static std::string to_size(uintmax_t size) {
     const bool use_mb = size >= 1024 * 1024;
-    return std::format("{:.2f}{} > {:.2f}KB", size / (use_mb ? (1024 * 1024.0) : 1024.0), use_mb ? "MB" : "KB",
-                       max_size / 1024.0);
+    return std::format("{:.2f}{}", size / (use_mb ? (1024 * 1024.0) : 1024.0), use_mb ? "MB" : "KB");
 }
 
 [[nodiscard]] static bool load_binary(const pathT& path, std::string& str) {
@@ -636,7 +634,7 @@ static std::string too_long(uintmax_t size, int max_size) {
     }
 
     if (!ec && size > max_size) {
-        messenger::set_msg("File too large: {}", too_long(size, max_size));
+        messenger::set_msg("File too large: {} > {}", to_size(size), to_size(max_size));
     } else {
         messenger::set_msg("Failed to load file.");
     }
@@ -716,7 +714,7 @@ void load_clipboard(sync_point& out) {
     if (ImGui::SmallButton("Read clipboard") || shortcuts::item_shortcut(ImGuiKey_W)) {
         const std::string_view str = read_clipboard();
         if (str.size() > max_size) {
-            messenger::set_msg("Text too long: {}", too_long(str.size(), max_size));
+            messenger::set_msg("Text too long: {} > {}", to_size(str.size()), to_size(max_size));
         } else if (!str.empty()) {
             text.clear();
             text.append(str);

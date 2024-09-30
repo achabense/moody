@@ -268,8 +268,8 @@ inline bool begin_menu_for_item() {
 
         const ImVec2 mouse_pos = ImGui::GetMousePos();
         const ImVec2 pad = square_size();
-        if (!item_rect.ContainsWithPad(mouse_pos, pad * 2) &&
-            !imgui_GetWindowRect().ContainsWithPad(mouse_pos, pad * 3)) {
+        if (!item_rect.ContainsWithPad(mouse_pos, pad * 1.5) &&
+            !imgui_GetWindowRect().ContainsWithPad(mouse_pos, pad * 2.5)) {
             ImGui::CloseCurrentPopup();
         }
     }
@@ -492,14 +492,16 @@ class messenger {
         std::optional<ImVec2> m_min{};
         int m_count{};
 
+        using clockT = std::chrono::steady_clock;
+        clockT::time_point m_time{};
+
     public:
         // (Defined as a workaround for gcc building.)
         // (Related: https://stackoverflow.com/questions/53408962)
-        messageT() : m_str{}, m_min{}, m_count{} {}
+        messageT() : m_str{}, m_min{}, m_count{}, m_time{} {}
 
         void set(std::string&& str) {
             m_min.reset();
-            m_count = 10;
 
             size_t subsize = 0;
             for (int line = 0; line < 20; ++line) {
@@ -522,10 +524,14 @@ class messenger {
         void display() {
             if (m_str.empty()) {
                 return;
-            } else {
-                assert(m_count > 0);
-                const ImVec2 delta = ImGui::GetIO().MouseDelta;
-                if ((delta.x || delta.y) && --m_count == 0) {
+            } else if (m_min) {
+                if (const ImVec2 delta = ImGui::GetIO().MouseDelta; delta.x || delta.y) {
+                    --m_count;
+                }
+                const bool t_expired = clockT::now() > m_time;
+                const bool c_expired = m_count < 0;
+                // TODO: ideally the callers of `set_msg` should be able to specify quitting cond.
+                if (m_str.size() < 10 ? (c_expired || t_expired) : (c_expired && t_expired)) {
                     m_str.clear();
                     return;
                 }
@@ -538,6 +544,9 @@ class messenger {
             const ImVec2 window_size = ImGui::CalcTextSize(text_beg, text_end, false, text_wrap) + padding * 2;
 
             if (!m_min) {
+                m_count = 10;
+                m_time = clockT::now() + std::chrono::milliseconds(500);
+
                 const ImVec2 main_size = ImGui::GetMainViewport()->Size;
                 if (ImGui::IsMousePosValid()) {
                     const ImVec2 pos = ImClamp(ImGui::GetMousePos(), ImVec2{0, 0}, main_size);
@@ -711,6 +720,12 @@ inline void set_clipboard_and_notify(const char* c_str) {
 
 inline void set_clipboard_and_notify(const std::string& str) { //
     set_clipboard_and_notify(str.c_str());
+}
+
+inline void set_msg_cleared(bool has_effect) {
+    // if (has_effect) {
+    messenger::set_msg("Cleared.");
+    // }
 }
 
 // It's not obvious whether `ImGui::GetClipboardText` can return nullptr, and

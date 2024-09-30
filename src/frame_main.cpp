@@ -230,8 +230,8 @@ void frame_main() {
         ImGui::SameLine();
         ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1 /* [1, size()] */);
         if (imgui_ItemClickableDouble()) {
+            set_msg_cleared(recorder.size() > 1);
             freeze = true, recorder.clear();
-            // messenger::set_msg("Cleared.");
         }
         imgui_ItemTooltip_StrID = "Clear##Rec";
         guide_mode::item_tooltip("Double right-click to clear the record (except the current rule).");

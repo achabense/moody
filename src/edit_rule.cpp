@@ -801,8 +801,8 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
             }
         }
         if (imgui_ItemClickableDouble()) {
+            set_msg_cleared(!page.empty());
             page.clear();
-            // messenger::set_msg("Cleared.");
         }
         imgui_ItemTooltip_StrID = "Clear";
         guide_mode::item_tooltip("Double right-click to clear.");
@@ -903,9 +903,9 @@ static void random_rule_window(bool& show_rand, sync_point& sync, const aniso::s
             ImGui::Text("Pages:%d At:N/A", calc_page());
         }
         if (imgui_ItemClickableDouble()) {
+            set_msg_cleared(!rules.empty());
             rules = std::vector<aniso::ruleT>{};
             page_no = 0;
-            // messenger::set_msg("Cleared.");
         }
         imgui_ItemTooltip_StrID = "Clear";
         guide_mode::item_tooltip("Double right-click to clear all pages.");

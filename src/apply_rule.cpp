@@ -572,7 +572,7 @@ public:
         };
 
         auto set_init_state = [&]() {
-            // !!TODO: the control flow is awkwardly convoluted...
+            // TODO: the control flow is awkwardly convoluted...
             const bool restarted = m_torus.set_init([&](initT& init, bool& pause) {
                 bool force_restart = false;
 
@@ -885,8 +885,8 @@ public:
             imgui_Str("Selected:N/A");
         }
         if (imgui_ItemClickableDouble()) {
+            set_msg_cleared(m_sel.has_value());
             m_sel.reset();
-            // messenger::set_msg("Cleared.");
         }
         imgui_ItemTooltip_StrID = "Clear##Sel";
         guide_mode::item_tooltip("Double right-click to clear.");
@@ -899,8 +899,8 @@ public:
             imgui_Str("Paste:N/A");
         }
         if (imgui_ItemClickableDouble()) {
+            set_msg_cleared(m_paste.has_value());
             m_paste.reset();
-            // messenger::set_msg("Cleared.");
         }
         imgui_ItemTooltip_StrID = "Clear##Paste";
         guide_mode::item_tooltip("Double right-click to clear.");
@@ -1279,6 +1279,7 @@ public:
                                                 "background.\n\n"
                                                 "Use 'Or' mode to treat black cells as transparent background. "
                                                 "('And' ~ white background.)");
+                        guide_mode::highlight();
                         term("Paste", "V", ImGuiKey_V, false, _paste);
                     } else { // Shortcut only.
                         auto term2 = [&](ImGuiKey key, bool use_sel, operationE op2) {
