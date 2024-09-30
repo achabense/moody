@@ -1145,6 +1145,7 @@ public:
                     _clear_outside,
                     _select_all,
                     _bounding_box,
+                    _spatial_period,
                     _copy,
                     _cut,
                     _paste,
@@ -1250,6 +1251,8 @@ public:
                         ImGui::Separator();
                         term("Select all", "A", ImGuiKey_A, false, _select_all);
                         term("Bound", "B", ImGuiKey_B, true, _bounding_box);
+                        term("Spatial period", "P", ImGuiKey_P, true, _spatial_period);
+                        // TODO: enhance to test temporal period as well (~ "test background")...
 
                         // Copy/Cut/Paste.
                         ImGui::Separator();
@@ -1293,6 +1296,7 @@ public:
                         term2(ImGuiKey_0, true, _clear_outside);
                         term2(ImGuiKey_A, false, _select_all);
                         term2(ImGuiKey_B, true, _bounding_box);
+                        term2(ImGuiKey_P, true, _spatial_period);
                         term2(ImGuiKey_C, true, _copy);
                         term2(ImGuiKey_X, true, _cut);
                         term2(ImGuiKey_V, false, _paste);
@@ -1356,6 +1360,15 @@ public:
                             .active = false, .beg = sel_range.begin + begin, .end = sel_range.begin + end.plus(-1, -1)};
                     } else {
                         m_sel.reset();
+                    }
+                } else if (op == _spatial_period && m_sel) {
+                    const aniso::rangeT sel_range = m_sel->to_range();
+                    const aniso::vecT p_size = aniso::spatial_period(m_torus.read_only(sel_range));
+                    if (p_size.both_lt(sel_range.size()) && p_size.xy() * 3 < sel_range.size().xy()) {
+                        messenger::set_msg("Period size: x = {}, y = {}", p_size.x, p_size.y);
+                    } else {
+                        // (The too-large case is considered impossible to occur naturally.)
+                        messenger::set_msg("The selected area is too small, or not spatially periodic.");
                     }
                 } else if (op == _copy && m_sel) {
                     copy_sel();

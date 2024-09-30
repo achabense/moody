@@ -26,7 +26,7 @@ MAPBQUgoAUFoKBfXAACX18AAAUFoKAFBaCgX18AAFNfCABfXwAATl8QAP/9AADv/wAAXxsAQF9fAAD/v
 MAPBQ2y4UUFqbJ/XgiQz08AQE0AobAABaKgX1+AYB8fAIB/3UAAXl2CCP/fAADf/wAAX1eAAF9XKID/nyCA1/+AAA
 MAPBSWggSUFgaBfXwQQT08QAAWAoCSABSSyX18AQB8fRCBfXQQCX10CAP/fTSbf/zQBX1cADF9XCCD/3wSB3/+BBA
 MAPJYWgoIUFoKBfXwAAX18BAIUFoKAFBaCgX18ABF9fAABfXwABX18AAP//ABD//wIAX18AAF9fBAD//wAI//9AAA
-!!^ will evolve to amazing periodic background (needs some time), and there do exist oscillators in the background (period >2*2, cannot identify yet)
+!!^ will evolve to amazing periodic background (8*8; needs some time), and there do exist oscillators in the background (period >2*2, cannot identify yet)
 
 Copied area; should be an oscillator (the background period is large so it's harder to align correctly)
 ~

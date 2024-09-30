@@ -254,6 +254,46 @@ namespace aniso {
         }
     }
 
+    // `tile.size` -> non-periodic, or the period is too large
+    inline vecT spatial_period(const tile_const_ref tile) {
+        auto has_period_x = [tile](const int p_x) -> bool {
+            for (int y = 0; y < tile.size.y; ++y) {
+                for (int x = p_x; x < tile.size.x; ++x) {
+                    if (tile.at(x, y) != tile.at(x - p_x, y)) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        };
+
+        auto has_period_y = [tile](const int p_y) -> bool {
+            for (int y = p_y; y < tile.size.y; ++y) {
+                for (int x = 0; x < tile.size.x; ++x) {
+                    if (tile.at(x, y) != tile.at(x, y - p_y)) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        };
+
+        vecT p_size = tile.size;
+        for (int x = 1; x < std::min(tile.size.x, 60); ++x) {
+            if (has_period_x(x)) {
+                p_size.x = x;
+                break;
+            }
+        }
+        for (int y = 1; y < std::min(tile.size.y, 60); ++y) {
+            if (has_period_y(y)) {
+                p_size.y = y;
+                break;
+            }
+        }
+        return p_size;
+    }
+
 #ifdef ENABLE_TESTS
     namespace _tests {
         // TODO: many tests in this header can be simplified if using `tileT`.
