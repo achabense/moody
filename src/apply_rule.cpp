@@ -547,7 +547,7 @@ public:
         static bool background = 0;
         static aniso::blitE paste_mode = aniso::blitE::Copy;
 
-        static bool auto_fit = false;
+        bool resize_fullscreen = false;
         bool locate_center = false;
         bool find_suitable_zoom = false;
         bool highlight_canvas = false;
@@ -716,7 +716,6 @@ public:
             const auto iy = input_y.input("##Height", std::format("Height:{}", size.y).c_str());
 
             if (ix || iy) {
-                auto_fit = false;
                 locate_center = true;
                 find_suitable_zoom = true;
 
@@ -729,24 +728,16 @@ public:
         auto select_zoom = [&] {
             ImGui::AlignTextToFramePadding();
             imgui_Str("Zoom ~");
-            bool auto_fit_next = auto_fit;
             m_coord.zoom.select([&](const bool is_cur, const float z, const char* const s) {
                 ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                const bool selected =
-                    ImGui::RadioButton((auto_fit && is_cur) ? std::format("[{0}]###{0}", s).c_str() : s, is_cur);
-                if (selected) {
-                    auto_fit_next = is_cur ? !auto_fit : true;
+                if (ImGui::RadioButton(s, is_cur)) {
+                    resize_fullscreen = true;
                     return true;
                 }
                 return false;
             });
-            auto_fit = auto_fit_next;
             ImGui::SameLine();
-            imgui_StrTooltip("(?)",
-                             "Click a button to enter auto-resizing mode.\n\n"
-                             "The window will be automatically resized to full-screen. Dragging and scrolling are "
-                             "not available, but you can still rotate the space with 'Ctrl + drag'.\n\n"
-                             "(Click the same button to quit this mode.)");
+            imgui_StrTooltip("(?)", "Click to resize the space to full-screen.");
             guide_mode::highlight();
         };
 
@@ -922,11 +913,17 @@ public:
                 m_torus.pause_for_this_frame();
             }
 
-            if (auto_fit) {
+            if (resize_fullscreen) {
                 locate_center = true;
-                if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-                    m_torus.resize(from_imvec_floor((canvas_size - ImVec2(20, 20)) / m_coord.zoom));
-                }
+                m_torus.resize(from_imvec_floor((canvas_size - ImVec2(20, 20)) / m_coord.zoom));
+            } else if (find_suitable_zoom) {
+                // (wontfix) Poorly written, but works...
+                // Select the largest zoom that can hold the entire tile.
+                m_coord.zoom.slide(-100); // -> smallest.
+                m_coord.zoom.select([&](bool, float z, const char*) {
+                    const aniso::vecT size = m_torus.calc_size(from_imvec_floor((canvas_size - ImVec2(20, 20)) / z));
+                    return size.both_gteq(m_torus.size());
+                });
             }
 
             // `m_torus` won't resize now.
@@ -934,16 +931,6 @@ public:
             if (m_torus.resized_since_last_check()) {
                 m_sel.reset();
                 m_paste.reset();
-            }
-
-            if (find_suitable_zoom) {
-                // (wontfix) Poorly written, but works...
-                // Select the largest zoom that can hold the entire tile.
-                m_coord.zoom.slide(-100); // -> smallest.
-                m_coord.zoom.select([&](bool, float z, const char*) {
-                    const aniso::vecT size = m_torus.calc_size(from_imvec_floor((canvas_size - ImVec2(20, 20)) / z));
-                    return size.both_gteq(tile_size);
-                });
             }
 
             if (locate_center) {
@@ -977,12 +964,12 @@ public:
                             to_rotate -= ImVec2(dx, dy);
                             m_torus.rotate_00_to(dx, dy);
                         }
-                    } else if (!auto_fit) {
+                    } else {
                         m_coord.corner_pos -= io.MouseDelta / m_coord.zoom;
                     }
                 }
 
-                if (!auto_fit && imgui_MouseScrolling()) {
+                if (imgui_MouseScrolling()) {
                     to_rotate = {0, 0};
 
                     const ImVec2 space_pos = m_coord.to_space(mouse_pos);
