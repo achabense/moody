@@ -79,7 +79,7 @@ static void hex_image(const aniso::tile_const_ref source, const aniso::vecT /*so
     ImGui::Image(make_screen(dest_data, scaleE::Linear), to_imvec(window_size));
 }
 
-// `is_hexagonal_rule` is not strictly necessary, but it ensures that the project view is
+// `is_hexagonal_rule` is not strictly necessary, but it ensures that the projected view is
 // always meaningful.
 static bool want_hex_mode(const aniso::ruleT& rule) {
     // return shortcuts::global_flag(ImGuiKey_6);
@@ -1455,7 +1455,7 @@ void previewer::configT::_set() {
     ImGui::Separator();
 
     ImGui::SetNextItemWidth(item_width);
-    imgui_StepSliderInt("Step", &step, 1, 16);
+    imgui_StepSliderInt("Step", &step, 1, 24);
     ImGui::SetNextItemWidth(item_width);
     global_config::timer.slide_interval("Interval", 0, 400);
     ImGui::SameLine();

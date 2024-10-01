@@ -210,12 +210,11 @@ void frame_main() {
         // Use icons? https://github.com/ocornut/imgui/blob/master/docs/FONTS.md#using-icon-fonts
         ImGui::AlignTextToFramePadding();
         imgui_StrTooltip(
-            "(...)", "'<| Prev/Next |>' represents the record for the current rule (as shown in the right panel). "
-                     "When clicked, the left/right arrow key will be bound to 'Prev/Next'.\n\n"
-                     "To clear the record, right-click 'Total:.. At:..' and then click 'Clear' in the "
-                     "popup to confirm.\n\n"
-                     "To save the current rule, right-click the MAP-string, and it will be copied to the clipboard.");
-        // !!TODO: outdated.
+            "(...)",
+            "(Press 'H' to enter help mode for more tooltips; press 'H' again to quit the mode.)\n\n"
+            "'<| Prev/Next |>' represents the record for the current rule (as shown in the right panel). You can switch to previously tested rules with it.\n\n"
+            "Right-click 'Total:.. At:..' to clear the record.\n\n"
+            "Right-click the MAP-string (for the current rule) to copy to the clipboard.");
 
         ImGui::SameLine();
         ImGui::BeginGroup();
@@ -225,7 +224,9 @@ void frame_main() {
             [&] { freeze = true, recorder.set_next(); }, [&] { freeze = true, recorder.set_last(); });
         ImGui::EndGroup();
         imgui_ItemTooltip_StrID = "Seq##Record";
-        guide_mode::item_tooltip("You can switch to previously tested rules with this.");
+        guide_mode::item_tooltip(
+            "Record for the current rule. You can switch to previously tested rules with this.\n\n"
+            "(When a button is clicked, or when the window is focused and you press the left/right arrow key, the left/right arrow key will begin to serve as the shortcuts for 'Prev/Next'. This also applies to sequences in other windows.)");
 
         ImGui::SameLine();
         ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1 /* [1, size()] */);
@@ -233,7 +234,7 @@ void frame_main() {
             set_msg_cleared(recorder.size() > 1);
             freeze = true, recorder.clear();
         }
-        imgui_ItemTooltip_StrID = "Clear##Rec";
+        imgui_ItemTooltip_StrID = "Clear##Record";
         guide_mode::item_tooltip("Double right-click to clear the record (except the current rule).");
 
         ImGui::SameLine();
@@ -241,7 +242,7 @@ void frame_main() {
 
         ImGui::SameLine();
         imgui_StrCopyable(aniso::to_MAP_str(sync.rule), imgui_Str, set_clipboard_and_notify);
-        guide_mode::item_tooltip("Right-click to copy.");
+        guide_mode::item_tooltip("MAP-string for the current rule. Right-click to copy.");
 
         ImGui::Separator();
 

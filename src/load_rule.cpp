@@ -458,12 +458,17 @@ private:
         const int total = m_rules.size();
 
         if (total != 0) {
+            ImGui::BeginGroup();
             sequence::seq(
                 "<|", "Prev", "Next", "|>",                                   //
                 [&] { n_pos = 0; },                                           //
                 [&] { n_pos = std::max(0, m_pos.value_or(-1) - 1); },         //
                 [&] { n_pos = std::min(total - 1, m_pos.value_or(-1) + 1); }, //
                 [&] { n_pos = total - 1; });
+            ImGui::EndGroup();
+            imgui_ItemTooltip_StrID = "Seq##Rules";
+            guide_mode::item_tooltip("Rules found in the text.");
+
             ImGui::SameLine();
             if (m_pos.has_value()) {
                 ImGui::Text("Total:%d At:%d", total, *m_pos + 1);
@@ -474,8 +479,7 @@ private:
                 n_pos = m_pos.value_or(0);
             }
             imgui_ItemTooltip_StrID = "Sync";
-            guide_mode::item_tooltip("Double right-click to sync.");
-            // TODO: "sync" may be confusing to users...
+            guide_mode::item_tooltip("Double right-click to move to 'At'.");
 
             if (m_sel) {
                 n_pos.reset();

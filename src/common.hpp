@@ -325,7 +325,6 @@ inline bool imgui_SelectableStyledButton(const char* label, const bool selected 
     return ret;
 }
 
-// !!TODO: currently under-documented...
 class sequence {
     enum tagE { None, First, Prev, Next, Last };
 

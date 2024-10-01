@@ -714,21 +714,26 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
             page.clear();
         }
 
-        // !!TODO: not clear enough...
-        ImGui::AlignTextToFramePadding();
-        imgui_StrTooltip("(...)",
-                         "Iterate through the entire working set, by firstly iterating through all rules with "
-                         "distance = 1 to the masking rule, then 2, 3, ..., until max distance.\n\n"
-                         "For example, suppose the current rule belongs to the working set. To iterate through all "
-                         "rules with distance = 1 to the current rule, you can:\n"
-                         "1. '<< Cur' to set it as the custom mask.\n"
-                         "2. 'Next' to iterate. The left/right arrow key will be bound to 'Prev/Next' after you "
-                         "click the button.");
-        ImGui::SameLine();
-
         // TODO: improve...
+        // TODO: share with `edit_rule`?
+        const bool contained = subset.contains(sync.rule);
+        ImGui::BeginDisabled(!contained);
+        if (ImGui::Button("Locate")) {
+            assert(subset.contains(sync.rule));
+            page.clear();
+            page.push_back(sync.rule);
+            fill_next(adapter.page_size - 1);
+        }
+        ImGui::EndDisabled();
+        guide_mode::item_tooltip("Go to where the current rule belongs in the sequence.");
+        if (!contained) {
+            imgui_ItemTooltip(guide_mode::enabled() ? "\n(The current rule does not belong to the working set.)"
+                                                    : "The current rule does not belong to the working set.");
+        }
+
         static input_int input_dist{};
-        imgui_Str("Seek to dist ~ ");
+        ImGui::SameLine();
+        imgui_Str("Go to dist ~ ");
         ImGui::SameLine(0, 0);
         ImGui::SetNextItemWidth(ImGui::CalcTextSize("Max:0000").x + ImGui::GetStyle().FramePadding.x * 2);
         if (const auto dist = input_dist.input("##Seek", std::format("Max:{}", subset.get_par().k()).c_str())) {
@@ -743,22 +748,7 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
         ImGui::SameLine();
         imgui_StrTooltip("(?)", "The max distance is actually the number of groups in the working set.");
 
-        // TODO: share with `edit_rule`?
-        const bool contained = subset.contains(sync.rule);
-        ImGui::BeginDisabled(!contained);
-        if (ImGui::Button("Locate")) {
-            assert(subset.contains(sync.rule));
-            page.clear();
-            page.push_back(sync.rule);
-            fill_next(adapter.page_size - 1);
-        }
-        ImGui::EndDisabled();
-        guide_mode::item_tooltip("Seek to the position where the current rule belongs.");
-        if (!contained) {
-            imgui_ItemTooltip(guide_mode::enabled() ? "\n(The current rule does not belong to the working set.)"
-                                                    : "The current rule does not belong to the working set.");
-        }
-        ImGui::SameLine();
+        ImGui::BeginGroup();
         sequence::seq(
             "<00..", "Prev", "Next", "11..>",
             [&] {
@@ -785,7 +775,11 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
             },
             page.empty() ? "Click 'Locate', '<00..' or '11..>', or input a distance to get somewhere in the sequence."
                          : nullptr);
-        // TODO: add guide-tooltip.
+        ImGui::EndGroup();
+        imgui_ItemTooltip_StrID = "Seq##Trav";
+        guide_mode::item_tooltip(
+            "List of all rules in the working set: firstly the masking rule ('<00..'), then all rules with distance = 1 to it, then 2, 3, ..., until the largest distance ('11..>'). You can iterate through all rules in the working set with this.");
+        // !!TODO: will hide the inner tooltip...
 
         ImGui::SameLine();
         if (page.empty()) {
@@ -855,14 +849,11 @@ static void random_rule_window(bool& show_rand, sync_point& sync, const aniso::s
             assert(round(rate * c_free) == free_dist);
         }
         ImGui::SameLine();
-        imgui_StrTooltip("(?)",
-                         "Generate random rules (in the working set) with intended distance around/exactly to the "
-                         "masking rule, as specified by the button and slider.\n\n"
-                         "For example, if you are using the 'Zero' mask and distance = 'Around' 30, (when at the "
-                         "last page) '>>>' will generate pages of rules with around 30 groups having '1'.\n\n"
-                         "(Also, suppose the current rule belongs to the working set, you can set it to "
-                         "the custom mask, and generate in a low distance to get random rules that are \"close\" "
-                         "to it.)");
+        imgui_StrTooltip(
+            "(?)",
+            "Generate random rules (in the working set) with intended distance around/exactly to the masking rule, as specified by the button and slider.\n\n"
+            "For example, if you are using the 'Zero' mask and distance = 'Around' 30, when at the last page, '>>>' will generate pages of rules with around 30 groups having '1'.\n\n"
+            "(Also, suppose the current rule belongs to the working set, you can set it to the custom mask, and generate in a low distance to get random nearby rules for it.)");
         guide_mode::highlight();
         // TODO: where to record this?
         // The window can be resized to fit the page size by double-clicking the resize border.
@@ -891,10 +882,15 @@ static void random_rule_window(bool& show_rand, sync_point& sync, const aniso::s
         };
         auto set_last_page = [&] { set_page(rules.empty() ? 0 : calc_page() - 1); };
 
+        ImGui::BeginGroup();
         sequence::seq(
             "<|", "<<", ">>>", "|>", //
             [&] { set_page(0); }, [&] { set_page(page_no - 1); }, [&] { set_page(page_no + 1, true); }, set_last_page);
-        // TODO: add guide-tooltip
+        ImGui::EndGroup();
+        imgui_ItemTooltip_StrID = "Seq##Pages";
+        guide_mode::item_tooltip(
+            "Record of generated rules. '>>>' will generate pages of rules when you are at the last page.");
+
         ImGui::SameLine();
         if (!rules.empty()) {
             // TODO: will this be confusing when the page is resized?
@@ -1019,7 +1015,8 @@ void edit_rule(sync_point& sync) {
     }
     ImGui::SameLine();
     ImGui::Checkbox("Preview", &preview_mode);
-    guide_mode::item_tooltip("Try this!");
+    guide_mode::item_tooltip("Preview the effect of random-access flipping.\n\n"
+                             "(You may 'Collapse' the subset table to leave more room for the preview windows.)");
     if (preview_mode) {
         ImGui::SameLine();
         config.set("Settings");
