@@ -663,7 +663,7 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
     assert(show_trav);
     static ImVec2 size_constraint_min{};
     ImGui::SetNextWindowSizeConstraints(size_constraint_min, ImVec2(FLT_MAX, FLT_MAX));
-    // !!TODO: better title...
+    // TODO: better title...
     if (auto window = imgui_Window("Traverse the working set", &show_trav,
                                    ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar)) {
         static std::deque<aniso::ruleT> page;
@@ -692,26 +692,35 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
             }
         };
 
-        // (Moved from outer scope to avoid missing the change when this window is closed.)
-        const bool working_set_or_mask_is_changed = [&] {
+        auto fill_page = [&](int size) {
+            assert(!page.empty());
+            if (page.size() < size) {
+                fill_next(size - page.size());
+                // (This may happen when the page reaches the end of the sequence.)
+                if (page.size() < size) {
+                    fill_prev(size - page.size());
+                }
+            }
+        };
+
+        {
             static aniso::subsetT cmp_set{};
             static aniso::maskT cmp_mask{};
             bool changed = false;
             if (cmp_set != subset) {
-                changed = true;
                 cmp_set = subset;
+                changed = true;
             }
             if (cmp_mask != mask) {
-                changed = true;
                 cmp_mask = mask;
+                changed = true;
             }
-            return changed;
-        }();
 
-        // !!TODO: it's not a good idea to clear without confirmation...
-        if (working_set_or_mask_is_changed && !page.empty()) {
-            // !!TODO: whether to show message here?
-            page.clear();
+            // !!TODO: it's not a good idea to clear without confirmation...
+            if (changed && !page.empty()) {
+                // !!TODO: whether to show message here?
+                page.clear();
+            }
         }
 
         // TODO: improve...
@@ -722,7 +731,7 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
             assert(subset.contains(sync.rule));
             page.clear();
             page.push_back(sync.rule);
-            fill_next(adapter.page_size - 1);
+            fill_page(adapter.page_size);
         }
         ImGui::EndDisabled();
         guide_mode::item_tooltip("Go to where the current rule belongs in the sequence.");
@@ -739,11 +748,7 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
         if (const auto dist = input_dist.input("##Seek", std::format("Max:{}", subset.get_par().k()).c_str())) {
             page.clear();
             page.push_back(aniso::seq_mixed::seek_n(subset, mask, *dist));
-            fill_next(adapter.page_size - 1);
-            // TODO: whether to try to fill the page in this (and other similar) case?
-            if (page.size() < adapter.page_size) {
-                fill_prev(adapter.page_size - page.size());
-            }
+            fill_page(adapter.page_size);
         }
         ImGui::SameLine();
         imgui_StrTooltip("(?)", "The max distance is actually the number of groups in the working set.");
@@ -777,9 +782,6 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
                          : nullptr);
         ImGui::EndGroup();
         imgui_ItemTooltip_StrID = "Seq##Trav";
-        guide_mode::item_tooltip(
-            "List of all rules in the working set: firstly the masking rule ('<00..'), then all rules with distance = 1 to it, then 2, 3, ..., until the largest distance ('11..>'). You can iterate through all rules in the working set with this.");
-        // !!TODO: will hide the inner tooltip...
 
         ImGui::SameLine();
         if (page.empty()) {
@@ -801,6 +803,12 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
         imgui_ItemTooltip_StrID = "Clear";
         guide_mode::item_tooltip("Double right-click to clear.");
 
+        ImGui::SameLine();
+        imgui_StrTooltip(
+            "(?)",
+            "The sequence represents a list of all rules in the working set: firstly the masking rule ('<00..'), then all rules with distance = 1 to it, then 2, 3, ..., until the largest distance ('11..>'). You can iterate through all rules in the working set with it.");
+        guide_mode::highlight();
+
         ImGui::SameLine(0, 16);
         config.set("Preview settings");
 
@@ -812,11 +820,7 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
                         page.pop_back();
                     }
                 } else if (!page.empty() && page.size() < adapter.page_size) {
-                    fill_next(adapter.page_size - page.size());
-                    // (This may happen when the page reaches the end of the sequence.)
-                    if (page.size() < adapter.page_size) [[unlikely]] {
-                        fill_prev(adapter.page_size - page.size());
-                    }
+                    fill_page(adapter.page_size);
                 }
             },
             [](int j) { return j < page.size() ? &page[j] : nullptr; });
