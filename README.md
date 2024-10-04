@@ -3,7 +3,9 @@
 
 This program helps to explore a set of cellular automaton rules known as "[MAP rules](https://golly.sourceforge.io/Help/Algorithms/QuickLife.html#map)". In short, MAP rules are 2-state rules in the range-1 Moore neighborhood. They are a strict superset of outer-totalistic (aka life-like) rules, the most famous one being [Conway's Game of Life](https://conwaylife.com/wiki/Conway%27s_Game_of_Life).
 
-<img src="screenshot.gif" alt="screenshot" width=1000 />
+<img width="200" alt="Example" src="https://github.com/user-attachments/assets/bc5024d7-e27e-4a66-9c31-3dd3551dc693">
+<img width="200" alt="Example" src="https://github.com/user-attachments/assets/3b0099f6-f634-4e47-be9d-b61c3d5f4d7b">
+<img width="200" alt="Example" src="https://github.com/user-attachments/assets/2b7afd32-7b92-43cb-8f98-ae523d3221b6">
 
 #### Features
 - Rules are saved as MAP-strings, so they can be accepted by other programs like Golly. Also, patterns can be saved as RLE-strings.
