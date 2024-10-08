@@ -39,4 +39,11 @@ To get familiar with the program, in the program: press `H` to enter help mode; 
 #### Building
 The project is written in C++20 using the [ImGui](https://github.com/ocornut/imgui) and [SDL2](https://github.com/libsdl-org/SDL) libraries, and uses CMake for building. ImGui is included in this project; SDL2 will be fetched automatically by CMake.
 
-The project is developed on Windows 10. In my experience, it should be easy to open and build the project with Visual Studio (CMake tools required). There is no explicit dependency on OS-specific features, so the project may also work on some other systems.
+The project is developed on Windows 10. In my experience, it should be easy to open and build the project with Visual Studio (CMake tools required). Alternatively, to build the project directly with command line, assuming the project is to be built in the `Build` subdirectory, run:
+```
+cmake -B Build -S .
+
+cmake --build Build --config Release
+```
+
+There is no explicit dependency on OS-specific features, so the project may also work on some other systems.
