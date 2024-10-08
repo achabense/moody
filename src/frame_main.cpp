@@ -162,8 +162,8 @@ void frame_main() {
         }
     };
 
-    const ImGuiWindowFlags flags =
-        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus;
+    const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+                                   ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoSavedSettings;
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
 
     ImGui::SetNextWindowPos(viewport->WorkPos);
@@ -249,7 +249,11 @@ void frame_main() {
         if (ImGui::BeginTable("Layout", 2, ImGuiTableFlags_Resizable)) {
             const char* const label_hidden = "H\ni\nd\nd\ne\nn";
             const float min_w = imgui_CalcButtonSizeX(label_hidden);
+
+            ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 500);
+            ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
             imgui_LockTableLayoutWithMinColumnWidth(min_w);
+
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             // The child window is required here (for stable scrolling).

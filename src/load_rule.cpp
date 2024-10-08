@@ -124,12 +124,14 @@ bool set_home(const char* u8path) {
             if (!ec) {
                 home_path.swap(cp);
 
+#if 0
                 // These will outlive the imgui context.
                 static std::string ini_path, log_path;
                 ini_path = cpp17_u8string(home_path / "imgui.ini");
                 log_path = cpp17_u8string(home_path / "imgui_log.txt");
                 ImGui::GetIO().IniFilename = ini_path.c_str();
                 ImGui::GetIO().LogFilename = log_path.c_str();
+#endif
                 return true;
             }
         }

@@ -110,29 +110,6 @@ bool rule_algo::is_hexagonal_rule(const aniso::ruleT& rule) { //
     return aniso::_subsets::ignore_hex.contains(rule);
 }
 
-#if 0
-// (Not using trailing "reason" parameter, as the clang-format result will be very ugly...)
-static void guarded_block(const bool enable, const auto& fn /*, const char* reason = nullptr*/) {
-    if (!enable) {
-        ImGui::BeginDisabled();
-        ImGui::BeginGroup();
-    }
-    fn();
-    if (!enable) {
-        ImGui::EndGroup();
-        ImGui::EndDisabled();
-    }
-};
-
-// It seems that, the tooltip shown within the group will be hidden by the outer one.
-static void guarded_block(const bool enable, const char* reason_disabled, const auto& fn) {
-    ::guarded_block(enable, fn);
-    if (!enable) {
-        imgui_ItemTooltip(reason_disabled);
-    }
-};
-#endif
-
 static int fit_count(int avail, int size, int spacing) { //
     return std::max(1, (avail + spacing) / (size + spacing));
 }
