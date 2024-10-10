@@ -33,9 +33,14 @@ inline bool imgui_ItemFullyVisible() { //
     return GImGui->CurrentWindow->ClipRect.Contains(GImGui->LastItemData.Rect);
 }
 
+// `!ImGui::IsAnyItemActive() || ImGui::IsItemActive()`
+inline bool imgui_IsItemOrNoneActive() { //
+    return GImGui->ActiveId == 0 || GImGui->ActiveId == GImGui->LastItemData.ID;
+}
+
 // Workaround to provide stable result for some cases.
 // Related: https://github.com/ocornut/imgui/issues/7984 and 7945
-inline bool imgui_ItemHoveredForTooltip(const char* str_id = nullptr) { //
+inline bool imgui_ItemHoveredForTooltip(const char* str_id = nullptr) {
     if (!str_id) {
         return ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip);
     } else {
@@ -79,7 +84,7 @@ inline void imgui_ItemTooltip(const std::invocable<> auto& desc) {
     }
 }
 
-inline void imgui_ItemTooltip(std::string_view desc) {
+inline void imgui_ItemTooltip(std::string_view desc) { //
     imgui_ItemTooltip([desc] { ImGui::TextUnformatted(desc.data(), desc.data() + desc.size()); });
 }
 

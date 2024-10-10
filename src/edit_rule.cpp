@@ -291,8 +291,7 @@ private:
             imgui_ItemRectFilled(cent_col, ImVec2(4, 4));
         }
         imgui_ItemRect(ring_col);
-        if (button_mode && center != Disabled && ImGui::IsItemHovered() &&
-            (!ImGui::IsAnyItemActive() || ImGui::IsItemActive())) {
+        if (button_mode && center != Disabled && ImGui::IsItemHovered() && imgui_IsItemOrNoneActive()) {
             imgui_ItemRectFilled(ImGui::IsItemActive() ? IM_COL32_GREY(255, 55) : IM_COL32_GREY(255, 45));
         }
     }

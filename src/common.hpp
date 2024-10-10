@@ -89,8 +89,7 @@ struct shortcuts {
     }
 
     static bool keys_avail() { //
-        // (Modal popups will set `WantCaptureKeyboard` unconditionally.)
-        return !ImGui::GetIO().WantTextInput && !ImGui::IsAnyItemActive();
+        return !ImGui::GetIO().WantCaptureKeyboard && !ImGui::IsAnyItemActive();
     }
 
     static bool keys_avail_and_window_hoverable() { // Not blocked by popup.
@@ -240,40 +239,42 @@ inline bool begin_popup_for_item(bool open, const char* str_id = nullptr) {
 }
 #endif
 
+// TODO: rename; `menu` is misleading...
 // Looks like a common popup, and will appear like a menu (but with more consistent closing behavior).
 // (Not meant to be used recursively; should end with `ImGui::EndPopup` instead of `EndMenu`.)
 inline bool begin_menu_for_item() {
-    const ImGuiID id = ImGui::GetItemID();
-    assert(id != 0); // Mainly designed for buttons.
     const ImRect item_rect = imgui_GetItemRect();
+    const ImGuiID item_id = ImGui::GetItemID();
+    assert(item_id != 0); // Mainly designed for buttons.
 
-    if (imgui_ItemHoveredForTooltip()) {
-        ImGui::OpenPopupEx(id, ImGuiPopupFlags_NoReopen);
+    if (!ImGui::IsPopupOpen(item_id, 0) && imgui_IsItemOrNoneActive() && imgui_ItemHoveredForTooltip()) {
+        ImGui::OpenPopupEx(item_id, ImGuiPopupFlags_NoReopen);
+        assert(ImGui::IsPopupOpen(item_id, 0));
         ImGui::SetNextWindowPos(item_rect.GetTR(), ImGuiCond_Appearing); // Like a menu.
     }
 
-    // Using modal popup for better closing behavior, while mimicking the visual style of normal popups.
-    // https://github.com/ocornut/imgui/issues/2491
-    ImGui::PushStyleColor(ImGuiCol_ModalWindowDimBg, IM_COL32_BLACK_TRANS);
-    const bool ret = ImGui::BeginPopupEx(id, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar |
-                                                 ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_Modal);
-    ImGui::PopStyleColor();
-
-    if (ret) {
-        ImGui::NavHighlightActivated(id);
-
-        // Workaround to mimic normal popup behavior. (Found when checking `RenderWindowDecorations`.)
-        ImGuiWindow* window = ImGui::GetCurrentWindow();
-        window->RootWindowForTitleBarHighlight = window->ParentWindow;
+    if (ImGui::BeginPopupEx(item_id, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar |
+                                         ImGuiWindowFlags_NoSavedSettings)) {
+        ImGui::NavHighlightActivated(item_id);
 
         const ImVec2 mouse_pos = ImGui::GetMousePos();
-        const ImVec2 pad = square_size();
-        if (!item_rect.ContainsWithPad(mouse_pos, pad * 1.5) &&
-            !imgui_GetWindowRect().ContainsWithPad(mouse_pos, pad * 2.5)) {
+        const auto window_rect = imgui_GetWindowRect();
+        if (!window_rect.Contains(mouse_pos) && item_rect.Contains(mouse_pos)) {
+#ifndef NDEBUG
+            // Avoid closing the popup when the item is clicked; relying on the impl details of this function:
+            (void)ImGui::UpdateMouseMovingWindowEndFrame;
+            // Initially I tried to use modal popup to avoid the closing behavior, but that caused much more
+            // trouble than it solved :|
+#endif
+            GImGui->IO.MouseClicked[0] = GImGui->IO.MouseClicked[1] = false;
+        } else if (const ImVec2 pad = square_size(); !ImGui::IsAnyItemActive() &&
+                                                     !item_rect.ContainsWithPad(mouse_pos, pad * 1.5) &&
+                                                     !window_rect.ContainsWithPad(mouse_pos, pad * 2.5)) {
             ImGui::CloseCurrentPopup();
         }
+        return true;
     }
-    return ret;
+    return false;
 }
 
 // Looks like `ImGui::Selectable` but behaves like a button (not designed for tables).
