@@ -1473,19 +1473,17 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
         aniso::tileT tile = {};
     };
     static std::unordered_map<uint64_t, termT> terms;
-
-    static unsigned latest = ImGui::GetFrameCount();
-    if (const unsigned frame = ImGui::GetFrameCount(); frame != latest) {
-        if (latest + 1 != frame) {
-            terms.clear();
-        } else {
+    {
+        const clearE clear = std::exchange(_preview_clear, clearE::None);
+        if (clear == clearE::InActive) {
             // According to https://en.cppreference.com/w/cpp/container/unordered_map/erase_if
             // There is no requirement on the predicate.
             std::erase_if(terms, [](std::pair<const uint64_t, termT>& pair) {
                 return !std::exchange(pair.second.active, false);
             });
+        } else if (clear == clearE::All) {
+            terms.clear();
         }
-        latest = frame;
     }
 
     const int width = config.width(), height = config.height();

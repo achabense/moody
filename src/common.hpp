@@ -96,24 +96,27 @@ struct shortcuts {
         return keys_avail() && imgui_IsWindowHoverable();
     }
 
-    static bool test(ImGuiKey key, bool repeat = false) {
+private:
+    friend void frame_main();
+
+    inline static ImGuiKey occupied = ImGuiKey_None;
+    static void begin_frame() { occupied = ImGuiKey_None; }
+
+    // Resolve shortcut competition when multiple keys are pressed.
+    static bool filter(ImGuiKey key) {
         assert(key != ImGuiKey_None);
-        {
-            // Resolve shortcut competition when multiple keys are pressed.
-            static unsigned latest = ImGui::GetFrameCount();
-            static ImGuiKey occupied = ImGuiKey_None;
-            if (const unsigned frame = ImGui::GetFrameCount(); frame != latest) {
-                latest = frame;
-                occupied = ImGuiKey_None;
-            }
-            if (occupied != ImGuiKey_None && occupied != key) {
-                return false;
-            }
+        if (occupied == ImGuiKey_None) {
             if (ImGui::IsKeyDown(key)) {
                 occupied = key;
             }
+            return true;
         }
-        return ImGui::IsKeyPressed(key, repeat);
+        return occupied == key;
+    }
+
+public:
+    static bool test(ImGuiKey key, bool repeat = false) { //
+        return filter(key) && ImGui::IsKeyPressed(key, repeat);
     }
 
     static bool highlight(ImGuiID id = 0) {
@@ -333,16 +336,17 @@ class sequence {
     static bool extra_cond() { return !ImGui::IsKeyDown(ImGuiKey_Z) && !ImGui::IsKeyDown(ImGuiKey_X); }
 
     inline static ImGuiID bound_id = 0;
-    inline static ImU32 last_valid_frame = 0;
+    inline static bool keep_bound_id = false;
+    friend void frame_main();
+    static void begin_frame() {
+        if (!std::exchange(keep_bound_id, false)) {
+            bound_id = 0;
+        }
+    }
 
     // (`disable` is a workaround for a sequence in `edit_rule`...)
     static tagE seq(const char* label_first, const char* label_prev, const char* label_next, const char* label_last,
                     const char* const disable) {
-        const ImU32 this_frame = ImGui::GetFrameCount();
-        if (this_frame != last_valid_frame && this_frame != last_valid_frame + 1) {
-            bound_id = 0;
-        }
-
         tagE tag = None;
 
         if (ImGui::Button(label_first)) {
@@ -366,7 +370,7 @@ class sequence {
             bound_id == id_prev && !pair_disabled &&
             ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows /*Including popup hierarchy*/);
         if (shortcut_avail) { // Otherwise, `bound_id` will become 0 at next frame.
-            last_valid_frame = ImGui::GetFrameCount();
+            keep_bound_id = true;
         }
         auto button_with_shortcut = [shortcut_avail, window_focused](const char* label, ImGuiKey shortcut) {
             bool ret = ImGui::Button(label);
@@ -403,7 +407,7 @@ class sequence {
             (bound_id == 0 && window_focused && !pair_disabled && shortcuts::keys_avail() && extra_cond() &&
              (shortcuts::test(ImGuiKey_LeftArrow) || shortcuts::test(ImGuiKey_RightArrow)))) {
             bound_id = id_prev;
-            last_valid_frame = ImGui::GetFrameCount();
+            keep_bound_id = true;
         }
 
         return tag;
@@ -653,6 +657,15 @@ public:
     }
 
 private:
+    enum class clearE { None, InActive, All };
+    inline static clearE _preview_clear = clearE::All;
+
+    friend void frame_main();
+    static void begin_frame() {
+        using enum clearE;
+        _preview_clear = _preview_clear == None ? InActive : All;
+    }
+
     static void _preview(uint64_t id, const configT& config, const aniso::ruleT& rule, bool interactive,
                          ImU32& border_col);
 };
