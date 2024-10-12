@@ -281,12 +281,7 @@ private:
 
         imgui_ItemRectFilled(IM_COL32_BLACK);
         if (title && (center == None || center == Disabled)) {
-            const ImVec2 min = ImGui::GetItemRectMin();
-            const ImVec2 size = ImGui::GetItemRectSize();
-            const ImVec2 sz = ImGui::CalcTextSize(title, title + 1);
-            const ImVec2 pos(min.x + floor((size.x - sz.x) / 2),
-                             min.y + floor((size.y - sz.y) / 2) - 1 /* -1 for better visual effect */);
-            ImGui::GetWindowDrawList()->AddText(pos, title_col, title, title + 1);
+            imgui_ItemStr(title_col, {title, title + 1});
         } else {
             imgui_ItemRectFilled(cent_col, ImVec2(4, 4));
         }
@@ -374,7 +369,9 @@ public:
 
     void select(const sync_point& target) {
         ImGui::BeginGroup();
-        if (ImGui::BeginTable("Checklists", 2, ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit)) {
+        if (ImGui::BeginTable("Checklists", 2,
+                              ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit |
+                                  ImGuiTableFlags_NoKeepColumnsVisible)) {
             auto check = [&, id = 0](termT& term, bool show_title = false) mutable {
                 ImGui::PushID(id++);
                 ImGui::BeginDisabled(term.disabled);
@@ -400,7 +397,15 @@ public:
                         ImGui::SameLine();
                     }
                     ImGui::BeginGroup();
+                    const float title_w = ImGui::CalcTextSize(t.title).x;
+                    const float button_w = ImGui::GetFrameHeight();
+                    if (title_w < button_w) {
+                        imgui_AddCursorPosX((button_w - title_w) / 2);
+                    }
                     imgui_Str(t.title);
+                    if (button_w < title_w) {
+                        imgui_AddCursorPosX((title_w - button_w) / 2);
+                    }
                     check(t);
                     ImGui::EndGroup();
                 }
@@ -621,7 +626,7 @@ struct page_adapter {
                 ImGui::PopID();
                 ImGui::EndDisabled();
                 imgui_ItemTooltip("Empty.");
-                previewer::dummy(config, IM_COL32_BLACK);
+                previewer::dummy(config);
             }
             ImGui::EndGroup();
 
@@ -1053,8 +1058,7 @@ void edit_rule(sync_point& sync) {
         // Precise vertical alignment:
         // https://github.com/ocornut/imgui/issues/2064
         const auto align_text = [](float height) {
-            const float off = std::max(0.0f, (height - ImGui::GetTextLineHeight()) / 2);
-            ImGui::SetCursorPosY(floor(ImGui::GetCursorPos().y + off));
+            imgui_AddCursorPosY(std::max(0.0f, (height - ImGui::GetTextLineHeight()) / 2));
         };
 
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));

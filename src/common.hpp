@@ -285,7 +285,10 @@ inline bool begin_menu_for_item() {
 // should be redesigned.)
 inline bool imgui_SelectableStyledButton(const char* label, const bool selected = false,
                                          const char* menu_shortcut = nullptr) {
-    assert(!ImGui::GetCurrentWindowRead()->DC.IsSameLine);
+    assert(!GImGui->CurrentWindow->DC.IsSameLine);
+    if (GImGui->CurrentWindow->SkipItems) {
+        return false;
+    }
 
     if (!selected) {
         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32_BLACK_TRANS);
@@ -294,7 +297,7 @@ inline bool imgui_SelectableStyledButton(const char* label, const bool selected 
     if (prev_id != 0 && prev_id == ImGui::GetItemID()) {
         // As if the last call used `ImGui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, 0)`.
         // (PushStyleVar-ItemSpacing affects the spacing to the next item. See `ImGui::ItemSize` for details.)
-        ImGui::GetCurrentWindow()->DC.CursorPos.y -= std::round(ImGui::GetStyle().ItemSpacing.y);
+        imgui_AddCursorPosY(-ImGui::GetStyle().ItemSpacing.y);
     }
 
     const float frame_padding_y = 2;
@@ -629,11 +632,15 @@ public:
         }
     };
 
-    static void dummy(const configT& config, const ImU32 col) {
+    static void dummy(const configT& config, const char* str = "--") {
         ImGui::Dummy(config.size_imvec());
         if (ImGui::IsItemVisible()) {
-            imgui_ItemRectFilled(col);
+            imgui_ItemRectFilled(IM_COL32_BLACK);
             imgui_ItemRect(ImGui::GetColorU32(ImGuiCol_TableBorderStrong)); // Instead of `ImGuiCol_Border`
+
+            if (str && *str != '\0') {
+                imgui_ItemStr(ImGui::GetColorU32(ImGuiCol_TextDisabled), str);
+            }
         }
     }
 

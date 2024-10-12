@@ -88,6 +88,18 @@ inline void imgui_ItemTooltip(std::string_view desc) { //
     imgui_ItemTooltip([desc] { ImGui::TextUnformatted(desc.data(), desc.data() + desc.size()); });
 }
 
+inline void imgui_ItemStr(ImU32 col, std::string_view str) {
+    if (!str.empty()) {
+        const char *begin = str.data(), *end = begin + str.size();
+        const ImVec2 item_min = ImGui::GetItemRectMin();
+        const ImVec2 item_size = ImGui::GetItemRectSize();
+        const ImVec2 str_size = ImGui::CalcTextSize(begin, end);
+        const ImVec2 pos(item_min.x + floor((item_size.x - str_size.x) / 2),
+                         item_min.y + floor((item_size.y - str_size.y) / 2) - 1 /* -1 for better visual effect */);
+        ImGui::GetWindowDrawList()->AddText(pos, col, begin, end);
+    }
+}
+
 inline bool imgui_ItemClickable(bool double_click) {
     if (!ImGui::IsItemHovered()) {
         return false;
@@ -212,6 +224,19 @@ inline bool imgui_MouseScrollingUp() { return ImGui::GetIO().MouseWheel > 0; }
 
 inline float imgui_CalcButtonSizeX(const char* label) { //
     return ImGui::CalcTextSize(label, nullptr, true).x + ImGui::GetStyle().FramePadding.x * 2;
+}
+
+// (Referring to `ImGui::Get/SetCursorScreenPos(...)`.)
+inline void imgui_AddCursorPosX(float dx) {
+    ImGuiWindow* window = ImGui::GetCurrentWindow();
+    window->DC.CursorPos.x = floor(window->DC.CursorPos.x + dx);
+    window->DC.IsSetPos = true;
+}
+
+inline void imgui_AddCursorPosY(float dy) {
+    ImGuiWindow* window = ImGui::GetCurrentWindow();
+    window->DC.CursorPos.y = floor(window->DC.CursorPos.y + dy);
+    window->DC.IsSetPos = true;
 }
 
 // TODO: workaround to set min column width for tables. Highly dependent on impl details.
