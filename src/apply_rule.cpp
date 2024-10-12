@@ -940,6 +940,7 @@ public:
 
             if (m_sel && m_sel->active && (!r_down || m_paste || ImGui::IsItemDeactivated())) {
                 m_sel->active = false;
+                // !!TODO: document somewhere...
                 // Allow a single right-click to unselect the area.
                 // (`bounding_box` has no size check like this. This is intentional.)
                 if (m_sel->width() * m_sel->height() <= 2) {
@@ -986,7 +987,7 @@ public:
                 const aniso::vecT cel_pos = from_imvec_floor(m_coord.to_space(mouse_pos));
 
                 // (`want_hex_mode` should be tested only when the zoom window is really going to be shown.)
-                if (!m_paste && (!active || !r_down)) {
+                if (!m_paste && !(m_sel && m_sel->active && m_sel->to_range().size().xy() > 2)) {
                     if (imgui_ItemHoveredForTooltip() && cel_pos.both_gteq({-10, -10}) &&
                         cel_pos.both_lt(tile_size.plus(10, 10))) {
                         hex_mode = want_hex_mode(sync.rule);
