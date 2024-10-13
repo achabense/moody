@@ -272,11 +272,15 @@ static void identify(const aniso::tile_const_ref tile, const aniso::ruleT& rule,
 class percentT {
     int m_val; // ∈ [0, 100].
 public:
-    percentT(double v) { m_val = std::clamp(v, 0.0, 1.0) * 100; }
+    percentT(double v) { m_val = round(std::clamp(v, 0.0, 1.0) * 100); }
 
     double get() const { return m_val / 100.0; }
     void step_slide(const char* label) {
         imgui_StepSliderInt(label, &m_val, 0, 100, std::format("{:.2f}", m_val / 100.0).c_str());
+    }
+
+    void step_slide(const char* label, int min, int max, int step) {
+        imgui_StepSliderIntEx(label, &m_val, min, max, step, std::format("{:.2f}", m_val / 100.0).c_str());
     }
 
     friend bool operator==(const percentT&, const percentT&) = default;
@@ -303,10 +307,22 @@ struct initT {
             aniso::fill(tile.data(), background.data());
             std::mt19937 rand{(uint32_t)seed};
             aniso::random_flip(tile.data().clip(range), rand, density.get());
-            // TODO: support random_fill mode (fill_outside + random_fill) as well?
         } else {
             aniso::fill(tile.data(), background.data());
         }
+    }
+
+    // Background ~ 0.
+    static void initialize(aniso::tileT& tile, int seed, percentT density, percentT area) {
+        assert(!tile.empty());
+        const aniso::vecT tile_size = tile.size();
+        const auto range = clamp_window(tile_size, tile_size / 2, from_imvec_floor(to_imvec(tile_size) * area.get()));
+
+        assert(!range.empty());
+        aniso::fill(tile.data(), 0);
+        std::mt19937 rand{(uint32_t)seed};
+        // (Using `random_fill` as the background is 0.)
+        aniso::random_fill(tile.data().clip(range), rand, density.get());
     }
 };
 
@@ -1424,10 +1440,9 @@ void apply_rule(sync_point& sync) {
 
 // TODO: support zoom = 0.5, 1, 2?
 // TODO: apply initT? (notice background poses extra size requirements...)
-
 struct global_config {
-    // TODO: this can easily be made object-local.
     inline static global_timer::timerT timer{global_timer::min_nonzero_interval};
+    inline static percentT area = 1.0;
 };
 
 void previewer::configT::_set() {
@@ -1452,7 +1467,11 @@ void previewer::configT::_set() {
     }
     ImGui::SetNextItemWidth(item_width);
     imgui_StepSliderInt("Seed", &seed, 0, 9);
-    imgui_Str("Density ~ 0.5, area ~ 1.0, background ~ default");
+    ImGui::SetNextItemWidth(item_width);
+    global_config::area.step_slide("Area", 10, 100, 10);
+    ImGui::SameLine();
+    imgui_StrTooltip("(?)", "This is shared by all preview windows in the program.");
+    imgui_Str("Density ~ 0.5, background ~ default");
     ImGui::Separator();
 
     ImGui::SetNextItemWidth(item_width);
@@ -1460,7 +1479,7 @@ void previewer::configT::_set() {
     ImGui::SetNextItemWidth(item_width);
     global_config::timer.slide_interval("Interval", 0, 400);
     ImGui::SameLine();
-    imgui_StrTooltip("(?)", "This setting is shared by all preview windows in different places.");
+    imgui_StrTooltip("(?)", "This is shared by all preview windows in the program.");
 }
 
 // TODO: allow setting the step and interval with shortcuts when the window is hovered?
@@ -1469,7 +1488,8 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
     struct termT {
         bool active = false;
         bool skip_run = false;
-        int seed = {};
+        int seed = 0;
+        percentT area = 0;
         aniso::ruleT rule = {};
         aniso::tileT tile = {};
     };
@@ -1503,13 +1523,14 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
     const bool l_down = ImGui::IsMouseDown(ImGuiMouseButton_Left);
     const bool restart = (shortcuts::keys_avail() && shortcuts::test(ImGuiKey_T)) ||
                          (hovered && (l_down || shortcuts::keys_avail()) && shortcuts::test(ImGuiKey_R)) ||
-                         term.tile.size() != size || term.seed != config.seed || term.rule != rule;
+                         term.tile.size() != size || term.seed != config.seed || term.area != global_config::area ||
+                         term.rule != rule;
     if (restart) {
         term.tile.resize(size);
         term.seed = config.seed;
+        term.area = global_config::area;
         term.rule = rule;
-        std::mt19937 rand(config.seed);
-        aniso::random_fill(term.tile.data(), rand, 0.5);
+        initT::initialize(term.tile, config.seed, 0.5 /*density*/, global_config::area);
         term.skip_run = true;
     }
 

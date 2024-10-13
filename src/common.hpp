@@ -493,6 +493,18 @@ inline bool imgui_StepSliderInt(const char* label, int* v, int v_min, int v_max,
     return changed;
 }
 
+// `v_str` should be the direct string for `v`, instead of a format str.
+inline bool imgui_StepSliderIntEx(const char* label, int* v, int v_min, int v_max, int v_step, const char* v_str) {
+    assert(v_min < v_max && v_step > 0 && ((v_max - v_min) % v_step) == 0);
+    const int u_max = (v_max - v_min) / v_step;
+    int u = std::clamp((*v - v_min) / v_step, 0, u_max);
+    imgui_StepSliderInt(label, &u, 0, u_max, v_str);
+    const int v2 = u * v_step + v_min;
+    const bool changed = *v != v2;
+    *v = v2;
+    return changed;
+}
+
 class messenger {
     class messageT {
         std::string m_str{};
