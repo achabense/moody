@@ -453,16 +453,65 @@ public:
             }
         }
 
+        {
+            preview_setting& n_preview = o_preview ? *o_preview : m_preview;
+            std::optional<int> n_pos = std::nullopt;
+            if (o_pos && !m_rules.empty()) {
+                n_pos = std::clamp(*o_pos, 0, int(m_rules.size()));
+            }
+
+            // Precedence:
+            // Line-selecting > locating > (starting line-selection) > left-click setting
+            if (const auto pos = display_header(n_preview); !n_pos) {
+                n_pos = pos;
+            }
+            ImGui::Separator();
+            if (std::exchange(rewind, false)) {
+                ImGui::SetNextWindowScroll({0, 0});
+            }
+            if (const auto [pos, sel] = display_page(!m_sel ? n_pos : std::nullopt, n_preview); pos || sel) {
+                if (!n_pos) {
+                    n_pos = pos;
+                }
+                if (sel) {
+                    m_sel = sel;
+                }
+            }
+
+            if (!m_sel && n_pos) {
+                assert(*n_pos >= 0 && *n_pos < int(m_rules.size()));
+                out.set(m_rules[*n_pos]);
+                m_pos = *n_pos;
+            }
+        }
+
+        // Prevent interaction with other widgets, so that for example, the parent window cannot be
+        // closed when there are selected lines.
+        if (m_sel) {
+            const ImGuiID claim = ImGui::GetID("Claim");
+            ImGuiWindow* const window = ImGui::GetCurrentWindow();
+
+            // (Idk which are actually necessary/preferable, but the following combination works as intended.)
+
+            // ImGui::SetHoveredID(claim);
+            ImGui::SetActiveID(claim, window);
+            // ImGui::SetFocusID(claim, window);
+            ImGui::FocusWindow(window);
+
+            // Otherwise, for some reason the parent window will still be collapsed if its
+            // title bar is double-clicked.
+            // Related: https://github.com/ocornut/imgui/issues/7841
+            ImGui::SetKeyOwner(ImGui::MouseButtonToKey(ImGuiMouseButton_Left), claim);
+            // ImGui::SetKeyOwner(ImGui::MouseButtonToKey(ImGuiMouseButton_Right), claim);
+        }
+    }
+
+private:
+    [[nodiscard]] std::optional<int> display_header(preview_setting& n_preview) const {
         std::optional<int> n_pos = std::nullopt;
-        std::optional<selT> n_sel = std::nullopt;
-        preview_setting& n_preview = o_preview ? *o_preview : m_preview;
 
         const int total = m_rules.size();
         if (total != 0) {
-            if (o_pos) {
-                n_pos = std::clamp(*o_pos, 0, total);
-            }
-
             // ImGui::BeginGroup();
             sequence::seq(
                 "<|", "Prev", "Next", "|>",                                   //
@@ -496,30 +545,17 @@ public:
             ImGui::Text("(No rules)");
         }
 
-        if (m_sel) {
-            n_pos.reset();
-        }
-
-        ImGui::Separator();
-
-        if (std::exchange(rewind, false)) {
-            ImGui::SetNextWindowScroll({0, 0});
-        }
-        display_page(n_pos, n_sel, n_pos, n_preview);
-
-        if (n_sel) {
-            m_sel = *n_sel;
-        } else if (n_pos) {
-            out.set(m_rules[*n_pos]);
-            m_pos = *n_pos;
-        }
+        return n_pos;
     }
 
-private:
-    void display_page(std::optional<int>& n_pos, std::optional<selT>& n_sel, const std::optional<int> locate,
-                      const preview_setting& n_preview) const {
-        assert_implies(m_sel, !n_pos);
-        const int total = m_rules.size();
+    struct passT {
+        std::optional<int> n_pos = std::nullopt;
+        std::optional<selT> n_sel = std::nullopt;
+    };
+
+    [[nodiscard]] passT display_page(const std::optional<int> locate, const preview_setting& n_preview) const {
+        assert_implies(m_sel, !locate);
+        passT pass{};
 
         ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32_GREY(24, 255));
         if (auto child = imgui_ChildWindow("Content")) {
@@ -541,16 +577,15 @@ private:
                 // (`ImGui::TextWrapped` has no problem rendering long single-lines now.)
                 // (Related: https://github.com/ocornut/imgui/issues/7496)
                 imgui_StrWrapped(text, item_width);
-                const ImVec2 str_min = ImGui::GetItemRectMin();
-                const ImVec2 str_max = ImGui::GetItemRectMax();
+                const auto [str_min, str_max] = imgui_GetItemRect();
                 const bool line_hovered = test_hover && mouse_pos.y >= str_min.y && mouse_pos.y < str_max.y;
                 // `line_hovered` may become true for two adjacent lines if using `mouse_pos.y <= str_max.y`.
 
                 if (!locate && line_hovered) {
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-                        n_sel = {this_l, this_l};
+                        pass.n_sel = {this_l, this_l};
                     } else if (m_sel && ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-                        n_sel = {m_sel->beg, this_l};
+                        pass.n_sel = {m_sel->beg, this_l};
                     }
                 }
                 if (m_sel && m_sel->contains(this_l)) {
@@ -559,7 +594,7 @@ private:
                 }
 
                 if (id.has_value()) {
-                    assert(*id >= 0 && *id < total);
+                    assert(*id >= 0 && *id < int(m_rules.size()));
 
                     // TODO: temporarily preserved.
                     constexpr bool has_lock = false;
@@ -567,22 +602,12 @@ private:
                     if (*id == m_pos) {
                         drawlist->AddRectFilled(str_min, str_max, IM_COL32(has_lock ? 196 : 0, 255, 0, 60));
                     }
-                    if (!m_sel && !n_sel &&
+                    if (!m_sel &&
                         (line_hovered && mouse_pos.x >= str_min.x && mouse_pos.x < str_max.x /*str-hovered*/)) {
                         drawlist->AddRectFilled(str_min, str_max, IM_COL32(has_lock ? 196 : 0, 255, 0, 30));
                         if (!locate && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-                            n_pos = *id;
+                            pass.n_pos = *id;
                         }
-
-#if 0
-                        // TODO: the effect is preferable (lacks tooltip delay though), but it interacts
-                        // poorly with right-click selection...
-                        if (!preview_mode && ImGui::BeginTooltip()) {
-                            previewer::preview(-1, previewer::configT::_220_160, m_rules[*id], false);
-
-                            ImGui::EndTooltip();
-                        }
-#endif
                     }
 
                     if (n_preview.enabled) {
@@ -604,33 +629,11 @@ private:
                 }
             }
             ImGui::PopStyleVar();
-
-            // Prevent interaction with other widgets, so that for example, the parent window cannot be
-            // closed when there are selected lines.
-            if (m_sel || n_sel) {
-                const ImGuiID claim = ImGui::GetID("Claim");
-                ImGuiWindow* const window = ImGui::GetCurrentWindow(); // TODO: or GetCurrentWindowRead?
-
-                // (Idk which are actually necessary/preferable, but the following combination works as intended.)
-
-                // ImGui::SetHoveredID(claim);
-                ImGui::SetActiveID(claim, window);
-                // ImGui::SetFocusID(claim, window);
-                ImGui::FocusWindow(window);
-
-                // Otherwise, for some reason the parent window will still be collapsed if its
-                // title bar is double-clicked.
-                // Related: https://github.com/ocornut/imgui/issues/7841
-                ImGui::SetKeyOwner(ImGui::MouseButtonToKey(ImGuiMouseButton_Left), claim);
-                // ImGui::SetKeyOwner(ImGui::MouseButtonToKey(ImGuiMouseButton_Right), claim);
-            }
         }
         ImGui::PopStyleColor();
 
-        // !!TODO: recheck...
-        assert_implies(m_sel, !n_pos);
-        assert(!(n_sel.has_value() && n_pos.has_value()));
-        assert_implies(n_pos, *n_pos >= 0 && *n_pos < total);
+        assert_implies(locate, !pass.n_pos && !pass.n_sel);
+        return pass;
     }
 };
 
