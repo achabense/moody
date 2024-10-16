@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <fstream>
 #include <ranges>
+#include <unordered_map>
 
 #include "common.hpp"
 
@@ -355,6 +356,11 @@ public:
     }
 };
 
+struct preview_setting {
+    bool enabled = true;
+    previewer::configT config = previewer::configT::_220_160;
+};
+
 // It is easy to locate all rules in the text via `extract_MAP_str`.
 // However there are no easy ways to locate or highlight (only) the rule across the lines.
 // See: https://github.com/ocornut/imgui/issues/2313
@@ -383,19 +389,17 @@ class textT {
     };
     std::optional<selT> m_sel = std::nullopt;
 
-    mutable bool preview_mode = true;
-    mutable previewer::configT config{previewer::configT::_220_160};
+    preview_setting m_preview{}; // TODO: move out of class?
 
-    mutable bool rewind = false;
+    bool rewind = false;
 
 public:
     textT() {}
     textT(std::string_view str) { append(str); }
 
-    // (Avoid overwriting preview settings by accident.)
     textT& operator=(const textT&) = delete;
 
-    bool has_rule() const { return !m_rules.empty(); }
+    int count_rule() const { return m_rules.size(); }
 
     void clear() {
         m_lines.clear();
@@ -416,9 +420,15 @@ public:
         }
     }
 
+    void append(const aniso::ruleT& rule) {
+        lineT& line = m_lines.emplace_back(aniso::to_MAP_str(rule));
+        m_rules.push_back(rule);
+        line.id = m_rules.size() - 1;
+    }
+
     void reset_scroll() { rewind = true; }
 
-    void display(sync_point& out) {
+    void display(sync_point& out, const std::optional<int> o_pos = std::nullopt, preview_setting* o_preview = nullptr) {
         if (m_sel) {
             if (ImGui::IsWindowAppearing()) {
                 // This should not happen, as the interaction to the parent window will be blocked
@@ -445,31 +455,24 @@ public:
 
         std::optional<int> n_pos = std::nullopt;
         std::optional<selT> n_sel = std::nullopt;
+        preview_setting& n_preview = o_preview ? *o_preview : m_preview;
 
-        display_const(n_pos, n_sel);
-        if (n_sel) {
-            m_sel = *n_sel;
-        } else if (n_pos) {
-            out.set(m_rules[*n_pos]);
-            m_pos = *n_pos;
-        }
-    }
-
-private:
-    void display_const(std::optional<int>& n_pos, std::optional<selT>& n_sel) const {
         const int total = m_rules.size();
-
         if (total != 0) {
-            ImGui::BeginGroup();
+            if (o_pos) {
+                n_pos = std::clamp(*o_pos, 0, total);
+            }
+
+            // ImGui::BeginGroup();
             sequence::seq(
                 "<|", "Prev", "Next", "|>",                                   //
                 [&] { n_pos = 0; },                                           //
                 [&] { n_pos = std::max(0, m_pos.value_or(-1) - 1); },         //
                 [&] { n_pos = std::min(total - 1, m_pos.value_or(-1) + 1); }, //
                 [&] { n_pos = total - 1; });
-            ImGui::EndGroup();
-            imgui_ItemTooltip_StrID = "Seq##Rules";
-            guide_mode::item_tooltip("Rules found in the text.");
+            // ImGui::EndGroup();
+            // imgui_ItemTooltip_StrID = "Seq##Rules";
+            // guide_mode::item_tooltip("Rules found in the text.");
 
             ImGui::SameLine();
             if (m_pos.has_value()) {
@@ -483,28 +486,41 @@ private:
             imgui_ItemTooltip_StrID = "Sync";
             guide_mode::item_tooltip("Double right-click to move to 'At'.");
 
-            if (m_sel) {
-                n_pos.reset();
-            }
-
             ImGui::SameLine(0, 16);
-            ImGui::Checkbox("Preview", &preview_mode);
-            if (preview_mode) {
+            ImGui::Checkbox("Preview", &n_preview.enabled);
+            if (n_preview.enabled) {
                 ImGui::SameLine();
-                config.set("Settings");
+                n_preview.config.set("Settings");
             }
         } else {
             ImGui::Text("(No rules)");
         }
 
-        assert_implies(m_sel, !n_pos);
-        const std::optional<int> locate = n_pos;
+        if (m_sel) {
+            n_pos.reset();
+        }
 
         ImGui::Separator();
 
         if (std::exchange(rewind, false)) {
             ImGui::SetNextWindowScroll({0, 0});
         }
+        display_page(n_pos, n_sel, n_pos, n_preview);
+
+        if (n_sel) {
+            m_sel = *n_sel;
+        } else if (n_pos) {
+            out.set(m_rules[*n_pos]);
+            m_pos = *n_pos;
+        }
+    }
+
+private:
+    void display_page(std::optional<int>& n_pos, std::optional<selT>& n_sel, const std::optional<int> locate,
+                      const preview_setting& n_preview) const {
+        assert_implies(m_sel, !n_pos);
+        const int total = m_rules.size();
+
         ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32_GREY(24, 255));
         if (auto child = imgui_ChildWindow("Content")) {
             set_scroll_by_up_down(ImGui::GetTextLineHeight() * 2); // TODO: document the behavior.
@@ -519,7 +535,7 @@ private:
                 const int this_l = l++;
                 ImGui::TextDisabled("%2d ", this_l + 1);
                 ImGui::SameLine();
-                if (preview_mode && id.has_value()) {
+                if (n_preview.enabled && id.has_value()) {
                     ImGui::BeginGroup();
                 }
                 // (`ImGui::TextWrapped` has no problem rendering long single-lines now.)
@@ -569,13 +585,14 @@ private:
 #endif
                     }
 
-                    if (preview_mode) {
+                    if (n_preview.enabled) {
                         imgui_StrDisabled("-: ");
                         ImGui::SameLine();
+                        // TODO: wasteful; should not be calculated repeatedly...
                         if (*id != 0 && m_rules[*id] == m_rules[*id - 1]) {
                             imgui_StrDisabled("The same as the last rule.");
                         } else {
-                            previewer::preview(*id, config, m_rules[*id]);
+                            previewer::preview(*id, n_preview.config, m_rules[*id]);
                         }
                         ImGui::EndGroup();
                     }
@@ -610,6 +627,7 @@ private:
         }
         ImGui::PopStyleColor();
 
+        // !!TODO: recheck...
         assert_implies(m_sel, !n_pos);
         assert(!(n_sel.has_value() && n_pos.has_value()));
         assert_implies(n_pos, *n_pos >= 0 && *n_pos < total);
@@ -783,4 +801,77 @@ void load_doc(sync_point& out) {
             doc_id.reset();
         }
     }
+}
+
+struct recordT {
+    using mapT = std::unordered_map<aniso::compressT, int, aniso::compressT::hashT>;
+
+    mapT m_map;
+    textT m_text;
+
+    void append(const aniso::ruleT& rule) {
+        assert(m_map.size() == m_text.count_rule());
+        if (m_map.try_emplace(rule, m_text.count_rule() /*`line.id`*/).second) {
+            m_text.append(rule);
+        }
+    }
+
+    std::optional<int> find(const aniso::ruleT& rule) {
+        if (const auto fnd = m_map.find(rule); fnd != m_map.end()) {
+            return fnd->second;
+        }
+        return std::nullopt;
+    }
+
+    void clear() {
+        m_map.clear();
+        m_text.clear();
+    }
+};
+
+static recordT record_tested;
+static recordT record_copied;
+
+void rule_record::tested(const aniso::ruleT& rule) { //
+    record_tested.append(rule);
+}
+
+void rule_record::copied(const aniso::ruleT& rule) { //
+    record_copied.append(rule);
+}
+
+void rule_record::load_record(sync_point& sync) {
+    static recordT* active = &record_tested;
+    static preview_setting preview{.enabled = false};
+
+    std::optional<int> locate = std::nullopt;
+    if (ImGui::SmallButton("Clear")) { // !!TODO: whether to require double-click here?
+        active->clear();
+        if (active == &record_tested) {
+            active->append(sync.rule);
+        }
+    }
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Locate")) {
+        locate = active->find(sync.rule);
+        if (!locate.has_value()) {
+            messenger::set_msg("Not found.");
+        }
+    }
+    guide_mode::item_tooltip("..."); // !!TODO
+
+    ImGui::SameLine();
+    imgui_Str("Viewing ~");
+    ImGui::SameLine();
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{0, 0});
+    imgui_RadioButton("Tested rules", &active, &record_tested);
+    ImGui::SameLine();
+    imgui_RadioButton("Copied rules", &active, &record_copied);
+    ImGui::PopStyleVar();
+    ImGui::SameLine();
+    imgui_StrTooltip("(?)", "..."); // !!TODO
+    guide_mode::highlight();
+
+    ImGui::Separator();
+    active->m_text.display(sync, locate, &preview);
 }

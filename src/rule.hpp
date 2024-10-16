@@ -360,4 +360,36 @@ namespace aniso {
     }  // namespace _tests
 #endif // ENABLE_TESTS
 
+    class compressT {
+        std::array<std::uint8_t, 64> m_data;
+
+    public:
+        compressT(const ruleT& rule) : m_data{} {
+            for_each_code([&](codeT c) { m_data[c.val >> 3] |= int(rule[c]) << (c.val & 0b111); });
+        }
+        ruleT decompress() const {
+            return make_rule([&](codeT c) { return bool(1 & (m_data[c.val >> 3] >> (c.val & 0b111))); });
+        }
+        operator ruleT() const { return decompress(); }
+
+        friend bool operator==(const compressT&, const compressT&) = default;
+
+        struct hashT {
+            auto operator()(const compressT& cmpr) const {
+                return std::hash<std::string_view>{}(
+                    {reinterpret_cast<const char*>(&cmpr.m_data), sizeof(cmpr.m_data)});
+            }
+        };
+    };
+
+#ifdef ENABLE_TESTS
+    namespace _tests {
+        inline const testT test_compressT = [] {
+            const ruleT a = make_rule([](auto) { return testT::rand() & 1; });
+            const compressT b = a;
+            assert(b == compressT(a));
+            assert(b.decompress() == a);
+        };
+    } // namespace _tests
+#endif
 } // namespace aniso

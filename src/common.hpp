@@ -48,6 +48,12 @@ void load_doc(sync_point&);
 void edit_rule(sync_point&);
 void apply_rule(sync_point&);
 
+struct rule_record {
+    static void tested(const aniso::ruleT&);
+    static void copied(const aniso::ruleT&);
+    static void load_record(sync_point&);
+};
+
 struct rule_algo {
     static aniso::ruleT trans_reverse(const aniso::ruleT&);
     static bool is_hexagonal_rule(const aniso::ruleT&);
@@ -550,7 +556,7 @@ class messenger {
                 const bool t_expired = clockT::now() > m_time;
                 const bool c_expired = m_count < 0;
                 // TODO: ideally the callers of `set_msg` should be able to specify quitting cond.
-                if (m_str.size() < 10 ? (c_expired || t_expired) : (c_expired && t_expired)) {
+                if (m_str.size() < 15 ? (c_expired || t_expired) : (c_expired && t_expired)) {
                     m_str.clear();
                     return;
                 }

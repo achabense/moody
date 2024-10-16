@@ -41,61 +41,6 @@ public:
 };
 #endif
 
-// TODO: improve recorder logic if possible...
-// Never empty.
-class recorderT {
-    std::vector<aniso::ruleT> m_record;
-    int m_pos;
-
-public:
-    recorderT() {
-        m_record.push_back(aniso::game_of_life());
-        m_pos = 0;
-    }
-
-    int size() const { return m_record.size(); }
-
-    // [0, size() - 1]
-    int pos() const { return m_pos; }
-
-    const aniso::ruleT& current() const {
-        assert(m_pos >= 0 && m_pos < size());
-        return m_record[m_pos];
-    }
-
-    void update(const aniso::ruleT& rule) {
-        if (rule != m_record[m_pos]) {
-            const int last = size() - 1;
-            if (m_pos == last && last != 0 && rule == m_record[last - 1]) {
-                m_pos = last - 1;
-            } else if (m_pos == last - 1 && rule == m_record[last]) {
-                m_pos = last;
-            } else {
-                // TODO: or reverse([m_pos]...[last])? or do nothing?
-                if (m_pos != last) {
-                    std::swap(m_record[m_pos], m_record[last]);
-                }
-                m_record.push_back(rule);
-                set_last();
-            }
-        }
-    }
-
-    void set_next() { set_pos(m_pos + 1); }
-    void set_prev() { set_pos(m_pos - 1); }
-    void set_first() { set_pos(0); }
-    void set_last() { set_pos(size() - 1); }
-
-    void clear() {
-        // `m_record = {m_record[m_pos]}` will not free the memory.
-        m_record = std::vector<aniso::ruleT>{m_record[m_pos]};
-        m_pos = 0;
-    }
-
-private:
-    void set_pos(int pos) { m_pos = std::clamp(pos, 0, size() - 1); }
-};
-
 static void get_reversal_dual(const bool button_result, sync_point& sync) {
     if (button_result) {
         sync.set(rule_algo::trans_reverse(sync.rule));
@@ -126,9 +71,10 @@ void frame_main() {
     sequence::begin_frame();
     previewer::begin_frame();
 
-    static recorderT recorder;
-    bool freeze = false;
-    sync_point sync = recorder.current();
+    static aniso::ruleT sync_rule = aniso::game_of_life();
+    sync_point sync = sync_rule;
+
+    rule_record::tested(sync.rule);
     if (sync_point_override::begin_frame(&sync.rule)) {
         messenger::set_msg("This is the same as the current rule.");
     }
@@ -139,6 +85,7 @@ void frame_main() {
     static bool show_file = false;
     static bool show_clipboard = false;
     static bool show_doc = false;
+    static bool show_record = false;
     auto load_rule = [&](bool& open, const char* title, void (*load_fn)(sync_point&)) {
         if (ImGui::Checkbox(title, &open) && open) {
             ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
@@ -181,7 +128,12 @@ void frame_main() {
         ImGui::SameLine();
         load_rule(show_doc, "Documents", load_doc);
         guide_mode::item_tooltip("Concepts, example rules, etc.");
+
         const int wide_spacing = ImGui::CalcTextSize(" ").x * 3;
+        ImGui::SameLine(0, wide_spacing);
+        load_rule(show_record, "Record", rule_record::load_record);
+        guide_mode::item_tooltip("Record for the current rule and copied rules.");
+
         ImGui::SameLine(0, wide_spacing);
         ImGui::Text("(%d FPS)", (int)round(ImGui::GetIO().Framerate));
 #ifdef SET_FRAME_RATE
@@ -194,8 +146,8 @@ void frame_main() {
 #endif // SET_FRAME_RATE
 
 #ifndef NDEBUG
-        ImGui::SameLine();
-        imgui_Str("  (Debug mode)");
+        ImGui::SameLine(0, wide_spacing);
+        imgui_Str("(Debug mode)");
         ImGui::SameLine();
         static bool show_demo = false;
         ImGui::Checkbox("Demo window", &show_demo);
@@ -203,14 +155,13 @@ void frame_main() {
             ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
             ImGui::ShowDemoWindow(&show_demo);
         }
-        ImGui::SameLine();
-        ImGui::Text("  Frame:%d", ImGui::GetFrameCount());
+        ImGui::SameLine(0, wide_spacing);
+        ImGui::Text("Frame:%d", ImGui::GetFrameCount());
 #endif // !NDEBUG
 
         ImGui::Separator();
 
-        // TODO: rename 'Prev/Next'? is 'Undo/Redo' suitable?
-        // Use icons? https://github.com/ocornut/imgui/blob/master/docs/FONTS.md#using-icon-fonts
+        // !!TODO: rewrite...
         ImGui::AlignTextToFramePadding();
         imgui_StrTooltip(
             "(...)",
@@ -219,33 +170,20 @@ void frame_main() {
             "Right-click 'Total:.. At:..' to clear the record.\n\n"
             "Right-click the MAP-string (for the current rule) to copy to the clipboard.");
 
-        ImGui::SameLine();
-        ImGui::BeginGroup();
-        sequence::seq(
-            "<|", "Prev", "Next", "|>", //
-            [&] { freeze = true, recorder.set_first(); }, [&] { freeze = true, recorder.set_prev(); },
-            [&] { freeze = true, recorder.set_next(); }, [&] { freeze = true, recorder.set_last(); });
-        ImGui::EndGroup();
-        imgui_ItemTooltip_StrID = "Seq##Record";
-        guide_mode::item_tooltip(
-            "Record for the current rule. You can switch to previously tested rules with this.\n\n"
-            "(When a button is clicked, or when the window is focused and you press the left/right arrow key, the left/right arrow key will begin to serve as the shortcuts for 'Prev/Next'. This also applies to sequences in other windows.)");
+        // !!TODO: find a new place for this...
+        // When a button is clicked, or when the window is focused and you press the left/right arrow key, the
+        // left/right arrow key will begin to serve as the shortcuts for 'Prev/Next'. This also applies to sequences
+        // in other windows.
 
         ImGui::SameLine();
-        ImGui::Text("Total:%d At:%d", recorder.size(), recorder.pos() + 1 /* [1, size()] */);
-        if (imgui_ItemClickableDouble()) {
-            set_msg_cleared(recorder.size() > 1);
-            freeze = true, recorder.clear();
-        }
-        imgui_ItemTooltip_StrID = "Clear##Record";
-        guide_mode::item_tooltip("Double right-click to clear the record (except the current rule).");
-
+        imgui_Str("Current rule ~");
         ImGui::SameLine();
         get_reversal_dual(ImGui::Button("Rev"), sync);
-
         ImGui::SameLine();
-        imgui_StrCopyable(aniso::to_MAP_str(sync.rule), imgui_Str, set_clipboard_and_notify);
-        guide_mode::item_tooltip("MAP-string for the current rule. Right-click to copy.");
+        if (imgui_StrCopyable(aniso::to_MAP_str(sync.rule), imgui_Str, set_clipboard_and_notify)) {
+            rule_record::copied(sync.rule);
+        }
+        guide_mode::item_tooltip("Right-click to copy.");
 
         ImGui::Separator();
 
@@ -283,7 +221,7 @@ void frame_main() {
         }
     }
 
-    if (!freeze && sync.out_rule) {
-        recorder.update(*sync.out_rule);
+    if (sync.out_rule) {
+        sync_rule = *sync.out_rule;
     }
 }

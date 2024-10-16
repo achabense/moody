@@ -142,12 +142,14 @@ inline void imgui_StrDisabled(std::string_view str) {
 
 // TODO: the name is outdated now...
 // Using std::string as `SetClipboardText` requires C-style string.
-inline void imgui_StrCopyable(const std::string& str, void (*str_func)(std::string_view),
+inline bool imgui_StrCopyable(const std::string& str, void (*str_func)(std::string_view),
                               void (*copy_func)(const std::string&)) {
     str_func(str);
     if (imgui_ItemClickableSingle()) {
         copy_func(str);
+        return true;
     }
+    return false;
 }
 
 // Similar to `HelpMarker` in "imgui_demo.cpp".
