@@ -31,6 +31,10 @@ inline void assert_utf8_encoding() {
 // To make things easy the program does not try to deal with these strings.
 #endif
 
+struct no_create {
+    no_create() = delete;
+};
+
 inline std::mt19937& global_mt19937() {
     static std::mt19937 rand{(uint32_t)time(0)};
     return rand;
@@ -48,13 +52,15 @@ void load_doc(sync_point&);
 void edit_rule(sync_point&);
 void apply_rule(sync_point&);
 
-struct rule_record {
+class rule_record : no_create {
+public:
     static void tested(const aniso::ruleT&);
     static void copied(const aniso::ruleT&);
     static void load_record(sync_point&);
 };
 
-struct rule_algo {
+class rule_algo : no_create {
+public:
     static aniso::ruleT trans_reverse(const aniso::ruleT&);
     static bool is_hexagonal_rule(const aniso::ruleT&);
 };
@@ -89,7 +95,8 @@ inline float wrap_len() {
 
 // TODO: consider using ImGui::Shortcut?
 // Some features cannot easily be satisfied with `ImGui::Shortcut` and `ImGui::SetNextItemShortcut`.
-struct shortcuts {
+class shortcuts : no_create {
+public:
     static bool global_flag(ImGuiKey key) { //
         return !ImGui::GetIO().WantTextInput && ImGui::IsKeyDown(key);
     }
@@ -184,7 +191,7 @@ inline void quick_info(std::string_view msg) {
 }
 #endif
 
-class guide_mode {
+class guide_mode : no_create {
     inline static bool enable_tooltip = false;
 
     friend void frame_main();
@@ -248,7 +255,7 @@ inline bool begin_popup_for_item(bool open, const char* str_id = nullptr) {
 }
 #endif
 
-// TODO: rename; `menu` is misleading...
+// !!TODO: rename; `menu` is misleading...
 // Looks like a common popup, and will appear like a menu (but with more consistent closing behavior).
 // (Not meant to be used recursively; should end with `ImGui::EndPopup` instead of `EndMenu`.)
 inline bool begin_menu_for_item() {
@@ -338,7 +345,7 @@ inline bool imgui_SelectableStyledButton(const char* label, const bool selected 
     return ret;
 }
 
-class sequence {
+class sequence : no_create {
     enum tagE { None, First, Prev, Next, Last };
 
     // Workaround to avoid the current rule being changed in override mode.
@@ -423,8 +430,6 @@ class sequence {
     }
 
 public:
-    sequence() = delete;
-
     static void seq(const char* label_first, const char* label_prev, const char* label_next, const char* label_last,
                     const auto& act_first, const auto& act_prev, const auto& act_next, const auto& act_last,
                     const char* disable = nullptr) {
@@ -438,7 +443,7 @@ public:
     }
 };
 
-class imgui_StepSliderShortcuts {
+class imgui_StepSliderShortcuts : no_create {
     friend bool imgui_StepSliderInt(const char* label, int* v, int v_min, int v_max, const char* format);
 
     inline static ImGuiKey minus = ImGuiKey_None;
@@ -511,7 +516,7 @@ inline bool imgui_StepSliderIntEx(const char* label, int* v, int v_min, int v_ma
     return changed;
 }
 
-class messenger {
+class messenger : no_create {
     class messageT {
         std::string m_str{};
         std::optional<ImVec2> m_min{};
@@ -597,8 +602,6 @@ class messenger {
     inline static messageT m_msg;
 
 public:
-    messenger() = delete;
-
     static void set_msg(std::string str) { m_msg.set(std::move(str)); }
 
     template <class... U>
@@ -611,10 +614,8 @@ public:
 };
 
 // Preview rules.
-class previewer {
+class previewer : no_create {
 public:
-    previewer() = delete;
-
     // TODO: should be more flexible...
     class configT {
     public:
@@ -714,7 +715,8 @@ public:
 // TODO: ideally this should attach to a `sync_point` object.
 // (Would require previewer::preview to take `sync_point` parameter.)
 // However, as there is only one `sync_point` in the program, it makes no actual difference for now.
-struct sync_point_override {
+class sync_point_override : no_create {
+public:
     inline static aniso::ruleT rule{};
     inline static bool want_test_set = false;
     inline static bool want_test_run = false;
@@ -777,7 +779,7 @@ inline std::string_view read_clipboard() {
     return str;
 }
 
-class global_timer {
+class global_timer : no_create {
     static constexpr int time_unit = 25;                // ms.
     static constexpr int min_time = 0, max_time = 1000; // ms.
     static_assert(max_time % time_unit == 0);
