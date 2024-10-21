@@ -255,10 +255,10 @@ inline bool begin_popup_for_item(bool open, const char* str_id = nullptr) {
 }
 #endif
 
-// !!TODO: rename; `menu` is misleading...
 // Looks like a common popup, and will appear like a menu (but with more consistent closing behavior).
-// (Not meant to be used recursively; should end with `ImGui::EndPopup` instead of `EndMenu`.)
-inline bool begin_menu_for_item() {
+// Not meant to be used recursively.
+// (This could be made into an RAII class, but I find that would be even harder to name properly...)
+inline bool begin_popup_for_item() {
     const ImRect item_rect = imgui_GetItemRect();
     const ImGuiID item_id = ImGui::GetItemID();
     assert(item_id != 0); // Mainly designed for buttons.
@@ -644,7 +644,7 @@ public:
 
         void set(const char* label) {
             ImGui::Button(label);
-            if (begin_menu_for_item()) {
+            if (begin_popup_for_item()) {
                 _set();
                 ImGui::EndPopup();
             }

@@ -139,7 +139,7 @@ void frame_main() {
 #ifdef SET_FRAME_RATE
         ImGui::SameLine();
         ImGui::SmallButton("Set");
-        if (begin_menu_for_item()) {
+        if (begin_popup_for_item()) {
             timer.set_fps();
             ImGui::EndPopup();
         }

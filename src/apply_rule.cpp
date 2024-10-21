@@ -835,7 +835,7 @@ public:
         ImGui::SameLine(floor(1.5 * item_width));
         ImGui::BeginGroup();
         ImGui::Button("Init state");
-        if (begin_menu_for_item()) {
+        if (begin_popup_for_item()) {
             set_init_state();
             ImGui::EndPopup();
         }

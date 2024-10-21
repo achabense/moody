@@ -721,7 +721,7 @@ void load_file(sync_point& out) {
         ImGui::SmallButton("Recent");
         // `BeginPopup` will consume the settings, even if not opened.
         ImGui::SetNextWindowSize({300, 200}, ImGuiCond_Always);
-        if (begin_menu_for_item()) {
+        if (begin_popup_for_item()) {
             nav.select_history();
             ImGui::EndPopup();
         }
@@ -743,7 +743,7 @@ void load_file(sync_point& out) {
         ImGui::SameLine();
         ImGui::SmallButton("Select");
         ImGui::SetNextWindowSize({300, 200}, ImGuiCond_Always);
-        if (begin_menu_for_item()) {
+        if (begin_popup_for_item()) {
             std::optional<pathT> sel = std::nullopt;
             nav.select_file(&*path, sel);
             if (sel && try_load(*sel)) {
@@ -818,7 +818,7 @@ void load_doc(sync_point& out) {
         const bool close = ImGui::SmallButton("Close");
         ImGui::SameLine();
         ImGui::SmallButton("Select");
-        if (begin_menu_for_item()) {
+        if (begin_popup_for_item()) {
             select();
             ImGui::EndPopup();
         }

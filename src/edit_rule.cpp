@@ -946,7 +946,7 @@ void edit_rule(sync_point& sync) {
         } else {
             ImGui::SameLine();
             ImGui::Button("Select");
-            if (begin_menu_for_item()) {
+            if (begin_popup_for_item()) {
                 select();
                 ImGui::EndPopup();
             }
