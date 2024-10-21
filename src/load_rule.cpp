@@ -367,13 +367,46 @@ struct preview_setting {
 // So, currently `textT` is line-based, and only recognizes the first rule for each line, and will
 // highlight the whole line if the line contains a rule.
 class textT {
-    struct lineT {
-        std::string text;
-        std::optional<int> id = std::nullopt;
+    std::string m_text{};
+    std::vector<aniso::compressT> m_rules{};
+
+    // Won't be invalidated by reallocation.
+    struct str_ref {
+        int begin = 0, size = 0;
+        std::string_view get(const std::string& str) const { //
+            return {str.data() + begin, (size_t)size};
+        }
+    };
+    struct rule_ref {
+        int pos = -1;
+        bool has_value() const { return pos != -1; }
+        const aniso::compressT& get(const std::vector<aniso::compressT>& rules) const {
+            assert(pos >= 0 && pos < (int)rules.size());
+            return rules[pos];
+        }
+    };
+    struct line_ref {
+        str_ref str = {};   // -> `m_text`
+        rule_ref rule = {}; // -> `m_rules`
+        bool eq_last = false;
     };
 
-    std::vector<lineT> m_lines{};
-    std::vector<aniso::ruleT> m_rules{};
+    std::vector<line_ref> m_lines{};
+
+    line_ref& _append_line(const std::string_view line) {
+        const str_ref ref = {m_text.size(), line.size()};
+        if (!line.empty()) {
+            m_text += line;
+        }
+        return m_lines.emplace_back(ref);
+    }
+    void _attach_rule(line_ref& line, const aniso::ruleT& rule) {
+        m_rules.emplace_back(rule);
+        const int pos = m_rules.size() - 1;
+        line.rule.pos = pos;
+        line.eq_last = pos > 0 ? m_rules[pos] == m_rules[pos - 1] : false;
+    }
+
     std::optional<int> m_pos = std::nullopt; // `display` returned m_rules[*m_pos] last time.
 
     struct selT {
@@ -410,20 +443,18 @@ public:
 
     // `str` is assumed to be utf8-encoded.
     // (If not, the rules are still likely extractable.)
-    void append(std::string_view str) {
+    void append(const std::string_view str) {
         for (const auto& l : std::views::split(str, '\n')) {
-            lineT& line = m_lines.emplace_back(std::string(l.data(), l.size()));
+            line_ref& line = _append_line({l.data(), l.size()});
             if (const auto extr = aniso::extract_MAP_str(l); extr.has_rule()) {
-                m_rules.push_back(extr.get_rule());
-                line.id = m_rules.size() - 1;
+                _attach_rule(line, extr.get_rule());
             }
         }
     }
 
     void append(const aniso::ruleT& rule) {
-        lineT& line = m_lines.emplace_back(aniso::to_MAP_str(rule));
-        m_rules.push_back(rule);
-        line.id = m_rules.size() - 1;
+        line_ref& line = _append_line(aniso::to_MAP_str(rule));
+        _attach_rule(line, rule);
     }
 
     void reset_scroll() { rewind = true; }
@@ -445,7 +476,7 @@ public:
                     if (i != min) {
                         str += '\n';
                     }
-                    str += m_lines[i].text;
+                    str += m_lines[i].str.get(m_text);
                 }
                 // (wontfix) `SetClipboardText` will skip contents after '\0' (normally a utf8 text file
                 // should not contain '\0' between the lines).
@@ -542,7 +573,7 @@ private:
                 n_preview.config.set("Settings");
             }
         } else {
-            ImGui::Text("(No rules)");
+            imgui_Str("(No rules)");
         }
 
         return n_pos;
@@ -567,16 +598,16 @@ private:
             ImDrawList* const drawlist = ImGui::GetWindowDrawList();
 
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
-            for (int l = 0; const auto& [text, id] : m_lines) {
+            for (int l = 0; const auto& [str, rule, eq_last] : m_lines) {
                 const int this_l = l++;
                 ImGui::TextDisabled("%2d ", this_l + 1);
                 ImGui::SameLine();
-                if (n_preview.enabled && id.has_value()) {
+                if (n_preview.enabled && rule.has_value()) {
                     ImGui::BeginGroup();
                 }
                 // (`ImGui::TextWrapped` has no problem rendering long single-lines now.)
                 // (Related: https://github.com/ocornut/imgui/issues/7496)
-                imgui_StrWrapped(text, item_width);
+                imgui_StrWrapped(str.get(m_text), item_width);
                 const auto [str_min, str_max] = imgui_GetItemRect();
                 const bool line_hovered = test_hover && mouse_pos.y >= str_min.y && mouse_pos.y < str_max.y;
                 // `line_hovered` may become true for two adjacent lines if using `mouse_pos.y <= str_max.y`.
@@ -593,37 +624,34 @@ private:
                     drawlist->AddRectFilled(str_min, str_max, IM_COL32_GREY(255, 40));
                 }
 
-                if (id.has_value()) {
-                    assert(*id >= 0 && *id < int(m_rules.size()));
-
+                if (rule.has_value()) {
                     // TODO: temporarily preserved.
                     constexpr bool has_lock = false;
 
-                    if (*id == m_pos) {
+                    if (rule.pos == m_pos) {
                         drawlist->AddRectFilled(str_min, str_max, IM_COL32(has_lock ? 196 : 0, 255, 0, 60));
                     }
                     if (!m_sel &&
                         (line_hovered && mouse_pos.x >= str_min.x && mouse_pos.x < str_max.x /*str-hovered*/)) {
                         drawlist->AddRectFilled(str_min, str_max, IM_COL32(has_lock ? 196 : 0, 255, 0, 30));
                         if (!locate && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-                            pass.n_pos = *id;
+                            pass.n_pos = rule.pos;
                         }
                     }
 
                     if (n_preview.enabled) {
                         imgui_StrDisabled("-: ");
                         ImGui::SameLine();
-                        // TODO: wasteful; should not be calculated repeatedly...
-                        if (*id != 0 && m_rules[*id] == m_rules[*id - 1]) {
+                        if (eq_last) {
                             imgui_StrDisabled("The same as the last rule.");
                         } else {
-                            previewer::preview(*id, n_preview.config, m_rules[*id]);
+                            previewer::preview(rule.pos, n_preview.config, [&] { return rule.get(m_rules); });
                         }
                         ImGui::EndGroup();
                     }
 
                     // It's ok to test fully-visible even if the region is not large enough.
-                    if (*id == locate && !imgui_ItemFullyVisible()) {
+                    if (rule.pos == locate && !imgui_ItemFullyVisible()) {
                         ImGui::SetScrollHereY();
                     }
                 }
