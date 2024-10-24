@@ -394,7 +394,7 @@ class textT {
     std::vector<line_ref> m_lines{};
 
     line_ref& _append_line(const std::string_view line) {
-        const str_ref ref = {m_text.size(), line.size()};
+        const str_ref ref = {(int)m_text.size(), (int)line.size()};
         if (!line.empty()) {
             m_text += line;
         }
