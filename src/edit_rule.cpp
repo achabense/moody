@@ -295,7 +295,7 @@ public:
     // Mainly about `select`.
     // TODO: some descriptions rely too much on "current rule"...
     static void about() {
-        auto explain = [&](bool contained, centerE center, const char* desc) {
+        auto explain = [](bool contained, centerE center, const char* desc) {
             ImGui::Dummy(square_size());
             put_term(contained, center, nullptr, false);
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
@@ -315,20 +315,6 @@ public:
         imgui_Str("The ring color reflects the relation between the subset and the current rule:");
         explain(true, None, "The rule belongs to this subset.");
         explain(false, None, "The rule does not belong to this subset.");
-        // v (Preserved for reference.)
-#if 0
-        // TODO: this is quite user-unfriendly... (Cannot improve unless the subset system is
-        // extended to incorporate value constraints.)
-        explain(Compatible, None,
-                "The rule does not belong to this subset, but there exist rules in the subset that meet the "
-                "constraints (locked values) posed by rule-lock pair.\n"
-                "(Notice that even though some subsets may meet this condition individually, their "
-                "intersection may still contain no rules that satisfy the constraints.)");
-        explain(Incompatible, None,
-                "The rule does not belong to this subset, and the constraints cannot be satisfied by any rule "
-                "in this subset.");
-#endif
-
         ImGui::Separator();
         imgui_Str("The center color is irrelevant to the ring color, and reflects the selection details:");
         explain(false, None, "Not selected.");
@@ -367,8 +353,7 @@ public:
                                  "subset. See '(...)' for details.");
     }
 
-    void select(const sync_point& target) {
-        ImGui::BeginGroup();
+    void select(const aniso::ruleT* const target = nullptr) {
         if (ImGui::BeginTable("Checklists", 2,
                               ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit |
                                   ImGuiTableFlags_NoKeepColumnsVisible)) {
@@ -381,13 +366,12 @@ public:
                 }
                 ImGui::EndDisabled();
                 ImGui::PopID();
-                put_term(
-                    term.set->contains(sync_point_override::want_test_set ? sync_point_override::rule : target.rule),
-                    term.selected    ? Selected
-                    : term.including ? Including
-                    : term.disabled  ? Disabled
-                                     : None,
-                    show_title ? term.title : nullptr, true);
+                put_term(target ? term.set->contains(*target) : false,
+                         term.selected    ? Selected
+                         : term.including ? Including
+                         : term.disabled  ? Disabled
+                                          : None,
+                         show_title ? term.title : nullptr, true);
                 imgui_ItemTooltip(term.description);
             };
 
@@ -445,11 +429,6 @@ public:
                     [&] { checklist(terms_hex); });
 
             ImGui::EndTable();
-        }
-        ImGui::EndGroup();
-        if (sync_point_override::want_test_set) {
-            imgui_ItemRectFilled(IM_COL32(0, 128, 255, 16));
-            imgui_ItemRect(IM_COL32(0, 128, 255, 255));
         }
     }
 };
@@ -937,7 +916,11 @@ void edit_rule(sync_point& sync) {
             guide_mode::item_tooltip("Select every subset that contains the current rule.");
 
             ImGui::Separator();
-            select_set.select(sync);
+            select_set.select(sync_point_override::want_test_set ? &sync_point_override::rule : &sync.rule);
+            if (sync_point_override::want_test_set) {
+                imgui_ItemRectFilled(IM_COL32(0, 128, 255, 16));
+                imgui_ItemRect(IM_COL32(0, 128, 255, 255));
+            }
         };
 
         if (!collapse) {
