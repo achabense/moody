@@ -149,7 +149,7 @@ class subset_selector {
     void update_current() {
         current = aniso::subsetT::universal();
 
-        for_each_term([&](termT& t) {
+        for_each_term([&](const termT& t) {
             assert_implies(t.disabled, !t.selected);
             if (t.selected) {
                 current = current & *t.set;
@@ -168,7 +168,8 @@ class subset_selector {
     }
 
 public:
-    subset_selector() : current(aniso::subsetT::universal()) {
+    // `init_sel` should be either nullptr or the address of one of members in `aniso::_subsets`.
+    explicit subset_selector(const aniso::subsetT* init_sel = nullptr) : current(aniso::subsetT::universal()) {
         using namespace aniso::_subsets;
 
         // TODO: refine descriptions.
@@ -208,8 +209,7 @@ public:
 
         terms_native.emplace_back("All", &native_isotropic,
                                   "Isotropic MAP rules. (Rules that preserve all symmetries.)\n\n"
-                                  "(This is equal to the intersection of the following subsets in this line.)",
-                                  true /* Selected */);
+                                  "(This is equal to the intersection of the following subsets in this line.)");
         terms_native.emplace_back("|", &native_refl_wsx,
                                   "Rules that preserve reflection symmetry, taking '|' as the axis.");
         terms_native.emplace_back("-", &native_refl_asd, "Ditto, the reflection axis is '-'.");
@@ -257,8 +257,45 @@ public:
         terms_hex.emplace_back("C3", &hex_C3, "C3 symmetry.");
         terms_hex.emplace_back("C6", &hex_C6, "C6 symmetry. This is a strict subset of C2/C3.");
 
-        for_each_term([](const termT& t) { assert(t.title && t.set && t.description); });
+        for_each_term([](const termT& t) {
+            assert(t.title && t.set && t.description);
+            assert(!t.selected && !t.including && !t.disabled);
+        });
+
+        if (init_sel) {
+            for_each_term([&init_sel](termT& t) {
+                if (t.set == init_sel) {
+                    t.selected = true;
+                    init_sel = nullptr;
+                }
+            });
+            assert(!init_sel);
+        }
+
         update_current();
+    }
+
+    subset_selector(const subset_selector&) = delete;
+
+    // (Could be defaulted if `termT::title/set` etc are declared non-const.)
+    subset_selector& operator=(const subset_selector& that) {
+        current = that.current;
+
+        auto copy_sel = [](termT_list& this_ls, const termT_list& that_ls) {
+            const int size = this_ls.size();
+            for (int i = 0; i < size; ++i) {
+                this_ls[i].selected = that_ls[i].selected;
+                this_ls[i].including = that_ls[i].including;
+                this_ls[i].disabled = that_ls[i].disabled;
+            }
+        };
+        copy_sel(terms_ignore, that.terms_ignore);
+        copy_sel(terms_misc, that.terms_misc);
+        copy_sel(terms_native, that.terms_native);
+        copy_sel(terms_totalistic, that.terms_totalistic);
+        copy_sel(terms_hex, that.terms_hex);
+
+        return *this;
     }
 
 private:
@@ -343,6 +380,7 @@ public:
         update_current();
     }
 
+    // TODO: redesign...
     void show_working(const sync_point& target) {
         ImGui::AlignTextToFramePadding();
         imgui_Str("Working set ~");
@@ -353,14 +391,22 @@ public:
                                  "subset. See '(...)' for details.");
     }
 
-    void select(const aniso::ruleT* const target = nullptr) {
+    void select(const aniso::ruleT* const target = nullptr, const aniso::subsetT* const should_include = nullptr) {
+        if (should_include && !current.includes(*should_include)) {
+            assert(false);
+            clear();
+        }
+
         if (ImGui::BeginTable("Checklists", 2,
                               ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit |
                                   ImGuiTableFlags_NoKeepColumnsVisible)) {
             auto check = [&, id = 0](termT& term, bool show_title = false) mutable {
+                const bool disabled = term.disabled || (should_include && !term.set->includes(*should_include));
+                assert_implies(disabled, !term.selected);
+
                 ImGui::PushID(id++);
                 ImGui::BeginDisabled(term.disabled);
-                if (ImGui::InvisibleButton("##Invisible", square_size()) && !term.disabled) {
+                if (ImGui::InvisibleButton("##Invisible", square_size()) && !disabled) {
                     term.selected = !term.selected;
                     update_current();
                 }
@@ -369,7 +415,7 @@ public:
                 put_term(target ? term.set->contains(*target) : false,
                          term.selected    ? Selected
                          : term.including ? Including
-                         : term.disabled  ? Disabled
+                         : disabled       ? Disabled
                                           : None,
                          show_title ? term.title : nullptr, true);
                 imgui_ItemTooltip(term.description);
@@ -560,6 +606,8 @@ struct page_adapter {
     void display(const previewer::configT& config, sync_point& out, ImVec2& min_req_size,
                  std::function<void()> page_resized, std::function<const aniso::ruleT*(int)> access) {
         const ImVec2 avail_size = ImGui::GetContentRegionAvail();
+        // (The same value as in `edit_rule`.)
+        const int spacing_x = ImGui::GetStyle().ItemSpacing.x + 3;
 
         // Background
         ImGui::GetWindowDrawList()->AddRectFilled(ImGui::GetCursorScreenPos(), ImGui::GetCursorScreenPos() + avail_size,
@@ -574,7 +622,7 @@ struct page_adapter {
             const float group_size_y = item_spacing_y /*separator*/ + button_size.y +
                                        item_spacing_y /*between the button and previewer*/ + previewer_size.y;
 
-            const int xc = fit_count(avail_size.x, group_size_x, 16 /*SameLine(0, 16)*/);
+            const int xc = fit_count(avail_size.x, group_size_x, spacing_x);
             const int yc = fit_count(avail_size.y, group_size_y, item_spacing_y);
             perline = xc;
             if (page_size != xc * yc) {
@@ -585,7 +633,7 @@ struct page_adapter {
 
         for (int j = 0; j < page_size; ++j) {
             if (j % perline != 0) {
-                ImGui::SameLine(0, 16); // (The same value as in `edit_rule`.)
+                ImGui::SameLine(0, spacing_x);
             } else {
                 ImGui::Separator();
             }
@@ -769,7 +817,7 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
             "The sequence represents a list of all rules in the working set: firstly the masking rule ('<00..'), then all rules with distance = 1 to it, then 2, 3, ..., until the largest distance ('11..>'). You can iterate through all rules in the working set with it.");
         guide_mode::highlight();
 
-        ImGui::SameLine(0, 16);
+        ImGui::SameLine();
         config.set("Preview settings");
 
         adapter.display(
@@ -870,7 +918,7 @@ static void random_rule_window(bool& show_rand, sync_point& sync, const aniso::s
         imgui_ItemTooltip_StrID = "Clear";
         guide_mode::item_tooltip("Double right-click to clear all pages.");
 
-        ImGui::SameLine(0, 16);
+        ImGui::SameLine();
         config.set("Preview settings");
 
         // TODO: reconsider page-resized logic (seeking to the last page may still be confusing).
@@ -882,10 +930,10 @@ static void random_rule_window(bool& show_rand, sync_point& sync, const aniso::s
     }
 }
 
-// TODO: rename some variables for better clarity. (e.g. `subset` -> `working_set`)
+// !!TODO: rename some variables for better clarity. (e.g. `subset` -> `working_set`)
 void edit_rule(sync_point& sync) {
     // Select subsets.
-    static subset_selector select_set;
+    static subset_selector select_set{&aniso::_subsets::native_isotropic};
     {
         ImGui::AlignTextToFramePadding();
         imgui_StrTooltip("(...)", subset_selector::about);
@@ -937,7 +985,7 @@ void edit_rule(sync_point& sync) {
     }
     const aniso::subsetT& subset = select_set.get();
     assert(!subset.empty());
-    const bool contained = subset.contains(sync.rule);
+    const bool contained = subset.contains(sync.rule); // !!TODO: rename...
 
     ImGui::Separator();
 
@@ -951,13 +999,12 @@ void edit_rule(sync_point& sync) {
 
     ImGui::Separator();
 
-    const aniso::partitionT& par = subset.get_par();
-    const auto scanlist = aniso::scanT::scanlist(par, mask, sync.rule);
-
     static bool show_trav = false;
     static bool show_rand = false;
     static bool preview_mode = false;
     static previewer::configT config{previewer::configT::_220_160};
+    static bool show_super_set = false;
+    static subset_selector select_set_super;
     {
         const bool clicked = ImGui::Checkbox("Traverse", &show_trav);
         guide_mode::item_tooltip("Iterate through all rules in the working set.");
@@ -981,7 +1028,7 @@ void edit_rule(sync_point& sync) {
             random_rule_window(show_rand, sync, subset, mask);
         }
     }
-    ImGui::SameLine();
+    ImGui::SameLine(0, ImGui::CalcTextSize(" ").x * 3);
     ImGui::Checkbox("Preview", &preview_mode);
     guide_mode::item_tooltip("Preview the effect of random-access flipping.\n\n"
                              "(You may 'Collapse' the subset table to leave more room for the preview windows.)");
@@ -989,9 +1036,37 @@ void edit_rule(sync_point& sync) {
         ImGui::SameLine();
         config.set("Settings");
     }
+    ImGui::SameLine();
+    if (ImGui::Checkbox("Superset", &show_super_set) && show_super_set) {
+        // !!TODO: or clear? or do nothing?
+        select_set_super = select_set;
+    }
+    // guide_mode::item_tooltip("!!TODO");
+    // !!TODO: lacks documentation...
+    // !!TODO: should reset `show_super_set` when the working set is changed...
+    if (show_super_set) {
+        if (!select_set_super.get().includes(subset)) {
+            select_set_super = select_set;
+        }
+
+        ImGui::SameLine();
+        ImGui::Button("Select##Super"); // TODO: this is a bit awkward...
+        if (begin_popup_for_item()) {
+            if (ImGui::Button("Clear##Super")) {
+                select_set_super.clear();
+            }
+            ImGui::Separator();
+            select_set_super.select(nullptr, &subset);
+
+            ImGui::EndPopup();
+        }
+
+        assert(select_set_super.get().includes(subset));
+    }
 
     {
-        const int c_group = par.k();
+        // !!TODO: compare with the super set when `show_super_set` is set...
+        const int c_group = subset.get_par().k();
 
         if (contained) {
             const int dist = aniso::distance(subset, mask, sync.rule);
@@ -1044,126 +1119,188 @@ void edit_rule(sync_point& sync) {
             imgui_AddCursorPosY(std::max(0.0f, (height - ImGui::GetTextLineHeight()) / 2));
         };
 
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
-        const int zoom = 7;
-        const int spacing = preview_mode ? 16 : 12;
-        const int perline = [&] {
+        const int button_zoom = 7;
+        const ImVec2 button_padding{2, 2};
+        const int spacing_x = ImGui::GetStyle().ItemSpacing.x + 3;
+        const int group_size_x = [&]() {
             // button-size + inner-spacing + label-size
-            int group_size = (2 * 2 + 3 * zoom) + imgui_ItemInnerSpacingX() +
+            int group_size = (button_padding.x * 2 + 3 * button_zoom) + imgui_ItemInnerSpacingX() +
                              ImGui::CalcTextSize(preview_mode ? labels_preview[0] : labels_normal[0]).x;
             if (preview_mode) {
                 group_size = std::max(group_size, config.width());
             }
-            return fit_count(ImGui::GetContentRegionAvail().x, group_size, spacing);
+            return group_size;
         }();
+        const auto calc_perline = [&](const int avail_x) { //
+            return fit_count(avail_x, group_size_x, spacing_x);
+        };
 
-        int n = 0;
-        assert(par.k() <= 512);
-        std::array<bool, 512> shown{};
+        auto show_group = [&](bool set_contains, int preview_id, const aniso::groupT& group) {
+            const bool has_lock = false; // TODO: temporarily preserved.
 
-        // v (Preserved for reference.)
-#if 0
-        for (const auto select : {+[](const aniso::scanT& c) { return !c.all_0() && !c.all_1(); }, //
-                                  +[](const aniso::scanT& c) { return !c.any_locked(); },          //
-                                  +[](const aniso::scanT& c) { return c.any_locked(); }}) {
-#else
-        for (const auto select : {+[](const aniso::scanT& c) { return !c.pure(); }, //
-                                  +[](const aniso::scanT& c) { return c.pure(); }}) {
-#endif
-            par.for_each_group([&](const int j, const aniso::groupT& group) {
-                if (shown[j] || !select(scanlist[j])) {
-                    return;
+            const bool pure = set_contains || aniso::all_same_or_different(group, mask, sync.rule);
+            const aniso::codeT head = group[0];
+            const auto get_adjacent_rule = [&] {
+                aniso::ruleT rule = sync.rule;
+                for (const aniso::codeT code : group) {
+                    rule[code] = !rule[code];
                 }
-                shown[j] = true;
+                return rule;
+            };
+            const auto group_details = [&] {
+                imgui_Str("Click to flip the values in this group.");
+                if (!set_contains) {
+                    // !!TODO: working-set / superset...
+                    // TODO: ctrl + 0/1 to set against masking rule (all-same or different)?
+                    // imgui_Str("\n(The current rule does not belong to the working set;\n"
+                    //           "press 'Ctrl' to enable flipping anyway.)");
+                    imgui_Str("!!TODO...ctrl");
+                }
+                ImGui::Separator();
+                ImGui::Text("Group size: %d", (int)group.size());
+                const int max_to_show = 48;
+                for (int n = 0; const aniso::codeT code : group) {
+                    if (n++ % 8 != 0) {
+                        ImGui::SameLine();
+                    }
+                    code_image(code, button_zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
+                    ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                    align_text(ImGui::GetItemRectSize().y);
+                    imgui_Str(labels_normal[masked[code]]);
+                    if (n == max_to_show) {
+                        break;
+                    }
+                }
+                if (group.size() > max_to_show) {
+                    imgui_Str("...");
+                }
+            };
 
-                const bool has_lock = false; // TODO: temporarily preserved.
-                const bool pure = scanlist[j].pure();
-                if (n % perline != 0) {
-                    ImGui::SameLine(0, spacing);
+            // TODO: better color... (will be ugly if using green colors...)
+            // _ButtonHovered: ImVec4(0.26f, 0.59f, 0.98f, 1.00f)
+            // [0]:Button, [1]:Hover, [2]:Active
+            static const ImVec4 button_col_normal[3]{
+                {0.26f, 0.59f, 0.98f, 0.70f}, {0.26f, 0.59f, 0.98f, 0.85f}, {0.26f, 0.59f, 0.98f, 1.00f}};
+            static const ImVec4 button_col_impure[3]{
+                {0.26f, 0.59f, 0.98f, 0.30f}, {0.26f, 0.59f, 0.98f, 0.40f}, {0.26f, 0.59f, 0.98f, 0.50f}};
+            const ImVec4* const button_color = pure ? button_col_normal : button_col_impure;
+
+            if (preview_mode) {
+                ImGui::BeginGroup();
+            }
+            ImGui::PushStyleColor(ImGuiCol_Button, button_color[0]);
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, button_color[1]);
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, button_color[2]);
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, button_padding);
+            const bool enable_edit = set_contains || ImGui::GetIO().KeyCtrl;
+            if (!enable_edit) {
+                // Not using ImGui::BeginDisabled(), so the button color will not be affected.
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+            }
+            if (code_button(head, button_zoom)) {
+                sync.set(get_adjacent_rule());
+            }
+            if (!enable_edit) {
+                ImGui::PopItemFlag();
+            }
+            ImGui::PopStyleVar();
+            ImGui::PopStyleColor(3);
+            imgui_ItemTooltip(group_details);
+
+            ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+            align_text(ImGui::GetItemRectSize().y);
+            imgui_Str(!pure ? "-x" : (preview_mode ? labels_preview[masked[head]] : labels_normal[masked[head]]));
+            if (has_lock) {
+                imgui_ItemRect(IM_COL32_WHITE, ImVec2(-2, -2));
+            }
+
+            if (preview_mode) {
+                previewer::preview(preview_id, config, get_adjacent_rule /*()*/);
+                ImGui::EndGroup();
+            }
+        };
+
+        if (!show_super_set || subset.includes(select_set_super.get()) /*==*/) {
+            const int perline = calc_perline(ImGui::GetContentRegionAvail().x);
+
+            std::vector<aniso::groupT> working_set_groups = subset.get_par().groups();
+            if (!contained) {
+                std::stable_partition(
+                    working_set_groups.begin(), working_set_groups.end(),
+                    [&](const aniso::groupT& group) { return !aniso::all_same_or_different(group, mask, sync.rule); });
+            }
+            for (int n = 0; const aniso::groupT& group : working_set_groups) {
+                const int this_n = n++;
+
+                if (this_n % perline != 0) {
+                    ImGui::SameLine(0, spacing_x);
                 } else {
                     ImGui::Separator();
                 }
-                ++n;
+                show_group(contained, this_n, group);
+            }
+        } else {
+            // (This ensures the positions are not affected by the table.)
+            ImGui::PushStyleVar(ImGuiStyleVar_CellPadding,
+                                ImVec2((spacing_x - 1) / 2, ImGui::GetStyle().ItemSpacing.y));
+            ImGui::PushStyleColor(ImGuiCol_TableBorderStrong, ImGui::GetColorU32(ImGuiCol_Separator));
+            if (ImGui::BeginTable("Table", 2,
+                                  ImGuiTableFlags_BordersInner | ImGuiTableFlags_BordersOuterH |
+                                      ImGuiTableFlags_NoKeepColumnsVisible)) {
+                ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed,
+                                        group_size_x /*provides stable visual when the layout switches*/);
+                ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
 
-                const aniso::codeT head = group[0];
-                const auto get_adjacent_rule = [&] {
-                    aniso::ruleT rule = sync.rule;
-                    for (aniso::codeT code : group) {
-                        rule[code] = !rule[code];
-                    }
-                    return rule;
-                };
-                const auto show_group = [&] {
-                    imgui_Str("Click to flip the values in this group.");
-                    if (!contained) {
-                        imgui_Str(
-                            "\n(The current rule does not belong to the working set;\npress 'Ctrl' to enable flipping anyway.)");
-                    }
-                    ImGui::Separator();
-                    ImGui::Text("Group size: %d", (int)group.size());
-                    const int max_to_show = 48;
-                    for (int x = 0; const aniso::codeT code : group) {
-                        if (x++ % 8 != 0) {
-                            ImGui::SameLine();
+                const aniso::subsetT& super_set = select_set_super.get();
+                const bool super_contains = super_set.contains(sync.rule);
+                aniso::codeT::map_to<bool> visited;
+                visited.fill(false);
+                std::vector<aniso::groupT> subgroups; // Superset has smaller groups.
+                subset.get_par().for_each_group([&](const int j, const aniso::groupT& group) {
+                    subgroups.clear();
+                    for (const aniso::codeT code : group) {
+                        if (!visited[code]) {
+                            const aniso::groupT subgroup = super_set.get_par().group_for(code);
+                            for (const aniso::codeT c : subgroup) {
+                                visited[c] = true;
+                            }
+                            subgroups.push_back(subgroup);
                         }
-                        code_image(code, zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
-                        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                        align_text(ImGui::GetItemRectSize().y);
-                        imgui_Str(labels_normal[masked[code]]);
-                        if (x == max_to_show) {
-                            break;
+                    }
+
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn();
+                    show_group(contained, j, group);
+                    ImGui::TableNextColumn();
+                    if (subgroups.size() == 1) {
+                        // The same as the working set's group; no need to display.
+                        // !!TODO: however, the flipping requirements are different (working-set.contains vs
+                        // superset.contains)... should redesign.
+                    } else {
+                        const int perline = calc_perline(ImGui::GetContentRegionAvail().x);
+
+                        if (!super_contains) {
+                            std::stable_partition(subgroups.begin(), subgroups.end(), [&](const aniso::groupT& group) {
+                                return !aniso::all_same_or_different(group, mask, sync.rule);
+                            });
                         }
+                        ImGui::PushID(j);
+                        for (int n = 0; const aniso::groupT& subgroup : subgroups) {
+                            const int this_n = n++;
+
+                            if (this_n % perline != 0) {
+                                ImGui::SameLine(0, spacing_x);
+                            }
+                            show_group(super_contains, this_n, subgroup);
+                        }
+                        ImGui::PopID();
                     }
-                    if (group.size() > max_to_show) {
-                        imgui_Str("...");
-                    }
-                };
-
-                // TODO: better color... (will be ugly if using green colors...)
-                // _ButtonHovered: ImVec4(0.26f, 0.59f, 0.98f, 1.00f)
-                // [0]:Button, [1]:Hover, [2]:Active
-                static const ImVec4 button_col_normal[3]{
-                    {0.26f, 0.59f, 0.98f, 0.70f}, {0.26f, 0.59f, 0.98f, 0.85f}, {0.26f, 0.59f, 0.98f, 1.00f}};
-                static const ImVec4 button_col_impure[3]{
-                    {0.26f, 0.59f, 0.98f, 0.30f}, {0.26f, 0.59f, 0.98f, 0.40f}, {0.26f, 0.59f, 0.98f, 0.50f}};
-                const ImVec4* const button_color = pure ? button_col_normal : button_col_impure;
-
-                if (preview_mode) {
-                    ImGui::BeginGroup();
-                }
-                ImGui::PushStyleColor(ImGuiCol_Button, button_color[0]);
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, button_color[1]);
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive, button_color[2]);
-                const bool enable_edit = contained || ImGui::GetIO().KeyCtrl;
-                if (!enable_edit) {
-                    // Not using ImGui::BeginDisabled(), so the button color will not be affected.
-                    ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
-                }
-                if (code_button(head, zoom)) {
-                    sync.set(get_adjacent_rule());
-                }
-                if (!enable_edit) {
-                    ImGui::PopItemFlag();
-                }
-                ImGui::PopStyleColor(3);
-                imgui_ItemTooltip(show_group);
-
-                ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                align_text(ImGui::GetItemRectSize().y);
-                imgui_Str(preview_mode ? labels_preview[masked[head]] : labels_normal[masked[head]]);
-                if (has_lock) {
-                    imgui_ItemRect(IM_COL32_WHITE, ImVec2(-2, -2));
-                }
-
-                if (preview_mode) {
-                    previewer::preview(j, config, get_adjacent_rule /*()*/);
-                    ImGui::EndGroup();
-                }
-            });
+                });
+                ImGui::EndTable();
+            }
+            ImGui::PopStyleColor();
+            ImGui::PopStyleVar();
         }
-        assert(n == par.k());
-
-        ImGui::PopStyleVar(1);
     }
     ImGui::PopStyleColor();
 }

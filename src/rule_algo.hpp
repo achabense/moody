@@ -142,6 +142,13 @@ namespace aniso {
                 }
             }
         }
+        std::vector<groupT> groups() const {
+            std::vector<groupT> vec(m_k);
+            for (int j = 0; j < m_k; ++j) {
+                vec[j] = jth_group(j);
+            }
+            return vec;
+        }
 
         /*implicit*/ partitionT(const equivT& eq) : m_eq(eq) {
             m_k = 0;
@@ -333,12 +340,22 @@ namespace aniso {
             }
         }
 
+#if 0
         static std::vector<scanT> scanlist(const partitionT& par, const maskT& mask, const ruleT& rule) {
             std::vector<scanT> vec(par.k());
             par.for_each_group([&](int j, const groupT& group) { vec[j] = scanT(group, mask, rule); });
             return vec;
         }
+#endif
     };
+
+    // ~ scanT(...).pure().
+    inline bool all_same_or_different(const groupT& group, const ruleT& a, const ruleT& b) {
+        const bool v = a[group[0]] == b[group[0]];
+        return std::ranges::all_of(group.subspan(1), [&, v](const codeT code) { //
+            return v == (a[code] == b[code]);
+        });
+    }
 
     // Return a rule in the subset that is closest to `rule` (as measured by the MAP set).
     // (If the rule already belongs to `subset`, the result will be exactly `rule`.)

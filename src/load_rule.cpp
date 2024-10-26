@@ -566,7 +566,7 @@ private:
             imgui_ItemTooltip_StrID = "Sync";
             guide_mode::item_tooltip("Double right-click to move to 'At'.");
 
-            ImGui::SameLine(0, 16);
+            ImGui::SameLine();
             ImGui::Checkbox("Preview", &n_preview.enabled);
             if (n_preview.enabled) {
                 ImGui::SameLine();
