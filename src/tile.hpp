@@ -302,8 +302,8 @@ namespace aniso {
             const vecT padding_b{.x = int(testT::rand() % 5), .y = int(testT::rand() % 5)};
             const vecT inner_size{10, 10};
             const vecT size = padding_a + inner_size + padding_b;
-            std::unique_ptr<bool> data(new bool[size.xy()]);
-            const tile_ref tile{.size = size, .stride = size.x, .data = data.get()};
+            const auto tile_data = std::make_unique_for_overwrite<bool[]>(size.xy());
+            const tile_ref tile{.size = size, .stride = size.x, .data = tile_data.get()};
             const rangeT inner_range{padding_a, padding_a + inner_size};
             fill(tile.clip(inner_range), 0);
             const bool period[4]{1, 0, 0, 1}; // Checkerboard.
@@ -521,8 +521,8 @@ namespace aniso {
         inline const testT test_RLE_str = [] {
             const vecT sizes[]{{.x = 1, .y = 1}, {.x = 10, .y = 1}, {.x = 1, .y = 10}, {.x = 32, .y = 60}};
             for (const vecT size : sizes) {
-                std::unique_ptr<bool[]> a_data(new bool[size.xy()] /* uninitialized */);
-                std::unique_ptr<bool[]> b_data(new bool[size.xy()] /* uninitialized */);
+                const auto a_data = std::make_unique_for_overwrite<bool[]>(size.xy());
+                const auto b_data = std::make_unique_for_overwrite<bool[]>(size.xy());
                 const tile_ref a{size, size.x, a_data.get()};
                 const tile_ref b{size, size.x, b_data.get()};
                 random_fill(a, testT::rand, 0.5);
@@ -583,23 +583,6 @@ namespace aniso {
                 }
             }
         };
-
-        // Workaround to avoid creating multiple static variables in `apply_rule` and `apply_rule_torus` (as
-        // they are templates). Ideally they should be invisible from anywhere else in the library.
-        inline static std::vector<char> helper_memory_for_apply{};
-
-        inline border_ref_<false /* !is_const */> temp_border_for(const vecT size) {
-            static std::unique_ptr<bool[]> data{};
-            static int len{};
-
-            if (const int required = calc_border_size(size); len < required) {
-                data.reset(new bool[required * 2]{});
-                len = required * 2;
-            }
-
-            return {.size = size, .data = data.get()};
-        }
-
     } // namespace _misc
 
     using border_ref = _misc::border_ref_<false /* !is_const */>;
@@ -613,11 +596,8 @@ namespace aniso {
         assert(source.size == source_border.size);
         const vecT size = source.size;
 
-        if (_misc::helper_memory_for_apply.size() < size.x) {
-            _misc::helper_memory_for_apply.resize(size.x * 2);
-        }
-
-        char* const vec_p6 = _misc::helper_memory_for_apply.data();
+        const auto vec_p6_data = std::make_unique_for_overwrite<char[]>(size.x);
+        char* const vec_p6 = vec_p6_data.get();
         {
             const bool *const up = source_border.up_line(), *cn = source.line(0);
             const auto [up_l, up_r] = source_border.get_lr(-1);
@@ -657,7 +637,8 @@ namespace aniso {
         assert(source.size == dest.size);
         const vecT size = source.size;
 
-        const border_ref border = _misc::temp_border_for(size);
+        const auto border_data = std::make_unique_for_overwrite<bool[]>(calc_border_size(size));
+        const border_ref border{.size = size, .data = border_data.get()};
         border.collect_from(source, source, source, source, source, source, source, source);
         apply_rule(rule, dest, source, border);
     }

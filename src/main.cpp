@@ -40,7 +40,7 @@ static SDL_Texture* create_texture(SDL_TextureAccess access, int w, int h) {
 // }
 
 // Manage textures for `make_screen`.
-class screen_textures {
+class screen_textures : no_create {
     struct blobT {
         bool used;
         int w, h;
@@ -129,7 +129,7 @@ public:
 }
 
 // Manage the texture for `code_image` and `code_button`.
-class code_atlas {
+class code_atlas : no_create {
     inline static SDL_Texture* texture = nullptr;
 
 public:

@@ -1225,9 +1225,9 @@ void edit_rule(sync_point& sync) {
 
             std::vector<aniso::groupT> working_set_groups = subset.get_par().groups();
             if (!contained) {
-                std::stable_partition(
-                    working_set_groups.begin(), working_set_groups.end(),
-                    [&](const aniso::groupT& group) { return !aniso::all_same_or_different(group, mask, sync.rule); });
+                std::ranges::stable_partition(working_set_groups, [&](const aniso::groupT& group) {
+                    return !aniso::all_same_or_different(group, mask, sync.rule);
+                });
             }
             for (int n = 0; const aniso::groupT& group : working_set_groups) {
                 const int this_n = n++;
@@ -1280,7 +1280,7 @@ void edit_rule(sync_point& sync) {
                         const int perline = calc_perline(ImGui::GetContentRegionAvail().x);
 
                         if (!super_contains) {
-                            std::stable_partition(subgroups.begin(), subgroups.end(), [&](const aniso::groupT& group) {
+                            std::ranges::stable_partition(subgroups, [&](const aniso::groupT& group) {
                                 return !aniso::all_same_or_different(group, mask, sync.rule);
                             });
                         }

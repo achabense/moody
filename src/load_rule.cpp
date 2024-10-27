@@ -178,10 +178,8 @@ class file_nav {
 
             {
                 // (`m_record` is small enough.)
-                const auto find = std::find(m_record.begin(), m_record.end(), p);
-                if (find != m_record.end()) {
-                    m_record.erase(find);
-                }
+                // (May be slightly less efficient than find -> member erase; not a problem.)
+                std::erase(m_record, p);
                 m_record.push_front(p);
                 if (m_record.size() > max_record) {
                     m_record.resize(max_record);
