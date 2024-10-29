@@ -435,6 +435,8 @@ public:
     void clear() {
         m_lines.clear();
         m_rules.clear();
+        m_text.clear();
+
         m_pos.reset();
         m_sel.reset();
     }
