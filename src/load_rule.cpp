@@ -460,6 +460,8 @@ public:
     void reset_scroll() { rewind = true; }
 
     void display(sync_point& out, const std::optional<int> o_pos = std::nullopt, preview_setting* o_preview = nullptr) {
+        assert_implies(m_lines.empty(), m_text.empty() && m_rules.empty());
+
         if (m_sel) {
             if (ImGui::IsWindowAppearing()) {
                 // This should not happen, as the interaction to the parent window will be blocked
@@ -665,7 +667,10 @@ private:
     }
 };
 
+// These limits are not inherent to textT's functions, but just arbitrary numbers
+// small enough to guarantee performance and large enough for normal use cases.
 static const int max_size = 1024 * 256;
+static const int max_line = 20000;
 
 // For error message.
 static std::string to_size(uintmax_t size) {
@@ -696,6 +701,10 @@ static std::string to_size(uintmax_t size) {
     return false;
 }
 
+static int count_line(const std::string_view str) { //
+    return std::ranges::count(str, '\n');
+}
+
 // TODO: support opening multiple files?
 // TODO: add a mode to avoid opening files without rules?
 void load_file(sync_point& out) {
@@ -706,6 +715,10 @@ void load_file(sync_point& out) {
 
     auto try_load = [](const pathT& p) -> bool {
         if (std::string str; load_binary(p, str)) {
+            if (const int l = count_line(str); l > max_line) {
+                messenger::set_msg("The file contains too many lines: {} > {}", l, max_line);
+                return false;
+            }
             text.clear();
             text.append(str);
             return true;
@@ -770,6 +783,8 @@ void load_clipboard(sync_point& out) {
         const std::string_view str = read_clipboard();
         if (str.size() > max_size) {
             messenger::set_msg("Text too long: {} > {}", to_size(str.size()), to_size(max_size));
+        } else if (const int l = count_line(str); l > max_line) {
+            messenger::set_msg("The text contains too many lines: {} > {}", l, max_line);
         } else if (!str.empty()) {
             text.clear();
             text.append(str);
