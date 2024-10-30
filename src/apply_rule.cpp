@@ -1438,14 +1438,15 @@ void apply_rule(sync_point& sync) {
     return runner.display(sync);
 }
 
-// TODO: support zoom = 0.5, 1, 2?
-// TODO: apply initT? (notice background poses extra size requirements...)
 struct global_config {
     inline static global_timer::timerT timer{global_timer::min_nonzero_interval};
     inline static percentT area = 1.0;
 };
 
 void previewer::configT::_set() {
+    // ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{2, 2});
+
+    ImGui::AlignTextToFramePadding();
     imgui_StrTooltip(
         "(...)",
         "Press 'T' to restart all preview windows.\n\n"
@@ -1457,14 +1458,39 @@ void previewer::configT::_set() {
         "- Hover and press 'X' to temporarily override the current rule with the previewed one in the space window. The previewed rule will not be recorded in this case.\n\n"
         "If the rule belongs to 'Hex' subset, you can also hover and press '6' to see the projected view in the real hexagonal space. (This also applies to the space window.)");
     guide_mode::highlight();
+    // !!TODO: what to reset? size/zoom or size/zoom/seed/step?
+    // (Should be regarded as under-documented before this is decided.)
+    ImGui::SameLine();
+    if (ImGui::Button("Reset")) {
+        _reset_size_zoom();
+    }
     ImGui::Separator();
 
-    ImGui::AlignTextToFramePadding();
-    imgui_Str("Size ~");
-    for (int i = 0; i < Count; ++i) {
-        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-        imgui_RadioButton(size_terms[i].str, &size, sizeE{i});
+    for (const bool f : {true, false}) {
+        ImGui::AlignTextToFramePadding();
+        imgui_Str(f ? "Width  ~" : "Height ~");
+        ImGui::PushID(f);
+        for (const int v : {120, 160, 220, 280}) {
+            ImGui::SameLine(/*0, imgui_ItemInnerSpacingX()*/);
+            imgui_RadioButton(std::to_string(v).c_str(), f ? &width_ : &height_, v);
+        }
+        ImGui::PopID();
+        if (f) {
+            ImGui::SameLine();
+            imgui_StrTooltip(
+                "(?)",
+                "!!TODO: explain this is widget size (while the space window's \"Size ~\" refers to actual space size.");
+        }
     }
+    ImGui::AlignTextToFramePadding();
+    imgui_Str("Zoom   ~"); // TODO: should this be "zoom" or "scale"?
+    for (const auto [label, v] :
+         std::initializer_list<std::pair<const char*, float>>{{"0.5", 0.5}, {"1", 1}, {"2", 2}}) {
+        ImGui::SameLine(/*0, imgui_ItemInnerSpacingX()*/);
+        imgui_RadioButton(label, &zoom_, v);
+    }
+    ImGui::Separator();
+
     ImGui::SetNextItemWidth(item_width);
     imgui_StepSliderInt("Seed", &seed, 0, 9);
     ImGui::SetNextItemWidth(item_width);
@@ -1480,6 +1506,8 @@ void previewer::configT::_set() {
     global_config::timer.slide_interval("Interval", 0, 400);
     ImGui::SameLine();
     imgui_StrTooltip("(?)", "This is shared by all preview windows in the program.");
+
+    // ImGui::PopStyleVar();
 }
 
 // TODO: allow setting the step and interval with shortcuts when the window is hovered?
@@ -1507,9 +1535,7 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
         }
     }
 
-    const int width = config.width(), height = config.height();
-    const aniso::vecT size{.x = width, .y = height};
-    assert(ImGui::GetItemRectSize() == ImVec2(width, height));
+    assert(ImGui::GetItemRectSize() == config.size_imvec());
     assert(ImGui::IsItemVisible());
 
     termT& term = terms[id];
@@ -1519,14 +1545,15 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
     }
     term.active = true;
 
+    const aniso::vecT tile_size{.x = int(config.width_ / config.zoom_), .y = int(config.height_ / config.zoom_)};
     const bool hovered = interactive && ImGui::IsItemHovered();
     const bool l_down = ImGui::IsMouseDown(ImGuiMouseButton_Left);
     const bool restart = (shortcuts::keys_avail() && shortcuts::test(ImGuiKey_T)) ||
                          (hovered && (l_down || shortcuts::keys_avail()) && shortcuts::test(ImGuiKey_R)) ||
-                         term.tile.size() != size || term.seed != config.seed || term.area != global_config::area ||
-                         term.rule != rule;
+                         term.tile.size() != tile_size || term.seed != config.seed ||
+                         term.area != global_config::area || term.rule != rule;
     if (restart) {
-        term.tile.resize(size);
+        term.tile.resize(tile_size);
         term.seed = config.seed;
         term.area = global_config::area;
         term.rule = rule;
@@ -1544,22 +1571,26 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
     }
 
     // Intentionally display after running for better visual effect (the initial state of the tile won't be displayed).
-    const ImTextureID texture = make_screen(term.tile.data(), scaleE::Nearest);
+    const scaleE scale_mode = config.zoom_ >= 1 ? scaleE::Nearest : scaleE::Linear;
+    const ImTextureID texture = make_screen(term.tile.data(), scale_mode);
     ImGui::GetWindowDrawList()->AddImage(texture, ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
-    if (interactive && imgui_ItemHoveredForTooltip()) {
+    if (interactive && imgui_ItemHoveredForTooltip() && (config.zoom_ <= 1 || shortcuts::global_flag(ImGuiKey_6))) {
         assert(ImGui::IsMousePosValid());
-        const ImVec2 pos = ImGui::GetMousePos() - ImGui::GetItemRectMin();
+        const aniso::vecT pos = from_imvec_floor((ImGui::GetMousePos() - ImGui::GetItemRectMin()) / config.zoom_);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
         if (ImGui::BeginTooltip()) {
-            const aniso::rangeT clamped = clamp_window(size, from_imvec_floor(pos), {64, 48});
+            const aniso::rangeT clamped = clamp_window(tile_size, pos, {64, 48});
             assert(!clamped.empty());
             if (want_hex_mode(rule)) {
                 // Using `pos` instead of (clamped.begin + .end) / 2, as otherwise the bottom-left
                 // corner cannot be fully shown.
-                hex_image(term.tile.data(), from_imvec_floor(pos), clamped.size() * 3, 3);
+                hex_image(term.tile.data(), pos, clamped.size() * 3, 3);
+            } else if (scale_mode == scaleE::Nearest) {
+                ImGui::Image(texture, to_imvec(clamped.size() * 3), to_imvec(clamped.begin) / to_imvec(tile_size),
+                             to_imvec(clamped.end) / to_imvec(tile_size));
             } else {
-                ImGui::Image(texture, to_imvec(clamped.size() * 3), to_imvec(clamped.begin) / to_imvec(size),
-                             to_imvec(clamped.end) / to_imvec(size));
+                ImGui::Image(make_screen(term.tile.data().clip(clamped), scaleE::Nearest),
+                             to_imvec(clamped.size() * 3));
             }
 
             ImGui::EndTooltip();

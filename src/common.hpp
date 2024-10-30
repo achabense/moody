@@ -616,31 +616,32 @@ public:
 // Preview rules.
 class previewer : no_create {
 public:
-    // TODO: should be more flexible...
     class configT {
-    public:
-        enum sizeE : int { _160_160 = 0, _220_160, _220_220, _280_220, Count };
-
-    private:
-        struct termT {
-            int w, h;
-            const char* str;
-        };
-        static constexpr termT size_terms[Count]{
-            {160, 160, "160*160"}, {220, 160, "220*160"}, {220, 220, "220*220"}, {280, 220, "280*220"}};
-
         friend previewer;
-        sizeE size; // Cannot be `Count`.
-        int seed;
-        int step;
+        float zoom_ = 1;
+        int width_ = 220;
+        int height_ = 160;
+
+        int seed = 0;
+        int step = 1;
+
         void _set();
+        void _reset_size_zoom() {
+            zoom_ = 1;
+            width_ = 220;
+            height_ = 160;
+            // seed = 0;
+            // step = 1;
+        }
 
     public:
-        /*implicit*/ configT(sizeE size) : size(size), seed(0), step(1) { assert(size >= 0 && size < Count); }
+        // TODO: temporarily preserved to avoid breaking existing calls.
+        enum sizeE { _220_160 = 0 };
+        configT(sizeE) {}
 
-        int width() const { return size_terms[size].w; }
-        int height() const { return size_terms[size].h; }
-        ImVec2 size_imvec() const { return ImVec2(size_terms[size].w, size_terms[size].h); }
+        int width() const { return width_; }
+        int height() const { return height_; }
+        ImVec2 size_imvec() const { return ImVec2(width_, height_); }
 
         void set(const char* label) {
             ImGui::Button(label);
