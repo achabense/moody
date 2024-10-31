@@ -1610,5 +1610,6 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
         border_col = IM_COL32_WHITE;
         set_clipboard_and_notify(aniso::to_MAP_str(rule));
         rule_record::copied(rule);
+        rule_recorder::record(rule_recorder::Copied, rule);
     }
 }

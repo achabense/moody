@@ -59,6 +59,14 @@ public:
     static void load_record(sync_point&);
 };
 
+class rule_recorder : no_create {
+public:
+    enum typeE : int { Current, Copied, TraverseOrRandom, RandomAccess, Ignore };
+
+    static void record(typeE type, const aniso::ruleT& rule, const aniso::ruleT* from = nullptr);
+    static void load_record(sync_point&);
+};
+
 class rule_algo : no_create {
 public:
     static aniso::ruleT trans_reverse(const aniso::ruleT&);
@@ -701,6 +709,7 @@ class sync_point {
     friend void frame_main();
 
     std::optional<aniso::ruleT> out_rule = std::nullopt;
+    rule_recorder::typeE rec_type = rule_recorder::Ignore;
 
     sync_point(const aniso::ruleT& rule) : rule{rule} {}
 
@@ -710,7 +719,10 @@ public:
 
     const aniso::ruleT rule;
 
-    void set(const aniso::ruleT& rule) { out_rule.emplace(rule); }
+    void set(const aniso::ruleT& rule, rule_recorder::typeE type = rule_recorder::Ignore) {
+        out_rule.emplace(rule);
+        rec_type = type;
+    }
 };
 
 // TODO: ideally this should attach to a `sync_point` object.

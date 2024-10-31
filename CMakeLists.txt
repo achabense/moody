@@ -30,6 +30,7 @@ add_executable(${PROJECT_NAME} WIN32
 
     src/apply_rule.cpp
     src/edit_rule.cpp
+    src/record_rule.cpp
     src/docs.cpp
     src/load_rule.cpp
     src/frame_main.cpp

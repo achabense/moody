@@ -642,7 +642,8 @@ struct page_adapter {
             if (const aniso::ruleT* rule = access(j); rule != nullptr) {
                 ImGui::PushID(j);
                 if (ImGui::Button(">> Cur")) {
-                    out.set(*rule);
+                    // TODO: working, but ideally should specify record type from outside.
+                    out.set(*rule, rule_recorder::TraverseOrRandom);
                 }
                 ImGui::PopID();
                 previewer::preview(j, config, *rule);
@@ -1198,7 +1199,7 @@ void edit_rule(sync_point& sync) {
                 ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
             }
             if (code_button(head, button_zoom)) {
-                sync.set(get_adjacent_rule());
+                sync.set(get_adjacent_rule(), rule_recorder::RandomAccess);
             }
             if (!enable_edit) {
                 ImGui::PopItemFlag();
