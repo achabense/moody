@@ -459,7 +459,7 @@ public:
 
     void reset_scroll() { rewind = true; }
 
-    void display(sync_point& out, const std::optional<int> o_pos = std::nullopt, preview_setting* o_preview = nullptr) {
+    void display(sync_point& out) {
         assert_implies(m_lines.empty(), m_text.empty() && m_rules.empty());
 
         if (m_sel) {
@@ -487,22 +487,23 @@ public:
         }
 
         {
-            preview_setting& n_preview = o_preview ? *o_preview : m_preview;
-            std::optional<int> n_pos = std::nullopt;
-            if (o_pos && !m_rules.empty()) {
-                n_pos = std::clamp(*o_pos, 0, int(m_rules.size()));
-            }
-
             // Precedence:
-            // Line-selecting > locating > (starting line-selection) > left-click setting
-            if (const auto pos = display_header(n_preview); !n_pos) {
-                n_pos = pos;
+            // Line-selecting > iterating > (starting line-selection) > left-click setting
+            std::optional<int> n_pos = display_header(m_rules.size(), m_pos);
+            if (!m_rules.empty()) {
+                ImGui::SameLine();
+                ImGui::Checkbox("Preview", &m_preview.enabled);
+                if (m_preview.enabled) {
+                    ImGui::SameLine();
+                    m_preview.config.set("Settings");
+                }
             }
             ImGui::Separator();
+
             if (std::exchange(rewind, false)) {
                 ImGui::SetNextWindowScroll({0, 0});
             }
-            if (const auto [pos, sel] = display_page(!m_sel ? n_pos : std::nullopt, n_preview); pos || sel) {
+            if (const auto [pos, sel] = display_page(!m_sel ? n_pos : std::nullopt); pos || sel) {
                 if (!n_pos) {
                     n_pos = pos;
                 }
@@ -540,10 +541,9 @@ public:
     }
 
 private:
-    [[nodiscard]] std::optional<int> display_header(preview_setting& n_preview) const {
+    static std::optional<int> display_header(const int total, const std::optional<int> m_pos) {
         std::optional<int> n_pos = std::nullopt;
 
-        const int total = m_rules.size();
         if (total != 0) {
             // ImGui::BeginGroup();
             sequence::seq(
@@ -567,13 +567,6 @@ private:
             }
             imgui_ItemTooltip_StrID = "Sync";
             guide_mode::item_tooltip("Double right-click to move to 'At'.");
-
-            ImGui::SameLine();
-            ImGui::Checkbox("Preview", &n_preview.enabled);
-            if (n_preview.enabled) {
-                ImGui::SameLine();
-                n_preview.config.set("Settings");
-            }
         } else {
             imgui_Str("(No rules)");
         }
@@ -586,7 +579,7 @@ private:
         std::optional<selT> n_sel = std::nullopt;
     };
 
-    [[nodiscard]] passT display_page(const std::optional<int> locate, const preview_setting& n_preview) const {
+    [[nodiscard]] passT display_page(const std::optional<int> locate) const {
         assert_implies(m_sel, !locate);
         passT pass{};
 
@@ -604,7 +597,7 @@ private:
                 const int this_l = l++;
                 ImGui::TextDisabled("%2d ", this_l + 1);
                 ImGui::SameLine();
-                if (n_preview.enabled && rule.has_value()) {
+                if (m_preview.enabled && rule.has_value()) {
                     ImGui::BeginGroup();
                 }
                 // (`ImGui::TextWrapped` has no problem rendering long single-lines now.)
@@ -641,13 +634,13 @@ private:
                         }
                     }
 
-                    if (n_preview.enabled) {
+                    if (m_preview.enabled) {
                         imgui_StrDisabled("-: ");
                         ImGui::SameLine();
                         if (eq_last) {
                             imgui_StrDisabled("The same as the last rule.");
                         } else {
-                            previewer::preview(rule.pos, n_preview.config, [&] { return rule.get(m_rules); });
+                            previewer::preview(rule.pos, m_preview.config, [&] { return rule.get(m_rules); });
                         }
                         ImGui::EndGroup();
                     }
