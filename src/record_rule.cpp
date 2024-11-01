@@ -71,40 +71,38 @@ static std::optional<int> display_page(const int total, const std::function<anis
     return n_pos;
 }
 
-namespace {
-    struct recordT {
-        using keyT = aniso::compressT;
-        using mapT = std::unordered_map<keyT, int /*-> m_vec[i]*/, keyT::hashT>;
-        using vecT = std::vector<const keyT* /*-> m_map's keys*/>;
+struct recordT {
+    using keyT = aniso::compressT;
+    using mapT = std::unordered_map<keyT, int /*-> m_vec[i]*/, keyT::hashT>;
+    using vecT = std::vector<const keyT* /*-> m_map's keys*/>;
 
-        mapT m_map;
-        vecT m_vec;
+    mapT m_map;
+    vecT m_vec;
 
-        int size() const {
-            assert(m_map.size() == m_vec.size());
-            return m_vec.size();
+    int size() const {
+        assert(m_map.size() == m_vec.size());
+        return m_vec.size();
+    }
+
+    std::optional<int> find(const aniso::ruleT& rule) const {
+        const auto iter = m_map.find(rule);
+        return iter != m_map.end() ? std::optional<int>(iter->second) : std::nullopt;
+    }
+
+    std::pair<int /*-> m_vec[i]*/, bool> emplace(const aniso::ruleT& rule) {
+        assert(m_map.size() == m_vec.size());
+        const auto [iter, newly_emplaced] = m_map.try_emplace(rule, m_vec.size());
+        if (newly_emplaced) {
+            m_vec.push_back({&iter->first});
         }
+        return {iter->second, newly_emplaced};
+    }
 
-        std::optional<int> find(const aniso::ruleT& rule) const {
-            const auto iter = m_map.find(rule);
-            return iter != m_map.end() ? std::optional<int>(iter->second) : std::nullopt;
-        }
-
-        std::pair<int /*-> m_vec[i]*/, bool> emplace(const aniso::ruleT& rule) {
-            assert(m_map.size() == m_vec.size());
-            const auto [iter, newly_emplaced] = m_map.try_emplace(rule, m_vec.size());
-            if (newly_emplaced) {
-                m_vec.push_back({&iter->first});
-            }
-            return {iter->second, newly_emplaced};
-        }
-
-        void clear() {
-            m_vec.clear();
-            m_map.clear();
-        }
-    };
-} // namespace
+    void clear() {
+        m_vec.clear();
+        m_map.clear();
+    }
+};
 
 static recordT record_current;
 static recordT record_copied;

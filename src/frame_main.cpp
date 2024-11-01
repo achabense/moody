@@ -75,7 +75,6 @@ void frame_main() {
     sync_point sync = sync_rule;
 
     rule_recorder::record(rule_recorder::Current, sync.rule);
-    rule_record::tested(sync.rule);
     if (sync_point_override::begin_frame(&sync.rule)) {
         messenger::set_msg("This is the same as the current rule.");
     }
@@ -87,7 +86,6 @@ void frame_main() {
     static bool show_clipboard = false;
     static bool show_doc = false;
     static bool show_record = false;
-    static bool show_record_v2 = false;
     auto load_rule = [&](bool& open, const char* title, void (*load_fn)(sync_point&)) {
         if (ImGui::Checkbox(title, &open) && open) {
             ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
@@ -133,11 +131,8 @@ void frame_main() {
 
         const int wide_spacing = ImGui::CalcTextSize(" ").x * 3;
         ImGui::SameLine(0, wide_spacing);
-        load_rule(show_record, "Record", rule_record::load_record);
-        guide_mode::item_tooltip("Record for the current rule and copied rules.");
-        ImGui::SameLine();
-        load_rule(show_record_v2, "Record(v2)", rule_recorder::load_record);
-        guide_mode::item_tooltip("!!TODO");
+        load_rule(show_record, "Record", rule_recorder::load_record);
+        guide_mode::item_tooltip("!!TODO"); // (temp) Record for the current rule and copied rules.
 
         ImGui::SameLine(0, wide_spacing);
         ImGui::Text("(%d FPS)", (int)round(ImGui::GetIO().Framerate));
@@ -186,7 +181,6 @@ void frame_main() {
         get_reversal_dual(ImGui::Button("Rev"), sync);
         ImGui::SameLine();
         if (imgui_StrCopyable(aniso::to_MAP_str(sync.rule), imgui_Str, set_clipboard_and_notify)) {
-            rule_record::copied(sync.rule);
             rule_recorder::record(rule_recorder::Copied, sync.rule);
         }
         guide_mode::item_tooltip("Right-click to copy.");

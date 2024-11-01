@@ -52,13 +52,6 @@ void load_doc(sync_point&);
 void edit_rule(sync_point&);
 void apply_rule(sync_point&);
 
-class rule_record : no_create {
-public:
-    static void tested(const aniso::ruleT&);
-    static void copied(const aniso::ruleT&);
-    static void load_record(sync_point&);
-};
-
 class rule_recorder : no_create {
 public:
     enum typeE : int { Current, Copied, TraverseOrRandom, RandomAccess, Ignore };
