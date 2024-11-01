@@ -468,7 +468,10 @@ public:
                 // when there are selected lines.
                 assert(false);
                 m_sel.reset(); // Defensive.
-            } else if (ImGui::IsMouseReleased(ImGuiMouseButton_Right) /* From anywhere */) {
+            } else if (!ImGui::IsMouseDown(ImGuiMouseButton_Right) /* From anywhere */) {
+                // Note: `IsMouseReleased` may fail to catch release event in rare cases. For example:
+                // [right-down] -> left-click the program-window's title bar [both-down] ->
+                // release right mouse [left-down], then a menu will appear -> minimize and restore the program.
                 m_sel.reset();
             } else if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) /* From anywhere */ ||
                        shortcuts::test(ImGuiKey_C) /*Raw test; the interaction will be locked by `m_sel`*/) {
