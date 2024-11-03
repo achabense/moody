@@ -188,8 +188,7 @@ void frame_main() {
         ImGui::Separator();
 
         if (ImGui::BeginTable("Layout", 2, ImGuiTableFlags_Resizable)) {
-            const char* const label_hidden = "H\ni\nd\nd\ne\nn";
-            const float min_w = imgui_CalcButtonSizeX(label_hidden);
+            const float min_w = 6;
 
             ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 500);
             ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
@@ -200,9 +199,9 @@ void frame_main() {
             // The child window is required here (for stable scrolling).
             if (auto child = imgui_ChildWindow("Edit", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
                 if (ImGui::GetContentRegionAvail().x == min_w) { // TODO: working, but looks fragile...
-                    ImGui::BeginDisabled();
-                    ImGui::Button(label_hidden, ImGui::GetContentRegionAvail());
-                    ImGui::EndDisabled();
+                    ImGui::Dummy(ImGui::GetContentRegionAvail());
+                    imgui_ItemRectFilled(ImGui::GetColorU32(ImGuiCol_FrameBg, ImGui::GetStyle().DisabledAlpha));
+                    imgui_ItemTooltip("Hidden.");
                 } else {
                     edit_rule(sync);
                 }
@@ -210,9 +209,9 @@ void frame_main() {
             ImGui::TableNextColumn();
             if (auto child = imgui_ChildWindow("Apply", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
                 if (ImGui::GetContentRegionAvail().x == min_w) {
-                    ImGui::BeginDisabled();
-                    ImGui::Button(label_hidden, ImGui::GetContentRegionAvail());
-                    ImGui::EndDisabled();
+                    ImGui::Dummy(ImGui::GetContentRegionAvail());
+                    imgui_ItemRectFilled(ImGui::GetColorU32(ImGuiCol_FrameBg, ImGui::GetStyle().DisabledAlpha));
+                    imgui_ItemTooltip("Hidden.");
                 } else {
                     apply_rule(sync);
                 }
