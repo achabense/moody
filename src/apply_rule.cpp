@@ -20,6 +20,13 @@ static bool strobing(const aniso::ruleT& rule) {
     return rule[all_0] == 1 && rule[all_1] == 0;
 }
 
+static int adjust_step(int step, const aniso::ruleT& rule) {
+    if ((step % 2) && strobing(rule)) {
+        return step + 1;
+    }
+    return step;
+}
+
 //           q w -
 //           a s d
 // Works for - x c case (~ rules in 'Hex' subset).
@@ -372,23 +379,19 @@ class runnerT {
 
         static constexpr int step_min = 1, step_max = 100;
         int step = 1;
-        bool anti_strobing = true;
-        int actual_step() const {
-            if (anti_strobing && strobing(rule) && step % 2) {
-                return step + 1;
-            }
-            return step;
-        }
+        int actual_step() const { return adjust_step(step, rule); }
 
         bool pause = false;
         int extra_step = 0;
         global_timer::timerT timer{global_timer::min_nonzero_interval};
     };
 
+    // TODO: ideally the space window should skip the initial state as well (if not paused).
+    // (This change is not as easy to make as it seems, as the current impl is toooo fragile...)
     class torusT {
         initT m_init{.seed = 0, .density = 0.5, .area = 0.5, .background = aniso::tileT{{.x = 1, .y = 1}}};
         aniso::tileT m_torus{{.x = 600, .y = 400}};
-        ctrlT m_ctrl{.rule{}, .step = 1, .anti_strobing = true, .pause = false};
+        ctrlT m_ctrl{.rule{}, .step = 1, .pause = false};
         int m_gen = 0;
 
         bool extra_pause = false;
@@ -408,7 +411,6 @@ class runnerT {
 
             if (m_ctrl.rule != rule) {
                 m_ctrl.rule = rule;
-                m_ctrl.anti_strobing = true;
                 m_ctrl.pause = false;
 
                 restart();
@@ -587,132 +589,120 @@ public:
             return enable_shortcuts && shortcuts::test(key, repeat);
         };
 
-        auto set_init_state = [&]() {
-            // TODO: the control flow is awkwardly convoluted...
-            const bool restarted = m_torus.set_init([&](initT& init, bool& pause) {
-                bool force_restart = false;
+        auto set_init_state = [&](initT& init, bool& pause) {
+            const bool force_restart = ImGui::Button("Restart");
+            ImGui::SameLine();
+            ImGui::Checkbox("Pause", &pause);
 
-                if (ImGui::Button("Restart")) {
-                    force_restart = true;
-                }
-                ImGui::SameLine();
-                ImGui::Checkbox("Pause", &pause);
+            ImGui::PushItemWidth(item_width);
+            imgui_StepSliderInt("Seed", &init.seed, 0, 29);
+            init.density.step_slide("Density");
+            init.area.step_slide("Area");
+            ImGui::PopItemWidth();
 
-                ImGui::PushItemWidth(item_width);
-                imgui_StepSliderInt("Seed", &init.seed, 0, 29);
-                init.density.step_slide("Density");
-                init.area.step_slide("Area");
-                ImGui::PopItemWidth();
+            ImGui::Separator();
 
-                ImGui::Separator();
+            ImGui::AlignTextToFramePadding();
+            imgui_StrTooltip("(...)", "Left-click a cell to set it to 1 (white).\n"
+                                      "Right-click to set to 0 (black).\n\n"
+                                      "'Ctrl + left-click' to resize.");
+            ImGui::SameLine();
+            imgui_Str("Background ~");
+            ImGui::SameLine();
+            if (ImGui::Button("Clear##Bg")) {
+                aniso::fill(init.background.data(), 0);
+            }
 
-                ImGui::AlignTextToFramePadding();
-                imgui_StrTooltip("(...)", "Left-click a cell to set it to 1 (white).\n"
-                                          "Right-click to set to 0 (black).\n\n"
-                                          "'Ctrl + left-click' to resize.");
-                ImGui::SameLine();
-                imgui_Str("Background ~");
-                ImGui::SameLine();
-                if (ImGui::Button("Clear##Bg")) {
-                    aniso::fill(init.background.data(), 0);
-                }
+            // There are:
+            // demo_size.z is a multiple of any i <= max_period.z, and
+            // cell_button_size.z * max_period.z == demo_size.z * demo_zoom (so the images have the same
+            // size as the board)
+            const aniso::vecT max_period{.x = 4, .y = 4};
+            const aniso::vecT demo_size{.x = 24, .y = 24};
+            const int demo_zoom = 3;
+            const ImVec2 cell_button_size{18, 18};
 
-                // There are:
-                // demo_size.z is a multiple of any i <= max_period.z, and
-                // cell_button_size.z * max_period.z == demo_size.z * demo_zoom (so the images have the same
-                // size as the board)
-                const aniso::vecT max_period{.x = 4, .y = 4};
-                const aniso::vecT demo_size{.x = 24, .y = 24};
-                const int demo_zoom = 3;
-                const ImVec2 cell_button_size{18, 18};
+            std::optional<aniso::vecT> resize{};
+            const aniso::tile_ref data = init.background.data();
+            ImGui::BeginGroup();
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {0, 0});
+            for (int y = 0, id = 0; y < max_period.y; ++y) {
+                for (int x = 0; x < max_period.x; ++x) {
+                    if (x != 0) {
+                        ImGui::SameLine();
+                    }
+                    const bool in_range = x < data.size.x && y < data.size.y;
 
-                std::optional<aniso::vecT> resize{};
-                const aniso::tile_ref data = init.background.data();
-                ImGui::BeginGroup();
-                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {0, 0});
-                for (int y = 0, id = 0; y < max_period.y; ++y) {
-                    for (int x = 0; x < max_period.x; ++x) {
-                        if (x != 0) {
-                            ImGui::SameLine();
-                        }
-                        const bool in_range = x < data.size.x && y < data.size.y;
+                    // To get things work, there is no need for unique ID here. Added to avoid
+                    // "conflicting id" message in debug mode.
+                    // (Ideally, this can be totally avoided by using one single invisible button.)
+                    ImGui::PushID(id++);
+                    ImGui::InvisibleButton(
+                        "##Invisible", cell_button_size,
+                        ImGuiButtonFlags_MouseButtonLeft |
+                            ImGuiButtonFlags_MouseButtonRight); // So right-click can activate the button.
+                    ImGui::PopID();
+                    imgui_ItemRectFilled(in_range ? (data.at(x, y) ? IM_COL32_WHITE : IM_COL32_BLACK)
+                                                  : IM_COL32_GREY(60, 255));
+                    imgui_ItemRect(IM_COL32_GREY(160, 255));
 
-                        // To get things work, there is no need for unique ID here. Added to avoid
-                        // "conflicting id" message in debug mode.
-                        // (Ideally, this can be totally avoided by using one single invisible button.)
-                        ImGui::PushID(id++);
-                        ImGui::InvisibleButton(
-                            "##Invisible", cell_button_size,
-                            ImGuiButtonFlags_MouseButtonLeft |
-                                ImGuiButtonFlags_MouseButtonRight); // So right-click can activate the button.
-                        ImGui::PopID();
-                        imgui_ItemRectFilled(in_range ? (data.at(x, y) ? IM_COL32_WHITE : IM_COL32_BLACK)
-                                                      : IM_COL32_GREY(60, 255));
-                        imgui_ItemRect(IM_COL32_GREY(160, 255));
-
-                        if (ImGui::IsItemHovered()) {
-                            if (ImGui::GetIO().KeyCtrl) {
-                                if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-                                    resize = {.x = x + 1, .y = y + 1};
-                                }
-                            } else if (in_range) {
-                                if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-                                    data.at(x, y) = 0;
-                                } else if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-                                    data.at(x, y) = 1;
-                                }
+                    if (ImGui::IsItemHovered()) {
+                        if (ImGui::GetIO().KeyCtrl) {
+                            if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                                resize = {.x = x + 1, .y = y + 1};
+                            }
+                        } else if (in_range) {
+                            if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+                                data.at(x, y) = 0;
+                            } else if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                                data.at(x, y) = 1;
                             }
                         }
                     }
                 }
-                ImGui::PopStyleVar();
-                ImGui::EndGroup();
-
-                {
-                    aniso::tileT demo(demo_size);
-                    aniso::fill(demo.data(), data);
-
-                    ImGui::SameLine(0, 0);
-                    imgui_Str(" ~ ");
-                    ImGui::SameLine(0, 0);
-                    ImGui::Image(make_screen(demo.data(), scaleE::Nearest), to_imvec(demo.size() * demo_zoom));
-                    imgui_ItemRect(IM_COL32_GREY(160, 255));
-
-                    static aniso::tileT init, curr;
-                    static bool skip_next = false;
-                    if (rule_changed // Defensive, won't actually happen now.
-                        || ImGui::IsWindowAppearing() || init != demo) {
-                        init = aniso::tileT(demo);
-                        curr = aniso::tileT(demo);
-                        skip_next = true;
-                    }
-
-                    ImGui::SameLine(0, 0);
-                    imgui_Str(" ~ ");
-                    ImGui::SameLine(0, 0);
-                    ImGui::Image(make_screen(curr.data(), scaleE::Nearest), to_imvec(curr.size() * demo_zoom));
-                    imgui_ItemRect(IM_COL32_GREY(160, 255));
-
-                    static global_timer::timerT timer{200};
-                    if (timer.test() && !std::exchange(skip_next, false)) {
-                        curr.run_torus(sync.rule);
-                    }
-                }
-
-                if (resize && init.background.size() != *resize) {
-                    aniso::tileT resized(*resize); // Already 0-filled.
-                    const aniso::vecT common = aniso::min(resized.size(), init.background.size());
-                    aniso::copy(resized.data().clip({{}, common}), init.background.data().clip({{}, common}));
-                    init.background.swap(resized);
-                }
-
-                return force_restart;
-            });
-
-            if (restarted) {
-                m_sel.reset();
-                m_paste.reset();
             }
+            ImGui::PopStyleVar();
+            ImGui::EndGroup();
+
+            {
+                aniso::tileT demo(demo_size);
+                aniso::fill(demo.data(), data);
+
+                ImGui::SameLine(0, 0);
+                imgui_Str(" ~ ");
+                ImGui::SameLine(0, 0);
+                ImGui::Image(make_screen(demo.data(), scaleE::Nearest), to_imvec(demo.size() * demo_zoom));
+                imgui_ItemRect(IM_COL32_GREY(160, 255));
+
+                static aniso::tileT init, curr;
+                static bool skip_next = false;
+                if (rule_changed // Defensive, won't actually happen now.
+                    || ImGui::IsWindowAppearing() || init != demo) {
+                    init = aniso::tileT(demo);
+                    curr = aniso::tileT(demo);
+                    skip_next = true;
+                }
+
+                ImGui::SameLine(0, 0);
+                imgui_Str(" ~ ");
+                ImGui::SameLine(0, 0);
+                ImGui::Image(make_screen(curr.data(), scaleE::Nearest), to_imvec(curr.size() * demo_zoom));
+                imgui_ItemRect(IM_COL32_GREY(160, 255));
+
+                static global_timer::timerT timer{200};
+                if (timer.test() && !std::exchange(skip_next, false)) {
+                    curr.run_torus(sync.rule);
+                }
+            }
+
+            if (resize && init.background.size() != *resize) {
+                aniso::tileT resized(*resize); // Already 0-filled.
+                const aniso::vecT common = aniso::min(resized.size(), init.background.size());
+                aniso::copy(resized.data().clip({{}, common}), init.background.data().clip({{}, common}));
+                init.background.swap(resized);
+            }
+
+            return force_restart;
         };
 
         auto input_size = [&] {
@@ -806,7 +796,6 @@ public:
 
             ImGui::Separator(); // To align with the left panel.
 
-            assert(ctrl.anti_strobing);
             const bool is_strobing = strobing(ctrl.rule);
             std::string step_str = std::to_string(ctrl.step);
             if (is_strobing) {
@@ -836,7 +825,10 @@ public:
         ImGui::BeginGroup();
         ImGui::Button("Init state");
         if (begin_popup_for_item()) {
-            set_init_state();
+            if (m_torus.set_init(set_init_state)) {
+                m_sel.reset();
+                m_paste.reset();
+            }
             ImGui::EndPopup();
         }
 
@@ -1564,13 +1556,13 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
     // (`IsItemActive` does not work as preview-window is based on `Dummy`.)
     const bool pause = hovered && l_down;
     if (!pause && (restart || (global_config::timer.test() && !std::exchange(term.skip_run, false)))) {
-        const int p = config.step + ((config.step % 2 == 1) && strobing(rule));
+        const int p = adjust_step(config.step, rule);
         for (int i = 0; i < p; ++i) {
             term.tile.run_torus(rule);
         }
     }
+    // Unless paused, the initial state will not be shown. This is intentional for better visual effect.
 
-    // Intentionally display after running for better visual effect (the initial state of the tile won't be displayed).
     const scaleE scale_mode = config.zoom_ >= 1 ? scaleE::Nearest : scaleE::Linear;
     const ImTextureID texture = make_screen(term.tile.data(), scale_mode);
     ImGui::GetWindowDrawList()->AddImage(texture, ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
