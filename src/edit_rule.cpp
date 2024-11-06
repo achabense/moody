@@ -205,7 +205,9 @@ public:
             "Von", &ignore_von,
             "Rules in the von-Neumann neighborhood. (Rules whose values are independent of 'q/e/z/c'.)\n\n"
             "(For symmetric von-Neumann rules you can directly combine this with native-symmetry terms.)");
-        terms_misc.emplace_back("S.c.", &self_complementary, "Self-complementary rules.");
+        terms_misc.emplace_back(
+            "S.c.", &self_complementary,
+            "Self-complementary rules. That is, their 0/1 reversal duals are just themselves - for any pattern, [apply such a rule] has the same effect as [flip all values -> apply the same rule -> flip all values].");
 
         terms_native.emplace_back("All", &native_isotropic,
                                   "Isotropic MAP rules. (Rules that preserve all symmetries.)\n\n"

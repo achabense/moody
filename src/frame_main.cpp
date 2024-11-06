@@ -46,16 +46,19 @@ static void get_reversal_dual(const bool button_result, sync_point& sync) {
         sync.set(rule_algo::trans_reverse(sync.rule));
     }
     imgui_ItemTooltip([&] {
-        imgui_Str("Get the 0/1 reversal dual of the current rule.");
+        ImGui::PushTextWrapPos(400);
+        imgui_Str(
+            "Get the 0/1 reversal dual of the current rule.\n\n"
+            "(That is, for any pattern, [apply the original rule] has the same effect as [flip all values -> apply the dual -> flip all values].)");
         ImGui::Separator();
+        imgui_Str("Preview:");
+        ImGui::SameLine();
         const aniso::ruleT rev = rule_algo::trans_reverse(sync.rule);
-        if (rev != sync.rule) {
-            imgui_Str("Preview:");
-            ImGui::SameLine();
-            previewer::preview(-1, previewer::configT::_220_160, rev, false);
-        } else {
-            imgui_Str("(The result will be the same as the current rule, as the current rule is self-complementary.)");
+        previewer::preview(-1, previewer::configT::_220_160, rev, false);
+        if (rev == sync.rule) {
+            imgui_Str("(It's the same as the current rule, as the current rule is self-complementary.)");
         }
+        ImGui::PopTextWrapPos();
     });
 }
 
@@ -178,20 +181,31 @@ void frame_main() {
         ImGui::SameLine();
         imgui_Str("Current rule ~");
         ImGui::SameLine();
-        get_reversal_dual(ImGui::Button("Rev"), sync);
-        ImGui::SameLine();
         if (imgui_StrCopyable(aniso::to_MAP_str(sync.rule), imgui_Str, set_clipboard_and_notify)) {
             rule_recorder::record(rule_recorder::Copied, sync.rule);
         }
         guide_mode::item_tooltip("Right-click to copy.");
+        ImGui::SameLine();
+        get_reversal_dual(ImGui::Button("0/1 rev"), sync);
 
         ImGui::Separator();
 
         if (ImGui::BeginTable("Layout", 2, ImGuiTableFlags_Resizable)) {
+            static bool right_was_hidden = false;
             const float min_w = 6;
 
-            ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 500);
-            ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
+            if (std::exchange(right_was_hidden, false)) {
+                // So when the program window is resized (e.g. maximized), the right panel will remain hidden.
+                // (As tested this does not affect manual resizing (using table's resize bar) within the program.)
+                // (No need to do the same thing for left panel.)
+                ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
+                ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, min_w);
+                // TODO: working, but this looks a bit fragile... Are there table flags to do this?
+            } else {
+                ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 500);
+                ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
+            }
+
             imgui_LockTableLayoutWithMinColumnWidth(min_w);
 
             ImGui::TableNextRow();
@@ -212,6 +226,7 @@ void frame_main() {
                     ImGui::Dummy(ImGui::GetContentRegionAvail());
                     imgui_ItemRectFilled(ImGui::GetColorU32(ImGuiCol_FrameBg, ImGui::GetStyle().DisabledAlpha));
                     imgui_ItemTooltip("Hidden.");
+                    right_was_hidden = true;
                 } else {
                     apply_rule(sync);
                 }
