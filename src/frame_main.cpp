@@ -197,21 +197,12 @@ void frame_main() {
         ImGui::Separator();
 
         if (ImGui::BeginTable("Layout", 2, ImGuiTableFlags_Resizable)) {
-            static bool right_was_hidden = false;
+            // TODO: ideally, the right panel should remain hidden (if already) unless resized by table's resize-bar.
+            // (So for example, the right panel will still remain hidden if the program window is maximized).
+            // However I haven't found a way to do this reliably...
             const float min_w = 6;
-
-            if (std::exchange(right_was_hidden, false)) {
-                // So when the program window is resized (e.g. maximized), the right panel will remain hidden.
-                // (As tested this does not affect manual resizing (using table's resize bar) within the program.)
-                // (No need to do the same thing for left panel.)
-                ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
-                ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, min_w);
-                // TODO: working, but this looks a bit fragile... Are there table flags to do this?
-            } else {
-                ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 510);
-                ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
-            }
-
+            ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 510);
+            ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
             imgui_LockTableLayoutWithMinColumnWidth(min_w);
 
             ImGui::TableNextRow();
@@ -232,7 +223,6 @@ void frame_main() {
                     ImGui::Dummy(ImGui::GetContentRegionAvail());
                     imgui_ItemRectFilled(ImGui::GetColorU32(ImGuiCol_FrameBg, ImGui::GetStyle().DisabledAlpha));
                     imgui_ItemTooltip("Hidden.");
-                    right_was_hidden = true;
                 } else {
                     apply_rule(sync);
                 }
