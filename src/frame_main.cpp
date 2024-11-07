@@ -63,6 +63,12 @@ static void get_reversal_dual(const bool button_result, sync_point& sync) {
 }
 
 void frame_main() {
+    // Make collapsed windows obvious to see.
+    ImGui::PushStyleColor(ImGuiCol_TitleBgCollapsed, ImGui::GetColorU32(ImGuiCol_TitleBgActive, 0.8));
+    if (compact_mode) {
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{3, 2});
+    }
+
 #ifdef SET_FRAME_RATE
     static timerT timer;
     timer.wait();
@@ -202,7 +208,7 @@ void frame_main() {
                 ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, min_w);
                 // TODO: working, but this looks a bit fragile... Are there table flags to do this?
             } else {
-                ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 500);
+                ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 510);
                 ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
             }
 
@@ -239,4 +245,15 @@ void frame_main() {
         sync_rule = *sync.out_rule;
         rule_recorder::record(sync.rec_type, *sync.out_rule, &sync.rule);
     }
+
+    if (compact_mode) {
+        ImGui::PopStyleVar();
+    }
+    ImGui::PopStyleColor();
+
+#ifndef NDEBUG
+    if (shortcuts::keys_avail() && shortcuts::test(ImGuiKey_7)) {
+        compact_mode = !compact_mode;
+    }
+#endif
 }

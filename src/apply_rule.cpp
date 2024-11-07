@@ -383,7 +383,7 @@ class runnerT {
 
         bool pause = false;
         int extra_step = 0;
-        global_timer::timerT timer{global_timer::min_nonzero_interval};
+        global_timer::timerT timer{init_zero_interval ? 0 : global_timer::min_nonzero_interval};
     };
 
     // TODO: ideally the space window should skip the initial state as well (if not paused).
@@ -1431,12 +1431,12 @@ void apply_rule(sync_point& sync) {
 }
 
 struct global_config {
-    inline static global_timer::timerT timer{global_timer::min_nonzero_interval};
+    inline static global_timer::timerT timer{init_zero_interval ? 0 : global_timer::min_nonzero_interval};
     inline static percentT area = 1.0;
 };
 
 void previewer::configT::_set() {
-    // ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{2, 2});
+    ImGui::PushItemWidth(item_width);
 
     ImGui::AlignTextToFramePadding();
     imgui_StrTooltip(
@@ -1483,23 +1483,19 @@ void previewer::configT::_set() {
     }
     ImGui::Separator();
 
-    ImGui::SetNextItemWidth(item_width);
     imgui_StepSliderInt("Seed", &seed, 0, 9);
-    ImGui::SetNextItemWidth(item_width);
     global_config::area.step_slide("Area", 10, 100, 10);
     ImGui::SameLine();
     imgui_StrTooltip("(?)", "This is shared by all preview windows in the program.");
     imgui_Str("Density ~ 0.5, background ~ default");
     ImGui::Separator();
 
-    ImGui::SetNextItemWidth(item_width);
     imgui_StepSliderInt("Step", &step, 1, 24);
-    ImGui::SetNextItemWidth(item_width);
     global_config::timer.slide_interval("Interval", 0, 400);
     ImGui::SameLine();
     imgui_StrTooltip("(?)", "This is shared by all preview windows in the program.");
 
-    // ImGui::PopStyleVar();
+    ImGui::PopItemWidth();
 }
 
 // TODO: allow setting the step and interval with shortcuts when the window is hovered?

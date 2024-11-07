@@ -1122,7 +1122,7 @@ void edit_rule(sync_point& sync) {
             imgui_AddCursorPosY(std::max(0.0f, (height - ImGui::GetTextLineHeight()) / 2));
         };
 
-        const int button_zoom = 7;
+        const int button_zoom = compact_mode ? 6 : 7;
         const ImVec2 button_padding{2, 2};
         const int spacing_x = ImGui::GetStyle().ItemSpacing.x + 3;
         const int group_size_x = [&]() {

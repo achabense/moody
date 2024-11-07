@@ -201,17 +201,19 @@ int main(int, char**) {
     // Create window with SDL_Renderer graphics context
     {
         const char* const window_title = "Moody v 0.9.8 (WIP)";
+
+        // To maximize the window: SDL_WINDOW_MAXIMIZED, or for guaranteed initial color:
+        // SDL_WINDOW_HIDDEN (-> SDL_MaximizeWindow) -> manual render-clear -> SDL_ShowWindow
         const SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
         window =
             SDL_CreateWindow(window_title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
-    }
-    if (!window) {
-        resource_failure();
-    }
-
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
-    if (!renderer) {
-        resource_failure();
+        if (!window) {
+            resource_failure();
+        }
+        renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
+        if (!renderer) {
+            resource_failure();
+        }
     }
 
     // Setup Dear ImGui context
@@ -296,10 +298,7 @@ int main(int, char**) {
     while (begin_frame()) {
         screen_textures::begin_frame();
 
-        // Make collapsed windows obvious to see. Set outside of `frame_main` for convenience.
-        ImGui::PushStyleColor(ImGuiCol_TitleBgCollapsed, ImGui::GetColorU32(ImGuiCol_TitleBgActive, 0.8));
         frame_main();
-        ImGui::PopStyleColor();
 
         end_frame();
 

@@ -452,10 +452,12 @@ public:
         }
     }
 
+#if 0
     void append(const aniso::ruleT& rule) {
         line_ref& line = _append_line(aniso::to_MAP_str(rule));
         _attach_rule(line, rule);
     }
+#endif
 
     void reset_scroll() { rewind = true; }
 

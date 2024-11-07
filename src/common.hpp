@@ -94,6 +94,15 @@ inline float wrap_len() {
     return ImGui::GetFontSize() * 35.0f;
 }
 
+// TODO: should finally be configurable in the program.
+// inline const bool init_maximize_window = false;
+inline const bool init_zero_interval = false;
+#ifndef NDEBUG
+inline bool compact_mode = false;
+#else // Release
+inline const bool compact_mode = false;
+#endif
+
 // TODO: consider using ImGui::Shortcut?
 // Some features cannot easily be satisfied with `ImGui::Shortcut` and `ImGui::SetNextItemShortcut`.
 class shortcuts : no_create {
