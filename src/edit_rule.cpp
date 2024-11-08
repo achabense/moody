@@ -172,41 +172,53 @@ public:
     explicit subset_selector(const aniso::subsetT* init_sel = nullptr) : current(aniso::subsetT::universal()) {
         using namespace aniso::_subsets;
 
-        // TODO: refine descriptions.
         terms_ignore.emplace_back(
             "q", &ignore_q,
-            "Rules whose values are independent of 'q'. That is, for any two cases where only 'q' is different, "
-            "the mapped values are the same.\n"
-            "(Therefore, these rules will behave as if the neighborhood does not include 'q'. The same applies to "
-            "'w/e/a/d/z/x/c'.)\n\n"
+            "Rules whose values are independent of 'q'. That is, for any two cases where only 'q' differs, "
+            "the rule will map the center cell to the same value.\n\n"
+            "    |0 w e|       |1 w e|\n"
+            "rule|a s d| = rule|a s d|\n"
+            "    |z x c|       |z x c|\n\n"
+            "Therefore, these rules will behave as if the neighborhood does not include 'q'. The same applies to "
+            "'w/e/a/d/z/x/c'.\n\n"
             "('q/w/e/a/s/d/z/x/c' are named after the keys in 'qwerty' keyboard.)");
         terms_ignore.emplace_back("w", &ignore_w, "See 'q' for details.");
         terms_ignore.emplace_back("e", &ignore_e, "See 'q' for details.");
         terms_ignore.emplace_back("a", &ignore_a, "See 'q' for details.");
         terms_ignore.emplace_back(
             "s", &ignore_s_z,
-            "For any two cases where only 's' is different, the mapped values are the same.\n"
-            "(When 'q/w/e/a/d/z/x/c' are the same, there must be: either s:0->1, s:1->1 or s:0->0, s:1->0.)\n\n"
-            "(This is defined in the same way as 'q', but it's strange to treat this as \"independent of 's'\".)");
+            "For any two cases where only 's' (the center cell itself) differs, the rule will map the center cell to the same value.\n\n"
+            "    |q w e|       |q w e|\n"
+            "rule|a 0 d| = rule|a 1 d|\n"
+            "    |z x c|       |z x c|\n\n"
+            "So when the surrounding cells are the same, there must be: either s:0->1, s:1->1 or s:0->0, s:1->0.\n\n"
+            "(Though this is defined in the same way as other independence subsets, it's strange to treat this as \"independent of 's'\".)");
         terms_ignore.emplace_back("d", &ignore_d, "See 'q' for details.");
         terms_ignore.emplace_back("z", &ignore_z, "See 'q' for details.");
         terms_ignore.emplace_back("x", &ignore_x, "See 'q' for details.");
         terms_ignore.emplace_back("c", &ignore_c, "See 'q' for details.");
 
-        terms_misc.emplace_back("s(*)", &ignore_s_i,
-                                "Similar to 's' - for any two cases where only 's' is different, the \"flip-ness\" of "
-                                "the values are the same (either s:0->0, s:1->1 or s:0->1, s:1->0).");
-        terms_misc.emplace_back("Hex", &ignore_hex,
-                                "Rules that emulate hexagonal neighborhood, by making the values independent of 'e/z'. "
-                                "See the last line for demonstration.\n\n"
-                                "For windows displaying hexagonal rules, you can hover on them and press '6' to see "
-                                "what \"actually\" happens in the corresponding hexagonal space.");
+        terms_misc.emplace_back(
+            "s(*)", &ignore_s_i,
+            "Similar to 's' - for any two cases where only 's' differs, the rule will map the center cell to values so that the resulting \"flip-ness\" will be the same. That is:\n\n"
+            "     |q w e|             |q w e|\n"
+            "(rule|a 0 d| = 0) = (rule|a 1 d| = 1)\n"
+            "     |z x c|             |z x c|\n\n"
+            "So when the surrounding cells are the same, there must be: either s:0->0, s:1->1 (no flip in either case) or s:0->1, s:1->0 (flip in both cases).");
+        // TODO: refine descriptions.
+        terms_misc.emplace_back(
+            "Hex", &ignore_hex,
+            "Rules that emulate hexagonal neighborhood, by making the values independent of 'e' and 'z'. "
+            "See the last line for illustration.\n\n"
+            "For windows displaying hexagonal rules, you can hover on them and press '6' to see "
+            "what \"actually\" happens in the corresponding hexagonal space.");
         terms_misc.emplace_back(
             "Von", &ignore_von,
             "Rules in the von-Neumann neighborhood. (Rules whose values are independent of 'q/e/z/c'.)\n\n"
             "(For symmetric von-Neumann rules you can directly combine this with native-symmetry terms.)");
+        // !!TODO: the old name (S.c.) is still referred-to in several places.
         terms_misc.emplace_back(
-            "S.c.", &self_complementary,
+            "Comp", &self_complementary,
             "Self-complementary rules. That is, their 0/1 reversal duals are just themselves - for any pattern, [apply such a rule] has the same effect as [flip all values -> apply the same rule -> flip all values].");
 
         terms_native.emplace_back("All", &native_isotropic,
@@ -853,20 +865,19 @@ static void random_rule_window(bool& show_rand, sync_point& sync, const aniso::s
         int free_dist = round(rate * c_free); // Intended distance.
 
         static bool exact_mode = false;
-        if (ImGui::Button(exact_mode ? "Exactly###Mode" : "Around ###Mode")) {
-            exact_mode = !exact_mode;
-        }
-        guide_mode::item_tooltip("Click to switch between 'Around' / 'Exactly'.");
+        imgui_RadioButton("Around", &exact_mode, false);
         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+        imgui_RadioButton("Exactly", &exact_mode, true);
+        ImGui::SameLine();
         ImGui::SetNextItemWidth(item_width);
-        if (imgui_StepSliderInt("Dist", &free_dist, 0, c_free, has_lock ? "(Free) %d" : "%d") && c_free != 0) {
+        if (imgui_StepSliderInt("##Dist", &free_dist, 0, c_free, has_lock ? "(Free) %d" : "%d") && c_free != 0) {
             rate = double(free_dist) / c_free;
             assert(round(rate * c_free) == free_dist);
         }
         ImGui::SameLine();
         imgui_StrTooltip(
-            "(?)",
-            "Generate random rules (in the working set) with intended distance around/exactly to the masking rule, as specified by the button and slider.\n\n"
+            "(...)",
+            "Generate random rules (in the working set) with intended distance around/exactly to the masking rule.\n\n"
             "For example, if you are using the 'Zero' mask and distance = 'Around' 30, when at the last page, '>>>' will generate pages of rules with around 30 groups having '1'.\n\n"
             "(Also, suppose the current rule belongs to the working set, you can set it to the custom mask, and generate in a low distance to get random nearby rules for it.)");
         guide_mode::highlight();
