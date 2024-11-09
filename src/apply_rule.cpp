@@ -743,7 +743,12 @@ public:
                 return false;
             });
             ImGui::SameLine();
-            imgui_StrTooltip("(?)", "Click to resize the space to full-screen.");
+            imgui_StrTooltip(
+                "(?)",
+                "The buttons are for resizing the space to full-screen. (Scroll in the window to zoom in/out without resizing.)");
+            if (imgui_ItemHoveredForTooltip()) {
+                highlight_canvas = true;
+            }
             guide_mode::highlight();
         };
 
@@ -788,7 +793,7 @@ public:
             imgui_StrTooltip("(?)", [] {
                 imgui_Str("+s: ");
                 ImGui::SameLine(0, 0);
-                imgui_Str("Run manually (advance generation by step).");
+                imgui_Str("Run manually (firstly pause the space, then advance generation by step afterwards).");
                 imgui_Str("+1: ");
                 ImGui::SameLine(0, 0);
                 imgui_Str("Advance generation by 1 instead of step.");
@@ -806,14 +811,12 @@ public:
             imgui_StepSliderShortcuts::set(ImGuiKey_1, ImGuiKey_2, enable_shortcuts);
             imgui_StepSliderInt("Step", &ctrl.step, ctrl.step_min, ctrl.step_max, step_str.c_str());
             imgui_StepSliderShortcuts::reset();
-            if (is_strobing) {
-                ImGui::SameLine();
-                imgui_StrTooltip("(?)",
-                                 "As the current rule has '000...->1' and '111...->0', the step will be adjusted "
-                                 "to 2*n to avoid bad visual effect (flashing pure-color background).\n\n"
-                                 "(You can change the parity of generation with the '+1' button.)");
-                guide_mode::highlight();
-            }
+            ImGui::SameLine();
+            imgui_StrTooltip(
+                "(?)",
+                "If the current rule maps '000...' to '1' and '111...' to '0' (aka strobing rules), the step will be ceiled to 2*n to avoid large spans of pure-color areas flashing between two colors.\n\n"
+                "In such cases, the step will be shown as e.g. '1 -> 2', '2 -> 2', '3 -> 4', '4 -> 4'. The adjustment also applies to '+s' mode, but you can still change the parity of generation with the '+1' button.\n\n"
+                "Occasionally, you may also find rules that don't flash in the pure-color case (so the adjustment won't happen), but can develop non-trivial flashing areas. The effect can usually be avoided by manually setting an even step.");
 
             const int min_ms = 0, max_ms = 400;
             imgui_StepSliderShortcuts::set(ImGuiKey_3, ImGuiKey_4, enable_shortcuts);
@@ -843,13 +846,17 @@ public:
         ImGui::Separator();
 
         ImGui::AlignTextToFramePadding();
-        imgui_StrTooltip(
-            "(...)", "Mouse operations:\n"
-                     "1. Scroll in the window to zoom in/out.\n"
-                     "2. When there is nothing to paste, you can drag with left button to move the window, or 'Ctrl + "
-                     "left-drag' to \"rotate\" the space, or drag with right button to select area.\n"
-                     "3. Otherwise, left-click to decide where to paste. To move the window you can drag with "
-                     "right button. Rotating and selecting are not available in this case.");
+        imgui_StrTooltip("(...)", "Mouse operations:\n"
+                                  "- Scroll in the window to zoom in/out.\n\n"
+                                  "When there is no pattern to paste:\n"
+                                  "- Drag with left button to move the window.\n"
+                                  "- 'Ctrl' and drag to \"rotate\" the space.\n"
+                                  "- Drag with right button to select area.\n"
+                                  "- (The selection can be cleared with a single right-click.)\n\n"
+                                  "When there is pattern to paste:\n"
+                                  "- Left-click to decide where to paste.\n"
+                                  "- Drag with right button to move the window.\n"
+                                  "- (Rotating and selecting are not available in this case.)");
         if (imgui_ItemHoveredForTooltip()) {
             highlight_canvas = true;
         }
@@ -866,10 +873,12 @@ public:
         static bool show_range_window = false;
         ImGui::Checkbox("Range ops", &show_range_window);
         ImGui::SameLine();
-        imgui_StrDisabled("(?)");
+        imgui_StrTooltip(
+            "(?)",
+            "The shortcuts listed in 'Range ops', including 'V' for pasting, are available only when the space window "
+            "is hovered or held by mouse button.");
         guide_mode::highlight();
-        const bool show_range_window_in_tooltip = imgui_ItemHoveredForTooltip();
-        if (show_range_window_in_tooltip) {
+        if (imgui_ItemHoveredForTooltip()) {
             highlight_canvas = true;
         }
 
@@ -888,7 +897,15 @@ public:
             m_sel.reset();
         }
         imgui_ItemTooltip_StrID = "Clear##Sel";
-        guide_mode::item_tooltip("Double right-click to clear.");
+        guide_mode::item_tooltip(
+            "Double right-click to clear.\n\n"
+            "(When there is no pattern to paste, the more direct way is to single right-click the space window.)");
+        // TODO: the code looks really awkward... whether to make item-tooltip return value?
+        if (guide_mode::enabled()) {
+            if (imgui_ItemHoveredForTooltip("Clear##Sel")) {
+                highlight_canvas = true;
+            }
+        }
 
         ImGui::SameLine(0, wide_spacing);
         if (m_paste) {
@@ -948,7 +965,6 @@ public:
 
             if (m_sel && m_sel->active && (!r_down || m_paste || ImGui::IsItemDeactivated())) {
                 m_sel->active = false;
-                // !!TODO: document somewhere...
                 // Allow a single right-click to unselect the area.
                 // (`bounding_box` has no size check like this. This is intentional.)
                 if (m_sel->width() * m_sel->height() <= 2) {
@@ -1262,7 +1278,7 @@ public:
                             "Identify a single oscillator or spaceship in 2*2 periodic background "
                             "(e.g., pure white, pure black, striped, or checkerboard background), and "
                             "copy its smallest phase to the clipboard.");
-                        // !!TODO: improve compatibility with 'There is no selected area' message...
+                        // TODO: improve compatibility with 'There is no selected area' message...
 
                         ImGui::Separator();
                         ImGui::AlignTextToFramePadding();
@@ -1300,32 +1316,24 @@ public:
                     }
                 };
 
-                [&] {
+                {
+                    bool displayed = false;
                     if (show_range_window) {
                         ImGui::SetNextWindowCollapsed(false, ImGuiCond_Appearing);
                         if (ImGui::IsMousePosValid()) {
                             ImGui::SetNextWindowPos(ImGui::GetMousePos() + ImVec2(2, 2), ImGuiCond_Appearing);
                         }
-                        auto window =
-                            imgui_Window("Range operations", &show_range_window,
-                                         ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings);
-                        if (window.visible) {
+                        if (auto window =
+                                imgui_Window("Range operations", &show_range_window,
+                                             ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
                             range_operations(true /* display */);
-                            return; // Using lambda for this return.
+                            displayed = true;
                         }
                     }
-                    if (show_range_window_in_tooltip && ImGui::BeginTooltip()) {
-                        imgui_StrWrapped(
-                            "The shortcuts (including 'V' for pasting) are available only when the space window "
-                            "is hovered or held by mouse button.",
-                            ImGui::CalcItemWidth());
-                        ImGui::Separator();
-                        range_operations(true /* display */);
-                        ImGui::EndTooltip();
-                    } else {
+                    if (!displayed) {
                         range_operations(false /* shortcut only */);
                     }
-                }();
+                }
 
                 // TODO: disable some operations if `m_paste.has_value`?
                 if (op == _capture_closed && m_sel) {
