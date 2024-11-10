@@ -590,9 +590,20 @@ public:
         };
 
         auto set_init_state = [&](initT& init, bool& pause) {
-            const bool force_restart = ImGui::Button("Restart");
+            // TODO: highlight() does not work here as it conflicts with popup's.
+            // Ideally and neither should use `NavHighlightActivated` for highlighting...
+            const bool force_restart =
+                ImGui::Button("Restart") ||
+                (shortcuts::keys_avail() && shortcuts::test(ImGuiKey_R) /*&& shortcuts::highlight()*/);
             ImGui::SameLine();
             ImGui::Checkbox("Pause", &pause);
+            if (shortcuts::keys_avail() && shortcuts::test(ImGuiKey_Space) /*&& shortcuts::highlight()*/) {
+                pause = !pause;
+            }
+            ImGui::SameLine();
+            imgui_StrTooltip(
+                "(?)", "The space will restart and pause if you 'Restart' or change init settings.\n\n"
+                       "For convenience, the shortcuts for 'Restart' ('R') and 'Pause' ('Space') also work here.");
 
             ImGui::PushItemWidth(item_width);
             imgui_StepSliderInt("Seed", &init.seed, 0, 29);
@@ -605,64 +616,60 @@ public:
             ImGui::AlignTextToFramePadding();
             imgui_StrTooltip("(...)", "Left-click a cell to set it to 1 (white).\n"
                                       "Right-click to set to 0 (black).\n\n"
-                                      "'Ctrl + left-click' to resize.");
+                                      "'Ctrl' and left-click a cell to resize to that position.");
             ImGui::SameLine();
-            imgui_Str("Background ~");
+            imgui_Str("Background");
             ImGui::SameLine();
             if (ImGui::Button("Clear##Bg")) {
                 aniso::fill(init.background.data(), 0);
+                // TODO: whether to force-restart in this case?
             }
 
             // There are:
             // demo_size.z is a multiple of any i <= max_period.z, and
             // cell_button_size.z * max_period.z == demo_size.z * demo_zoom (so the images have the same
             // size as the board)
-            const aniso::vecT max_period{.x = 4, .y = 4};
-            const aniso::vecT demo_size{.x = 24, .y = 24};
-            const int demo_zoom = 3;
-            const ImVec2 cell_button_size{18, 18};
+            constexpr aniso::vecT max_period{.x = 4, .y = 4};
+            constexpr aniso::vecT demo_size{.x = 24, .y = 24};
+            constexpr int demo_zoom = 3;
+            constexpr ImVec2 cell_button_size{18, 18};
 
             std::optional<aniso::vecT> resize{};
             const aniso::tile_ref data = init.background.data();
-            ImGui::BeginGroup();
-            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {0, 0});
-            for (int y = 0, id = 0; y < max_period.y; ++y) {
-                for (int x = 0; x < max_period.x; ++x) {
-                    if (x != 0) {
-                        ImGui::SameLine();
-                    }
-                    const bool in_range = x < data.size.x && y < data.size.y;
+            ImGui::InvisibleButton("##Board", cell_button_size * to_imvec(max_period),
+                                   ImGuiButtonFlags_MouseButtonLeft |
+                                       ImGuiButtonFlags_MouseButtonRight); // So right-click can activate the button.
+            {
+                const ImVec2 button_beg = ImGui::GetItemRectMin();
+                const bool button_hovered = ImGui::IsItemHovered();
+                const ImVec2 mouse_pos = ImGui::GetMousePos();
+                ImDrawList* const drawlist = ImGui::GetWindowDrawList();
+                for (int y = 0; y < max_period.y; ++y) {
+                    for (int x = 0; x < max_period.x; ++x) {
+                        const bool in_range = x < data.size.x && y < data.size.y;
 
-                    // To get things work, there is no need for unique ID here. Added to avoid
-                    // "conflicting id" message in debug mode.
-                    // (Ideally, this can be totally avoided by using one single invisible button.)
-                    ImGui::PushID(id++);
-                    ImGui::InvisibleButton(
-                        "##Invisible", cell_button_size,
-                        ImGuiButtonFlags_MouseButtonLeft |
-                            ImGuiButtonFlags_MouseButtonRight); // So right-click can activate the button.
-                    ImGui::PopID();
-                    imgui_ItemRectFilled(in_range ? (data.at(x, y) ? IM_COL32_WHITE : IM_COL32_BLACK)
-                                                  : IM_COL32_GREY(60, 255));
-                    imgui_ItemRect(IM_COL32_GREY(160, 255));
-
-                    if (ImGui::IsItemHovered()) {
-                        if (ImGui::GetIO().KeyCtrl) {
-                            if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-                                resize = {.x = x + 1, .y = y + 1};
-                            }
-                        } else if (in_range) {
-                            if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
-                                data.at(x, y) = 0;
-                            } else if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-                                data.at(x, y) = 1;
+                        const ImVec2 cell_beg = button_beg + cell_button_size * ImVec2(x, y);
+                        const ImVec2 cell_end = cell_beg + cell_button_size;
+                        drawlist->AddRectFilled(cell_beg, cell_end,
+                                                in_range ? (data.at(x, y) ? IM_COL32_WHITE : IM_COL32_BLACK)
+                                                         : IM_COL32_GREY(60, 255));
+                        drawlist->AddRect(cell_beg, cell_end, IM_COL32_GREY(160, 255));
+                        if (button_hovered && ImRect(cell_beg, cell_end).Contains(mouse_pos) /*[)*/) {
+                            if (ImGui::GetIO().KeyCtrl) {
+                                if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                                    resize = {.x = x + 1, .y = y + 1};
+                                }
+                            } else if (in_range) {
+                                if (ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
+                                    data.at(x, y) = 0;
+                                } else if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                                    data.at(x, y) = 1;
+                                }
                             }
                         }
                     }
                 }
             }
-            ImGui::PopStyleVar();
-            ImGui::EndGroup();
 
             {
                 aniso::tileT demo(demo_size);
@@ -743,9 +750,8 @@ public:
                 return false;
             });
             ImGui::SameLine();
-            imgui_StrTooltip(
-                "(?)",
-                "The buttons are for resizing the space to full-screen. (Scroll in the window to zoom in/out without resizing.)");
+            imgui_StrTooltip("(?)", "The buttons are for resizing the space to full-screen.\n\n"
+                                    "(Scroll in the window to zoom in/out without resizing.)");
             if (imgui_ItemHoveredForTooltip()) {
                 highlight_canvas = true;
             }
