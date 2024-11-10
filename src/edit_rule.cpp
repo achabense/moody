@@ -830,7 +830,6 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
         imgui_StrTooltip(
             "(?)",
             "The sequence represents a list of all rules in the working set: firstly the masking rule ('<00..'), then all rules with distance = 1 to it, then 2, 3, ..., until the largest distance ('11..>'). You can iterate through all rules in the working set with it.");
-        guide_mode::highlight();
 
         ImGui::SameLine();
         config.set("Preview settings");
@@ -880,7 +879,6 @@ static void random_rule_window(bool& show_rand, sync_point& sync, const aniso::s
             "Generate random rules (in the working set) with intended distance around/exactly to the masking rule.\n\n"
             "For example, if you are using the 'Zero' mask and distance = 'Around' 30, when at the last page, '>>>' will generate pages of rules with around 30 groups having '1'.\n\n"
             "(Also, suppose the current rule belongs to the working set, you can set it to the custom mask, and generate in a low distance to get random nearby rules for it.)");
-        guide_mode::highlight();
         // TODO: where to record this?
         // The window can be resized to fit the page size by double-clicking the resize border.
 
@@ -1113,7 +1111,6 @@ void edit_rule(sync_point& sync) {
             if (imgui_ItemClickableDouble()) {
                 sync.set(aniso::approximate(subset, sync.rule));
             }
-            guide_mode::highlight();
         }
     }
 

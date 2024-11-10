@@ -141,7 +141,7 @@ void frame_main() {
         const int wide_spacing = ImGui::CalcTextSize(" ").x * 3;
         ImGui::SameLine(0, wide_spacing);
         load_rule(show_record, "Record", rule_recorder::load_record);
-        guide_mode::item_tooltip("!!TODO"); // (temp) Record for the current rule and copied rules.
+        guide_mode::item_tooltip("Record for current rule, copied rules, etc.");
 
         ImGui::SameLine(0, wide_spacing);
         ImGui::Text("(%d FPS)", (int)round(ImGui::GetIO().Framerate));

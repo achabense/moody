@@ -755,7 +755,6 @@ public:
             if (imgui_ItemHoveredForTooltip()) {
                 highlight_canvas = true;
             }
-            guide_mode::highlight();
         };
 
         ImGui::PushItemWidth(item_width);
@@ -775,7 +774,6 @@ public:
             if (imgui_ItemHoveredForTooltip()) {
                 highlight_canvas = true;
             }
-            guide_mode::highlight();
             ImGui::SameLine();
             if (ImGui::Button("Restart") || item_shortcut(ImGuiKey_R, false)) {
                 m_torus.restart();
@@ -866,7 +864,6 @@ public:
         if (imgui_ItemHoveredForTooltip()) {
             highlight_canvas = true;
         }
-        guide_mode::highlight();
 
         ImGui::SameLine();
         if (ImGui::Button("Center")) {
@@ -883,7 +880,6 @@ public:
             "(?)",
             "The shortcuts listed in 'Range ops', including 'V' for pasting, are available only when the space window "
             "is hovered or held by mouse button.");
-        guide_mode::highlight();
         if (imgui_ItemHoveredForTooltip()) {
             highlight_canvas = true;
         }
@@ -1300,7 +1296,6 @@ public:
                                                 "background.\n\n"
                                                 "Use 'Or' mode to treat black cells as transparent background. "
                                                 "('And' ~ white background.)");
-                        guide_mode::highlight();
                         term("Paste", "V", ImGuiKey_V, false, _paste);
                     } else { // Shortcut only.
                         auto term2 = [&](ImGuiKey key, bool use_sel, operationE op2) {
@@ -1452,7 +1447,7 @@ struct global_config {
 void previewer::configT::_set() {
     ImGui::PushItemWidth(item_width);
 
-    ImGui::AlignTextToFramePadding();
+    // ImGui::AlignTextToFramePadding();
     imgui_StrTooltip(
         "(...)",
         "Press 'T' to restart all preview windows.\n\n"
@@ -1463,13 +1458,14 @@ void previewer::configT::_set() {
         "- Hover and press 'Z' to see which subsets the previewed rule belongs to in the subset table.\n"
         "- Hover and press 'X' to temporarily override the current rule with the previewed one in the space window. The previewed rule will not be recorded in this case.\n\n"
         "If the rule belongs to 'Hex' subset, you can also hover and press '6' to see the projected view in the real hexagonal space. (This also applies to the space window.)");
-    guide_mode::highlight();
-    // !!TODO: what to reset? size/zoom or size/zoom/seed/step?
-    // (Should be regarded as under-documented before this is decided.)
+#if 0
+    // TODO: what to reset? size/zoom or size/zoom/seed/step?
     ImGui::SameLine();
     if (ImGui::Button("Reset")) {
         _reset_size_zoom();
     }
+    guide_mode::item_tooltip("(Width, height and zoom.)");
+#endif
     ImGui::Separator();
 
     for (const bool f : {true, false}) {

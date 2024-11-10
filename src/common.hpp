@@ -220,11 +220,14 @@ public:
     // For use in combination with other tooltips.
     static bool enabled() { return enable_tooltip; }
 
+#if 0
+    // It's getting unclear what should really be highlighted...
     static void highlight() {
         if (enable_tooltip) {
             _highlight();
         }
     }
+#endif
 
     static void item_tooltip(const std::string_view tooltip) {
         if (enable_tooltip) {
