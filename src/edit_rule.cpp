@@ -259,12 +259,12 @@ public:
                                "intersection with native-symmetry terms will typically be very small.)");
         terms_hex.emplace_back(
             "a-d", &hex_refl_asd,
-            "Rules that emulate reflection symmetry in the hexagonal tiling, taking the axis from 'a' to 'd'.");
-        terms_hex.emplace_back("q-c", &hex_refl_qsc, "Ditto, the reflection axis is 'q to c'.");
-        terms_hex.emplace_back("w-x", &hex_refl_wsx, "Ditto, the reflection axis is 'w to x'.");
-        terms_hex.emplace_back("a|q", &hex_refl_aq, "Ditto, the reflection axis is vertical to 'a to q'.");
-        terms_hex.emplace_back("q|w", &hex_refl_qw, "Ditto, the reflection axis is vertical to 'q to w'.");
-        terms_hex.emplace_back("w|d", &hex_refl_wd, "Ditto, the reflection axis is vertical to 'w to d'.");
+            "Rules that emulate reflection symmetry in the hexagonal tiling, taking the axis from 'a' to 'd' (a-to-d).");
+        terms_hex.emplace_back("q-c", &hex_refl_qsc, "Ditto, the reflection axis is q-to-c.");
+        terms_hex.emplace_back("w-x", &hex_refl_wsx, "Ditto, the reflection axis is w-to-x.");
+        terms_hex.emplace_back("a|q", &hex_refl_aq, "Ditto, the reflection axis is vertical to a-to-q.");
+        terms_hex.emplace_back("q|w", &hex_refl_qw, "Ditto, the reflection axis is vertical to q-to-w.");
+        terms_hex.emplace_back("w|d", &hex_refl_wd, "Ditto, the reflection axis is vertical to w-to-d.");
         terms_hex.emplace_back("C2", &hex_C2,
                                "Rules that emulate C2 symmetry in the hexagonal tiling.\n"
                                "(Not to be confused with native C2 rules.)");
@@ -405,7 +405,8 @@ public:
                                  "subset. See '(...)' for details.");
     }
 
-    void select(const aniso::ruleT* const target = nullptr, const aniso::subsetT* const should_include = nullptr) {
+    void select(const aniso::ruleT* const target = nullptr, const aniso::subsetT* const should_include = nullptr,
+                const bool show_desc = true) {
         if (should_include && !current.includes(*should_include)) {
             assert(false);
             clear();
@@ -432,7 +433,9 @@ public:
                          : disabled       ? Disabled
                                           : None,
                          show_title ? term.title : nullptr, true);
-                imgui_ItemTooltip(term.description);
+                if (show_desc) {
+                    imgui_ItemTooltip(term.description);
+                }
             };
 
             auto checklist = [&](termT_list& terms) {
@@ -739,9 +742,8 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
                 changed = true;
             }
 
-            // !!TODO: it's not a good idea to clear without confirmation...
+            // TODO: are there better behaviors than clearing directly?
             if (changed && !page.empty()) {
-                // !!TODO: whether to show message here?
                 page.clear();
             }
         }
@@ -774,7 +776,11 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
             fill_page(adapter.page_size);
         }
         ImGui::SameLine();
-        imgui_StrTooltip("(?)", "The max distance is actually the number of groups in the working set.");
+        imgui_StrTooltip(
+            "(...)",
+            "The sequence represents a list of all rules in the working set, in the following order: firstly the masking rule ('<00..'), then all rules with distance = 1 to it, then 2, 3, ..., up to the largest distance ('11..>') (which is the number of groups in the working set).\n\n"
+            "You can traverse the entire working set with this. Some interesting examples include: inner-totalistic rules ('Tot(+s)'), self-complementary totalistic rules ('Comp' & 'Tot'), isotropic von-Neumann rules ('All' & 'Von'), and a similar set ('All' & 'w').\n\n"
+            "Even if the working set is very large, you may find this still useful sometimes.");
 
         ImGui::BeginGroup();
         sequence::seq(
@@ -824,12 +830,8 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
             page.clear();
         }
         imgui_ItemTooltip_StrID = "Clear";
-        guide_mode::item_tooltip("Double right-click to clear.");
-
-        ImGui::SameLine();
-        imgui_StrTooltip(
-            "(?)",
-            "The sequence represents a list of all rules in the working set: firstly the masking rule ('<00..'), then all rules with distance = 1 to it, then 2, 3, ..., until the largest distance ('11..>'). You can iterate through all rules in the working set with it.");
+        guide_mode::item_tooltip("Double right-click to clear.\n\n"
+                                 "(The page will also be cleared if the working set or masking rule changes.)");
 
         ImGui::SameLine();
         config.set("Preview settings");
@@ -876,11 +878,8 @@ static void random_rule_window(bool& show_rand, sync_point& sync, const aniso::s
         ImGui::SameLine();
         imgui_StrTooltip(
             "(...)",
-            "Generate random rules (in the working set) with intended distance around/exactly to the masking rule.\n\n"
-            "For example, if you are using the 'Zero' mask and distance = 'Around' 30, when at the last page, '>>>' will generate pages of rules with around 30 groups having '1'.\n\n"
-            "(Also, suppose the current rule belongs to the working set, you can set it to the custom mask, and generate in a low distance to get random nearby rules for it.)");
-        // TODO: where to record this?
-        // The window can be resized to fit the page size by double-clicking the resize border.
+            "The sequence serves as the record of generated rules - when you are at the last page ('At' ~ 'Pages' or 'N/A'), '>>>' will generate pages of random rules (in the working set) with intended distance around/exactly to the masking rule.\n\n"
+            "For example, if you are using the 'Zero' mask and distance = 'Around' 30, when at the last page, '>>>' will generate pages of rules with around 30 groups having '1'. Also, if the current rule already belongs to the working set, to get some random rules close to it, you can set it to the custom mask and '>>>' in a low distance.");
 
         static std::vector<aniso::ruleT> rules{};
         static page_adapter adapter{};
@@ -913,7 +912,8 @@ static void random_rule_window(bool& show_rand, sync_point& sync, const aniso::s
         ImGui::EndGroup();
         imgui_ItemTooltip_StrID = "Seq##Pages";
         guide_mode::item_tooltip(
-            "Record of generated rules. '>>>' will generate pages of rules when you are at the last page.");
+            "'>>>' will generate pages of rules when you are at the last page. See '(...)' for details.");
+        // TODO: tooltip: it's especially convenient to control the sequence with shortcuts ('Left/Right').
 
         ImGui::SameLine();
         if (!rules.empty()) {
@@ -1019,7 +1019,9 @@ void edit_rule(sync_point& sync) {
     static subset_selector select_set_super;
     {
         const bool clicked = ImGui::Checkbox("Traverse", &show_trav);
-        guide_mode::item_tooltip("Iterate through all rules in the working set.");
+        guide_mode::item_tooltip(
+            "Iterate through all rules in the working set.\n\n"
+            "(The page can be resized by resizing the window. And also, the window can be resized to fit the page by double-clicking its resize border. The same applies to 'Random'.)");
         if (clicked && show_trav) {
             ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
             ImGui::SetNextWindowPos(ImGui::GetItemRectMax() + ImVec2(30, -120), ImGuiCond_FirstUseEver);
@@ -1049,13 +1051,21 @@ void edit_rule(sync_point& sync) {
         config.set("Settings");
     }
     ImGui::SameLine();
+    {
+        // TODO: unnecessarily expensive.
+        static aniso::subsetT cmp_set = subset;
+        if (cmp_set != subset) {
+            /* working-set changes -> */ show_super_set = false;
+            cmp_set = subset;
+        }
+    }
     if (ImGui::Checkbox("Superset", &show_super_set) && show_super_set) {
-        // !!TODO: or clear? or do nothing?
         select_set_super = select_set;
     }
-    // guide_mode::item_tooltip("!!TODO");
-    // !!TODO: lacks documentation...
-    // !!TODO: should reset `show_super_set` when the working set is changed...
+    guide_mode::item_tooltip(
+        "Compare the working set with its superset.\n\n"
+        "The superset will initially be the same as the working set (and has no effect) after you turn on this mode. Select a strict superset to see the difference.\n\n"
+        "The mode will be turned off automatically if the working set changes.");
     if (show_super_set) {
         if (!select_set_super.get().includes(subset)) {
             select_set_super = select_set;
@@ -1067,8 +1077,10 @@ void edit_rule(sync_point& sync) {
             if (ImGui::Button("Clear##Super")) {
                 select_set_super.clear();
             }
+            ImGui::SameLine();
+            imgui_StrTooltip("(?)", "!!TODO: explain that a superset is an arbitrary combination of selectable ones.");
             ImGui::Separator();
-            select_set_super.select(nullptr, &subset);
+            select_set_super.select(nullptr, &subset, false /*no tooltip*/);
 
             ImGui::EndPopup();
         }
