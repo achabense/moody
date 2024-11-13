@@ -103,7 +103,7 @@ static void display_path(const pathT& p, float avail_w) {
     if (imgui_ItemClickableSingle()) {
         set_clipboard_and_notify(cpp17_u8string(p));
     }
-    guide_mode::item_tooltip(clipped ? "\n(Right-click to copy.)" : "Right-click to copy.");
+    guide_mode::item_tooltip("Right-click to copy.");
 }
 
 static void display_filename(const pathT& p) {
@@ -112,7 +112,7 @@ static void display_filename(const pathT& p) {
     if (imgui_ItemClickableSingle()) {
         set_clipboard_and_notify(cpp17_u8string(p));
     }
-    guide_mode::item_tooltip("\n(Right-click to copy.)");
+    guide_mode::item_tooltip("Right-click to copy.");
 }
 
 static pathT home_path{};

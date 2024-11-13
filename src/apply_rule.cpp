@@ -750,9 +750,8 @@ public:
                 return false;
             });
             ImGui::SameLine();
-            imgui_StrTooltip("(?)", "The buttons are for resizing the space to full-screen.\n\n"
-                                    "(Scroll in the window to zoom in/out without resizing.)");
-            if (imgui_ItemHoveredForTooltip()) {
+            if (imgui_StrTooltip("(?)", "The buttons are for resizing the space to full-screen.\n\n"
+                                        "(Scroll in the window to zoom in/out without resizing.)")) {
                 highlight_canvas = true;
             }
         };
@@ -765,13 +764,12 @@ public:
             };
 
             ImGui::AlignTextToFramePadding();
-            imgui_StrTooltip("(...)", "Keyboard shortcuts:\n"
-                                      "Restart: R    Pause: Space    +s/+1: N/M (repeatable)\n"
-                                      "-/+ Step:     1/2 (repeatable)\n"
-                                      "-/+ Interval: 3/4 (repeatable)\n\n"
-                                      "These shortcuts are available only when the space window is hovered or held "
-                                      "by mouse button.");
-            if (imgui_ItemHoveredForTooltip()) {
+            if (imgui_StrTooltip("(...)", "Keyboard shortcuts:\n"
+                                          "Restart: R    Pause: Space    +s/+1: N/M (repeatable)\n"
+                                          "-/+ Step:     1/2 (repeatable)\n"
+                                          "-/+ Interval: 3/4 (repeatable)\n\n"
+                                          "These shortcuts are available only when the space window is hovered or held "
+                                          "by mouse button.")) {
                 highlight_canvas = true;
             }
             ImGui::SameLine();
@@ -850,18 +848,17 @@ public:
         ImGui::Separator();
 
         ImGui::AlignTextToFramePadding();
-        imgui_StrTooltip("(...)", "Mouse operations:\n"
-                                  "- Scroll in the window to zoom in/out.\n\n"
-                                  "When there is no pattern to paste:\n"
-                                  "- Drag with left button to move the window.\n"
-                                  "- 'Ctrl' and drag to \"rotate\" the space.\n"
-                                  "- Drag with right button to select area.\n"
-                                  "- (The selection can be cleared with a single right-click.)\n\n"
-                                  "When there is pattern to paste:\n"
-                                  "- Left-click to decide where to paste.\n"
-                                  "- Drag with right button to move the window.\n"
-                                  "- (Rotating and selecting are not available in this case.)");
-        if (imgui_ItemHoveredForTooltip()) {
+        if (imgui_StrTooltip("(...)", "Mouse operations:\n"
+                                      "- Scroll in the window to zoom in/out.\n\n"
+                                      "When there is no pattern to paste:\n"
+                                      "- Drag with left button to move the window.\n"
+                                      "- 'Ctrl' and drag to \"rotate\" the space.\n"
+                                      "- Drag with right button to select area.\n"
+                                      "- (The selection can be cleared with a single right-click.)\n\n"
+                                      "When there is pattern to paste:\n"
+                                      "- Left-click to decide where to paste.\n"
+                                      "- Drag with right button to move the window.\n"
+                                      "- (Rotating and selecting are not available in this case.)")) {
             highlight_canvas = true;
         }
 
@@ -876,11 +873,10 @@ public:
         static bool show_range_window = false;
         ImGui::Checkbox("Range ops", &show_range_window);
         ImGui::SameLine();
-        imgui_StrTooltip(
-            "(?)",
-            "The shortcuts listed in 'Range ops', including 'V' for pasting, are available only when the space window "
-            "is hovered or held by mouse button.");
-        if (imgui_ItemHoveredForTooltip()) {
+        if (imgui_StrTooltip(
+                "(?)",
+                "The shortcuts listed in 'Range ops', including 'V' for pasting, are available only when the space window "
+                "is hovered or held by mouse button.")) {
             highlight_canvas = true;
         }
 
@@ -899,14 +895,10 @@ public:
             m_sel.reset();
         }
         imgui_ItemTooltip_StrID = "Clear##Sel";
-        guide_mode::item_tooltip(
-            "Double right-click to clear.\n\n"
-            "(When there is no pattern to paste, the more direct way is to single right-click the space window.)");
-        // TODO: the code looks really awkward... whether to make item-tooltip return value?
-        if (guide_mode::enabled()) {
-            if (imgui_ItemHoveredForTooltip("Clear##Sel")) {
-                highlight_canvas = true;
-            }
+        if (guide_mode::item_tooltip(
+                "Double right-click to clear.\n\n"
+                "(When there is no pattern to paste, the more direct way is to single right-click the space window.)")) {
+            highlight_canvas = true;
         }
 
         ImGui::SameLine(0, wide_spacing);
@@ -1280,7 +1272,6 @@ public:
                             "Identify a single oscillator or spaceship in 2*2 periodic background "
                             "(e.g., pure white, pure black, striped, or checkerboard background), and "
                             "copy its smallest phase to the clipboard.");
-                        // TODO: improve compatibility with 'There is no selected area' message...
 
                         ImGui::Separator();
                         ImGui::AlignTextToFramePadding();

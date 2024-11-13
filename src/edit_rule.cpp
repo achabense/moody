@@ -599,11 +599,10 @@ public:
                     ImGui::NavHighlightActivated(radio_id);
                 }
                 ImGui::EndDisabled();
-                guide_mode::item_tooltip("Set the custom masking rule to the current rule.");
                 if (!contained) {
-                    imgui_ItemTooltip(guide_mode::enabled() ? "\n(The current rule does not belong to the working set.)"
-                                                            : "The current rule does not belong to the working set.");
+                    imgui_ItemTooltip("The current rule does not belong to the working set.");
                 }
+                guide_mode::item_tooltip("Set the custom masking rule to the current rule.");
             }
         }
 
@@ -759,11 +758,10 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
             fill_page(adapter.page_size);
         }
         ImGui::EndDisabled();
-        guide_mode::item_tooltip("Go to where the current rule belongs in the sequence.");
         if (!contained) {
-            imgui_ItemTooltip(guide_mode::enabled() ? "\n(The current rule does not belong to the working set.)"
-                                                    : "The current rule does not belong to the working set.");
+            imgui_ItemTooltip("The current rule does not belong to the working set.");
         }
+        guide_mode::item_tooltip("Go to where the current rule belongs in the sequence.");
 
         static input_int input_dist{};
         ImGui::SameLine();

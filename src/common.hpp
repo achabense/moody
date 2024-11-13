@@ -217,10 +217,10 @@ class guide_mode : no_create {
     }
 
 public:
+#if 0
     // For use in combination with other tooltips.
     static bool enabled() { return enable_tooltip; }
 
-#if 0
     // It's getting unclear what should really be highlighted...
     static void highlight() {
         if (enable_tooltip) {
@@ -229,12 +229,18 @@ public:
     }
 #endif
 
-    static void item_tooltip(const std::string_view tooltip) {
+    static bool item_tooltip(const std::string_view tooltip) {
         if (enable_tooltip) {
             _highlight();
-            imgui_ItemTooltip(tooltip);
+            return imgui_ItemTooltip([tooltip] {
+                if (ImGui::GetCurrentWindowRead()->BeginCount > 1) {
+                    ImGui::Separator();
+                }
+                imgui_Str(tooltip);
+            });
         } else {
             imgui_ItemTooltip_StrID = nullptr;
+            return false;
         }
     }
 };

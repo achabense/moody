@@ -68,10 +68,10 @@ inline bool imgui_ItemHoveredForTooltip(const char* str_id = nullptr) {
 
 inline const char* imgui_ItemTooltip_StrID = nullptr;
 
-inline void imgui_ItemTooltip(const std::invocable<> auto& desc) {
+inline bool imgui_ItemTooltip(const std::invocable<> auto& desc) {
     const char* str_id = std::exchange(imgui_ItemTooltip_StrID, nullptr);
     if (GImGui->CurrentWindow->SkipItems) {
-        return;
+        return false;
     }
     if (imgui_ItemHoveredForTooltip(str_id)) {
         if (ImGui::BeginTooltip()) {
@@ -80,12 +80,14 @@ inline void imgui_ItemTooltip(const std::invocable<> auto& desc) {
             desc();
             ImGui::PopTextWrapPos();
             ImGui::EndTooltip();
+            return true;
         }
     }
+    return false;
 }
 
-inline void imgui_ItemTooltip(std::string_view desc) { //
-    imgui_ItemTooltip([desc] { ImGui::TextUnformatted(desc.data(), desc.data() + desc.size()); });
+inline bool imgui_ItemTooltip(std::string_view desc) { //
+    return imgui_ItemTooltip([desc] { ImGui::TextUnformatted(desc.data(), desc.data() + desc.size()); });
 }
 
 inline void imgui_ItemStr(ImU32 col, std::string_view str) {
@@ -153,13 +155,13 @@ inline bool imgui_StrCopyable(const std::string& str, void (*str_func)(std::stri
 }
 
 // Similar to `HelpMarker` in "imgui_demo.cpp".
-inline void imgui_StrTooltip(std::string_view str, const std::invocable<> auto& desc) {
+inline bool imgui_StrTooltip(std::string_view str, const std::invocable<> auto& desc) {
     imgui_StrDisabled(str);
-    ::imgui_ItemTooltip(desc);
+    return ::imgui_ItemTooltip(desc);
 }
 
-inline void imgui_StrTooltip(std::string_view str, std::string_view desc) { //
-    imgui_StrTooltip(str, [desc] { imgui_Str(desc); });
+inline bool imgui_StrTooltip(std::string_view str, std::string_view desc) { //
+    return imgui_StrTooltip(str, [desc] { imgui_Str(desc); });
 }
 
 struct [[nodiscard]] imgui_Window {
