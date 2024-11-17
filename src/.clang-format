@@ -27,3 +27,5 @@ AccessModifierOffset: -4
 
 IndentCaseLabels: true
 AllowShortCaseLabelsOnASingleLine: true
+
+ReflowComments: false

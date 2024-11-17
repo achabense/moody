@@ -104,6 +104,12 @@ namespace aniso {
 
     using groupT = std::span<const codeT>;
 
+    inline void flip_values(const groupT& group, ruleT& r) {
+        for (const codeT c : group) {
+            r[c] = !r[c];
+        }
+    }
+
     class partitionT {
         equivT m_eq;
         int m_k{}; // `m_eq` has `m_k` groups.
@@ -357,6 +363,7 @@ namespace aniso {
         });
     }
 
+#if 0
     // Return a rule in the subset that is closest to `rule` (as measured by the MAP set).
     // (If the rule already belongs to `subset`, the result will be exactly `rule`.)
     inline ruleT approximate(const subsetT& subset, const ruleT& rule) {
@@ -378,6 +385,26 @@ namespace aniso {
         assert_implies(subset.contains(rule), res == rule);
         return res;
     }
+#else
+    // The old impl cannot guarantee uniqueness (both values are ok when c_0=c_1, so the result is just impl-defined) or similarity (cannot be trivially implied by distance).
+
+    // If rule belongs to {par, mask}, the result will be the rule itself.
+    inline ruleT approximate(const partitionT& par, const maskT& mask, const ruleT& rule) {
+        ruleT res{};
+        par.for_each_group([&](const groupT& group) {
+            if (all_same_or_different(group, mask, rule)) {
+                for (const codeT code : group) {
+                    res[code] = rule[code];
+                }
+            } else {
+                for (const codeT code : group) {
+                    res[code] = mask[code];
+                }
+            }
+        });
+        return res;
+    }
+#endif
 
     // Firstly get approximate(subset, rule), then transform the rule to another one.
     // The groups are listed as a sequence of values (relative to `mask`) and re-assigned by `fn`.
@@ -386,7 +413,7 @@ namespace aniso {
         assert(subset.contains(mask));
 
         const partitionT& par = subset.get_par();
-        ruleT_masked r = mask ^ approximate(subset, rule);
+        ruleT_masked r = mask ^ approximate(par, mask, rule);
 
         // `seq` is not a codeT::map_to<bool>.
         assert(par.k() <= 512);

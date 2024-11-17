@@ -1048,7 +1048,7 @@ void edit_rule(sync_point& sync) {
         ImGui::SameLine();
         config.set("Settings");
     }
-    ImGui::SameLine();
+
     {
         // TODO: unnecessarily expensive.
         static aniso::subsetT cmp_set = subset;
@@ -1057,6 +1057,8 @@ void edit_rule(sync_point& sync) {
             cmp_set = subset;
         }
     }
+
+    ImGui::SameLine();
     if (ImGui::Checkbox("Superset", &show_super_set) && show_super_set) {
         select_set_super = select_set;
     }
@@ -1107,19 +1109,20 @@ void edit_rule(sync_point& sync) {
             ImGui::Text("Groups:%d !contained", c_group);
             ImGui::SameLine();
             imgui_StrTooltip("(?)", [&] {
-                imgui_Str("The current rule does not belong to the working set.\n\n"
-                          "Check the dull-blue groups for details - no matter which mask is selected, for any rule in "
-                          "the working set, the masked values should be all the same in any group.\n\n"
-                          "You can get rules in the working set from the 'Traverse' or 'Random' window. Or optionally, "
-                          "you can double right-click this '(?)' to get the following rule in the working set.");
+                imgui_Str(
+                    "The current rule does not belong to the working set.\n\n"
+                    "Check the dull-blue groups ('-x') for details - no matter which mask is selected, for any rule in "
+                    "the working set, the masked values should be all the same in any group.\n\n"
+                    "You can get rules in the working set from the 'Traverse' or 'Random' window. Or optionally, "
+                    "you can double right-click this '(?)' to set all '-x' groups to be the same as the masking rule.");
                 ImGui::Separator();
                 imgui_Str("Preview:");
                 ImGui::SameLine();
-                previewer::preview(-1, previewer::configT::_220_160, aniso::approximate(subset, sync.rule), false);
+                previewer::preview(-1, previewer::configT::_220_160,
+                                   aniso::approximate(subset.get_par(), mask, sync.rule), false);
             });
-            // TODO: maybe it's better just to remove this feature...
             if (imgui_ItemClickableDouble()) {
-                sync.set(aniso::approximate(subset, sync.rule));
+                sync.set(aniso::approximate(subset.get_par(), mask, sync.rule));
             }
         }
     }
@@ -1163,9 +1166,7 @@ void edit_rule(sync_point& sync) {
             const aniso::codeT head = group[0];
             const auto get_adjacent_rule = [&] {
                 aniso::ruleT rule = sync.rule;
-                for (const aniso::codeT code : group) {
-                    rule[code] = !rule[code];
-                }
+                aniso::flip_values(group, rule);
                 return rule;
             };
             const auto group_details = [&] {
