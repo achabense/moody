@@ -1159,7 +1159,7 @@ void edit_rule(sync_point& sync) {
             return fit_count(avail_x, group_size_x, spacing_x);
         };
 
-        auto show_group = [&](bool set_contains, int preview_id, const aniso::groupT& group) {
+        auto show_group = [&](const bool set_contains, const int preview_id, const aniso::groupT& group) {
             const bool has_lock = false; // TODO: temporarily preserved.
 
             const bool pure = set_contains || aniso::all_same_or_different(group, mask, sync.rule);
@@ -1170,18 +1170,14 @@ void edit_rule(sync_point& sync) {
                 return rule;
             };
             const auto group_details = [&] {
+                const int group_size = group.size();
+
+                // TODO: ctrl + click to set the values to be all-same/different from the masking rule?
                 imgui_Str("Click to flip the values in this group.");
-                if (!set_contains) {
-                    // !!TODO: working-set / superset...
-                    // TODO: ctrl + 0/1 to set against masking rule (all-same or different)?
-                    // imgui_Str("\n(The current rule does not belong to the working set;\n"
-                    //           "press 'Ctrl' to enable flipping anyway.)");
-                    imgui_Str("!!TODO...ctrl");
-                }
                 ImGui::Separator();
-                ImGui::Text("Group size: %d", (int)group.size());
+                ImGui::Text("Group size: %d", group_size);
                 const int max_to_show = 48;
-                for (int n = 0; const aniso::codeT code : group) {
+                for (int n = 0; const aniso::codeT code : group.first(std::min(group_size, max_to_show))) {
                     if (n++ % 8 != 0) {
                         ImGui::SameLine();
                     }
@@ -1189,11 +1185,8 @@ void edit_rule(sync_point& sync) {
                     ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                     align_text(ImGui::GetItemRectSize().y);
                     imgui_Str(labels_normal[masked[code]]);
-                    if (n == max_to_show) {
-                        break;
-                    }
                 }
-                if (group.size() > max_to_show) {
+                if (group_size > max_to_show) {
                     imgui_Str("...");
                 }
             };
@@ -1214,17 +1207,19 @@ void edit_rule(sync_point& sync) {
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, button_color[1]);
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, button_color[2]);
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, button_padding);
-            const bool enable_edit = set_contains || ImGui::GetIO().KeyCtrl;
-            if (!enable_edit) {
-                // Not using ImGui::BeginDisabled(), so the button color will not be affected.
-                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
-            }
+            // TODO: disabled; what should the check be like when the superset is also present?
+            // ~ "The current rule does not belong to the working set; press 'Ctrl' to enable flipping anyway."
+            // const bool enable_edit = set_contains || ImGui::GetIO().KeyCtrl;
+            // if (!enable_edit) {
+            //     // Not using ImGui::BeginDisabled(), so the button color will not be affected.
+            //     ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+            // }
             if (code_button(head, button_zoom)) {
                 sync.set(get_adjacent_rule(), rule_recorder::RandomAccess);
             }
-            if (!enable_edit) {
-                ImGui::PopItemFlag();
-            }
+            // if (!enable_edit) {
+            //     ImGui::PopItemFlag();
+            // }
             ImGui::PopStyleVar();
             ImGui::PopStyleColor(3);
             imgui_ItemTooltip(group_details);
@@ -1296,8 +1291,6 @@ void edit_rule(sync_point& sync) {
                     ImGui::TableNextColumn();
                     if (subgroups.size() == 1) {
                         // The same as the working set's group; no need to display.
-                        // !!TODO: however, the flipping requirements are different (working-set.contains vs
-                        // superset.contains)... should redesign.
                     } else {
                         const int perline = calc_perline(ImGui::GetContentRegionAvail().x);
 
