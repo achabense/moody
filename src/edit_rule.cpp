@@ -216,7 +216,6 @@ public:
             "Von", &ignore_von,
             "Rules in the von-Neumann neighborhood. (Rules whose values are independent of 'q/e/z/c'.)\n\n"
             "(For symmetric von-Neumann rules you can directly combine this with native-symmetry terms.)");
-        // !!TODO: the old name (S.c.) is still referred-to in several places.
         terms_misc.emplace_back(
             "Comp", &self_complementary,
             "Self-complementary rules. That is, their 0/1 reversal duals are just themselves - for any pattern, [apply such a rule] has the same effect as [flip all values -> apply the same rule -> flip all values].");
@@ -940,7 +939,7 @@ static void random_rule_window(bool& show_rand, sync_point& sync, const aniso::s
     }
 }
 
-// !!TODO: rename some variables for better clarity. (e.g. `subset` -> `working_set`)
+// TODO: rename some variables for better clarity. (e.g. `subset` -> `working_set`, `contained` -> `working_contains`)
 void edit_rule(sync_point& sync) {
     // Select subsets.
     static subset_selector select_set{&aniso::_subsets::native_isotropic};
@@ -995,7 +994,7 @@ void edit_rule(sync_point& sync) {
     }
     const aniso::subsetT& subset = select_set.get();
     assert(!subset.empty());
-    const bool contained = subset.contains(sync.rule); // !!TODO: rename...
+    const bool contained = subset.contains(sync.rule);
 
     ImGui::Separator();
 
@@ -1078,7 +1077,14 @@ void edit_rule(sync_point& sync) {
                 select_set_super.clear();
             }
             ImGui::SameLine();
-            imgui_StrTooltip("(?)", "!!TODO: explain that a superset is an arbitrary combination of selectable ones.");
+            if (ImGui::Button("Reset##Super")) {
+                select_set_super = select_set;
+            }
+            guide_mode::item_tooltip("Reset to be the same as the working set.");
+            ImGui::SameLine();
+            imgui_StrTooltip(
+                "(?)",
+                "A superset can be any combination of the sets selectable in this table (which are what the working set belongs to, i.d. those center-marked in working set's selection table).");
             ImGui::Separator();
             select_set_super.select(nullptr, &subset, false /*no tooltip*/);
 
@@ -1086,10 +1092,10 @@ void edit_rule(sync_point& sync) {
         }
 
         assert(select_set_super.get().includes(subset));
+        assert(select_set_super.get().contains(mask));
     }
 
     {
-        // !!TODO: compare with the super set when `show_super_set` is set...
         const int c_group = subset.get_par().k();
 
         if (contained) {
@@ -1123,6 +1129,29 @@ void edit_rule(sync_point& sync) {
             });
             if (imgui_ItemClickableDouble()) {
                 sync.set(aniso::approximate(subset.get_par(), mask, sync.rule));
+            }
+        }
+
+        if (show_super_set) {
+            ImGui::SameLine(0, ImGui::CalcTextSize(" ").x * 3);
+
+            const aniso::subsetT& superset = select_set_super.get();
+            // TODO: avoid repeated calculations...
+            if (subset.includes(superset)) { // ==
+                imgui_Str("vs superset: Same");
+                ImGui::SameLine();
+                imgui_StrTooltip("(?)", "Select a strict superset ('Select') to see the difference.");
+            } else {
+                const bool super_contains = superset.contains(sync.rule);
+
+                std::string str = std::format("vs superset: Groups:{}", superset.get_par().k());
+                if (super_contains) {
+                    const int dist = aniso::distance(superset, mask, sync.rule);
+                    str += std::format(" ({}:{} {}:{})", chr_1, dist, chr_0, superset.get_par().k() - dist);
+                } else {
+                    str += " !contained"; // TODO: add '(?)' as well?
+                }
+                imgui_Str(str);
             }
         }
     }
@@ -1291,6 +1320,10 @@ void edit_rule(sync_point& sync) {
                     ImGui::TableNextColumn();
                     if (subgroups.size() == 1) {
                         // The same as the working set's group; no need to display.
+                        if (!preview_mode) {
+                            align_text(button_zoom * 3); // TODO: fragile...
+                        }
+                        imgui_StrDisabled("(Same)");
                     } else {
                         const int perline = calc_perline(ImGui::GetContentRegionAvail().x);
 

@@ -38,7 +38,7 @@ x = 7, y = 14, rule = MAPARYBFxZoF34WaBd+aIF+6RZoF35ogX7paIF+6YEX6ZcWaBd+aIF+6Wi
 
 The left panel provides ways to analyze and update the current rule based on a series of subsets. For detailed descriptions see the next section ('Subset, mask and rule operations'). In short:
 The subsets that the current rule belongs to will be marked with light-green borders. For example, the Game of Life rule is an outer-totalistic rule (which also satisfies all symmetries), so every button in the 'Native symmetry' line, and the first button in the next line will be highlighted.
-To explore new rules, you need to firstly specify a "working set", which is the set you are going to explore. You can select multiple subsets - the program will calculate the intersection of them as the working set. For example, if you select 'All' (isotropic rules; selected by default) and 'S.c.' (self-complementary rules), you are going to explore the rules that are both isotropic and self-complementary. Then you need to select a "mask" (masking rule) to guide how to observe the current rule and generate new rules.
+To explore new rules, you need to firstly specify a "working set", which is the set you are going to explore. You can select multiple subsets - the program will calculate the intersection of them as the working set. For example, if you select 'All' (isotropic rules; selected by default) and 'Comp' (self-complementary rules), you are going to explore the rules that are both isotropic and self-complementary. Then you need to select a "mask" (masking rule) to guide how to observe the current rule and generate new rules.
 To get new rules:
 The 'Traverse' window provides a way to iterate through all rules in the working set (which is not practical if the working set is very large).
 The program also has the 'Random' window to generate random rules in the working set.
@@ -103,7 +103,7 @@ For the current rule C:
 Here are some use cases.
 
 If the working set is small enough (having only a few groups), the most direct way to explore the set is to check every rule in it.
-Take 'S.c. & Tot(+s)' (self-complementary & inner-totalistic rules) for example. There are only 5 groups ~ 2^5=32 rules in the set, so it's fairly reasonable to check all of them using the 'Traverse' window. Typically, it does not matter which rule serves as the mask if you decide to iterate through the entire working set. However, in this case, neither 'Zero' nor 'Identity' works. Suppose you are using the 'Fallback' mask, in the traverse window, by clicking '<00..' you will start from M', which happens to be the "voting" rule:
+Take 'Comp & Tot(+s)' (self-complementary & inner-totalistic rules) for example. There are only 5 groups ~ 2^5=32 rules in the set, so it's fairly reasonable to check all of them using the 'Traverse' window. Typically, it does not matter which rule serves as the mask if you decide to iterate through the entire working set. However, in this case, neither 'Zero' nor 'Identity' works. Suppose you are using the 'Fallback' mask, in the traverse window, by clicking '<00..' you will start from M', which happens to be the "voting" rule:
 MAPAAAAAQABARcAAQEXARcXfwABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf3//f////w
 And the next rule should be:
 MAPgAAAAQABARcAAQEXARcXfwABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf3//f////g
@@ -175,7 +175,7 @@ MAPAxEkiDlAgEIC2mcMDTWcNhDDmAcEHBZKjUUNInwAZqgRQggGb5AAtAJqmisCKGlJYJIlOJh5EFnCy
 
 
 ---- Rules with state symmetry (the self-complementary rules)
-Self-complementary rules are supported in the program via 'S.c.'.
+Self-complementary rules are supported in the program via 'Comp'.
 
 There do exist self-complementary rules that allow for spaceships and oscillators. For example, the following rule is found using the 'Lock & Capture' feature in this program:
 MAPARcTZhegPEwRdxPuFCBIzyBmF8A8+4g3RMD7A+03nz8DBhNIPyD83RPuIMP8F5n7DO3714g3EXfNw/oXmTcXfw
@@ -268,12 +268,12 @@ MAPoKAAAKCgAAAFBQAABQUAAKCgAACgoAAABQUAAAUFAAAFBQAABQUAAF9fAABfXwAABQUAAAUFAABfX
 MAP+vqlpfr6paWgoFVVoKBVVfr6paX6+qWloKBVVaCgVVWgoA8PoKAPDwAA+voAAPr6oKAPD6CgDw8AAPr6AAD6+g
 MAP+vqlpfr6paWlpVBQpaVQUPr6paX6+qWlpaVQUKWlUFClpQoKpaUKCl9foKBfX6CgpaUKCqWlCgpfX6CgX1+goA
 
-It's reluctant to regard 's' as "independent of the center cell". However, there are a lot of strange rules in the 's & S.c.' subset.
-'s & S.c. & /':
+It's reluctant to regard 's' as "independent of the center cell". However, there are a lot of strange rules in the 's & Comp' subset.
+'s & Comp & /':
 MAPBQEFARUeFR4HQQdBHz0fPQcBBwEHBQcFBwEHASUFJQVfW19bfx9/H18fXx9/H38fQwdDB30ffR+HV4dXf19/Xw
 MAPAUABQFUVVRUZkRmRNZ41nlEAUQAVFRUVogGiARYRFhF3l3eXf7p/uldXV1f/df91hlOGU3ZndmdXVVdV/X/9fw
 
-'s & S.c. & -':
+'s & Comp & -':
 MAPACEAIYCBgIFVVVVVX3dfdxGdEZ0BVQFVd313fUN/Q38BPQE9QRFBEVV/VX9Gd0Z3EQURBVVVVVV+/n7+e/97/w
 MAPEgASAAEJAQk1bzVvHVYdVlVFVUUZERkR9hH2EX1/fX8BQQFBd5B3kHdnd2ddVV1VlUeVRwlTCVNvf29//7f/tw
 
