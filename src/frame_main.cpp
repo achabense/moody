@@ -84,7 +84,9 @@ void frame_main() {
     sync_point sync = sync_rule;
 
     rule_recorder::record(rule_recorder::Current, sync.rule);
-    if (sync_point_override::begin_frame(&sync.rule)) {
+    sync_point_override::begin_frame();
+    if ((sync_point_override::want_test_run || sync_point_override::want_test_set) &&
+        sync_point_override::rule == sync.rule) {
         messenger::set_msg("This is the same as the current rule.");
     }
 

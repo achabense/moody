@@ -755,23 +755,16 @@ public:
         return false;
     }
 
-    static bool begin_frame(const aniso::ruleT* clear_if_same = nullptr) {
-        bool same = false;
-        if (clear_if_same && (want_test_set_next || want_test_run_next) && *clear_if_same == rule_next) {
-            want_test_set_next = false;
-            want_test_run_next = false;
-            same = true;
-        }
-
+private:
+    friend void frame_main();
+    static void begin_frame() {
         want_test_set = std::exchange(want_test_set_next, false);
         want_test_run = std::exchange(want_test_run_next, false);
         if (want_test_set || want_test_run) {
             rule = rule_next;
         }
-        return same;
     }
 
-private:
     inline static aniso::ruleT rule_next{};
     inline static bool want_test_set_next = false;
     inline static bool want_test_run_next = false;
