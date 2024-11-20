@@ -1132,7 +1132,7 @@ void edit_rule(sync_point& sync) {
             imgui_StrTooltip("(?)", [&] {
                 imgui_Str(
                     "The current rule does not belong to the working set.\n\n"
-                    "Check the dull-blue groups ('-x') for details - no matter which mask is selected, for any rule in "
+                    "Check the '-x' groups for details - no matter which mask is selected, for any rule in "
                     "the working set, the masked values should be all the same in any group.\n\n"
                     "You can get rules in the working set from the 'Traverse' or 'Random' window. Or optionally, "
                     "you can double right-click this '(?)' to set all '-x' groups to be the same as the masking rule.");
@@ -1203,7 +1203,8 @@ void edit_rule(sync_point& sync) {
             return fit_count(avail_x, group_size_x, spacing_x);
         };
 
-        auto show_group = [&](const bool set_contains, const int preview_id, const aniso::groupT& group) {
+        auto show_group = [&](const bool set_contains, const char* const require_ctrl, const int preview_id,
+                              const aniso::groupT& group) {
             const bool has_lock = false; // TODO: temporarily preserved.
 
             const bool pure = set_contains || aniso::all_same_or_different(group, mask, sync.rule);
@@ -1216,8 +1217,13 @@ void edit_rule(sync_point& sync) {
             const auto group_details = [&] {
                 const int group_size = group.size();
 
-                // TODO: ctrl + click to set the values to be all-same/different from the masking rule?
-                imgui_Str("Click to flip the values in this group.");
+                if (!require_ctrl) {
+                    imgui_Str("Click to flip the values in this group.");
+                } else {
+                    ImGui::Text("The current rule does not belong to the %s; press 'Ctrl' to enable flipping anyway.",
+                                require_ctrl);
+                }
+
                 ImGui::Separator();
                 ImGui::Text("Group size: %d", group_size);
                 const int max_to_show = 48;
@@ -1251,19 +1257,17 @@ void edit_rule(sync_point& sync) {
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, button_color[1]);
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, button_color[2]);
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, button_padding);
-            // TODO: disabled; what should the check be like when the superset is also present?
-            // ~ "The current rule does not belong to the working set; press 'Ctrl' to enable flipping anyway."
-            // const bool enable_edit = set_contains || ImGui::GetIO().KeyCtrl;
-            // if (!enable_edit) {
-            //     // Not using ImGui::BeginDisabled(), so the button color will not be affected.
-            //     ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
-            // }
+            const bool enable_edit = !require_ctrl || ImGui::GetIO().KeyCtrl;
+            if (!enable_edit) {
+                // Not using ImGui::BeginDisabled(), so the button color will not be affected.
+                ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+            }
             if (code_button(head, button_zoom)) {
                 sync.set(get_adjacent_rule(), rule_recorder::RandomAccess);
             }
-            // if (!enable_edit) {
-            //     ImGui::PopItemFlag();
-            // }
+            if (!enable_edit) {
+                ImGui::PopItemFlag();
+            }
             ImGui::PopStyleVar();
             ImGui::PopStyleColor(3);
             imgui_ItemTooltip(group_details);
@@ -1298,7 +1302,7 @@ void edit_rule(sync_point& sync) {
                 } else {
                     ImGui::Separator();
                 }
-                show_group(contained, this_n, group);
+                show_group(contained, !contained ? "working set" : nullptr, this_n, group);
             }
         } else {
             // (This ensures the positions are not affected by the table.)
@@ -1331,7 +1335,10 @@ void edit_rule(sync_point& sync) {
 
                     ImGui::TableNextRow();
                     ImGui::TableNextColumn();
-                    show_group(contained, j, group);
+                    // TODO: the ctrl-check for superset case is somewhat under-documented...
+                    // It's fine to require superset-contains here (especially when subgroups.size = 1, the group is shown on the working set's side),
+                    // but this may be a bit confusing to users...
+                    show_group(contained, !super_contains ? "superset" : nullptr, j, group);
                     ImGui::TableNextColumn();
                     if (subgroups.size() == 1) {
                         // The same as the working set's group; no need to display.
@@ -1354,7 +1361,7 @@ void edit_rule(sync_point& sync) {
                             if (this_n % perline != 0) {
                                 ImGui::SameLine(0, spacing_x);
                             }
-                            show_group(super_contains, this_n, subgroup);
+                            show_group(super_contains, !super_contains ? "superset" : nullptr, this_n, subgroup);
                         }
                         ImGui::PopID();
                     }
