@@ -214,8 +214,8 @@ public:
             "what \"actually\" happens in the corresponding hexagonal space.");
         terms_misc.emplace_back(
             "Von", &ignore_von,
-            "Rules in the von-Neumann neighborhood. (Rules whose values are independent of 'q/e/z/c'.)\n\n"
-            "(For symmetric von-Neumann rules you can directly combine this with native-symmetry terms.)");
+            "Rules in the von-Neumann neighborhood. (In other words, their values are independent of 'q', 'e', 'z' and 'c'.)\n\n"
+            "(For symmetric von-Neumann rules you can directly combine this with native-symmetry subsets.)");
         terms_misc.emplace_back(
             "Comp", &self_complementary,
             "Self-complementary rules. That is, their 0/1 reversal duals are just themselves - for any pattern, [apply such a rule] has the same effect as [flip all values -> apply the same rule -> flip all values].");
@@ -253,9 +253,8 @@ public:
                                "Rules that emulate isotropic hexagonal rules. "
                                "You can hover on the displaying windows for such rules and press '6' to "
                                "better view the symmetries in the corresponding hexagonal space.\n\n"
-                               "(Remember to unselect native-symmetry terms when working with this line. "
-                               "These subsets have no direct relation with native symmetries, and their "
-                               "intersection with native-symmetry terms will typically be very small.)");
+                               "(Notice that these subsets have no direct relation with native symmetries, and their "
+                               "intersection with native-symmetry subsets will typically be very small.)");
         terms_hex.emplace_back(
             "a-d", &hex_refl_asd,
             "Rules that emulate reflection symmetry in the hexagonal tiling, taking the axis from 'a' to 'd' (a-to-d).");
@@ -315,6 +314,7 @@ private:
     enum centerE { Selected, Including, Disabled, None }; // TODO: add "equals" relation?
 
     // (Follows `ImGui::Dummy` or `ImGui::InvisibleButton`.)
+    // TODO: title: const char* -> char? ('\0' ~ no title)
     static void put_term(bool contained, centerE center, const char* title /* Optional */, bool button_mode) {
         const ImU32 cent_col = center == Selected    ? IM_COL32(65, 150, 255, 255) // Roughly _ButtonHovered
                                : center == Including ? IM_COL32(25, 60, 100, 255)  // Roughly _Button
@@ -355,18 +355,18 @@ public:
             imgui_Str(desc);
         };
 
-        imgui_Str("The buttons represent subsets of MAP rules. You can select them freely - the program "
-                  "will calculate the intersection of selected subsets (with the entire MAP set), "
-                  "and help you explore rules in it.\n\n"
-                  "The intersection is later called \"working set\". For example, if a rule is said to belong to the "
-                  "working set, it should also belong to every selected subset. If nothing is selected, the "
-                  "working set will be the entire MAP set.");
+        imgui_Str(
+            "The buttons stand for subsets of MAP rules. You can select them freely - the program "
+            "will calculate the intersection of selected subsets (with the entire MAP set), and help you explore rules in it.\n\n"
+            "This intersection is called the \"working set\". For example, if a rule is said to belong to the "
+            "working set, it should also belong to every selected subset. If nothing is selected, the working set will be the entire MAP set.");
         ImGui::Separator();
-        imgui_Str("The ring color reflects the relation between the subset and the current rule:");
+        imgui_Str("For each subset:\n\n"
+                  "The ring color represents whether the current rule belongs to the subset:");
         explain(true, None, "The rule belongs to this subset.");
         explain(false, None, "The rule does not belong to this subset.");
-        ImGui::Separator();
-        imgui_Str("The center color is irrelevant to the ring color, and reflects the selection details:");
+        // ImGui::Separator();
+        imgui_Str("\nThe center mark is unrelated to the ring, and represents selection details:");
         explain(false, None, "Not selected.");
         explain(false, Selected, "Selected.");
         explain(false, Including,
@@ -400,8 +400,9 @@ public:
         ImGui::SameLine();
         ImGui::Dummy(square_size());
         put_term(current.contains(target.rule), None, nullptr, false);
-        guide_mode::item_tooltip("This will be light green if the current rule belongs to every selected "
-                                 "subset. See '(...)' for details.");
+        guide_mode::item_tooltip(
+            "This stands for the intersection of selected subsets; will be light green if the current rule belongs to every selected "
+            "subset. See '(...)' for details.");
     }
 
     void select(const aniso::ruleT* const target = nullptr, const aniso::subsetT* const should_include = nullptr,
@@ -505,52 +506,46 @@ class mask_selector {
     };
     static constexpr termT mask_terms[]{
         {"Zero",
-         "The all-zero rule. (Every cell will become 0, regardless of its neighbors.)\n\n"
-         "The distance to this rule is equal to the number of groups that returns 1, and the masked "
-         "values can directly represent the actual values of the rule:\n"
-         "Different:'1' ~ the cell will become 1 in this case.\n"
-         "Same:'0' ~ the cell will become 0 in this case.",
+         "The rule that maps the cell to 0 in all cases.\n\n"
+         "For any rule in any case, being the same as this rule means the rule maps the cell to 0, and being different from this rule means the rule maps the cell to 1. Also, the distance to this rule is equal to the number of groups that map cells to 1.\n\n"
+         "Masked value:\n"
+         "Same ~ '0': the cell will become 0 in this case.\n"
+         "Different ~ '1': the cell will become 1.",
          '0', '1'},
 
         {"Identity",
-         "The rule that preserves the values in all cases. (Every cell will stay unchanged, "
-         "regardless of its neighbors.)\n\n"
+         "The rule that does not change the cell's value in all cases.\n\n"
          "Masked value:\n"
-         "Different:'f' ~ the cell will \"flip\" in this case.\n"
-         "Same:'.' ~ the cell will stay unchanged in this case.",
+         "Same ~ '.': the cell will stay unchanged (0->0 or 1->1).\n"
+         "Different ~ 'f': the cell will \"flip\" (0->1 or 1->0).\n",
          '.', 'f'},
 
         {"Fallback",
-         "A rule calculated by the program that belongs to the working set. Depending on what subsets "
-         "are selected, it may be the same as zero-rule, or identity-rule, or just an ordinary rule in the set.\n"
+         "A rule known to belong to the working set. Depending on what subsets are selected, it may "
+         "be the same as zero-rule, or identity-rule, or another rule in the working set if neither works.\n\n"
          "This is provided in case there are no other rules known to belong to the working set. It will not "
          "change unless the working set is updated.\n\n"
-         "Masked value: different:'i', same:'o'.",
+         "Masked value: same ~ 'o', different ~ 'i'.",
          'o', 'i'},
 
         {"Custom",
-         "You can click '<< Cur' to set this to the current rule.\n\n"
-         "This is initially the Game of Life rule, and will not change until you click '<< Cur' next time. "
-         "So for example, if you want to get some random rules with a small distance to the current rule, you "
+         "This is initially the Game of Life rule, and can be updated to the current rule by clicking '<< Cur'. "
+         "So for example, if you want to get some random rules close to the current rule, you "
          "can do '<< Cur' and generate random rules with a low distance in the 'Random' window.\n\n"
-         "Masked value: different:'i', same:'o'.",
+         "Masked value: same ~ 'o', different ~ 'i'.",
          'o', 'i'}};
 
     aniso::maskT mask_custom{aniso::game_of_life()};
     maskE mask_tag = Zero;
 
 public:
-    // TODO: improve...
     static void about() {
         imgui_Str(
-            "The working set divides all cases into different groups. For any two rules in the working set, "
-            "they must have either all-the-same or all-the-different values in each group.\n\n"
-            "A mask is an arbitrary rule in the working set to compare with other rules (XOR masking). The values "
-            "of the current rule are viewed through the mask in the random-access section. The 'Zero' and 'Identity' "
-            "rules are special in the sense that the values masked by them have natural interpretations.\n\n"
-            "When talking about the \"distance\" between two rules (in the working set), it means the number of "
-            "groups where they have different values.\n\n"
-            "(For more details see the 'Subset, mask ...' section in 'Documents'.)");
+            "The working set divides all cases into different groups. For any two rules in the set, they must have either all-the-same or all-the-different values in each group.\n\n"
+            "As a result, the \"distance\" between two rules (in the set) can be defined as the number of groups where they have different values, and any rule in the set can act as an observer (called the \"mask\") to do XOR masking for other rules.\n\n"
+            "The 'Zero' and 'Identity' rules are special as the values masked by them have natural interpretations (actual mapped value and flip-ness). 'Fallback' is provided to guarantee there is at least one rule known to belong to the working set. Any other rule in the working set can serve as a mask via 'Custom' and '<< Cur'.\n\n"
+            "Both 'Traverse' and 'Random' generate rules based on the distance to the masking rule. In the random-access section, the values of the current rule are viewed through the mask (shown as masked values), but the result of random-access editing is unrelated to the masking rule.");
+        // "(For more details see the 'Subset, mask ...' section in 'Documents'.)"
     }
 
     // `subset` must not be a temporary.
@@ -596,12 +591,14 @@ public:
                     // It will be strange to call a shortcut function here.
                     // shortcuts::highlight(radio_id);
                     ImGui::NavHighlightActivated(radio_id);
+
+                    messenger::set_msg("Updated.");
                 }
                 ImGui::EndDisabled();
                 if (!contained) {
                     imgui_ItemTooltip("The current rule does not belong to the working set.");
                 }
-                guide_mode::item_tooltip("Set the custom masking rule to the current rule.");
+                guide_mode::item_tooltip("Update the custom masking rule to the current rule.");
             }
         }
 
