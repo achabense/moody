@@ -86,6 +86,8 @@ static void hex_image(const aniso::tile_const_ref source, const aniso::vecT /*so
     ImGui::Image(make_screen(dest_data, scaleE::Linear), to_imvec(window_size));
 }
 
+// TODO: whether to hard-block when !is-hex-rule ?
+#if 1
 // `is_hexagonal_rule` is not strictly necessary, but it ensures that the projected view is
 // always meaningful.
 static bool want_hex_mode(const aniso::ruleT& rule) {
@@ -99,6 +101,19 @@ static bool want_hex_mode(const aniso::ruleT& rule) {
     }
     return false;
 }
+#else
+static bool want_hex_mode(const aniso::ruleT& rule) {
+    if (shortcuts::global_flag(ImGuiKey_6)) {
+        if (!rule_algo::is_hexagonal_rule(rule)) {
+            // (The dynamics can still be produced by a higher-ranged hexagonal rule, but that's beyond the scope of this program.)
+            messenger::set_msg(
+                "This rule does not belong to 'Hex' subset. As a result, the dynamics of the projected view cannot be produced by an actual range-1 hexagonal rule.");
+        }
+        return true;
+    }
+    return false;
+}
+#endif
 
 // TODO: error-prone. Should work in a way similar to `identify`.
 // Copy the subrange and run as a torus space, recording all invoked mappings.
@@ -1430,6 +1445,7 @@ void apply_rule(sync_point& sync) {
     return runner.display(sync);
 }
 
+// TODO: let users decide which to be globally shared?
 struct global_config {
     inline static global_timer::timerT timer{init_zero_interval ? 0 : global_timer::min_nonzero_interval};
     inline static percentT area = 1.0;
@@ -1446,9 +1462,10 @@ void previewer::configT::_set() {
         "- Right-click to copy the rule.\n"
         "- Left-click and hold to pause.\n"
         "- Hover and press 'R' to restart.\n"
-        "- Hover and press 'Z' to see which subsets the previewed rule belongs to in the subset table.\n"
-        "- Hover and press 'X' to temporarily override the current rule with the previewed one in the space window. The previewed rule will not be recorded in this case.\n\n"
-        "If the rule belongs to 'Hex' subset, you can also hover and press '6' to see the projected view in the real hexagonal space. (This also applies to the space window.)");
+        "- 'Z' to see which subsets the previewed rule belongs to in the subset table.\n"
+        "- 'X' to temporarily override the current rule with the previewed one in the space window. The previewed rule will not be recorded in this case.\n\n"
+        "If the rule belongs to 'Hex' subset:\n"
+        "- '6' to see the projected view in the real hexagonal space. (This also applies to the space window.)");
 #if 0
     // TODO: what to reset? size/zoom or size/zoom/seed/step?
     ImGui::SameLine();
@@ -1468,11 +1485,9 @@ void previewer::configT::_set() {
             imgui_RadioButton(std::to_string(v).c_str(), f ? &width_ : &height_, v);
         }
         ImGui::PopID();
-        if (f) {
+        if (f) { // TODO: whether to point out the difference after all?
             ImGui::SameLine();
-            imgui_StrTooltip(
-                "(?)",
-                "!!TODO: explain this is widget size (while the space window's \"Size ~\" refers to actual space size.");
+            imgui_StrTooltip("(?)", "Image size. (In contrast, the space window's 'Size ~' refers to space size.");
         }
     }
     ImGui::AlignTextToFramePadding();
@@ -1562,15 +1577,16 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
 
     const scaleE scale_mode = config.zoom_ >= 1 ? scaleE::Nearest : scaleE::Linear;
     const ImTextureID texture = make_screen(term.tile.data(), scale_mode);
+    bool hex_mode = false;
     ImGui::GetWindowDrawList()->AddImage(texture, ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
-    if (interactive && imgui_ItemHoveredForTooltip() && (config.zoom_ <= 1 || shortcuts::global_flag(ImGuiKey_6))) {
+    if (interactive && imgui_ItemHoveredForTooltip() && ((hex_mode = want_hex_mode(rule)) || config.zoom_ <= 1)) {
         assert(ImGui::IsMousePosValid());
         const aniso::vecT pos = from_imvec_floor((ImGui::GetMousePos() - ImGui::GetItemRectMin()) / config.zoom_);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0, 0});
         if (ImGui::BeginTooltip()) {
             const aniso::rangeT clamped = clamp_window(tile_size, pos, {64, 48});
             assert(!clamped.empty());
-            if (want_hex_mode(rule)) {
+            if (hex_mode) {
                 // Using `pos` instead of (clamped.begin + .end) / 2, as otherwise the bottom-left
                 // corner cannot be fully shown.
                 hex_image(term.tile.data(), pos, clamped.size() * 3, 3);
