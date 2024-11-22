@@ -1166,7 +1166,7 @@ public:
                     _clear_outside,
                     _select_all,
                     _bounding_box,
-                    _spatial_period,
+                    _test_bg_period,
                     _copy,
                     _cut,
                     _paste,
@@ -1272,8 +1272,8 @@ public:
                         ImGui::Separator();
                         term("Select all", "A", ImGuiKey_A, false, _select_all);
                         term("Bound", "B", ImGuiKey_B, true, _bounding_box);
-                        term("Spatial period", "P", ImGuiKey_P, true, _spatial_period);
-                        // TODO: enhance to test temporal period as well (~ "test background")...
+                        term("Test background", "P", ImGuiKey_P, true, _test_bg_period);
+                        guide_mode::item_tooltip("Test the properties (size and period) of periodic background.");
 
                         // Copy/Cut/Paste.
                         ImGui::Separator();
@@ -1315,7 +1315,7 @@ public:
                         term2(ImGuiKey_0, true, _clear_outside);
                         term2(ImGuiKey_A, false, _select_all);
                         term2(ImGuiKey_B, true, _bounding_box);
-                        term2(ImGuiKey_P, true, _spatial_period);
+                        term2(ImGuiKey_P, true, _test_bg_period);
                         term2(ImGuiKey_C, true, _copy);
                         term2(ImGuiKey_X, true, _cut);
                         term2(ImGuiKey_V, false, _paste);
@@ -1372,11 +1372,30 @@ public:
                     } else {
                         m_sel.reset();
                     }
-                } else if (op == _spatial_period && m_sel) {
+                } else if (op == _test_bg_period && m_sel) {
                     const aniso::rangeT sel_range = m_sel->to_range();
                     const aniso::vecT p_size = aniso::spatial_period(m_torus.read_only(sel_range));
+                    // TODO: the check may have false positives (consider there is a single 1 in the 0 background).
+                    // (Requiring p_size * 2 <= sel_range.size will be too strict.)
                     if (p_size.both_lt(sel_range.size()) && p_size.xy() * 3 < sel_range.size().xy()) {
-                        messenger::set_msg("Period size: x = {}, y = {}", p_size.x, p_size.y);
+                        const auto period = [&]() -> std::optional<int> {
+                            const aniso::tileT init(m_torus.read_only({sel_range.begin, sel_range.begin + p_size}));
+                            aniso::tileT tile = init;
+                            const int max_g = 64;
+                            for (int g = 1; g <= max_g; ++g) {
+                                tile.run_torus(sync.rule);
+                                if (tile == init) {
+                                    return g;
+                                }
+                            }
+                            return std::nullopt;
+                        }();
+
+                        if (period) {
+                            messenger::set_msg("Period: x = {}, y = {}, p = {}", p_size.x, p_size.y, *period);
+                        } else {
+                            messenger::set_msg("Not periodic. (Spatial period: x = {}, y = {})", p_size.x, p_size.y);
+                        }
                     } else {
                         // (The too-large case is considered impossible to occur naturally.)
                         messenger::set_msg("The selected area is too small, or not spatially periodic.");
