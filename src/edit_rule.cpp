@@ -615,8 +615,9 @@ struct page_adapter {
     int page_size = 6, perline = 3;
 
     // `page_resized` should be able to access *this someway.
-    void display(const previewer::configT& config, sync_point& out, ImVec2& min_req_size,
-                 std::function<void()> page_resized, std::function<const aniso::ruleT*(int)> access) {
+    void display(const previewer::configT& config, const rule_recorder::typeE rec, sync_point& out,
+                 ImVec2& min_req_size, std::function<void()> page_resized,
+                 std::function<const aniso::ruleT*(int)> access) {
         const ImVec2 avail_size = ImGui::GetContentRegionAvail();
         // (The same value as in `edit_rule`.)
         const int spacing_x = ImGui::GetStyle().ItemSpacing.x + 3;
@@ -654,8 +655,7 @@ struct page_adapter {
             if (const aniso::ruleT* rule = access(j); rule != nullptr) {
                 ImGui::PushID(j);
                 if (ImGui::Button(">> Cur")) {
-                    // TODO: working, but ideally should specify record type from outside.
-                    out.set(*rule, rule_recorder::TraverseOrRandom);
+                    out.set(*rule, rec);
                 }
                 ImGui::PopID();
                 previewer::preview(j, config, *rule);
@@ -831,7 +831,7 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
         config.set("Preview settings");
 
         adapter.display(
-            config, sync, size_constraint_min,
+            config, rule_recorder::TraverseOrRandom, sync, size_constraint_min,
             [&] {
                 if (page.size() > adapter.page_size) {
                     while (page.size() > adapter.page_size) {
@@ -928,7 +928,7 @@ static void random_rule_window(bool& show_rand, sync_point& sync, const aniso::s
         config.set("Preview settings");
 
         // TODO: reconsider page-resized logic (seeking to the last page may still be confusing).
-        adapter.display(config, sync, size_constraint_min, set_last_page, [&](int j) {
+        adapter.display(config, rule_recorder::TraverseOrRandom, sync, size_constraint_min, set_last_page, [&](int j) {
             const int r = page_no * adapter.page_size + j;
             assert(r >= 0);
             return r < rules.size() ? &rules[r] : nullptr;
@@ -1022,7 +1022,7 @@ void edit_rule(sync_point& sync) {
 
     static bool show_trav = false;
     static bool show_rand = false;
-    static bool preview_mode = false;
+    static bool preview_mode = init_random_access_preview_mode;
     static previewer::configT config{previewer::configT::_220_160};
     static bool show_super_set = false;
     static subset_selector select_set_super;
@@ -1055,10 +1055,6 @@ void edit_rule(sync_point& sync) {
     ImGui::Checkbox("Preview", &preview_mode);
     guide_mode::item_tooltip("Preview the effect of random-access flipping.\n\n"
                              "(You may 'Collapse' the subset table to leave more room for the preview windows.)");
-    if (preview_mode) {
-        ImGui::SameLine();
-        config.set("Settings");
-    }
 
     {
         // TODO: unnecessarily expensive.
@@ -1105,6 +1101,12 @@ void edit_rule(sync_point& sync) {
 
         assert(select_set_super.get().includes(subset));
         assert(select_set_super.get().contains(mask));
+    }
+
+    // (Shown after 'Select' for better visual.)
+    if (preview_mode) {
+        ImGui::SameLine();
+        config.set("Settings");
     }
 
     {
@@ -1222,13 +1224,16 @@ void edit_rule(sync_point& sync) {
                 }
 
                 ImGui::Separator();
+
+                ImGui::PushTextWrapPos(-1); // No wrapping.
                 ImGui::Text("Group size: %d", group_size);
                 const int max_to_show = 48;
+                const int perline = 8;
                 for (int n = 0; const aniso::codeT code : group.first(std::min(group_size, max_to_show))) {
-                    if (n++ % 8 != 0) {
+                    if (n++ % perline != 0) {
                         ImGui::SameLine();
                     }
-                    code_image(code, button_zoom, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
+                    code_image(code, button_zoom /*or 6?*/, ImVec4(1, 1, 1, 1), ImVec4(0.5, 0.5, 0.5, 1));
                     ImGui::SameLine(0, imgui_ItemInnerSpacingX());
                     align_text(ImGui::GetItemRectSize().y);
                     imgui_Str(labels_normal[masked[code]]);
@@ -1236,6 +1241,21 @@ void edit_rule(sync_point& sync) {
                 if (group_size > max_to_show) {
                     imgui_Str("...");
                 }
+                ImGui::PopTextWrapPos();
+
+#ifndef NDEBUG
+                // TODO: refine...
+                if (!preview_mode) {
+                    ImGui::Separator();
+                    if (!shortcuts::global_flag(ImGuiKey_Z)) {
+                        imgui_Str("(Debug mode) 'Z' to preview the flipping result.");
+                    } else {
+                        imgui_Str("Preview:");
+                        ImGui::SameLine();
+                        previewer::preview(-1, config, get_adjacent_rule() /*in tooltip*/);
+                    }
+                }
+#endif
             };
 
             // TODO: better color... (will be ugly if using green colors...)

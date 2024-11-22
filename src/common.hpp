@@ -97,6 +97,7 @@ inline float wrap_len() {
 // TODO: should finally be configurable in the program.
 // inline const bool init_maximize_window = false;
 inline const bool init_zero_interval = false;
+inline const bool init_random_access_preview_mode = false;
 #ifndef NDEBUG
 inline bool compact_mode = false;
 #else // Release
