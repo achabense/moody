@@ -1243,84 +1243,83 @@ public:
                 });
 #endif
 
-                auto range_operations = [&](const bool display) {
-                    if (display) {
-                        const auto set_tag = [](bool& tag, const char* label, const char* message) {
-                            ImGui::Checkbox(label, &tag);
-                            ImGui::SameLine();
-                            imgui_StrTooltip("(?)", message);
-                        };
-
-                        ImGui::AlignTextToFramePadding();
-                        imgui_Str("Background ~");
-                        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                        imgui_RadioButton("0", &background, 0);
-                        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                        imgui_RadioButton("1", &background, 1);
+                auto range_operations_display = [&] {
+                    const auto set_tag = [](bool& tag, const char* label, const char* message) {
+                        ImGui::Checkbox(label, &tag);
                         ImGui::SameLine();
-                        imgui_StrTooltip(
-                            "(?)", "'Clear inside/outside' and 'Cut' will clear the range with the value.\n"
-                                   "'Bound' will get the bounding-box for the pattern that consists of !(value).");
+                        imgui_StrTooltip("(?)", message);
+                    };
 
-                        // Filling.
-                        ImGui::Separator();
-                        fill_den.step_slide("Fill density");
-                        term("Random fill", "+/=", ImGuiKey_Equal, true, _random_fill);
-                        term("Clear inside", "Backspace", ImGuiKey_Backspace, true, _clear_inside);
-                        term("Clear outside", "0 (zero)", ImGuiKey_0, true, _clear_outside);
+                    ImGui::AlignTextToFramePadding();
+                    imgui_Str("Background ~");
+                    ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                    imgui_RadioButton("0", &background, 0);
+                    ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                    imgui_RadioButton("1", &background, 1);
+                    ImGui::SameLine();
+                    imgui_StrTooltip("(?)",
+                                     "'Clear inside/outside' and 'Cut' will clear the range with the value.\n"
+                                     "'Bound' will get the bounding-box for the pattern that consists of !(value).");
 
-                        ImGui::Separator();
-                        term("Select all", "A", ImGuiKey_A, false, _select_all);
-                        term("Bound", "B", ImGuiKey_B, true, _bounding_box);
-                        term("Test background", "P", ImGuiKey_P, true, _test_bg_period);
-                        guide_mode::item_tooltip("Test the properties (size and period) of periodic background.");
+                    // Filling.
+                    ImGui::Separator();
+                    fill_den.step_slide("Fill density");
+                    term("Random fill", "+/=", ImGuiKey_Equal, true, _random_fill);
+                    term("Clear inside", "Backspace", ImGuiKey_Backspace, true, _clear_inside);
+                    term("Clear outside", "0 (zero)", ImGuiKey_0, true, _clear_outside);
 
-                        // Copy/Cut/Paste.
-                        ImGui::Separator();
-                        set_tag(add_rule, "Rule info",
-                                "Whether to include rule info ('rule = ...') in the header for the patterns.\n\n"
-                                "(This applies to 'Copy' and 'Cut'. 'Identify' will always include rule info.)");
-                        term("Copy", "C", ImGuiKey_C, true, _copy);
-                        term("Cut", "X", ImGuiKey_X, true, _cut);
-                        term("Identify", "I (i)", ImGuiKey_I, true, _identify);
-                        guide_mode::item_tooltip(
-                            "Identify a single oscillator or spaceship in 2*2 periodic background "
-                            "(e.g., pure white, pure black, striped, or checkerboard background), and "
-                            "copy its smallest phase to the clipboard.");
+                    ImGui::Separator();
+                    term("Select all", "A", ImGuiKey_A, false, _select_all);
+                    term("Bound", "B", ImGuiKey_B, true, _bounding_box);
+                    term("Test background", "P", ImGuiKey_P, true, _test_bg_period);
+                    guide_mode::item_tooltip("Test the properties (size and period) of periodic background.");
 
-                        ImGui::Separator();
-                        ImGui::AlignTextToFramePadding();
-                        imgui_Str("Paste mode ~");
-                        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                        imgui_RadioButton("Copy##M", &paste_mode, aniso::blitE::Copy);
-                        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                        imgui_RadioButton("Or", &paste_mode, aniso::blitE::Or);
-                        ImGui::SameLine(0, imgui_ItemInnerSpacingX());
-                        imgui_RadioButton("And", &paste_mode, aniso::blitE::And);
-                        ImGui::SameLine();
-                        imgui_StrTooltip("(?)", "Use 'Copy' mode for patterns with unknown or arbitrary (periodic) "
-                                                "background.\n\n"
-                                                "Use 'Or' mode to treat black cells as transparent background. "
-                                                "('And' ~ white background.)");
-                        term("Paste", "V", ImGuiKey_V, false, _paste);
-                    } else { // Shortcut only.
-                        auto term2 = [&](ImGuiKey key, bool use_sel, operationE op2) {
-                            if (checked_shortcut(key, !use_sel || m_sel.has_value())) {
-                                op = op2;
-                            }
-                        };
+                    // Copy/Cut/Paste.
+                    ImGui::Separator();
+                    set_tag(add_rule, "Rule info",
+                            "Whether to include rule info ('rule = ...') in the header for the patterns.\n\n"
+                            "(This applies to 'Copy' and 'Cut'. 'Identify' will always include rule info.)");
+                    term("Copy", "C", ImGuiKey_C, true, _copy);
+                    term("Cut", "X", ImGuiKey_X, true, _cut);
+                    term("Identify", "I (i)", ImGuiKey_I, true, _identify);
+                    guide_mode::item_tooltip("Identify a single oscillator or spaceship in 2*2 periodic background "
+                                             "(e.g., pure white, pure black, striped, or checkerboard background), and "
+                                             "copy its smallest phase to the clipboard.");
 
-                        term2(ImGuiKey_Equal, true, _random_fill);
-                        term2(ImGuiKey_Backspace, true, _clear_inside);
-                        term2(ImGuiKey_0, true, _clear_outside);
-                        term2(ImGuiKey_A, false, _select_all);
-                        term2(ImGuiKey_B, true, _bounding_box);
-                        term2(ImGuiKey_P, true, _test_bg_period);
-                        term2(ImGuiKey_C, true, _copy);
-                        term2(ImGuiKey_X, true, _cut);
-                        term2(ImGuiKey_V, false, _paste);
-                        term2(ImGuiKey_I, true, _identify);
-                    }
+                    ImGui::Separator();
+                    ImGui::AlignTextToFramePadding();
+                    imgui_Str("Paste mode ~");
+                    ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                    imgui_RadioButton("Copy##M", &paste_mode, aniso::blitE::Copy);
+                    ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                    imgui_RadioButton("Or", &paste_mode, aniso::blitE::Or);
+                    ImGui::SameLine(0, imgui_ItemInnerSpacingX());
+                    imgui_RadioButton("And", &paste_mode, aniso::blitE::And);
+                    ImGui::SameLine();
+                    imgui_StrTooltip("(?)", "Use 'Copy' mode for patterns with unknown or arbitrary (periodic) "
+                                            "background.\n\n"
+                                            "Use 'Or' mode to treat black cells as transparent background. "
+                                            "('And' ~ white background.)");
+                    term("Paste", "V", ImGuiKey_V, false, _paste);
+                };
+
+                auto range_operations_shortcut_only = [&] {
+                    auto term2 = [&](ImGuiKey key, bool use_sel, operationE op2) {
+                        if (checked_shortcut(key, !use_sel || m_sel.has_value())) {
+                            op = op2;
+                        }
+                    };
+
+                    term2(ImGuiKey_Equal, true, _random_fill);
+                    term2(ImGuiKey_Backspace, true, _clear_inside);
+                    term2(ImGuiKey_0, true, _clear_outside);
+                    term2(ImGuiKey_A, false, _select_all);
+                    term2(ImGuiKey_B, true, _bounding_box);
+                    term2(ImGuiKey_P, true, _test_bg_period);
+                    term2(ImGuiKey_C, true, _copy);
+                    term2(ImGuiKey_X, true, _cut);
+                    term2(ImGuiKey_V, false, _paste);
+                    term2(ImGuiKey_I, true, _identify);
                 };
 
                 {
@@ -1333,12 +1332,12 @@ public:
                         if (auto window =
                                 imgui_Window("Range operations", &show_range_window,
                                              ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
-                            range_operations(true /* display */);
+                            range_operations_display();
                             displayed = true;
                         }
                     }
                     if (!displayed) {
-                        range_operations(false /* shortcut only */);
+                        range_operations_shortcut_only();
                     }
                 }
 
