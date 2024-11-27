@@ -386,6 +386,7 @@ class textT {
     struct line_ref {
         str_ref str = {};   // -> `m_text`
         rule_ref rule = {}; // -> `m_rules`
+        bool highlight = false;
         bool eq_last = false;
     };
 
@@ -443,9 +444,16 @@ public:
 
     // `str` is assumed to be utf8-encoded.
     // (If not, the rules are still likely extractable.)
-    void append(const std::string_view str) {
+    void append(const std::string_view str, const std::string_view prefix = {}) {
         for (const auto& l : std::views::split(str, '\n')) {
-            line_ref& line = _append_line({l.data(), l.size()});
+            std::string_view sv{l.data(), l.size()};
+            const bool highlight = !prefix.empty() && sv.starts_with(prefix);
+            if (highlight) {
+                sv.remove_prefix(prefix.size());
+            }
+
+            line_ref& line = _append_line(sv);
+            line.highlight = highlight;
             if (const auto extr = aniso::extract_MAP_str(l); extr.has_rule()) {
                 _attach_rule(line, extr.get_rule());
             }
@@ -598,16 +606,24 @@ private:
             ImDrawList* const drawlist = ImGui::GetWindowDrawList();
 
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
-            for (int l = 0; const auto& [str, rule, eq_last] : m_lines) {
+            for (int l = 0; const auto& [str, rule, highlight, eq_last] : m_lines) {
                 const int this_l = l++;
                 ImGui::TextDisabled("%2d ", this_l + 1);
                 ImGui::SameLine();
                 if (m_preview.enabled && rule.has_value()) {
                     ImGui::BeginGroup();
                 }
+
+                if (highlight) {
+                    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 160, 255));
+                }
                 // (`ImGui::TextWrapped` has no problem rendering long single-lines now.)
                 // (Related: https://github.com/ocornut/imgui/issues/7496)
                 imgui_StrWrapped(str.get(m_text), item_width);
+                if (highlight) {
+                    ImGui::PopStyleColor();
+                }
+
                 const auto [str_min, str_max] = imgui_GetItemRect();
                 const bool line_hovered = test_hover && mouse_pos.y >= str_min.y && mouse_pos.y < str_max.y;
                 // `line_hovered` may become true for two adjacent lines if using `mouse_pos.y <= str_max.y`.
@@ -718,7 +734,11 @@ void load_file(sync_point& out) {
                 return false;
             }
             text.clear();
+#ifndef NDEBUG // Debug
+            text.append(str, "@@");
+#else // Release
             text.append(str);
+#endif
             return true;
         }
         return false;
@@ -810,7 +830,7 @@ void load_doc(sync_point& out) {
             // if (ImGui::Selectable(title, doc_id == i, ImGuiSelectableFlags_NoAutoClosePopups) && doc_id != i) {
             if (imgui_SelectableStyledButton(title, doc_id == i) && doc_id != i) {
                 text.clear();
-                text.append(contents);
+                text.append(contents, "@@");
                 text.reset_scroll();
                 doc_id = i;
             }

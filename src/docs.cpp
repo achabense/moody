@@ -129,22 +129,24 @@ x = 5, y = 27, rule = MAP+sASUIjICmiAgAiAEKBAhrIGFiAUbCCAoAChgnAAAw6AAkAIgKCAlAQ
 // Sometimes you may also want to jump outside of the predefined subsets. This can be done via random-access editing, and may lead to surprising discoveries. See the 'More about random-access editing' section for more info.
 // clang-format on
 
+// TODO: replace some examples with more interesting ones.
 constexpr const char* doc_rules = R"(
-The following rules are selected from different subsets. You can press 'Z' on a preview windows to see which subsets the rule belongs to. (The full list of preview-window operations is recorded in 'Settings'.) Or, if you are interested in the related subsets, you can click a rule and then 'Match' to select all the subsets the rule belongs to.
+The following rules are selected from different subsets. For each preview window you can press 'Z' to see which subsets the rule belongs to; the full list of preview-window operations is recorded in 'Settings'. If you are interested in a specific rule, you can click its rule string for more actions (for example, 'Match' to select related subsets).
 
 
----- Rules with native symmetry
+@@Symmetric rules
+
 Isotropic ('All', selected by default):
 MAPgAQFFAQABgAQAFRABgAAAgAAAAAAAAASRAhAggQAAioCFA4AAAAIEBKKzIDQBIAADAQIEEAAkHABAIAAAAAAAQ
 MAP/vj70upsmjLqi43n7oQwBt6ogHzgl26yvYiBohgzzqj4/MUi0YS9FLcNSGNF6DlJ50KB3MAzsOAWRNpFDDINBA
 MAPBSEBKiGAcMxBVCdvQAH//ySAf8+AAd1aAEE/DwAT728JCDX/DgF9/6VEf34MAX7bAAB3/QkTVX3Mkf57g397Xw
 MAPyC6AMHTtIsiwIAEF8IQAkX7sMoHssoEkcRAggcAgFECiqgEAIIQFgyGlAEOlyRkgK4ggBgIggQgWBUh0BYQuSA
 
-'-' alone ('|' (alone) is essentially the same as '-'):
+'-' alone ('|' (alone) is similar to '-'):
 MAPUwUFEETEhAeCBAFowogSBgEAAkAyAAAAggMAgDEFSQoEAgFJBEAQEQjEgACIk4DA0BggAGAEQNGgkMkIEBQRig
 MAPIKAkAIAAABAJAAgABFACAoCCoAABIQAAAAAGBAJABIFACEADAAIAAgAAlBVDABAAACEQCBQIQEhAAgEMJCAAEQ
 
-'\' alone ('/' (alone) is essentially the same as '\'):
+'\' alone ('/' (alone) is similar to '\'):
 MAPEUwRQHEGwsIwQQlGQBgAFETB8AEAARBIEmABoA4aKABgjHPAk6gQ5DwAAcQAABKQoGAyZQsCgBggwBAIieYiCQ
 MAPQAjggAIIgAAgAAAACQAAAAAAgAAggAAAKIQAAAAAAAAAAAIAAiEgAAgACIAICAEgACAAggAARAAKkAAEAABAAA
 
@@ -154,9 +156,9 @@ MAP2AAAAQAAAQCAAAAQAAAAAAAAAAAAAAAAAAAAQAAAAACAAAAAAAACAAAAAAAAAAAAgAAAAAAACAAAA
 MAPAj6qGRYEbAUJCY78vDHdV3RZxOaGCikQ1abIFMMgJBp3BiKINUAoCWLoKJrShCqIYswRCaAJjzpKQhA4KBiQyA
 
 'C4' alone:
-'C4' is a strict subset of 'C2'. In 'C4', sometimes (for example, by getting random rules) you will find rules where there are complex dynamics, but everything dies finally:
+'C4' is a strict subset of 'C2'. Often in 'C4', you will find rules with patterns that exhibit complex dynamics but disappear finally:
 MAPAkMwkQDI20gEBSC4F/gYtzNEmgAVCB0ookwgwMEGAA0FExCAo8gCgFw4ACAqEgALNCnhuUQcmQlgahCx2ACRHg
-It's highly likely that there exist rules with interesting oscillators or spaceships nearby. For example, the following rule has (C4) distance = 1 to the above one, but has huge spaceships:
+It turns out that, there usually exist rules with interesting oscillators or spaceships close to such rules. For example, the following rule has (C4) distance = 1 to the above one, but has huge spaceships:
 MAPAkMwkwDo20gEBSC4F/gItzNkmkA1iBkookwgwMEGgA0FExCAo8gigFw4AAAqEgALNCnhsUQcmQlgahCx2ACRHg
 It will be very helpful for finding such rules if you turn on 'Preview' for the random-access section.
 
@@ -165,7 +167,7 @@ MAPA0wFMBFTd2EGdnFywDNkKEYRDqgbKPiJ6DIklgrKDhYnSAit2JIckGwBtsuJBFMGAPAc5TvYilLBt
 MAPA0wFEBFTV2EGdnFywDNkKEYRDigbKHiJ6DIklgrKDhYnSAit2JIckGwBtsuJBFMGAPAc5TvYilLBtImEJIhUoA
 
 '| & -':
-Both '| & -' and '\ & /' (see below) are strict subsets of 'C2' (which is not true reversely - a rule that belongs to 'C2' may not belong to any of '|, -, \ or /').
+Both '| & -' and '\ & /' (see below) are strict subsets of 'C2'. (This is not true reversely - a rule that belongs to 'C2' may not belong to any of '|', '-', '\' or '/'.)
 MAPIAJIChAAUMgAELFhAQCBgIAASWAABCgAAEZCAIIQhAAAAaOBAgApgAAQAAICIRAAAJAYhBwCAAAACWhIQQRIAA
 MAP7AKSABAAABLAAwAAAQBgSKACABgQIEISEhCAIKkEAKCIAQAoEQAASIAAAAAAEgAAEuGAAAIEIKAASgAAWAEAAA
 
@@ -174,44 +176,58 @@ MAPAhghuAgQgywsgCBAwliAgA0RiiAAAOCQgggwwAQABABBCEUgFAgeESlGQEIUAACBAEQCUKCIkWBkA
 MAPAxEkiDlAgEIC2mcMDTWcNhDDmAcEHBZKjUUNInwAZqgRQggGb5AAtAJqmisCKGlJYJIlOJh5EFnCyBoFohglFA
 
 
----- Rules with state symmetry (the self-complementary rules)
-Self-complementary rules are supported in the program via 'Comp'.
+@@Self-complementary rules
 
-There do exist self-complementary rules that allow for spaceships and oscillators. For example, the following rule is found using the 'Lock & Capture' feature in this program:
+Self-complementary rules ('Comp') can work naturally with many other subsets. For example, the following rule is an isotropic self-complementary rule ('All & Comp').
 MAPARcTZhegPEwRdxPuFCBIzyBmF8A8+4g3RMD7A+03nz8DBhNIPyD83RPuIMP8F5n7DO3714g3EXfNw/oXmTcXfw
+As you see, both black and white "gliders" occur easily in this rule. The rule was found using a feature removed in v0.9.7 (due to some design flaws). The feature will be re-supported in the future, hopefully in the next version.
 
 
----- Totalistic rules
-Totalistic rules are strict subset of isotropic rules.
+@@Totalistic rules
 
 Outer-totalistic ('Tot'):
+Outer-totalistic rules are a strict subset of isotropic rules.
 MAPARYAARZoARcWaAEXaIEXfxZoARdogRd/aIEXf4EXf/8WaAEXaIEXf2iBF3+BF3//aIEXf4EXf/+BF3//F3///g
 MAPgAAAAQAAARcAAAEXAAEXfwAAARcAARd/AAEXfwEXf/8AAAEXAAEXfwABF38BF3//AAEXfwEXf/8BF3//F3///g
 
 Inner-totalistic ('Tot(+s)'):
+Inner-totalistic rules are further a strict subset of outer-totalistic rules.
 MAPAAAAAQABARcAAQEXARcXfwABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf3//f////g
 
-Though conceptually "simpler", totalistic rules have no additional symmetry properties than common isotropic rules. However, it's a good idea to "refine" totalistic rules in larger subsets like isotropic set. Take the voting rule for example:
+Though conceptually "simpler", totalistic rules have no additional symmetry properties than common isotropic rules. However, it's a good idea to check their neighboring rules in larger sets like isotropic set. Take the voting rule for example:
 MAPAAAAAQABARcAAQEXARcXfwABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf3//f////w
-The following rule has distance = 1 to the voting rule in the isotropic set.
+The following rule has distance = 1 to the voting rule in the isotropic set ('All').
 MAPIIAAAYABARcAAQEXARcXf4ABARcBFxd/ARcXfxd/f/8AAQEXARcXfwEXF38Xf3//ARcXfxd/f/8Xf3//f////w
+The voting rule is also self-complementary; the following rule has distance = 1 to it in 'All & Comp'.
+MAPAAEAAAEBABcAEQEHARcXfwABARcBFxd/AVcXPxd/f/8AAQEXAxcVfwEXF38Xf3//ARcXfx9/d/8X/39///9//w
+
+The program also supports totalistic rules in hexagonal and von-Neumann neighborhoods (see below). Except for outer-totalistic hex rules (which has 14 groups, i.e. 16*1024 rules), they are small enough to be traversed easily. Noticeably, there is a similar voting rule in hexagonal neighborhood (which is an inner-totalistic rule):
+MAPAAAAEQAREXcAAAARABERdwAREXcRd3f/ABERdxF3d/8AERF3EXd3/wAREXcRd3f/EXd3/3f///8Rd3f/d////w
 
 
----- Rules emulating hexagonal neighborhood
-The subsets at the last line emulate symmetries in the hexagonal tiling. For example, the following rule has spaceships of different shapes moving in different directions, however, these spaceships are conceptually the same thing in the corresponding hexagonal space. To confirm this, you can hover on the preview window and press '6' to see their "actual" shapes in the projected space, and you will see that they all have the same shape.
+@@Rules emulating hexagonal neighborhood
+
+For every rule in the 'Hex' subset, when viewed through hexagonal projection ('6'), the dynamics will behave as if produced by a real hexagonal rule. For convenience, these rules are referred to as hexagonal rules directly.
+
+The subsets at the last line emulate symmetries in the hexagonal space. For example, the following (isotropic) rule has spaceships of different shapes moving in different directions - however, if you hover on the preview window and press '6' to apply the projection, you will find they turn out to be the same thing (with the same shape) in the projected space.
 MAPEUQAIiIARGYRRAAiIgBEZgCIVSIAAO6IAIhVIgAA7ogAADPuiABEiAAAM+6IAESIiABmAAAAAACIAGYAAAAAAA
-(Also, if you identify those spaceships in the right panel (select a spaceship and press 'I'), you will find their periods are all the same.)
+Also, if you identify those spaceships in the right panel (select a spaceship and press 'I'), you will find that they all have the same period.
 
 Isotropic ('All', not to be confused with real isotropic rules):
 MAPEVWIADNmABERVYgAM2YAERHuABF37gAAEe4AEXfuAAARdwAA7u4RABF3AADu7hEA/6oARMwRIoj/qgBEzBEiiA
 MAPEUQRRCLuIhERRBFEIu4iETOqAJlmiBFEM6oAmWaIEURVZgARzIiZIlVmABHMiJki7gCIZgARZpnuAIhmABFmmQ
 MAPEURmqiKIzO4RRGaqIojM7iKI/yIAALvuIoj/IgAAu+5EAP/diABE7kQA/92IAETuiAB3IgAARACIAHciAABEAA
 
-'a-d' alone ('q-c' and 'w-x' (alone) are essentially the same as 'a-d'):
+'All & Comp':
+Self-complementary hexagonal rules are a relatively small set (13 groups, i.e. 8*1024 rules), and is a possible candidate for 'Traverse'.
+MAP7rv/zN1mqpnuu//M3Waqmd1mqpm7zEQi3WaqmbvMRCK73cwiZqqZRLvdzCJmqplEZqqZRMwAIohmqplEzAAiiA
+MAPEUQRVSJmMwARRBFVImYzABGqAMwz/1V3EaoAzDP/VXcRVQAzzP+qdxFVADPM/6p3/zOZu1V33Xf/M5m7VXfddw
+
+'a-d' alone ('q-c' and 'w-x' (alone) are similar to 'a-d'):
 MAPIhFmZgCZRAAiEWZmAJlEAAAAqu5ERKoAAACq7kREqgCZEcz/ABFVAJkRzP8AEVUAIqoAIgC7IgAiqgAiALsiAA
 MAPAMwARIiIIgAAzABEiIgiAETdEYgAM0QARN0RiAAzRAAiMwAAAHeIACIzAAAAd4gAEWZEAABmAAARZkQAAGYAAA
 
-'a|q' alone ('q|w' and 'w|d' (alone) are essentially the same as 'a|q'):
+'a|q' alone ('q|w' and 'w|d' (alone) are similar to 'a|q'):
 MAPAAAAAKoAiAAAAAAAqgCIAAAAIhEiRBEiAAAiESJEESKIEYgAqgAARIgRiACqAABEqgARIrsiAACqABEiuyIAAA
 MAPIncAVUQidwAidwBVRCJ3AO5EAEREAAAR7kQAREQAABEAqgCIAEQidwCqAIgARCJ3RACImSIR/2ZEAIiZIhH/Zg
 
@@ -226,10 +242,10 @@ MAPqsxEACIRiACqzEQAIhGIAAAAmQAAAACIAACZAAAAAIiIIgAAAABEAIgiAAAAAEQAiEQAACIAAACIR
 'C6' is a strict subset of both 'C2' and 'C3'.
 MAPEUQRVSLdM4gRRBFVIt0ziCK7IswiABFEIrsizCIAEURVAEQRmYiqIlUARBGZiKoizESIqiKZzBHMRIiqIpnMEQ
 MAPEVURRDO7IjMRVRFEM7siMzPdEZkAuxHMM90RmQC7EcxERABV/1XdIkREAFX/Vd0iu92qZrvuZoi73apmu+5miA
+('C6' is very close to hexagonal isotropy. Only a few groups are different; set the working set as 'All' and superset as 'C6' to see the difference.)
 
-'a-d & q|w':
+'a-d & q|w' ('q-c & w|d' and 'w-x & a|q' are similar to 'a-d & q|w'):
 MAPESIRAESZAGYRIhEARJkAZncARDOZACKIdwBEM5kAIoh3mSJEAABViHeZIkQAAFWI/zOZVVWIMwD/M5lVVYgzAA
-You may also try 'q-c & w|d' or 'w-x & a|q'.
 
 'a-d & q-c & w-x':
 Both 'a-d & q-c & w-x' and 'a|q & q|w & w|d' (see below) are strict subsets of 'C3'.
@@ -239,8 +255,9 @@ MAPiAAAAAAAACKIAAAAAAAAIgAAACIAMwAAAAAAIgAzAAAAERFVAGYAuwAREVUAZgC7ESIiMxFVACIRI
 MAPAGYRImbuRO4AZhEiZu5E7mYRZpmqAP9VZhFmmaoA/1VmzGb/EQCZM2bMZv8RAJkz7gBmMwCIVe7uAGYzAIhV7g
 
 
----- Rules emulating von-Neumann neighborhood
-Von-Neumann neighborhood is compatible with native symmetries - you can combine 'Von' with native symmetry subsets directly.
+@@Rules emulating von-Neumann neighborhood
+
+Von-Neumann neighborhood works naturally with native symmetries - you can combine 'Von' with native symmetry subsets directly. (Von-Neumann rules are also a strict subset of 'Hex', so the hexagonal projection ('6') applies to them as well.)
 
 Isotropic ('Von & All'):
 MAPzADMAAD/AADMAMwAAP8AADMzAAAzzAAAMzMAADPMAADMAMwAAP8AAMwAzAAA/wAAMzMAADPMAAAzMwAAM8wAAA
@@ -250,23 +267,21 @@ C2 ('Von & C2'):
 MAPADMAMwD/M/8AMwAzAP8z/wAzM8z//8zMADMzzP//zMwAMwAzAP8z/wAzADMA/zP/ADMzzP//zMwAMzPM///MzA
 MAPzP8zAMwzAADM/zMAzDMAADMzzAD/zAAAMzPMAP/MAADM/zMAzDMAAMz/MwDMMwAAMzPMAP/MAAAzM8wA/8wAAA
 
-Interestingly, there also exist voting rules in von-Neumann and hexagonal neighborhood:
-MAPAAAAMwAzM/8AAAAzADMz/wAzM/8z////ADMz/zP///8AAAAzADMz/wAAADMAMzP/ADMz/zP///8AMzP/M////w
-MAPAAAAEQAREXcAAAARABERdwAREXcRd3f/ABERdxF3d/8AERF3EXd3/wAREXcRd3f/EXd3/3f///8Rd3f/d////w
 
+@@Miscellaneous
 
----- Misc
-You can specify the neighborhood by yourself - 'q/w/e/a/s/d/z/x/c' are for rules whose values are "independent" of the corresponding cell. For example, 'Hex' is just a convenient way to represent 'e & z'.
+You can specify the neighborhood by yourself - 'q/w/e/a/s/d/z/x/c' are for rules whose values are "independent" of the corresponding cell. For example, 'Von' is actually equal to 'q & e & z & c' (independent of 'q', 'e', 'z' and 'c'), and 'Hex' is equal to 'e & z'.
 
 'q & a & z & -':
 As the values are independent of 'q', 'a' and 'z', "infomation" can only pass from right to left:
 MAPIjP/7iIz/+4zAN3/MwDd/92Zu//dmbv/Zrvud2a77nciM//uIjP/7jMA3f8zAN3/3Zm7/92Zu/9mu+53Zrvudw
 MAPAMwzzADMM8wRqnfuEap37iJm3XciZt13RAD/M0QA/zMAzDPMAMwzzBGqd+4RqnfuImbddyJm3XdEAP8zRAD/Mw
 
+Aside from von-Neumann rules, 'w & a & d & x' works naturally with native symmetries as well.
 'w & a & d & x & All (isotropic)':
-MAPoKAAAKCgAAAFBQAABQUAAKCgAACgoAAABQUAAAUFAAAFBQAABQUAAF9fAABfXwAABQUAAAUFAABfXwAAX18AAA
-MAP+vqlpfr6paWgoFVVoKBVVfr6paX6+qWloKBVVaCgVVWgoA8PoKAPDwAA+voAAPr6oKAPD6CgDw8AAPr6AAD6+g
 MAP+vqlpfr6paWlpVBQpaVQUPr6paX6+qWlpaVQUKWlUFClpQoKpaUKCl9foKBfX6CgpaUKCqWlCgpfX6CgX1+goA
+MAPBQWgoAUFoKBfXwAAX18AAAUFoKAFBaCgX18AAF9fAABfXwAAX18AAP//AAD//wAAX18AAF9fAAD//wAA//8AAA
+MAPBQWgoAUFoKBfXwoKX18KCgUFoKAFBaCgX18KCl9fCgpfX1BQX19QUP//AAD//wAAX19QUF9fUFD//wAA//8AAA
 
 It's reluctant to regard 's' as "independent of the center cell". However, there are a lot of strange rules in the 's & Comp' subset.
 's & Comp & /':
@@ -278,7 +293,7 @@ MAPACEAIYCBgIFVVVVVX3dfdxGdEZ0BVQFVd313fUN/Q38BPQE9QRFBEVV/VX9Gd0Z3EQURBVVVVVV+/
 MAPEgASAAEJAQk1bzVvHVYdVlVFVUUZERkR9hH2EX1/fX8BQQFBd5B3kHdnd2ddVV1VlUeVRwlTCVNvf29//7f/tw
 
 
-Finally, it's possible to get non-trivial rules that do not belong to any well-defined subsets (no symmetries, no independencies). See the next section ('More about random-access editing') for details.
+Finally, it's possible to get non-trivial rules that do not belong to any pre-defined subset. See the next section ('More about random-access editing') for details.
 )";
 
 constexpr const char* doc_random_access = R"(
