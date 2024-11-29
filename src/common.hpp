@@ -366,23 +366,21 @@ inline bool imgui_SelectableStyledButton(const char* label, const bool selected 
 }
 
 class sequence : no_create {
-    enum tagE { None, First, Prev, Next, Last };
-
     // Workaround to avoid the current rule being changed in override mode.
     static bool extra_cond() { return !ImGui::IsKeyDown(ImGuiKey_Z) && !ImGui::IsKeyDown(ImGuiKey_X); }
 
     inline static ImGuiID bound_id = 0;
-    inline static bool keep_bound_id = false;
-    friend void frame_main();
-    static void begin_frame() {
-        if (!std::exchange(keep_bound_id, false)) {
-            bound_id = 0;
-        }
-    }
+    inline static ImGuiID bound_id_next = 0;
 
-    // (`disable` is a workaround for a sequence in `edit_rule`...)
-    static tagE seq(const char* label_first, const char* label_prev, const char* label_next, const char* label_last,
-                    const char* const disable) {
+    friend void frame_main();
+    static void begin_frame() { bound_id = std::exchange(bound_id_next, 0); }
+
+public:
+    // (`disable_prev_next` is a workaround for a sequence in `edit_rule`.)
+    // 0:first, 1:prev, 2:next, 3:last
+    static int seq(const char* label_first, const char* label_prev, const char* label_next, const char* label_last,
+                   const char* const disable_prev_next = nullptr) {
+        enum tagE : int { None = -1, First, Prev, Next, Last };
         tagE tag = None;
 
         if (ImGui::Button(label_first)) {
@@ -390,7 +388,7 @@ class sequence : no_create {
         }
         ImGui::SameLine(0, imgui_ItemInnerSpacingX());
 
-        if (disable) {
+        if (disable_prev_next) {
             ImGui::BeginDisabled();
             ImGui::BeginGroup();
         }
@@ -406,7 +404,7 @@ class sequence : no_create {
             bound_id == id_prev && !pair_disabled &&
             ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows /*Including popup hierarchy*/);
         if (shortcut_avail) { // Otherwise, `bound_id` will become 0 at next frame.
-            keep_bound_id = true;
+            bound_id_next = bound_id;
         }
         auto button_with_shortcut = [shortcut_avail, window_focused](const char* label, ImGuiKey shortcut) {
             bool ret = ImGui::Button(label);
@@ -426,11 +424,11 @@ class sequence : no_create {
         if (button_with_shortcut(label_next, ImGuiKey_RightArrow)) {
             tag = Next;
         }
-        if (disable) {
+        if (disable_prev_next) {
             ImGui::EndGroup();
             ImGui::EndDisabled();
             if (!imgui_TestItemFlag(ImGuiItemFlags_Disabled)) {
-                imgui_ItemTooltip(disable);
+                imgui_ItemTooltip(disable_prev_next);
             }
         }
 
@@ -442,24 +440,10 @@ class sequence : no_create {
         if ((tag != None) ||
             (bound_id == 0 && window_focused && !pair_disabled && shortcuts::keys_avail() && extra_cond() &&
              (shortcuts::test(ImGuiKey_LeftArrow) || shortcuts::test(ImGuiKey_RightArrow)))) {
-            bound_id = id_prev;
-            keep_bound_id = true;
+            bound_id_next = id_prev;
         }
 
         return tag;
-    }
-
-public:
-    static void seq(const char* label_first, const char* label_prev, const char* label_next, const char* label_last,
-                    const auto& act_first, const auto& act_prev, const auto& act_next, const auto& act_last,
-                    const char* disable = nullptr) {
-        switch (seq(label_first, label_prev, label_next, label_last, disable)) {
-            case None: return;
-            case First: act_first(); return;
-            case Prev: act_prev(); return;
-            case Next: act_next(); return;
-            case Last: act_last(); return;
-        }
     }
 };
 

@@ -775,35 +775,36 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
             "You can traverse the entire working set with this. Some interesting examples include: inner-totalistic rules ('Tot(+s)'), self-complementary totalistic rules ('Comp' & 'Tot'), isotropic von-Neumann rules ('All' & 'Von'), and a similar set ('All' & 'w').\n\n"
             "Even if the working set is very large, you may find this still useful sometimes.");
 
-        ImGui::BeginGroup();
-        sequence::seq(
-            "<00..", "Prev", "Next", "11..>",
-            [&] {
+        // ImGui::BeginGroup();
+        const char* const disable_prev_next =
+            page.empty() ? "Click 'Locate', '<00..' or '11..>', or input a distance to get somewhere in the sequence."
+                         : nullptr;
+        switch (sequence::seq("<00..", "Prev", "Next", "11..>", disable_prev_next)) {
+            case 0:
                 page.clear();
                 page.push_back(aniso::seq_mixed::first(subset, mask));
                 fill_next(adapter.page_size - 1);
-            },
-            [&] {
+                break;
+            case 1:
                 fill_prev(adapter.page_size);
                 while (page.size() > adapter.page_size) {
                     page.pop_back();
                 }
-            },
-            [&] {
+                break;
+            case 2:
                 fill_next(adapter.page_size);
                 while (page.size() > adapter.page_size) {
                     page.pop_front();
                 }
-            },
-            [&] {
+                break;
+            case 3:
                 page.clear();
                 page.push_back(aniso::seq_mixed::last(subset, mask));
                 fill_prev(adapter.page_size - 1);
-            },
-            page.empty() ? "Click 'Locate', '<00..' or '11..>', or input a distance to get somewhere in the sequence."
-                         : nullptr);
-        ImGui::EndGroup();
-        imgui_ItemTooltip_StrID = "Seq##Trav";
+                break;
+        }
+        // ImGui::EndGroup();
+        // imgui_ItemTooltip_StrID = "Seq##Trav";
 
         ImGui::SameLine();
         if (page.empty()) {
@@ -899,9 +900,12 @@ static void random_rule_window(bool& show_rand, sync_point& sync, const aniso::s
         auto set_last_page = [&] { set_page(rules.empty() ? 0 : calc_page() - 1); };
 
         ImGui::BeginGroup();
-        sequence::seq(
-            "<|", "<<", ">>>", "|>", //
-            [&] { set_page(0); }, [&] { set_page(page_no - 1); }, [&] { set_page(page_no + 1, true); }, set_last_page);
+        switch (sequence::seq("<|", "<<", ">>>", "|>")) {
+            case 0: set_page(0); break;
+            case 1: set_page(page_no - 1); break;
+            case 2: set_page(page_no + 1, true); break;
+            case 3: set_last_page(); break;
+        }
         ImGui::EndGroup();
         imgui_ItemTooltip_StrID = "Seq##Pages";
         guide_mode::item_tooltip(

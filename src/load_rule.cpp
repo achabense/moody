@@ -559,12 +559,12 @@ private:
 
         if (total != 0) {
             // ImGui::BeginGroup();
-            sequence::seq(
-                "<|", "Prev", "Next", "|>",                                   //
-                [&] { n_pos = 0; },                                           //
-                [&] { n_pos = std::max(0, m_pos.value_or(-1) - 1); },         //
-                [&] { n_pos = std::min(total - 1, m_pos.value_or(-1) + 1); }, //
-                [&] { n_pos = total - 1; });
+            switch (sequence::seq("<|", "Prev", "Next", "|>")) {
+                case 0: n_pos = 0; break;
+                case 1: n_pos = std::max(0, m_pos.value_or(-1) - 1); break;
+                case 2: n_pos = std::min(total - 1, m_pos.value_or(-1) + 1); break;
+                case 3: n_pos = total - 1; break;
+            }
             // ImGui::EndGroup();
             // imgui_ItemTooltip_StrID = "Seq##Rules";
             // guide_mode::item_tooltip("Rules found in the text.");

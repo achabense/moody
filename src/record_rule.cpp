@@ -9,12 +9,12 @@ static std::optional<int> display_header(const int total, const std::optional<in
     if (total == 0) {
         imgui_Str("(No rules)");
     } else {
-        sequence::seq(
-            "<|", "Prev", "Next", "|>",                                   //
-            [&] { n_pos = 0; },                                           //
-            [&] { n_pos = std::max(0, m_pos.value_or(-1) - 1); },         //
-            [&] { n_pos = std::min(total - 1, m_pos.value_or(-1) + 1); }, //
-            [&] { n_pos = total - 1; });
+        switch (sequence::seq("<|", "Prev", "Next", "|>")) {
+            case 0: n_pos = 0; break;
+            case 1: n_pos = std::max(0, m_pos.value_or(-1) - 1); break;
+            case 2: n_pos = std::min(total - 1, m_pos.value_or(-1) + 1); break;
+            case 3: n_pos = total - 1; break;
+        }
         ImGui::SameLine();
         if (m_pos.has_value()) {
             ImGui::Text("Total:%d At:%d", total, *m_pos + 1);
