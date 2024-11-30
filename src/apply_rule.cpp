@@ -1532,9 +1532,9 @@ void previewer::configT::_set() {
     ImGui::PopItemWidth();
 }
 
-// TODO: allow setting the step and interval with shortcuts when the window is hovered?
-void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT& rule, bool interactive,
-                         ImU32& border_col) {
+class previewer_data {
+    friend class previewer;
+
     struct termT {
         bool active = false;
         bool skip_run = false;
@@ -1543,26 +1543,30 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
         aniso::ruleT rule = {};
         aniso::tileT tile = {};
     };
-    static std::unordered_map<uint64_t, termT> terms;
-    {
-        const clearE clear = std::exchange(_preview_clear, clearE::None);
-        if (clear == clearE::InActive) {
-            // According to https://en.cppreference.com/w/cpp/container/unordered_map/erase_if
-            // There is no requirement on the predicate.
-            std::erase_if(terms, [](std::pair<const uint64_t, termT>& pair) {
-                return !std::exchange(pair.second.active, false);
-            });
-        } else if (clear == clearE::All) {
-            terms.clear();
-        }
-    }
 
+    inline static std::unordered_map<uint64_t, termT> terms;
+};
+
+void previewer::begin_frame() {
+    if (!previewer_data::terms.empty()) {
+        // According to https://en.cppreference.com/w/cpp/container/unordered_map/erase_if
+        // There seems no requirement on the predicate.
+        std::erase_if(previewer_data::terms, [](std::pair<const uint64_t, previewer_data::termT>& pair) {
+            return !std::exchange(pair.second.active, false);
+        });
+    }
+}
+
+// TODO: allow setting the step and interval with shortcuts when the window is hovered?
+void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT& rule, bool interactive,
+                         ImU32& border_col) {
     assert(ImGui::GetItemRectSize() == config.size_imvec());
     assert(ImGui::IsItemVisible());
 
-    termT& term = terms[id];
+    previewer_data::termT& term = previewer_data::terms[id];
     if (term.active) [[unlikely]] {
-        imgui_ItemRect(IM_COL32_WHITE);
+        assert(false);
+        border_col = IM_COL32_WHITE;
         return;
     }
     term.active = true;

@@ -688,14 +688,8 @@ public:
     }
 
 private:
-    enum class clearE { None, InActive, All };
-    inline static clearE _preview_clear = clearE::All;
-
     friend void frame_main();
-    static void begin_frame() {
-        using enum clearE;
-        _preview_clear = _preview_clear == None ? InActive : All;
-    }
+    static void begin_frame();
 
     static void _preview(uint64_t id, const configT& config, const aniso::ruleT& rule, bool interactive,
                          ImU32& border_col);
