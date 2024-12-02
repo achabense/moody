@@ -1589,8 +1589,15 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
 
     // (`IsItemActive` does not work as preview-window is based on `Dummy`.)
     const bool pause = hovered && l_down;
-    if (!pause && (restart || (global_config::timer.test() && !std::exchange(term.skip_run, false)))) {
-        const int p = adjust_step(config.step, rule);
+#ifndef NDEBUG // Debug
+    // (Experimental; undocumented.)
+    // Whether to apply to the main space window as well?
+    const bool fast = hovered && shortcuts::global_flag(ImGuiKey_F);
+#else
+    constexpr bool fast = false;
+#endif
+    if (!pause && (restart || fast || (global_config::timer.test() && !std::exchange(term.skip_run, false)))) {
+        const int p = adjust_step(fast ? std::max(config.step, 10) : config.step, rule);
         for (int i = 0; i < p; ++i) {
             term.tile.run_torus(rule);
         }
