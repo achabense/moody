@@ -257,17 +257,26 @@ int main(int, char**) {
 #endif
 
     auto begin_frame = [] {
-        SDL_Event event;
-        while (SDL_PollEvent(&event)) {
-            ImGui_ImplSDL2_ProcessEvent(&event);
-            if (event.type == SDL_QUIT) {
-                return false;
+        for (;;) {
+            SDL_Event event;
+            while (SDL_PollEvent(&event)) {
+                ImGui_ImplSDL2_ProcessEvent(&event);
+                if (event.type == SDL_QUIT) {
+                    return false;
+                }
+                // This appears not needed.
+                // if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE &&
+                //     event.window.windowID == SDL_GetWindowID(window)) {
+                //     return false;
+                // }
             }
-            // This appears not needed.
-            // if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE &&
-            //     event.window.windowID == SDL_GetWindowID(window)) {
-            //     return false;
-            // }
+
+            // Related: https://github.com/ocornut/imgui/issues/7844
+            if (SDL_GetWindowFlags(window) & SDL_WINDOW_MINIMIZED) {
+                SDL_Delay(10);
+            } else {
+                break;
+            }
         }
 
         ImGui_ImplSDLRenderer2_NewFrame();

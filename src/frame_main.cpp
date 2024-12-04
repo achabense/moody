@@ -199,33 +199,47 @@ void frame_main() {
         ImGui::Separator();
 
         if (ImGui::BeginTable("Layout", 2, ImGuiTableFlags_Resizable)) {
-            // TODO: ideally, the right panel should remain hidden (if already) unless resized by table's resize-bar.
-            // (So for example, the right panel will still remain hidden if the program window is maximized).
-            // However I haven't found a way to do this reliably...
+            auto try_hide = [](const float width) {
+                if (const ImVec2 avail = ImGui::GetContentRegionAvail(); avail.x <= width) {
+                    ImGui::Dummy(avail);
+                    imgui_ItemRectFilled(ImGui::GetColorU32(ImGuiCol_FrameBg, ImGui::GetStyle().DisabledAlpha));
+                    imgui_ItemTooltip("Hidden.");
+                    return true;
+                }
+                return false;
+            };
+
+            static bool right_was_hidden = false;
             const float min_w = 6;
-            ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 510);
-            ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
+            {
+                // TODO: what can be skipped when the program is minimized? Is this check reliable for all backends?
+                const bool minimized = viewport->WorkSize.x <= 0 || viewport->WorkSize.y <= 0;
+                if (!minimized && std::exchange(right_was_hidden, false)) {
+                    // TODO: working, but this looks very fragile...
+                    // So when the program window is resized (e.g. maximized), the right panel will remain hidden.
+                    // (As tested this does not affect manual resizing (using table's resize bar) within the program.)
+                    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
+                    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, min_w);
+                } else {
+                    // (No need to check whether the left panel was hidden.)
+                    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 510);
+                    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
+                }
+            }
+
             imgui_LockTableLayoutWithMinColumnWidth(min_w);
 
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             // The child window is required here (for stable scrolling).
             if (auto child = imgui_ChildWindow("Edit", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
-                if (ImGui::GetContentRegionAvail().x == min_w) { // TODO: working, but looks fragile...
-                    ImGui::Dummy(ImGui::GetContentRegionAvail());
-                    imgui_ItemRectFilled(ImGui::GetColorU32(ImGuiCol_FrameBg, ImGui::GetStyle().DisabledAlpha));
-                    imgui_ItemTooltip("Hidden.");
-                } else {
+                if (!try_hide(min_w)) {
                     edit_rule(sync);
                 }
             }
             ImGui::TableNextColumn();
             if (auto child = imgui_ChildWindow("Apply", {}, 0, ImGuiWindowFlags_NoScrollbar)) {
-                if (ImGui::GetContentRegionAvail().x == min_w) {
-                    ImGui::Dummy(ImGui::GetContentRegionAvail());
-                    imgui_ItemRectFilled(ImGui::GetColorU32(ImGuiCol_FrameBg, ImGui::GetStyle().DisabledAlpha));
-                    imgui_ItemTooltip("Hidden.");
-                } else {
+                if (!(right_was_hidden = try_hide(min_w))) {
                     apply_rule(sync);
                 }
             }
