@@ -20,24 +20,21 @@
 static SDL_Window* window = nullptr;
 static SDL_Renderer* renderer = nullptr;
 
+// (Using macro in case the function is not inlined in debug mode.)
+#define color_for(b) (bool(b) ? IM_COL32_WHITE : IM_COL32_BLACK_TRANS)
+
 static SDL_Texture* create_texture(SDL_TextureAccess access, int w, int h) {
     assert(window && renderer);
 
-    // Using the same pixel format as the one in "imgui_impl_sdlrenderer2.cpp".
+    // Using `SDL_PIXELFORMAT_ABGR8888` (also in "imgui_impl_sdlrenderer2.cpp") to be compatible with `IM_COL32(...)`.
+    // (Actually, for current color setting (IM_COL32_WHITE and IM_COL32_BLACK_TRANS), whichever _XXXX8888 will be ok.)
+    static_assert(IM_COL32_A_SHIFT == 24 && IM_COL32_B_SHIFT == 16 && IM_COL32_G_SHIFT == 8 && IM_COL32_R_SHIFT == 0);
     SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888, access, w, h);
     if (!texture) {
         resource_failure();
     }
     return texture;
 }
-
-// (Using macro in case the function is not inlined in debug mode.)
-#define color_for(b) Uint32(bool(b) ? -1 : 0)
-
-// static Uint32 color_for(bool b) {
-//     // Guaranteed to work under SDL_PIXELFORMAT_XXXX8888.
-//     return b ? -1 /* White */ : 0 /* Black*/;
-// }
 
 // Manage textures for `make_screen`.
 class screen_textures : no_create {
