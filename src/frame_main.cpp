@@ -64,8 +64,9 @@ static void get_reversal_dual(const bool button_result, sync_point& sync) {
 
 void frame_main() {
     // Make collapsed windows obvious to see.
-    ImGui::PushStyleColor(ImGuiCol_TitleBgCollapsed, ImGui::GetColorU32(ImGuiCol_TitleBgActive, 0.8));
-    if (compact_mode) {
+    ImGui::PushStyleColor(ImGuiCol_TitleBgCollapsed, ImGui::GetColorU32(ImGuiCol_TitleBgActive, 0.8f));
+    const bool compact_mode_this_frame = compact_mode;
+    if (compact_mode_this_frame) {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{3, 2});
     }
 
@@ -214,7 +215,7 @@ void frame_main() {
             {
                 // TODO: what can be skipped when the program is minimized? Is this check reliable for all backends?
                 const bool minimized = viewport->WorkSize.x <= 0 || viewport->WorkSize.y <= 0;
-                if (!minimized && std::exchange(right_was_hidden, false)) {
+                if (!minimized && right_was_hidden) {
                     // TODO: working, but this looks very fragile...
                     // So when the program window is resized (e.g. maximized), the right panel will remain hidden.
                     // (As tested this does not affect manual resizing (using table's resize bar) within the program.)
@@ -252,7 +253,7 @@ void frame_main() {
         rule_recorder::record(sync.rec_type, *sync.out_rule, &sync.rule);
     }
 
-    if (compact_mode) {
+    if (compact_mode_this_frame) {
         ImGui::PopStyleVar();
     }
     ImGui::PopStyleColor();

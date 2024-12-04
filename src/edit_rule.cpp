@@ -313,8 +313,7 @@ private:
     enum centerE { Selected, Including, Disabled, None }; // TODO: add "equals" relation?
 
     // (Follows `ImGui::Dummy` or `ImGui::InvisibleButton`.)
-    // TODO: title: const char* -> char? ('\0' ~ no title)
-    static void put_term(bool contained, centerE center, const char* title /* Optional */, bool button_mode) {
+    static void put_term(bool contained, centerE center, char title /* '\0' ~ no title */, bool button_mode) {
         const ImU32 cent_col = center == Selected    ? IM_COL32(65, 150, 255, 255) // Roughly _ButtonHovered
                                : center == Including ? IM_COL32(25, 60, 100, 255)  // Roughly _Button
                                                      : IM_COL32_BLACK_TRANS;
@@ -324,13 +323,13 @@ private:
         if (center == Disabled) {
             title_col = IM_COL32_GREY(150, 255);
             if (!title) {
-                title = "-";
+                title = '-';
             }
         }
 
         imgui_ItemRectFilled(IM_COL32_BLACK);
         if (title && (center == None || center == Disabled)) {
-            imgui_ItemStr(title_col, {title, title + 1});
+            imgui_ItemStr(title_col, {&title, 1});
         } else {
             imgui_ItemRectFilled(cent_col, ImVec2(4, 4));
         }
@@ -346,7 +345,7 @@ public:
     static void about() {
         auto explain = [](bool contained, centerE center, const char* desc) {
             ImGui::Dummy(square_size());
-            put_term(contained, center, nullptr, false);
+            put_term(contained, center, '\0', false);
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
             ImGui::AlignTextToFramePadding(); // `Dummy` does not align automatically.
             imgui_Str(": ");
@@ -398,7 +397,7 @@ public:
         imgui_Str("Working set ~");
         ImGui::SameLine();
         ImGui::Dummy(square_size());
-        put_term(current.contains(target.rule), None, nullptr, false);
+        put_term(current.contains(target.rule), None, '\0', false);
         guide_mode::item_tooltip(
             "This stands for the intersection of selected subsets; will be light green if the current rule belongs to every selected "
             "subset. See '(...)' for details.");
@@ -431,7 +430,7 @@ public:
                          : term.including ? Including
                          : disabled       ? Disabled
                                           : None,
-                         show_title ? term.title : nullptr, true);
+                         show_title ? term.title[0] : '\0', true);
                 if (show_desc) {
                     imgui_ItemTooltip(term.description);
                 }
