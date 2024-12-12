@@ -1099,7 +1099,7 @@ public:
                     paste_beg = aniso::clamp(paste_beg, {0, 0}, tile_size - m_paste->size());
                     const aniso::vecT paste_end = paste_beg + m_paste->size();
 
-                    ImTextureID texture = nullptr;
+                    ImTextureID texture = 0;
                     // (wontfix) Wasteful, but after all this works...
                     m_torus.read_and_maybe_write([&](const aniso::tile_ref tile) {
                         const aniso::tile_ref paste_area = tile.clip({paste_beg, paste_end});

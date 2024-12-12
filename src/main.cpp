@@ -122,7 +122,7 @@ public:
         });
     }
     SDL_UnlockTexture(texture);
-    return texture;
+    return (ImTextureID)(intptr_t)texture;
 }
 
 // Manage the texture for `code_image` and `code_button`.
@@ -159,7 +159,7 @@ public:
         texture = nullptr;
     }
 
-    static SDL_Texture* get() { return texture; }
+    static ImTextureID get() { return (ImTextureID)(intptr_t)texture; }
 };
 
 void code_image(aniso::codeT code, int zoom, const ImVec4& tint_col, const ImVec4& border_col) {
