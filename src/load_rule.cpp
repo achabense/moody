@@ -605,10 +605,12 @@ private:
             const float region_max_x = imgui_ContentRegionMaxAbsX();
             ImDrawList* const drawlist = ImGui::GetWindowDrawList();
 
+            // (Not trying to align with larger numbers (>=1000) at the beginning.)
+            const int digit_width = m_lines.size() < 100 ? 2 : 3;
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
             for (int l = 0; const auto& [str, rule, highlight, eq_last] : m_lines) {
                 const int this_l = l++;
-                ImGui::TextDisabled("%2d ", this_l + 1);
+                ImGui::TextDisabled("%*d ", digit_width, this_l + 1);
                 ImGui::SameLine();
                 if (m_preview.enabled && rule.has_value()) {
                     ImGui::BeginGroup();
