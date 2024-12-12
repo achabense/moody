@@ -94,7 +94,7 @@ namespace aniso {
             assert(von_tot_exc_s.get_par().k() == 5 * 2);    // 0...4
             assert(von_tot_inc_s.get_par().k() == 6);        // 0...5
         };
-    }
+    } // namespace _tests
 #endif // ENABLE_TESTS
 
 } // namespace aniso
@@ -168,7 +168,21 @@ class subset_selector {
     }
 
 public:
-    // `init_sel` should be either nullptr or the address of one of members in `aniso::_subsets`.
+    // `sel` should be the address of one of members in `aniso::_subsets`.
+    void select_single(const aniso::subsetT* sel) {
+        assert(sel);
+        for_each_term([&sel](termT& t) {
+            t.disabled = false; // Will be updated by `update_current`.
+            t.selected = t.set == sel;
+            if (t.selected) {
+                sel = nullptr;
+            }
+        });
+        assert(!sel);
+
+        update_current();
+    }
+
     explicit subset_selector(const aniso::subsetT* init_sel = nullptr) : current(aniso::subsetT::universal()) {
         using namespace aniso::_subsets;
 
@@ -274,16 +288,10 @@ public:
         });
 
         if (init_sel) {
-            for_each_term([&init_sel](termT& t) {
-                if (t.set == init_sel) {
-                    t.selected = true;
-                    init_sel = nullptr;
-                }
-            });
-            assert(!init_sel);
+            select_single(init_sel);
+        } else {
+            update_current(); // Defensive; should have no effect.
         }
-
-        update_current();
     }
 
     subset_selector(const subset_selector&) = delete;
@@ -307,6 +315,17 @@ public:
         copy_sel(terms_hex, that.terms_hex);
 
         return *this;
+    }
+
+    uint64_t rep() /*const*/ {
+        int i = 0;
+        uint64_t val = 0;
+        for_each_term([&](termT& term) {
+            assert(i < 64);
+            val |= uint64_t(term.selected || term.including) << i;
+            ++i;
+        });
+        return val;
     }
 
 private:
@@ -942,6 +961,7 @@ static void random_rule_window(bool& show_rand, sync_point& sync, const aniso::s
 void edit_rule(sync_point& sync) {
     // Select subsets.
     static subset_selector select_set{&aniso::_subsets::native_isotropic};
+    const auto rep_before = select_set.rep();
     {
         ImGui::AlignTextToFramePadding();
         imgui_StrTooltip("(...)", subset_selector::about);
@@ -979,7 +999,7 @@ void edit_rule(sync_point& sync) {
             if (ImGui::Button("Clear##Sets")) {
                 select_set.clear();
             }
-            guide_mode::item_tooltip("Unselect the subsets. The resulting working set will be the entire MAP set.");
+            guide_mode::item_tooltip("Unselect all subsets. The resulting working set will be the entire MAP set.");
             ImGui::SameLine();
             if (ImGui::Button("Match")) {
                 select_set.match(sync);
@@ -1028,6 +1048,7 @@ void edit_rule(sync_point& sync) {
     static previewer::configT config{previewer::configT::_220_160};
     static bool show_super_set = false;
     static subset_selector select_set_super;
+    bool set_superset_example = false;
     {
         const bool clicked = ImGui::Checkbox("Traverse", &show_trav);
         guide_mode::item_tooltip(
@@ -1058,13 +1079,8 @@ void edit_rule(sync_point& sync) {
     guide_mode::item_tooltip("Preview the effect of random-access flipping.\n\n"
                              "(You may 'Collapse' the subset table to leave more room for the preview windows.)");
 
-    {
-        // TODO: unnecessarily expensive.
-        static aniso::subsetT cmp_set = subset;
-        if (cmp_set != subset) {
-            /* working-set changes -> */ show_super_set = false;
-            cmp_set = subset;
-        }
+    if (select_set.rep() != rep_before) {
+        /* working-set changes -> */ show_super_set = false;
     }
 
     ImGui::SameLine();
@@ -1086,6 +1102,7 @@ void edit_rule(sync_point& sync) {
             if (ImGui::Button("Clear##Super")) {
                 select_set_super.clear();
             }
+            guide_mode::item_tooltip("Unselect all.");
             ImGui::SameLine();
             if (ImGui::Button("Reset##Super")) {
                 select_set_super = select_set;
@@ -1094,7 +1111,11 @@ void edit_rule(sync_point& sync) {
             ImGui::SameLine();
             imgui_StrTooltip(
                 "(?)",
-                "A superset can be any combination of the sets selectable in this table (which are what the working set belongs to, i.d. those center-marked in working set's selection table).");
+                "A superset can be any combination of the sets selectable in this table (which are what the working set belongs to, i.e. those center-marked in working set's selection table).\n\n"
+                "You can double right-click this '(?)' for a working example (working set ~ outer-totalistic, vs superset ~ isotropic).");
+            if (imgui_ItemClickableDouble()) {
+                set_superset_example = true;
+            }
             ImGui::Separator();
             select_set_super.select(nullptr, &subset, false /*no tooltip*/);
 
@@ -1392,6 +1413,12 @@ void edit_rule(sync_point& sync) {
         }
     }
     ImGui::PopStyleColor();
+
+    if (set_superset_example) {
+        select_set.select_single(&aniso::_subsets::native_tot_exc_s);
+        select_set_super.select_single(&aniso::_subsets::native_isotropic);
+        preview_mode = false;
+    }
 }
 
 // TODO: temporarily preserved.
