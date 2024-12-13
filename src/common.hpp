@@ -143,6 +143,10 @@ public:
         return filter(key) && ImGui::IsKeyPressed(key, repeat);
     }
 
+    static bool test_down(ImGuiKey key) { //
+        return filter(key) && ImGui::IsKeyDown(key);
+    }
+
     static bool highlight(ImGuiID id = 0) {
         if (id == 0) {
             id = ImGui::GetItemID();

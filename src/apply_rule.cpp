@@ -20,6 +20,8 @@ static bool strobing(const aniso::ruleT& rule) {
     return rule[all_0] == 1 && rule[all_1] == 0;
 }
 
+static const int step_fast = 10;
+
 static int adjust_step(int step, const aniso::ruleT& rule) {
     if ((step % 2) && strobing(rule)) {
         return step + 1;
@@ -780,7 +782,7 @@ public:
 
             ImGui::AlignTextToFramePadding();
             if (imgui_StrTooltip("(...)", "Keyboard shortcuts:\n"
-                                          "Restart: R    Pause: Space    +s/+1: N/M (repeatable)\n"
+                                          "Restart: R    Pause: Space    +s/+1/+!: S/D/F (repeatable)\n"
                                           "-/+ Step:     1/2 (repeatable)\n"
                                           "-/+ Interval: 3/4 (repeatable)\n\n"
                                           "These shortcuts are available only when the space window is hovered or held "
@@ -797,13 +799,19 @@ public:
             }
             ImGui::PushItemFlag(ImGuiItemFlags_ButtonRepeat, true);
             ImGui::SameLine();
-            if (ImGui::Button("+s") || item_shortcut(ImGuiKey_N, true)) {
+            if (ImGui::Button("+s") || item_shortcut(ImGuiKey_S, true)) {
                 ctrl.extra_step = ctrl.pause ? ctrl.actual_step() : 0;
                 ctrl.pause = true;
             }
             ImGui::SameLine();
-            if (ImGui::Button("+1") || item_shortcut(ImGuiKey_M, true)) {
+            if (ImGui::Button("+1") || item_shortcut(ImGuiKey_D, true)) {
                 ctrl.extra_step = 1;
+            }
+            ImGui::SameLine();
+            ImGui::Button("+!");
+            if ((ImGui::IsItemActive() && ImGui::IsItemHovered() /* && ImGui::IsMouseDown(ImGuiMouseButton_Left)*/) ||
+                (enable_shortcuts && shortcuts::test_down(ImGuiKey_F) && shortcuts::highlight())) {
+                ctrl.extra_step = std::max(ctrl.actual_step(), step_fast);
             }
             ImGui::PopItemFlag(); // ImGuiItemFlags_ButtonRepeat
             ImGui::SameLine();
@@ -814,6 +822,9 @@ public:
                 imgui_Str("+1: ");
                 ImGui::SameLine(0, 0);
                 imgui_Str("Advance generation by 1 instead of step.");
+                imgui_Str("+!: ");
+                ImGui::SameLine(0, 0);
+                imgui_Str("Fast mode (advance generation by at least 10 in every frame).");
             });
 
             ImGui::Separator(); // To align with the left panel.
@@ -1475,11 +1486,11 @@ void previewer::configT::_set() {
     // ImGui::AlignTextToFramePadding();
     imgui_StrTooltip(
         "(...)",
-        "Press 'T' to restart all preview windows.\n\n"
-        "For individual windows:\n"
+        "Operations:\n"
         "- Right-click to copy the rule.\n"
         "- Left-click and hold to pause.\n"
-        "- Hover and press 'R' to restart.\n"
+        "- Hover and press 'R' to restart. ('T' for all preview windows)\n" // TODO: currently no '.' as it will introduce a new line...
+        "- 'F' to speed up. ('G' for all preview windows.)\n"
         "- 'Z' to see which subsets the previewed rule belongs to in the subset table.\n"
         "- 'X' to temporarily override the current rule with the previewed one in the space window. The previewed rule will not be recorded in this case.\n\n"
         "If the rule belongs to 'Hex' subset:\n"
@@ -1571,6 +1582,7 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
     }
     term.active = true;
 
+    // TODO: (though the actual behaviors are ok) these op logics are quite messy...
     const aniso::vecT tile_size{.x = int(config.width_ / config.zoom_), .y = int(config.height_ / config.zoom_)};
     const bool hovered = interactive && ImGui::IsItemHovered();
     const bool l_down = ImGui::IsMouseDown(ImGuiMouseButton_Left);
@@ -1588,16 +1600,12 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
     }
 
     // (`IsItemActive` does not work as preview-window is based on `Dummy`.)
+    // (_F will override pause mode (to align with the space window) while _G will not (to align with _T for restarting).
     const bool pause = hovered && l_down;
-#ifndef NDEBUG // Debug
-    // (Experimental; undocumented.)
-    // Whether to apply to the main space window as well?
-    const bool fast = hovered && shortcuts::global_flag(ImGuiKey_F);
-#else
-    constexpr bool fast = false;
-#endif
-    if (!pause && (restart || fast || (global_config::timer.test() && !std::exchange(term.skip_run, false)))) {
-        const int p = adjust_step(fast ? std::max(config.step, 10) : config.step, rule);
+    const bool fast = (hovered && shortcuts::test_down(ImGuiKey_F)) ||
+                      (!l_down && shortcuts::keys_avail() && shortcuts::test_down(ImGuiKey_G));
+    if (fast || (!pause && (restart || (global_config::timer.test() && !std::exchange(term.skip_run, false))))) {
+        const int p = adjust_step(fast ? std::max(config.step, step_fast) : config.step, rule);
         for (int i = 0; i < p; ++i) {
             term.tile.run_torus(rule);
         }
