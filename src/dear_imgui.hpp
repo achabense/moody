@@ -226,8 +226,16 @@ inline bool imgui_MouseScrollingDown() { return ImGui::GetIO().MouseWheel < 0; }
 
 inline bool imgui_MouseScrollingUp() { return ImGui::GetIO().MouseWheel > 0; }
 
-inline float imgui_CalcButtonSizeX(const char* label) { //
-    return ImGui::CalcTextSize(label, nullptr, true).x + ImGui::GetStyle().FramePadding.x * 2;
+inline ImVec2 imgui_CalcLabelSize(std::string_view label) { //
+    return ImGui::CalcTextSize(label.data(), label.data() + label.size(), true);
+}
+
+inline ImVec2 imgui_CalcButtonSize(std::string_view label) { //
+    return imgui_CalcLabelSize(label) + ImGui::GetStyle().FramePadding * 2;
+}
+
+inline ImVec2 imgui_CalcRequiredWindowSize() { //
+    return ImGui::GetCurrentWindowRead()->DC.CursorMaxPos + ImGui::GetStyle().WindowPadding - ImGui::GetWindowPos();
 }
 
 // (Referring to `ImGui::Get/SetCursorScreenPos(...)`.)

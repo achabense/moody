@@ -391,6 +391,7 @@ class textT {
     };
 
     std::vector<line_ref> m_lines{};
+    std::vector<int> m_highlighted{}; // -> `m_lines`
 
     line_ref& _append_line(const std::string_view line) {
         const str_ref ref = {(int)m_text.size(), (int)line.size()};
@@ -423,7 +424,8 @@ class textT {
 
     preview_setting m_preview{}; // TODO: move out of class?
 
-    bool rewind = false;
+    bool do_rewind = false;
+    int go_line = -1;
 
 public:
     textT() {}
@@ -437,9 +439,13 @@ public:
         m_lines.clear();
         m_rules.clear();
         m_text.clear();
+        m_highlighted.clear();
 
         m_pos.reset();
         m_sel.reset();
+
+        // do_rewind = false; // !!TODO: reconfirm whether this matters.
+        go_line = -1;
     }
 
     // `str` is assumed to be utf8-encoded.
@@ -454,6 +460,9 @@ public:
 
             line_ref& line = _append_line(sv);
             line.highlight = highlight;
+            if (highlight) {
+                m_highlighted.push_back(m_lines.size() - 1);
+            }
             if (const auto extr = aniso::extract_MAP_str(l); extr.has_rule()) {
                 _attach_rule(line, extr.get_rule());
             }
@@ -467,7 +476,57 @@ public:
     }
 #endif
 
-    void reset_scroll() { rewind = true; }
+    void reset_scroll() { do_rewind = true; }
+
+    void select_line() {
+        if (!begin_popup_for_item()) {
+            return;
+        }
+        // In popup.
+
+        const bool window_appearing = ImGui::IsWindowAppearing();
+        static input_int<6> input_line;
+        if (window_appearing) {
+            (void)input_line.flush();
+        }
+
+        ImGui::AlignTextToFramePadding();
+        imgui_Str("Go to line ~ ");
+        ImGui::SameLine(0, 0); // TODO: show "Max:N/A" if m_lines.empty?
+        ImGui::SetNextItemWidth(imgui_CalcButtonSize("MAX:000000").x);
+        if (auto l = input_line.input("##Line", std::format("Max:{}", m_lines.size()).c_str()); l && !m_lines.empty()) {
+            go_line = std::clamp(*l - 1, 0, (int)m_lines.size() - 1);
+        }
+        if (!m_highlighted.empty()) {
+            ImGui::Separator();
+
+            // TODO: are there easy ways to introduce vertical scrollbar, without messing with width?
+            const int limit = 12;
+            const float h = std::min((int)m_highlighted.size(), limit) *
+                            (ImGui::GetFontSize() + 4 /*imgui_SelectableStyledButton*/);
+            float w = 0;
+            if (window_appearing) { // (As tested, it's ok to specify width only when appearing.)
+                for (const int l : m_highlighted) {
+                    w = std::max(w, imgui_CalcLabelSize(m_lines[l].str.get(m_text)).x);
+                }
+                if (m_highlighted.size() > limit) {
+                    w += ImGui::GetStyle().ScrollbarSize;
+                }
+            }
+            if (auto child = imgui_ChildWindow("Sections", {w, h})) {
+                for (const int l : m_highlighted) {
+                    ImGui::PushID(l);
+                    // TODO: improve...
+                    if (imgui_SelectableStyledButton(std::string(m_lines[l].str.get(m_text)).c_str())) {
+                        go_line = l;
+                    }
+                    ImGui::PopID();
+                }
+            }
+        }
+
+        ImGui::EndPopup();
+    }
 
     void display(sync_point& out) {
         assert_implies(m_lines.empty(), m_text.empty() && m_rules.empty());
@@ -500,6 +559,7 @@ public:
         }
 
         {
+            // TODO: the current logics to handle these are horrifying...
             // Precedence:
             // Line-selecting > iterating > (starting line-selection) > left-click setting
             std::optional<int> n_pos = display_header(m_rules.size(), m_pos);
@@ -513,10 +573,16 @@ public:
             }
             ImGui::Separator();
 
-            if (std::exchange(rewind, false)) {
+            if (m_sel) {
+                n_pos.reset();
+                do_rewind = false;
+                go_line = -1;
+            }
+
+            if (std::exchange(do_rewind, false)) {
                 ImGui::SetNextWindowScroll({0, 0});
             }
-            if (const auto [pos, sel] = display_page(!m_sel ? n_pos : std::nullopt); pos || sel) {
+            if (const auto [pos, sel] = display_page(n_pos.value_or(-1), std::exchange(go_line, -1)); pos || sel) {
                 if (!n_pos) {
                     n_pos = pos;
                 }
@@ -575,11 +641,11 @@ private:
             } else {
                 ImGui::Text("Total:%d At:N/A", total);
             }
-            if (imgui_ItemClickableDouble()) {
+            if (imgui_ItemClickableDouble()) { // TODO: whether to remove this?
                 n_pos = m_pos.value_or(0);
             }
             imgui_ItemTooltip_StrID = "Sync";
-            guide_mode::item_tooltip("Double right-click to move to 'At'.");
+            guide_mode::item_tooltip("Double right-click to move to 'At' (or 1 if it's 'N/A').");
         } else {
             imgui_Str("(No rules)");
         }
@@ -592,8 +658,9 @@ private:
         std::optional<selT> n_sel = std::nullopt;
     };
 
-    [[nodiscard]] passT display_page(const std::optional<int> locate) const {
-        assert_implies(m_sel, !locate);
+    [[nodiscard]] passT display_page(const int locate_rule, const int locate_line) const {
+        const bool locating = locate_rule >= 0 || locate_line >= 0;
+        assert_implies(m_sel, !locating);
         passT pass{};
 
         ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32_GREY(24, 255));
@@ -611,6 +678,9 @@ private:
             for (int l = 0; const auto& [str, rule, highlight, eq_last] : m_lines) {
                 const int this_l = l++;
                 ImGui::TextDisabled("%*d ", digit_width, this_l + 1);
+                if (locate_line == this_l) {
+                    ImGui::SetScrollHereY(0);
+                }
                 ImGui::SameLine();
                 if (m_preview.enabled && rule.has_value()) {
                     ImGui::BeginGroup();
@@ -630,7 +700,7 @@ private:
                 const bool line_hovered = test_hover && mouse_pos.y >= str_min.y && mouse_pos.y < str_max.y;
                 // `line_hovered` may become true for two adjacent lines if using `mouse_pos.y <= str_max.y`.
 
-                if (!locate && line_hovered) {
+                if (!locating && line_hovered) {
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
                         pass.n_sel = {this_l, this_l};
                     } else if (m_sel && ImGui::IsMouseDown(ImGuiMouseButton_Right)) {
@@ -652,7 +722,7 @@ private:
                     if (!m_sel &&
                         (line_hovered && mouse_pos.x >= str_min.x && mouse_pos.x < str_max.x /*str-hovered*/)) {
                         drawlist->AddRectFilled(str_min, str_max, IM_COL32(has_lock ? 196 : 0, 255, 0, 30));
-                        if (!locate && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                        if (!locating && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
                             pass.n_pos = rule.pos;
                         }
                     }
@@ -669,7 +739,7 @@ private:
                     }
 
                     // It's ok to test fully-visible even if the region is not large enough.
-                    if (rule.pos == locate && !imgui_ItemFullyVisible()) {
+                    if (rule.pos == locate_rule && !imgui_ItemFullyVisible()) {
                         ImGui::SetScrollHereY();
                     }
                 }
@@ -678,7 +748,7 @@ private:
         }
         ImGui::PopStyleColor();
 
-        assert_implies(locate, !pass.n_pos && !pass.n_sel);
+        assert_implies(locating, !pass.n_pos && !pass.n_sel);
         return pass;
     }
 };
@@ -773,6 +843,7 @@ void load_file(sync_point& out) {
             try_load(*path);
             // Won't reset scroll.
         }
+        guide_mode::item_tooltip("Reload from disk.");
         ImGui::SameLine();
         ImGui::SmallButton("Select");
         ImGui::SetNextWindowSize({300, 200}, ImGuiCond_Always);
@@ -787,6 +858,9 @@ void load_file(sync_point& out) {
         }
         ImGui::SameLine();
         display_filename(*path);
+        ImGui::SameLine();
+        ImGui::SmallButton(">");
+        text.select_line();
 
         ImGui::Separator();
         text.display(out);
@@ -799,7 +873,7 @@ void load_file(sync_point& out) {
 
 void load_clipboard(sync_point& out) {
     static textT text;
-    if (ImGui::SmallButton("Read clipboard") || shortcuts::item_shortcut(ImGuiKey_W)) {
+    if (ImGui::SmallButton("Read") || shortcuts::item_shortcut(ImGuiKey_W)) {
         const std::string_view str = read_clipboard();
         if (str.size() > max_size) {
             messenger::set_msg("Text too long: {} > {}", to_size(str.size()), to_size(max_size));
@@ -812,9 +886,15 @@ void load_clipboard(sync_point& out) {
         }
     }
     ImGui::SameLine();
+    // TODO: require double clicking?
     if (ImGui::SmallButton("Clear")) {
         text.clear();
     }
+    ImGui::SameLine();
+    imgui_Str("Clipboard");
+    ImGui::SameLine();
+    ImGui::SmallButton(">");
+    text.select_line();
 
     ImGui::Separator();
     text.display(out);
@@ -859,6 +939,9 @@ void load_doc(sync_point& out) {
         }
         ImGui::SameLine();
         imgui_Str(docs[*doc_id][0]);
+        ImGui::SameLine();
+        ImGui::SmallButton(">");
+        text.select_line();
 
         ImGui::Separator();
         text.display(out);

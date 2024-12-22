@@ -1440,6 +1440,7 @@ public:
                                 // Set the rule only if the text really contains pattern data,
                                 // so the next paste is guaranteed to succeed.
                                 if (rule && *rule != sync.rule) {
+                                    // !!TODO: sometimes users may don't want to replace the rule...
                                     sync.set(*rule);
                                     messenger::set_msg("Loaded a different rule specified by the header. Paste again "
                                                        "for the pattern.");
@@ -1641,6 +1642,8 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
     }
 
     if (hovered) {
+        // TODO: 'X' mode is problematic (inconvenient and hard to doc)...
+        // TODO: support 'M' for 'Match'? Then 'Z'->'M' can be very convenient...
         if (sync_point_override::set(term.rule, shortcuts::global_flag(ImGuiKey_Z) /*test-set*/,
                                      shortcuts::global_flag(ImGuiKey_X) /*test-run*/)) {
             imgui_ItemRectFilled(IM_COL32(0, 128, 255, 16));

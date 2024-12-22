@@ -558,11 +558,12 @@ class mask_selector {
 public:
     static void about() {
         imgui_Str(
-            "The working set divides all cases into different groups. For any two rules in the set, they must have either all-the-same or all-the-different values in each group.\n\n"
+            "The working set divides all cases into different groups. For any two rules in the set, they must have either all-same or all-different values in each group.\n\n"
             "As a result, the \"distance\" between two rules (in the set) can be defined as the number of groups where they have different values, and any rule in the set can act as an observer (called the \"mask\") to do XOR masking for other rules.\n\n"
             "The 'Zero' and 'Identity' rules are special as the values masked by them have natural interpretations (actual mapped value and flip-ness). 'Fallback' is provided to guarantee there is at least one rule known to belong to the working set. Any other rule in the working set can serve as a mask via 'Custom' and '<< Cur'.\n\n"
             "Both 'Traverse' and 'Random' generate rules based on the distance to the masking rule. In the random-access section, the values of the current rule are viewed through the mask (shown as masked values), but the result of random-access editing is unrelated to the masking rule.");
         // "(For more details see the 'Subset, mask ...' section in 'Documents'.)"
+        // !!TODO: rewrite...
     }
 
     // `subset` must not be a temporary.
@@ -645,7 +646,7 @@ struct page_adapter {
 
         // Resize the page so all previewers can fit into the area. This should be done before the loop.
         if (!ImGui::IsWindowAppearing()) {
-            const ImVec2 button_size = ImGui::CalcTextSize(">> Cur") + ImGui::GetStyle().FramePadding * 2;
+            const ImVec2 button_size = imgui_CalcButtonSize(">> Cur");
             const ImVec2 previewer_size = config.size_imvec();
             const float item_spacing_y = ImGui::GetStyle().ItemSpacing.y;
             const float group_size_x = std::max(button_size.x, previewer_size.x);
@@ -689,9 +690,7 @@ struct page_adapter {
 
             if (j == 0) {
                 // The enclosing window should be able to fully contain at least one previewer.
-                // The code looks fairly fragile but works...
-                min_req_size = ImGui::GetCurrentWindowRead()->DC.CursorMaxPos + ImGui::GetStyle().WindowPadding -
-                               ImGui::GetWindowPos();
+                min_req_size = imgui_CalcRequiredWindowSize();
             }
         }
     }
@@ -780,7 +779,7 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
         ImGui::SameLine();
         imgui_Str("Go to dist ~ ");
         ImGui::SameLine(0, 0);
-        ImGui::SetNextItemWidth(ImGui::CalcTextSize("Max:0000").x + ImGui::GetStyle().FramePadding.x * 2);
+        ImGui::SetNextItemWidth(imgui_CalcButtonSize("Max:0000").x);
         if (const auto dist = input_dist.input("##Seek", std::format("Max:{}", subset.get_par().k()).c_str())) {
             page.clear();
             page.push_back(aniso::seq_mixed::seek_n(subset, mask, *dist));

@@ -317,6 +317,7 @@ inline bool begin_popup_for_item() {
     return false;
 }
 
+// TODO: ideally, there should be a way to specify overriding id.
 // Looks like `ImGui::Selectable` but behaves like a button (not designed for tables).
 // (`menu_shortcut` is a workaround to mimic `MenuItem` in the range-ops window. Ideally, that window
 // should be redesigned.)
@@ -343,7 +344,7 @@ inline bool imgui_SelectableStyledButton(const char* label, const bool selected 
 
     bool ret = false;
     if (!menu_shortcut) {
-        const ImVec2 label_size = ImGui::CalcTextSize(label, nullptr, true);
+        const ImVec2 label_size = imgui_CalcLabelSize(label);
         const ImVec2 button_size = {std::max(ImGui::GetContentRegionAvail().x, label_size.x),
                                     label_size.y + 2 * frame_padding_y};
         ret = ImGui::Button(label, button_size);
@@ -834,8 +835,10 @@ public:
 };
 
 // TODO: the name is too casual but I cannot think of a very suitable one...
+template <int max_digit = 5>
 class input_int {
-    char buf[6]{}; // 5 digits.
+    static_assert(1 <= max_digit && max_digit <= std::numeric_limits<int>::digits10);
+    char buf[max_digit + 1 /*'\0'*/]{};
 
 public:
     std::optional<int> flush() {
