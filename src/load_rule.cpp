@@ -428,12 +428,18 @@ class textT {
     int go_line = -1;
 
 public:
-    textT() {}
-    textT(std::string_view str) { append(str); }
+    textT() = default;
+    // textT(std::string_view str) { append(str); }
 
+    textT(const textT&) = delete;
     textT& operator=(const textT&) = delete;
 
-    int count_rule() const { return m_rules.size(); }
+    bool empty() const { return m_lines.empty(); }
+
+    // (No need to be accurate.)
+    bool roughly_check_larger(int size, int line, int sec) const { //
+        return (m_text.size() + m_lines.size()) > size || m_lines.size() > line || m_highlighted.size() > sec;
+    }
 
     void clear() {
         m_lines.clear();
@@ -478,6 +484,12 @@ public:
 
     void reset_scroll() { do_rewind = true; }
 
+    void set_last_sec() {
+        if (!m_highlighted.empty()) {
+            go_line = m_highlighted.back();
+        }
+    }
+
     void select_line() {
         if (!begin_popup_for_item()) {
             return;
@@ -501,7 +513,7 @@ public:
             ImGui::Separator();
 
             // TODO: are there easy ways to introduce vertical scrollbar, without messing with width?
-            const int limit = 12;
+            const int limit = 10;
             const float h = std::min((int)m_highlighted.size(), limit) *
                             (ImGui::GetFontSize() + 4 /*imgui_SelectableStyledButton*/);
             float w = 0;
@@ -873,22 +885,40 @@ void load_file(sync_point& out) {
 
 void load_clipboard(sync_point& out) {
     static textT text;
+    static std::string last_str;
+    static int last_index = 0;
+
+    // (The page will hold roughly at most 1.5*max_size/line.)
+    const bool too_much_content = text.roughly_check_larger(max_size, max_line, 100);
+    ImGui::BeginDisabled(too_much_content);
     if (ImGui::SmallButton("Read") || shortcuts::item_shortcut(ImGuiKey_W)) {
         const std::string_view str = read_clipboard();
-        if (str.size() > max_size) {
-            messenger::set_msg("Text too long: {} > {}", to_size(str.size()), to_size(max_size));
-        } else if (const int l = count_line(str); l > max_line) {
-            messenger::set_msg("The text contains too many lines: {} > {}", l, max_line);
-        } else if (!str.empty()) {
-            text.clear();
+        if (str.size() > max_size / 2) {
+            messenger::set_msg("Text too long: {} > {}", to_size(str.size()), to_size(max_size / 2));
+        } else if (const int l = count_line(str); l > max_line / 2) {
+            messenger::set_msg("The text contains too many lines: {} > {}", l, max_line / 2);
+        } else if (!str.empty() && last_str != str) {
+            last_str = str;
+
+            if (!text.empty()) {
+                text.append("\n"); // (Will append two lines.)
+            }
+            text.append(std::format("@@[{}]", ++last_index), "@@");
             text.append(str);
-            text.reset_scroll();
+            text.set_last_sec();
         }
     }
+    ImGui::EndDisabled();
+    if (too_much_content) {
+        imgui_ItemTooltip("Too much content.");
+    }
+
     ImGui::SameLine();
-    // TODO: require double clicking?
+    // !!TODO: require double clicking?
     if (ImGui::SmallButton("Clear")) {
         text.clear();
+        last_str.clear();
+        last_index = 0;
     }
     ImGui::SameLine();
     imgui_Str("Clipboard");

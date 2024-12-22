@@ -755,6 +755,7 @@ private:
 };
 
 inline void set_clipboard_and_notify(const char* c_str) {
+    // !!TODO: whether to set if it's ""?
     ImGui::SetClipboardText(c_str);
     messenger::set_msg("Copied.");
 }
@@ -774,6 +775,8 @@ inline void set_msg_cleared(bool has_effect) {
 inline std::string_view read_clipboard() {
     const char* str = ImGui::GetClipboardText();
     if (!str || *str == '\0') {
+        // !!TODO: the clipboard may contain a real empty string and the result is also "".
+        // So the message may need to be reconsidered...
         messenger::set_msg("Failed to read from the clipboard.");
         return {};
     }
