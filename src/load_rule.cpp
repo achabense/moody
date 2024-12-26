@@ -42,7 +42,7 @@ static pathT cpp17_u8path(const std::string_view path) { //
     }
 
     std::string full_str = cpp17_u8string(p);
-    const float full_w = ImGui::CalcTextSize(full_str.c_str()).x;
+    const float full_w = imgui_CalcTextSize(full_str).x;
     if (full_w <= avail_w) {
         set_clipped(false);
         return full_str;
@@ -63,14 +63,14 @@ static pathT cpp17_u8path(const std::string_view path) { //
         // ~ `&sep + 1` is valid, see:
         // https://stackoverflow.com/questions/14505851/is-the-one-past-the-end-pointer-of-a-non-array-type-a-valid-concept-in-c
         const char sep = pathT::preferred_separator;
-        const float sep_w = ImGui::CalcTextSize(&sep, &sep + 1).x;
+        const float sep_w = imgui_CalcTextSize({&sep, 1}).x;
 
         std::vector<std::string> vec;
         vec.push_back(cpp17_u8string(segs.back()));
-        float suffix_w = ImGui::CalcTextSize(vec.back().c_str()).x + ImGui::CalcTextSize("...").x + sep_w;
+        float suffix_w = imgui_CalcTextSize(vec.back()).x + imgui_CalcTextSize("...").x + sep_w;
         for (auto pos = segs.rbegin() + 1; pos != segs.rend(); ++pos) {
             std::string seg_str = cpp17_u8string(*pos);
-            const float seg_w = ImGui::CalcTextSize(seg_str.c_str()).x;
+            const float seg_w = imgui_CalcTextSize(seg_str).x;
             if (suffix_w + (seg_w + sep_w) <= avail_w) {
                 suffix_w += (seg_w + sep_w);
                 vec.push_back(std::move(seg_str));
@@ -80,7 +80,7 @@ static pathT cpp17_u8path(const std::string_view path) { //
         }
 
         if (suffix_w > full_w) {
-            // This may happen in rare cases like `C:/very-long-name`.
+            // This may happen in rare cases like `C:/very-long-name`. ('C:' ~> '...' makes the result longer.)
             return full_str;
         } else {
             std::string str = "...";
@@ -239,6 +239,7 @@ public:
         }
     }
 
+#if 0
     // TODO: redesign, and consider supporting recently-opened files as well.
     void select_history() {
         // ImGui::SetNextItemWidth(item_width);
@@ -265,6 +266,7 @@ public:
             }
         }
     }
+#endif
 
     void show_current() {
         if (!m_current.empty()) {
@@ -526,13 +528,10 @@ public:
                 }
             }
             if (auto child = imgui_ChildWindow("Sections", {w, h})) {
-                for (const int l : m_highlighted) {
-                    ImGui::PushID(l);
-                    // TODO: improve...
-                    if (imgui_SelectableStyledButton(std::string(m_lines[l].str.get(m_text)).c_str())) {
+                for (int id = 0; const int l : m_highlighted) {
+                    if (imgui_SelectableStyledButtonEx(id++, m_lines[l].str.get(m_text))) {
                         go_line = l;
                     }
-                    ImGui::PopID();
                 }
             }
         }
@@ -832,6 +831,7 @@ void load_file(sync_point& out) {
         if (ImGui::SmallButton("Refresh")) {
             nav.refresh_if_valid();
         }
+#if 0
         ImGui::SameLine();
         ImGui::SmallButton("Recent");
         // `BeginPopup` will consume the settings, even if not opened.
@@ -840,6 +840,7 @@ void load_file(sync_point& out) {
             nav.select_history();
             ImGui::EndPopup();
         }
+#endif
         ImGui::SameLine();
         nav.show_current();
 
@@ -940,7 +941,7 @@ void load_doc(sync_point& out) {
         for (int i = 0; docs[i][0] != nullptr; ++i) {
             const auto [title, contents] = docs[i];
             // if (ImGui::Selectable(title, doc_id == i, ImGuiSelectableFlags_NoAutoClosePopups) && doc_id != i) {
-            if (imgui_SelectableStyledButton(title, doc_id == i) && doc_id != i) {
+            if (imgui_SelectableStyledButtonEx(i, title, doc_id == i) && doc_id != i) {
                 text.clear();
                 text.append(contents, "@@");
                 text.reset_scroll();

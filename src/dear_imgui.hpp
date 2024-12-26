@@ -226,6 +226,10 @@ inline bool imgui_MouseScrollingDown() { return ImGui::GetIO().MouseWheel < 0; }
 
 inline bool imgui_MouseScrollingUp() { return ImGui::GetIO().MouseWheel > 0; }
 
+inline ImVec2 imgui_CalcTextSize(std::string_view text) { //
+    return ImGui::CalcTextSize(text.data(), text.data() + text.size(), false);
+}
+
 inline ImVec2 imgui_CalcLabelSize(std::string_view label) { //
     return ImGui::CalcTextSize(label.data(), label.data() + label.size(), true);
 }

@@ -317,7 +317,7 @@ inline bool begin_popup_for_item() {
     return false;
 }
 
-// TODO: ideally, there should be a way to specify overriding id.
+// TODO: should finally be replaced by Ex version.
 // Looks like `ImGui::Selectable` but behaves like a button (not designed for tables).
 // (`menu_shortcut` is a workaround to mimic `MenuItem` in the range-ops window. Ideally, that window
 // should be redesigned.)
@@ -362,6 +362,42 @@ inline bool imgui_SelectableStyledButton(const char* label, const bool selected 
     }
 
     ImGui::PopStyleVar(2);
+    prev_id = ImGui::GetItemID();
+    if (!selected) {
+        ImGui::PopStyleColor();
+    }
+
+    return ret;
+}
+
+// The actual item-id is id/##Sel, irrelevant to 'label'.
+inline bool imgui_SelectableStyledButtonEx(const int id, const std::string_view label, const bool selected = false) {
+    assert(!GImGui->CurrentWindow->DC.IsSameLine);
+    if (GImGui->CurrentWindow->SkipItems) {
+        return false;
+    }
+
+    if (!selected) {
+        ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32_BLACK_TRANS);
+    }
+    static ImGuiID prev_id = 0;
+    if (prev_id != 0 && prev_id == ImGui::GetItemID()) {
+        // As if the last call used `ImGui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, 0)`.
+        // (PushStyleVar-ItemSpacing affects the spacing to the next item. See `ImGui::ItemSize` for details.)
+        imgui_AddCursorPosY(-ImGui::GetStyle().ItemSpacing.y);
+    }
+
+    const float frame_padding_y = 2;
+    const ImVec2 label_size = imgui_CalcTextSize(label); // (Not trying to hide double-hash.)
+    const ImVec2 button_size = {std::max(ImGui::GetContentRegionAvail().x, label_size.x),
+                                label_size.y + 2 * frame_padding_y};
+    ImGui::PushID(id);
+    const bool ret = ImGui::Button("##Sel", button_size);
+    ImGui::PopID();
+    const auto rect = imgui_GetItemRect();
+    ImGui::RenderTextClipped(rect.Min + ImVec2(0, frame_padding_y), rect.Max - ImVec2(0, frame_padding_y), label.data(),
+                             label.data() + label.size(), &label_size, {0, 0} /*align*/, &rect);
+
     prev_id = ImGui::GetItemID();
     if (!selected) {
         ImGui::PopStyleColor();
