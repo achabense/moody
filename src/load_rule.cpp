@@ -6,6 +6,9 @@
 
 #include "common.hpp"
 
+// By default the project does not care about exceptions (taking as if they don't exist), but std::filesystem is an exception to this...
+// (& `bad_alloc` is always considered impossible to happen.)
+
 // TODO: whether to support write access (file-editing)?
 // Or at least support saving rules into file (without relying on the clipboard)?
 
@@ -14,9 +17,15 @@ using pathT = std::filesystem::path;
 // (wontfix) After wasting so much time, I'd rather afford the extra copy than bothering with "more efficient"
 // implementations any more.
 
-static std::string cpp17_u8string(const pathT& path) {
-    const auto u8string = path.u8string();
-    return std::string(u8string.begin(), u8string.end());
+// It's unclear whether these functions can fail due to transcoding...
+static std::string cpp17_u8string(const pathT& path) noexcept {
+    try {
+        const auto u8string = path.u8string();
+        return std::string(u8string.begin(), u8string.end());
+    } catch (...) {
+        assert(false);
+        return "?";
+    }
 }
 
 // As to why not using `filesystem::u8path`:
@@ -24,8 +33,13 @@ static std::string cpp17_u8string(const pathT& path) {
 // As to making an `std::u8string` first, see:
 // https://stackoverflow.com/questions/57603013/how-to-safely-convert-const-char-to-const-char8-t-in-c20
 // In short, in C++20 it's impossible to get `char8_t*` from `char*` without copy and in a well-defined way.
-static pathT cpp17_u8path(const std::string_view path) { //
-    return pathT(std::u8string(path.begin(), path.end()));
+static pathT cpp17_u8path(const std::string_view path) noexcept {
+    try {
+        return pathT(std::u8string(path.begin(), path.end()));
+    } catch (...) {
+        assert(false);
+        return {};
+    }
 }
 
 // I hate this part so much...
@@ -116,117 +130,212 @@ static void display_filename(const pathT& p) {
 }
 
 static pathT home_path{};
-bool set_home(const char* u8path) {
-    auto try_set = [](const char* u8path) {
-        std::error_code ec{};
-        const pathT p = u8path ? cpp17_u8path(u8path) : std::filesystem::current_path(ec);
-        if (!ec) {
-            pathT cp = std::filesystem::canonical(p, ec);
-            if (!ec) {
+bool set_home(const char* u8path) /*noexcept*/ {
+    std::error_code ec{};
+    if (u8path) {
+        const pathT p = cpp17_u8path(u8path);
+        if (!p.empty() && std::filesystem::is_directory(p, ec)) {
+            if (pathT cp = std::filesystem::canonical(p, ec); !ec) {
                 home_path.swap(cp);
-
-#if 0
-                // These will outlive the imgui context.
-                static std::string ini_path, log_path;
-                ini_path = cpp17_u8string(home_path / "imgui.ini");
-                log_path = cpp17_u8string(home_path / "imgui_log.txt");
-                ImGui::GetIO().IniFilename = ini_path.c_str();
-                ImGui::GetIO().LogFilename = log_path.c_str();
-#endif
                 return true;
             }
         }
-        return false;
-    };
+    }
+    if (const pathT p = std::filesystem::current_path(ec); !ec) {
+        if (pathT cp = std::filesystem::canonical(p, ec); !ec) {
+            home_path.swap(cp);
+            return true;
+        }
+    }
 
-    return (u8path && try_set(u8path)) || try_set(nullptr);
+    return false;
 }
 
-// TODO: redesign error message...
-class file_nav {
-    using entryT = std::filesystem::directory_entry;
+class folderT {
+    struct entryT {
+        pathT name;
+        std::string str;
+        entryT(pathT&& n) noexcept : name(std::move(n)), str(cpp17_u8string(name)) {}
+    };
 
-    char buf_path[200]{};
-    char buf_filter[20]{};
+    pathT m_path{};
+    std::vector<entryT> m_dirs{}, m_files{};
 
-    pathT m_current{};                       // Canonical path; empty() <-> invalid.
-    std::vector<entryT> m_dirs{}, m_files{}; // invalid -> empty()
-    std::deque<pathT> m_record{};            // Record for valid m_current; front() ~ most recent one.
-    int max_record = 10;
-
-    static void collect(const pathT& path, std::vector<entryT>& dirs, std::vector<entryT>& files) {
+    static void collect(const pathT& path, std::vector<entryT>& dirs, std::vector<entryT>& files) noexcept(false) {
         dirs.clear();
         files.clear();
         for (const auto& entry :
              std::filesystem::directory_iterator(path, std::filesystem::directory_options::skip_permission_denied)) {
-            const auto status = entry.status();
-            if (is_directory(status)) {
-                dirs.emplace_back(entry);
-            }
-            if (is_regular_file(status)) {
-                files.emplace_back(entry);
+            std::error_code ec{};
+            if (const auto status = entry.status(ec); !ec) {
+                const bool is_dir = std::filesystem::is_directory(status);
+                const bool is_file = !is_dir && std::filesystem::is_regular_file(status);
+                if (is_dir || is_file) {
+                    std::vector<entryT>& dest = is_dir ? dirs : files;
+                    if (pathT name = entry.path().filename(); !name.empty()) {
+                        dest.emplace_back(std::move(name));
+                    } else [[unlikely]] {
+                        assert(false);
+                        // 2024/12/25
+                        // Not seen in my environment (windows), but this will happen if entry.path() ends with a separator.
+                        // 1. The standard doesn't say whether that's possible.
+                        // 2. For a path that ends with separators, the standard doesn't provide a way to extract the filename directly.
+                        // 3. They don't even bother to provide a method to remove trailing separators.
+                        // https://www.reddit.com/r/cpp/comments/1bioa6x/why_is_there_no_remove_trailing_separator_and_has/
+                        // I wasted almost one hour on this and realized there is again no "efficient" way to deal with it, just like when I was messing with those fancy-neo-cpp20-styled utf8 strings.
+                        // If it's not for avoiding dragging in an extra library, I'd never want to work with these craps...
+                        pathT nAm_E = entry.path().parent_path().filename();
+                        dest.emplace_back(!nAm_E.empty() ? std::move(nAm_E) : "why??");
+                    }
+                }
             }
         }
     }
 
-    // (`path` may come from `entryT.path()` in `m_dirs`.)
-    bool set_current(const pathT& path) {
-        try {
-            pathT p = std::filesystem::canonical(path);
-            std::vector<entryT> p_dirs, p_files;
-            collect(p, p_dirs, p_files);
-
-            {
-                // (`m_record` is small enough.)
-                // (May be slightly less efficient than find -> member erase; not a problem.)
-                std::erase(m_record, p);
-                m_record.push_front(p);
-                if (m_record.size() > max_record) {
-                    m_record.resize(max_record);
-                }
-            }
-
-            m_current.swap(p);
-            m_dirs.swap(p_dirs);
-            m_files.swap(p_files);
-            return true;
-        } catch (const std::exception& /* not used; the encoding is a mystery */) {
-            messenger::set_msg("Cannot open folder:\n{}", cpp17_u8string(path));
-        }
-        return false;
+    void swap(folderT& other) noexcept {
+        m_path.swap(other.m_path);
+        m_dirs.swap(other.m_dirs);
+        m_files.swap(other.m_files);
     }
 
 public:
-    void refresh_if_valid() {
-        if (!m_current.empty()) {
-            try {
-                collect(m_current, m_dirs, m_files);
-            } catch (const std::exception& /* not used; the encoding is a mystery */) {
-                messenger::set_msg("Cannot refresh folder:\n{}", cpp17_u8string(m_current));
-                m_current.clear();
-                m_dirs.clear();
-                m_files.clear();
-            }
+    folderT() noexcept = default;
+
+    bool valid() const noexcept {
+        assert_implies(m_path.empty(), m_dirs.empty() && m_files.empty());
+        return !m_path.empty();
+    }
+
+    // Canonical.
+    const auto& path() const noexcept { return m_path; }
+
+    // Will be empty when !valid().
+    const auto& dirs() const noexcept { return m_dirs; }
+    const auto& files() const noexcept { return m_files; }
+
+    // TODO: ideally should only accept entry in m_files/m_dirs...
+    pathT operator/(const pathT& path) const noexcept {
+        // ~ `operator/` uses preferred-sep so the result should be all-preferred too.
+        return m_path / path;
+    }
+
+    void clear() noexcept {
+        m_path.clear();
+        m_dirs.clear();
+        m_files.clear();
+        assert(!valid());
+    }
+
+    bool assign_dir(const pathT& path) noexcept {
+        if (path.empty()) {
+            return false;
+        }
+
+        try {
+            pathT cp = std::filesystem::canonical(m_path / path);
+            std::vector<entryT> dirs, files;
+            collect(cp, dirs, files);
+            m_path.swap(cp);
+            m_dirs.swap(dirs);
+            m_files.swap(files);
+            return true;
+        } catch (...) {
+            return false;
         }
     }
 
-    file_nav() { set_current(home_path); }
+    bool refresh() noexcept {
+        if (!valid()) {
+            return false;
+        }
 
-    void select_file(const pathT* current_file /* Optional */, std::optional<pathT>& target) {
+        try {
+            std::vector<entryT> dirs, files;
+            collect(m_path, dirs, files);
+            m_dirs.swap(dirs);
+            m_files.swap(files);
+            return true;
+        } catch (...) {
+            return false;
+        }
+    }
+
+    bool assign_dir_or_file(const pathT& path, std::optional<pathT>& out_file) noexcept {
+        if (path.empty()) {
+            return false;
+        }
+
+        std::error_code ec{};
+        const pathT p = m_path / path;
+        const auto status = std::filesystem::status(p, ec);
+        if (ec) {
+            return false;
+        }
+
+        if (std::filesystem::is_directory(status)) {
+            return assign_dir(p);
+        } else if (std::filesystem::is_regular_file(status)) {
+            folderT temp;
+            if (!temp.assign_dir(p / "..")) { // 'p' may contain trailing sep, so parent_path doesn't apply here.
+                return false;
+            }
+
+            // Convert 'path' to the format so the equivalence can be checked by pure string comparision.
+            // Have to resort to this horribly inefficient one-by-one test, as the format of filenames are unclear in both sides...
+            // (Especially, it's unclear whether directory-entry.path() has "canonical" filename...)
+            for (const entryT& file : temp.m_files) {
+                if (std::filesystem::equivalent(temp / file.name, p, ec)) {
+                    out_file.emplace(temp / file.name);
+                    swap(temp);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+};
+
+class file_nav {
+    char buf_path[200]{};
+    char buf_filter[20]{}; // For files.
+
+    folderT m_current;
+
+    void set_dir(const pathT& path) {
+        if (!m_current.assign_dir(path)) {
+            messenger::set_msg("Cannot open this folder.");
+        }
+    }
+
+public:
+    bool valid() const { return m_current.valid(); }
+
+    void refresh_if_valid() {
+        if (m_current.valid() && !m_current.refresh()) {
+            messenger::set_msg("Cannot refresh the current folder.");
+            // TODO: whether to clear m_current?
+        }
+    }
+
+    file_nav() {
+        // (The message by `set_dir` is unlikely to be useful.)
+        // set_dir(home_path);
+        m_current.assign_dir(home_path);
+    }
+
+    void select_file(std::optional<pathT>& target, const pathT* current_file /*name*/ = nullptr, int* pid = nullptr) {
         ImGui::SetNextItemWidth(std::min(ImGui::CalcItemWidth(), (float)item_width));
         ImGui::InputText("Filter", buf_filter, std::size(buf_filter));
         ImGui::Separator();
         if (auto child = imgui_ChildWindow("Files")) {
+            int id = pid ? *pid : 0;
             bool has = false;
-            for (const entryT& entry : m_files) {
-                const std::string str = cpp17_u8string(entry.path().filename());
-                if (str.find(buf_filter) != str.npos) {
+            for (const auto& [file, str] : m_current.files()) {
+                if (!buf_filter[0] || str.find(buf_filter) != str.npos) {
                     has = true;
-                    const bool selected = current_file && *current_file == entry.path();
-                    // (`Selectable` will not close the popup from child-window.)
-                    // if (ImGui::Selectable(str.c_str(), selected)) {
-                    if (imgui_SelectableStyledButton(str.c_str(), selected)) {
-                        target = entry.path();
+                    const bool selected = current_file && file == *current_file;
+                    if (imgui_SelectableStyledButtonEx(id++, str, selected)) {
+                        target = m_current / file;
                     }
                     if (selected && ImGui::IsWindowAppearing()) {
                         ImGui::SetScrollHereY();
@@ -235,6 +344,9 @@ public:
             }
             if (!has) {
                 imgui_StrDisabled("None");
+            }
+            if (pid) {
+                *pid = id;
             }
         }
     }
@@ -269,15 +381,14 @@ public:
 #endif
 
     void show_current() {
-        if (!m_current.empty()) {
-            display_path(m_current, ImGui::GetContentRegionAvail().x);
+        if (m_current.valid()) {
+            display_path(m_current.path(), ImGui::GetContentRegionAvail().x);
         } else {
-            assert(m_dirs.empty() && m_files.empty());
             imgui_StrDisabled("N/A");
         }
     }
 
-    // Return one of `entryT.path()` in `m_files`.
+    // Return one of file path in `m_current`.
     std::optional<pathT> display() {
         std::optional<pathT> target = std::nullopt;
 
@@ -285,70 +396,57 @@ public:
             imgui_LockTableLayoutWithMinColumnWidth(140); // TODO: improve...
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
+            int id = 0; // For selectables.
             {
                 ImGui::SetNextItemWidth(std::min(ImGui::CalcItemWidth(), (float)item_width));
                 if (ImGui::InputTextWithHint("Open", "Folder or file path", buf_path, std::size(buf_path),
                                              ImGuiInputTextFlags_EnterReturnsTrue) &&
                     buf_path[0] != '\0') {
-                    const bool succ = [&]() -> bool {
-                        std::error_code ec{};
-                        const pathT p = m_current / cpp17_u8path(buf_path);
-                        if (std::filesystem::is_directory(p, ec)) {
-                            return set_current(p);
-                        } else if (std::filesystem::is_regular_file(p, ec) && set_current(p.parent_path())) {
-                            // (wontfix) Inefficient, but there are a lot of uncertainties about `entryT.path()`.
-                            // (Are there better ways to find such an entry? Is `entryT.path()` canonical?
-                            // Does `target = canonical(p)` or `target = entryT(p).path()` work?)
-                            for (const entryT& entry : m_files) {
-                                if (std::filesystem::equivalent(entry.path(), p, ec)) {
-                                    target = entry.path();
-                                    return true;
-                                }
-                            }
-                        }
-                        return false;
-                    }();
-                    if (!succ) {
-                        messenger::set_msg("Cannot open path:\n{}", buf_path);
+                    // It's impressive that path has implicit c-str ctor... why?
+                    if (!m_current.assign_dir_or_file(cpp17_u8path(buf_path), target)) {
+                        messenger::set_msg("Cannot open this path.");
                     }
 
                     buf_path[0] = '\0';
                 }
                 ImGui::Separator();
-                // TODO: instead of hiding this entry, should explicitly notify it's not available.
+
+                // TODO: reconsider disabled vs hiding...
+                // ImGui::BeginDisabled(home_path.empty());
                 if (!home_path.empty()) {
-                    // (Using `ImGuiSelectableFlags_NoPadWithHalfSpacing` for the same visual effect as
-                    // those in _ChildWindow("Folders").)
-                    // if (ImGui::Selectable("Home", false, ImGuiSelectableFlags_NoPadWithHalfSpacing)) {
-                    if (imgui_SelectableStyledButton("Home")) {
-                        set_current(home_path);
+                    if (imgui_SelectableStyledButtonEx(id++, "Home")) {
+                        set_dir(home_path);
                     }
                 }
-                // if (ImGui::Selectable("..", false, ImGuiSelectableFlags_NoPadWithHalfSpacing)) {
-                if (imgui_SelectableStyledButton("..")) {
-                    set_current(m_current.parent_path());
+                // ImGui::EndDisabled();
+                // if (home_path.empty()) {
+                //     imgui_ItemTooltip("Not available.");
+                // }
+
+                // ImGui::BeginDisabled(!m_current.valid());
+                if (imgui_SelectableStyledButtonEx(id++, "..")) {
+                    set_dir(".."); // (Both ".." and m_current.path().parent_path() work here.)
                 }
+                // ImGui::EndDisabled();
+
                 ImGui::Separator();
                 if (auto child = imgui_ChildWindow("Folders")) {
-                    if (m_dirs.empty()) {
+                    if (m_current.dirs().empty()) {
                         imgui_StrDisabled("None");
                     }
-                    const entryT* sel = nullptr;
-                    for (const entryT& entry : m_dirs) {
-                        // TODO: cache str?
-                        const std::string str = cpp17_u8string(entry.path().filename());
-                        // if (ImGui::Selectable(str.c_str())) {
-                        if (imgui_SelectableStyledButton(str.c_str())) {
-                            sel = &entry;
+                    const pathT* sel = nullptr;
+                    for (const auto& [dir, str] : m_current.dirs()) {
+                        if (imgui_SelectableStyledButtonEx(id++, str)) {
+                            sel = &dir;
                         }
                     }
                     if (sel) {
-                        set_current(sel->path());
+                        set_dir(m_current / (*sel));
                     }
                 }
             }
             ImGui::TableNextColumn();
-            select_file(nullptr, target);
+            select_file(target, nullptr, &id);
             ImGui::EndTable();
         }
 
@@ -775,7 +873,7 @@ static std::string to_size(uintmax_t size) {
     return std::format("{:.2f}{}", size / (use_mb ? (1024 * 1024.0) : 1024.0), use_mb ? "MB" : "KB");
 }
 
-[[nodiscard]] static bool load_binary(const pathT& path, std::string& str) {
+[[nodiscard]] static bool load_binary(const pathT& path, std::string& str) /*noexcept*/ {
     std::error_code ec{};
     const auto size = std::filesystem::file_size(path, ec);
     if (!ec && size <= max_size) {
@@ -828,9 +926,11 @@ void load_file(sync_point& out) {
     };
 
     if (!path) {
+        // ImGui::BeginDisabled(!nav.valid());
         if (ImGui::SmallButton("Refresh")) {
             nav.refresh_if_valid();
         }
+        // ImGui::EndDisabled();
 #if 0
         ImGui::SameLine();
         ImGui::SmallButton("Recent");
@@ -862,7 +962,8 @@ void load_file(sync_point& out) {
         ImGui::SetNextWindowSize({300, 200}, ImGuiCond_Always);
         if (begin_popup_for_item()) {
             std::optional<pathT> sel = std::nullopt;
-            nav.select_file(&*path, sel);
+            const pathT name = path->filename();
+            nav.select_file(sel, &name);
             if (sel && try_load(*sel)) {
                 text.reset_scroll(); // Even if the new path is the same as the old one.
                 path = std::move(*sel);
