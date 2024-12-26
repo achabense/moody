@@ -110,22 +110,21 @@ static pathT cpp17_u8path(const std::string_view path) noexcept {
 // (Sharing the same style as `imgui_StrCopyable`.)
 static void display_path(const pathT& p, float avail_w) {
     bool clipped = false;
-    imgui_Str(clip_path(p, avail_w, &clipped));
+    if (imgui_StrClickableSingle(clip_path(p, avail_w, &clipped))) {
+        set_clipboard_and_notify(cpp17_u8string(p));
+    }
     if (clipped) {
         imgui_ItemTooltip([&] { imgui_Str(cpp17_u8string(p)); });
-    }
-    if (imgui_ItemClickableSingle()) {
-        set_clipboard_and_notify(cpp17_u8string(p));
     }
     guide_mode::item_tooltip("Right-click to copy.");
 }
 
 static void display_filename(const pathT& p) {
-    imgui_Str(std::string("...") + char(pathT::preferred_separator) + cpp17_u8string(p.filename()));
-    imgui_ItemTooltip([&] { imgui_Str(cpp17_u8string(p)); });
-    if (imgui_ItemClickableSingle()) {
+    const char prefix[]{'.', '.', '.', char(pathT::preferred_separator), '\0'};
+    if (imgui_StrClickableSingle(prefix + cpp17_u8string(p.filename()))) {
         set_clipboard_and_notify(cpp17_u8string(p));
     }
+    imgui_ItemTooltip([&] { imgui_Str(cpp17_u8string(p)); });
     guide_mode::item_tooltip("Right-click to copy.");
 }
 
@@ -554,9 +553,9 @@ public:
         go_line = -1;
     }
 
-    // `str` is assumed to be utf8-encoded.
-    // (If not, the rules are still likely extractable.)
-    void append(const std::string_view str, const std::string_view prefix = {}) {
+    // `str` is assumed to be utf8-encoded. (If not, the rules are still extractable.)
+    void append(std::string str, const std::string_view prefix = {}) {
+        std::erase(str, '\r'); // So there won't exist "empty" lines with single invisible '\r'.
         for (const auto& l : std::views::split(str, '\n')) {
             std::string_view sv{l.data(), l.size()};
             const bool highlight = !prefix.empty() && sv.starts_with(prefix);
@@ -916,9 +915,9 @@ void load_file(sync_point& out) {
             }
             text.clear();
 #ifndef NDEBUG // Debug
-            text.append(str, "@@");
+            text.append(std::move(str), "@@");
 #else // Release
-            text.append(str);
+            text.append(std::move(str));
 #endif
             return true;
         }
@@ -1006,7 +1005,7 @@ void load_clipboard(sync_point& out) {
                 text.append("\n"); // (Will append two lines.)
             }
             text.append(std::format("@@[{}]", ++last_index), "@@");
-            text.append(str);
+            text.append(std::string(str));
             text.set_last_sec();
         }
     }
@@ -1044,7 +1043,7 @@ void load_doc(sync_point& out) {
             // if (ImGui::Selectable(title, doc_id == i, ImGuiSelectableFlags_NoAutoClosePopups) && doc_id != i) {
             if (imgui_SelectableStyledButtonEx(i, title, doc_id == i) && doc_id != i) {
                 text.clear();
-                text.append(contents, "@@");
+                text.append(std::string(contents), "@@");
                 text.reset_scroll();
                 doc_id = i;
             }
@@ -1055,8 +1054,11 @@ void load_doc(sync_point& out) {
         imgui_Str("A toy for exploring MAP rules, by GitHub user 'achabense'.");
         imgui_Str("The latest version is available at: ");
         ImGui::SameLine(0, 0);
-        // ImGui::TextLinkOpenURL("https://github.com/achabense/moody");
-        imgui_StrCopyable("https://github.com/achabense/moody", imgui_Str, set_clipboard_and_notify);
+        const char* const url = "https://github.com/achabense/moody";
+        // ImGui::TextLinkOpenURL(url);
+        if (imgui_StrClickableSingle(url)) {
+            set_clipboard_and_notify(url);
+        }
         guide_mode::item_tooltip("Right-click to copy.");
 
         ImGui::Separator();

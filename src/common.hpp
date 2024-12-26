@@ -790,14 +790,16 @@ private:
     inline static bool want_test_run_next = false;
 };
 
-inline void set_clipboard_and_notify(const char* c_str) {
-    // !!TODO: whether to set if it's ""?
-    ImGui::SetClipboardText(c_str);
-    messenger::set_msg("Copied.");
-}
-
-inline void set_clipboard_and_notify(const std::string& str) { //
-    set_clipboard_and_notify(str.c_str());
+inline void set_clipboard_and_notify(const std::string& str) {
+    if (str.empty() || str.find('\0') == str.npos) {
+        // TODO: whether to copy when str is empty?
+        ImGui::SetClipboardText(str.c_str());
+        messenger::set_msg("Copied.");
+    } else {
+        // This can happen when the user opens a data file and tries to copy lines.
+        // If copied, the result will be incomplete, and nothing in worst case (if starts with '\0').
+        messenger::set_msg("The text contains null characters.");
+    }
 }
 
 inline void set_msg_cleared(bool has_effect) {
@@ -811,9 +813,8 @@ inline void set_msg_cleared(bool has_effect) {
 inline std::string_view read_clipboard() {
     const char* str = ImGui::GetClipboardText();
     if (!str || *str == '\0') {
-        // !!TODO: the clipboard may contain a real empty string and the result is also "".
-        // So the message may need to be reconsidered...
-        messenger::set_msg("Failed to read from the clipboard.");
+        // If the clipboard contains a real empty string, the result is also "".
+        // messenger::set_msg("Failed to read from the clipboard.");
         return {};
     }
     return str;

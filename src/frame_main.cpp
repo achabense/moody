@@ -105,6 +105,7 @@ void frame_main() {
 
         // This is a workaround to support shortcut for clipboard-reading.
         // TODO: using 'W' to avoid conflicts with pattern-pasting; not quite conventional...
+        // TODO: paste -> create a temp window that will be destroyed when closed?
         if (&open == &show_clipboard) {
             if (shortcuts::keys_avail_and_window_hoverable() && shortcuts::test(ImGuiKey_W)) {
                 open = true;
@@ -190,7 +191,8 @@ void frame_main() {
         ImGui::SameLine();
         imgui_Str("Current rule ~");
         ImGui::SameLine();
-        if (imgui_StrCopyable(aniso::to_MAP_str(sync.rule), imgui_Str, set_clipboard_and_notify)) {
+        if (const auto str = aniso::to_MAP_str(sync.rule); imgui_StrClickableSingle(str)) {
+            set_clipboard_and_notify(str);
             rule_recorder::record(rule_recorder::Copied, sync.rule);
         }
         guide_mode::item_tooltip("Right-click to copy.");
