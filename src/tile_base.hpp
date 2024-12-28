@@ -1,5 +1,7 @@
 #pragma once
 
+#include <bit>
+
 #include "rule.hpp"
 
 namespace aniso {
@@ -56,14 +58,22 @@ namespace aniso {
         // Should be non-empty.
         template <class T>
         struct tile_ref_ {
+            T* data; // Non-owning; points at [0][0].
             vecT size;
             int stride; // Number of elements (instead of bytes).
-            T* data;    // Non-owning; points at [0][0].
+
+            tile_ref_(T* data, vecT size, int stride) : data{data}, size{size}, stride{stride} {
+                assert(data && size.x > 0 && size.y > 0 && size.x <= stride);
+            }
+
+            tile_ref_(T* data, vecT size) : data{data}, size{size}, stride{size.x} {
+                assert(data && size.x > 0 && size.y > 0);
+            }
 
             operator tile_ref_<const T>() const
                 requires(!std::is_const_v<T>)
             {
-                return tile_ref_<const T>{size, stride, data};
+                return std::bit_cast<tile_ref_<const T>>(*this);
             }
 
             bool contains(vecT pos) const { return pos.x >= 0 && pos.y >= 0 && pos.x < size.x && pos.y < size.y; }
@@ -87,7 +97,7 @@ namespace aniso {
 
             [[nodiscard]] tile_ref_ clip(const rangeT& range) const {
                 assert(!range.empty() && contains(range));
-                return {range.size(), stride, data + range.begin.x + stride * range.begin.y};
+                return {&at(range.begin), range.size(), stride};
             }
 
             void for_each_line(const auto& fn) const {

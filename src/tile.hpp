@@ -303,16 +303,16 @@ namespace aniso {
             const vecT inner_size{10, 10};
             const vecT size = padding_a + inner_size + padding_b;
             const auto tile_data = std::make_unique_for_overwrite<bool[]>(size.xy());
-            const tile_ref tile{.size = size, .stride = size.x, .data = tile_data.get()};
+            const tile_ref tile{tile_data.get(), size};
             const rangeT inner_range{padding_a, padding_a + inner_size};
             fill(tile.clip(inner_range), 0);
             const bool period[4]{1, 0, 0, 1}; // Checkerboard.
-            fill_outside(tile, inner_range, {{2, 2}, 2, period});
-            const rangeT test_range = bounding_box(tile, {{2, 2}, 2, period});
+            fill_outside(tile, inner_range, {period, {2, 2}});
+            const rangeT test_range = bounding_box(tile, {period, {2, 2}});
             assert(!test_range.empty());
             assert(test_range.begin == inner_range.begin && test_range.end == inner_range.end);
         };
-    }  // namespace _tests
+    } // namespace _tests
 #endif // ENABLE_TESTS
 
     // (`dest` and `source` should not overlap.)
@@ -523,8 +523,8 @@ namespace aniso {
             for (const vecT size : sizes) {
                 const auto a_data = std::make_unique_for_overwrite<bool[]>(size.xy());
                 const auto b_data = std::make_unique_for_overwrite<bool[]>(size.xy());
-                const tile_ref a{size, size.x, a_data.get()};
-                const tile_ref b{size, size.x, b_data.get()};
+                const tile_ref a{a_data.get(), size};
+                const tile_ref b{b_data.get(), size};
                 random_fill(a, testT::rand, 0.5);
                 from_RLE_str(to_RLE_str(a, nullptr), [&](long long w, long long h) {
                     assert(w == size.x && h == size.y);
@@ -533,7 +533,7 @@ namespace aniso {
                 assert(std::equal(a_data.get(), a_data.get() + size.xy(), b_data.get()));
             }
         };
-    }  // namespace _tests
+    } // namespace _tests
 #endif // ENABLE_TESTS
 
     inline constexpr int calc_border_size(const vecT size) { return 2 * (size.x + size.y) + 4; }
@@ -672,7 +672,7 @@ namespace aniso {
             const ruleT rule = make_rule([](codeT) { return testT::rand() & 1; });
 
             for_each_code([&](codeT code) {
-                const auto make_ref = [](bool& b) { return tile_ref{{1, 1}, 1, &b}; };
+                const auto make_ref = [](bool& b) { return tile_ref{&b, {1, 1}}; };
                 auto [q, w, e, a, s, d, z, x, c] = decode(code);
 
                 bool dest{}, border_data[calc_border_size({1, 1})]{};
@@ -689,8 +689,8 @@ namespace aniso {
             const ruleT copy_q = make_rule([](codeT c) { return c.get(codeT::bpos_q); });
 
             std::array<bool, 120> data[2]{};
-            const tile_ref tile{.size{.x = 10, .y = 12}, .stride = 10, .data = &data[0][0]};
-            const tile_ref compare{.size{.x = 10, .y = 12}, .stride = 10, .data = &data[1][0]};
+            const tile_ref tile{&data[0][0], {.x = 10, .y = 12}};
+            const tile_ref compare{&data[1][0], {.x = 10, .y = 12}};
             random_fill(tile, testT::rand, 0.5);
 
             for (int i = 0; i < 12; ++i) {
@@ -699,7 +699,7 @@ namespace aniso {
                 assert(data[0] == data[1]);
             }
         };
-    }  // namespace _tests
+    } // namespace _tests
 #endif // ENABLE_TESTS
 
     class tileT {
@@ -757,11 +757,11 @@ namespace aniso {
 
         tile_ref data() {
             assert(!empty());
-            return {.size = m_size, .stride = m_size.x /* continuous */, .data = m_data};
+            return {m_data, m_size}; // continuous
         }
         tile_const_ref data() const {
             assert(!empty());
-            return {.size = m_size, .stride = m_size.x /* continuous */, .data = m_data};
+            return {m_data, m_size}; // continuous
         }
 
         void run_torus(const rule_like auto& rule) { //

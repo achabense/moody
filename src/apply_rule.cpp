@@ -159,8 +159,8 @@ static void identify(const aniso::tile_const_ref tile, const aniso::ruleT& rule,
         bool operator==(const periodT&) const = default;
 
         static aniso::vecT size() { return period_size; }
-        aniso::tile_ref data() { return {period_size, period_size.x, m_data.data()}; }
-        aniso::tile_const_ref data() const { return {period_size, period_size.x, m_data.data()}; }
+        aniso::tile_ref data() { return {m_data.data(), period_size}; }
+        aniso::tile_const_ref data() const { return {m_data.data(), period_size}; }
 
         bool is_periodic(const aniso::ruleT& rule) const {
             periodT torus = *this;
