@@ -197,7 +197,7 @@ int main(int, char**) {
 
     // Create window with SDL_Renderer graphics context
     {
-        const char* const window_title = "Moody v 0.9.8 (WIP)";
+        const char* const window_title = "Blueberry v 0.9.8 (WIP)";
 
         // To maximize the window: SDL_WINDOW_MAXIMIZED, or for guaranteed initial color:
         // SDL_WINDOW_HIDDEN (-> SDL_MaximizeWindow) -> manual render-clear -> SDL_ShowWindow

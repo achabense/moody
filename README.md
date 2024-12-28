@@ -1,9 +1,9 @@
-### Moody
+### Blueberry (WIP)
 <p><sub>
-(Renamed from "Astral" in v0.9.5; the current name is still not satisfactory to me; a final name will be decided before v1.0)
+(Renamed from "Moody" in v0.9.8)
 </sub></p>
 
-https://github.com/achabense/moody
+https://github.com/achabense/blueberry
 
 This program helps to explore a set of cellular automaton rules known as "[MAP rules](https://golly.sourceforge.io/Help/Algorithms/QuickLife.html#map)". In short, MAP rules are 2-state rules in the range-1 Moore neighborhood. They are a strict superset of isotropic rules and outer-totalistic (aka life-like) rules, the most famous one being [Conway's Game of Life](https://conwaylife.com/wiki/Conway%27s_Game_of_Life). Below are some discoveries found by this program.
 
@@ -21,12 +21,12 @@ The program supports a series of subsets. You can easily identify which subsets 
 
 The program saves rules and patterns as common MAP-strings and RLE-strings, which can further be tested by other programs like Golly.
 
-There are a lot of rules collected during the development of this program, available [here](https://github.com/achabense/moody/tree/main/rules). You may download and have a look at some of them using the `Files` or `Clipboard` window.
+There are a lot of rules collected during the development of this program, available [here](https://github.com/achabense/blueberry/tree/main/rules). You may download and have a look at some of them using the `Files` or `Clipboard` window.
 
 <img width="300" alt="Screenshot" src="https://github.com/user-attachments/assets/0d6c5336-5b37-4575-b19e-22c52d363a1a">
 
 #### Getting started
-The binary built for Windows 10 is available at the [latest-release](https://github.com/achabense/moody/releases/latest) page. (If you are using a different system, you may try building the project yourself; see the "building" section below.)
+The binary built for Windows 10 is available at the [latest-release](https://github.com/achabense/blueberry/releases/latest) page. (If you are using a different system, you may try building the project yourself; see the "building" section below.)
 
 It's recommended to place the program in a separate folder, as it will create an "imgui.ini" file in the same directory, and for example, you can download those rule lists to a subdirectory, then it will be easy to find them in the `Files` window.
 

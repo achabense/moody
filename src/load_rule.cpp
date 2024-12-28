@@ -1054,7 +1054,7 @@ void load_doc(sync_point& out) {
         imgui_Str("A toy for exploring MAP rules, by GitHub user 'achabense'.");
         imgui_Str("The latest version is available at: ");
         ImGui::SameLine(0, 0);
-        const char* const url = "https://github.com/achabense/moody";
+        const char* const url = "https://github.com/achabense/blueberry";
         // ImGui::TextLinkOpenURL(url);
         if (imgui_StrClickableSingle(url)) {
             set_clipboard_and_notify(url);
