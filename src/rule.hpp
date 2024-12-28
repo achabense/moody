@@ -4,6 +4,7 @@
 #include <array>
 #include <cassert>
 #include <climits>
+#include <memory>
 #include <optional>
 #include <random>
 #include <span>
