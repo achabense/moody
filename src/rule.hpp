@@ -6,7 +6,6 @@
 #include <climits>
 #include <optional>
 #include <random>
-#include <regex>
 #include <span>
 #include <string>
 #include <utility>
@@ -28,7 +27,7 @@ namespace aniso {
             inline static std::mt19937 rand{(uint32_t)time(0)};
             testT(const auto& fn) noexcept { fn(); }
         };
-    }  // namespace _tests
+    } // namespace _tests
 #endif // ENABLE_TESTS
 
     // TODO: make cell-state strongly-typed?
@@ -113,7 +112,7 @@ namespace aniso {
             for_each_code([](codeT code) { assert(encode(decode(code)) == code); });
             assert(for_each_code_all_of([](codeT code) { return encode(decode(code)) == code; }));
         };
-    }  // namespace _tests
+    } // namespace _tests
 #endif // ENABLE_TESTS
 
     // Map `situT` (encoded as `codeT`) to the value `s` become at next generation.
@@ -165,7 +164,7 @@ namespace aniso {
     using lockT = codeT::map_to<bool>;
 
     namespace _misc {
-        inline char to_base64(uint8_t b6) {
+        inline char to_base64(const uint8_t b6) {
             if (b6 < 26) {
                 return 'A' + b6;
             } else if (b6 < 52) {
@@ -180,7 +179,7 @@ namespace aniso {
             }
         }
 
-        inline uint8_t from_base64(char ch) {
+        inline uint8_t from_base64(const char ch) {
             if (ch >= 'A' && ch <= 'Z') {
                 return ch - 'A';
             } else if (ch >= 'a' && ch <= 'z') {
@@ -193,6 +192,15 @@ namespace aniso {
                 assert(ch == '/');
                 return 63;
             }
+        }
+
+        inline bool is_base64(const char ch) { //
+            return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '+' ||
+                   ch == '/';
+        }
+
+        inline int count_base64(const std::string_view str) { //
+            return std::ranges::find_if_not(str, is_base64) - str.begin();
         }
 
         // https://golly.sourceforge.io/Help/Algorithms/QuickLife.html
@@ -209,6 +217,8 @@ namespace aniso {
             }
         }
 
+        inline const int MAP_length = (512 + 5) / 6; // 86; not including "MAP" prefix.
+
         inline void to_MAP(std::string& str, const auto& source /* ruleT or lockT */) {
             bool MAP_data[512]{};
             for_each_code([&](codeT code) { MAP_data[transcode_MAP(code)] = source[code]; });
@@ -222,6 +232,8 @@ namespace aniso {
         }
 
         inline void from_MAP(std::string_view str, auto& dest /* ruleT or lockT */) {
+            assert(str.size() >= MAP_length);
+
             bool MAP_data[512]{};
             auto put = [&MAP_data](int i, bool b) {
                 if (i < 512) {
@@ -245,6 +257,7 @@ namespace aniso {
     } // namespace _misc
 
     // Convert ruleT to a "MAP string".
+    // Format: MAP...( [...])? (regex: "MAP([a-zA-Z0-9+/]{86})( \\[([a-zA-Z0-9+/]{86})\\])?")
     inline std::string to_MAP_str(const ruleT& rule, const lockT* lock = nullptr) {
         std::string str = "MAP";
         _misc::to_MAP(str, rule);
@@ -256,59 +269,82 @@ namespace aniso {
         return str;
     }
 
-    // Extract ruleT (optionally with lockT) from text.
+    // Extract ruleT (and optionally lockT) from text.
     struct extrT {
         std::string_view prefix{};
-        std::string_view rule_str{};
-        std::string_view lock_str{};
+        std::string_view rule_str{}; // "MAP..."
+        std::string_view lock_str{}; // " [...]"
         std::string_view suffix{};
 
-        bool has_rule() const { return !rule_str.empty(); }
+        bool has_rule() const {
+            assert_implies(!rule_str.empty(), rule_str.size() == rule_len && rule_str.starts_with("MAP"));
+            return !rule_str.empty();
+        }
 
         bool has_lock() const {
             assert_implies(rule_str.empty(), lock_str.empty());
+            assert_implies(!lock_str.empty(),
+                           lock_str.size() == lock_len && lock_str.starts_with(" [") && lock_str.ends_with(']'));
             return !lock_str.empty();
         }
 
         ruleT get_rule() const {
             assert(has_rule());
             ruleT rule{};
-            _misc::from_MAP(rule_str, rule);
+            _misc::from_MAP(rule_str.substr(3 /*MAP*/, MAP_len), rule);
             return rule;
         }
 
         lockT get_lock() const {
             assert(has_lock());
             lockT lock{};
-            _misc::from_MAP(lock_str, lock);
+            _misc::from_MAP(lock_str.substr(2 /* [*/, MAP_len), lock);
             return lock;
+        }
+
+    private:
+        static constexpr int MAP_len = _misc::MAP_length;
+        static constexpr int rule_len = MAP_len + 3; // "MAP..."
+        static constexpr int lock_len = MAP_len + 3; // " [...]"
+
+    public:
+        // data = prefix + rule_str + lock_str + suffix.
+        // !has-rule -> data = prefix
+        extrT(const std::span<const char> data, const bool ignore_lock) {
+            const char* const begin = data.data();
+            const char* const end = data.data() + data.size();
+            std::string_view str{begin, end};
+            for (;;) {
+                if (const auto pos = str.find("MAP"); pos != str.npos && str.size() - pos >= rule_len) {
+                    str.remove_prefix(pos);
+                } else { // Not found.
+                    this->prefix = {begin, end};
+                    return;
+                }
+
+                if (const int prefix = _misc::count_base64(str.substr(3 /*MAP*/, MAP_len)); prefix < MAP_len) {
+                    str.remove_prefix(3 /*MAP*/ + prefix);
+                } else { // Matched.
+                    this->prefix = {begin, str.data()};
+                    this->rule_str = {str.data(), rule_len};
+                    str.remove_prefix(rule_len);
+                    if (!ignore_lock && str.size() >= lock_len && str.starts_with(" [") &&
+                        str[2 /* [*/ + MAP_len] == ']') {
+                        if (_misc::count_base64(str.substr(2 /* [*/, MAP_len)) == MAP_len) {
+                            this->lock_str = {str.data(), lock_len};
+                            str.remove_prefix(lock_len);
+                        }
+                    }
+                    assert(str.data() + str.size() == end);
+                    this->suffix = str;
+                    return;
+                }
+            }
         }
     };
 
-    inline extrT extract_MAP_str(std::span<const char> data) {
-        const char* begin = data.data();
-        const char* end = data.data() + data.size();
-
-        extrT extr{};
-
-        static_assert((512 + 5) / 6 == 86);
-        //                                1                  2       3
-        static const std::regex regex{"MAP([a-zA-Z0-9+/]{86})( \\[([a-zA-Z0-9+/]{86})\\])?",
-                                      std::regex_constants::optimize};
-
-        if (std::cmatch match; std::regex_search(begin, end, match, regex)) {
-            extr.prefix = {match.prefix().first, match.prefix().second};
-            extr.suffix = {match.suffix().first, match.suffix().second};
-
-            extr.rule_str = {match[1].first, match[1].second};
-            if (match[3].matched) {
-                extr.lock_str = {match[3].first, match[3].second};
-            }
-        } else {
-            extr.prefix = {begin, end}; // .suffix ~ {}
-        }
-
-        return extr;
+    inline extrT extract_MAP_str(std::span<const char> data, bool ignore_lock = false) {
+        return extrT(data, ignore_lock);
     }
 
 #ifdef ENABLE_TESTS
@@ -357,7 +393,7 @@ namespace aniso {
                 assert(extr2.get_lock() == lock);
             }
         };
-    }  // namespace _tests
+    } // namespace _tests
 #endif // ENABLE_TESTS
 
     class compressT {
