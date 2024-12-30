@@ -422,35 +422,55 @@ public:
             "subset. See '(...)' for details.");
     }
 
-    void select(const aniso::ruleT* const target = nullptr, const aniso::subsetT* const should_include = nullptr,
-                const bool show_desc = true) {
-        if (should_include && !current.includes(*should_include)) {
+    struct select_mode {
+        const aniso::ruleT* rule = nullptr;
+        bool select = false;
+        const aniso::subsetT* subset = nullptr; // `current` should include it.
+        bool tooltip = false;
+
+        void verify() const {
+            assert(rule || select);
+            assert_implies(subset, select);
+        }
+    };
+
+    void select(const select_mode mode) {
+        mode.verify();
+        if (mode.subset && !current.includes(*mode.subset)) {
             assert(false);
-            clear();
+            clear(); // -> MAP set.
         }
 
         if (ImGui::BeginTable("Checklists", 2,
                               ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit |
                                   ImGuiTableFlags_NoKeepColumnsVisible)) {
-            auto check = [&, id = 0](termT& term, bool show_title = false) mutable {
-                const bool disabled = term.disabled || (should_include && !term.set->includes(*should_include));
-                assert_implies(disabled, !term.selected);
+            auto check = [&, id = 0](termT& term, const bool show_title = false) mutable {
+                const bool contained = mode.rule && term.set->contains(*mode.rule);
+                const char title = show_title ? term.title[0] : '\0';
+                if (!mode.select) {
+                    ImGui::Dummy(square_size());
+                    put_term(contained, None, title, false);
+                    return;
+                }
+
+                const bool selectable = !term.disabled && (!mode.subset || term.set->includes(*mode.subset));
+                assert_implies(!selectable, !term.selected);
 
                 ImGui::PushID(id++);
-                ImGui::BeginDisabled(term.disabled);
-                if (ImGui::InvisibleButton("##Invisible", square_size()) && !disabled) {
+                ImGui::BeginDisabled(!selectable);
+                if (ImGui::InvisibleButton("##Invisible", square_size()) && selectable) {
                     term.selected = !term.selected;
                     update_current();
                 }
                 ImGui::EndDisabled();
                 ImGui::PopID();
-                put_term(target ? term.set->contains(*target) : false,
+                put_term(contained,
                          term.selected    ? Selected
                          : term.including ? Including
-                         : disabled       ? Disabled
+                         : !selectable    ? Disabled
                                           : None,
-                         show_title ? term.title[0] : '\0', true);
-                if (show_desc) {
+                         title, true);
+                if (mode.tooltip) {
                     imgui_ItemTooltip(term.description);
                 }
             };
@@ -956,6 +976,13 @@ static void random_rule_window(bool& show_rand, sync_point& sync, const aniso::s
     }
 }
 
+void previewer::_identify_rule(const aniso::ruleT& rule) {
+    global_tooltip(true, [&rule] {
+        static subset_selector dummy;
+        dummy.select({.rule = &rule});
+    });
+}
+
 // TODO: rename some variables for better clarity. (e.g. `subset` -> `working_set`, `contained` -> `working_contains`)
 void edit_rule(sync_point& sync) {
     // Select subsets.
@@ -971,29 +998,6 @@ void edit_rule(sync_point& sync) {
         ImGui::SameLine();
         ImGui::Checkbox("Collapse", &collapse);
 
-        // (Cannot un-collapse directly in this case, as the previewer may come from random-access section
-        // and its position will be affect by the subset table.)
-        // TODO: ideally, this should always be displayed with an independent tooltip.
-        // (How to decide window position? Shouldn't overlap with common item tooltips...)
-        if (collapse && sync_point_override::want_test_set) {
-            imgui_ItemRectFilled(IM_COL32(0, 128, 255, 16));
-            imgui_ItemRect(IM_COL32(0, 128, 255, 255));
-
-            // Multiple tooltips: https://github.com/ocornut/imgui/issues/1345
-            ImGui::SetNextWindowPos(imgui_GetItemRect().GetTR() + ImVec2(imgui_ItemSpacingX(), 0));
-            ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(0, 128, 255, 255));
-            if (auto tooltip =
-                    imgui_Window("Tooltip", nullptr,
-                                 ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoTitleBar |
-                                     ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
-                                     ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize)) {
-                select_set.select(&sync_point_override::rule);
-                const auto [min, max] = imgui_GetWindowRect();
-                ImGui::GetWindowDrawList()->AddRectFilled(min, max, IM_COL32(0, 128, 255, 16));
-            }
-            ImGui::PopStyleColor();
-        }
-
         auto select = [&] {
             if (ImGui::Button("Clear##Sets")) {
                 select_set.clear();
@@ -1006,11 +1010,7 @@ void edit_rule(sync_point& sync) {
             guide_mode::item_tooltip("Select every subset that contains the current rule.");
 
             ImGui::Separator();
-            select_set.select(sync_point_override::want_test_set ? &sync_point_override::rule : &sync.rule);
-            if (sync_point_override::want_test_set) {
-                imgui_ItemRectFilled(IM_COL32(0, 128, 255, 16));
-                imgui_ItemRect(IM_COL32(0, 128, 255, 255));
-            }
+            select_set.select({.rule = &sync.rule, .select = true, .tooltip = true});
         };
 
         if (!collapse) {
@@ -1116,7 +1116,7 @@ void edit_rule(sync_point& sync) {
                 set_superset_example = true;
             }
             ImGui::Separator();
-            select_set_super.select(nullptr, &subset, false /*no tooltip*/);
+            select_set_super.select({.select = true, .subset = &subset /*no tooltip*/});
 
             ImGui::EndPopup();
         }

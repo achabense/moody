@@ -252,7 +252,9 @@ public:
 
 // There is intended to be at most one call to this function in each window hierarchy.
 inline void set_scroll_by_up_down(float dy) {
-    if (shortcuts::keys_avail() && shortcuts::window_focused()) {
+    // !!TODO: recheck owner test...
+    if (shortcuts::keys_avail() && shortcuts::window_focused() &&
+        ImGui::TestKeyOwner(ImGuiKey_MouseWheelY, ImGuiKeyOwner_NoOwner)) {
         if (shortcuts::test(ImGuiKey_DownArrow, true)) {
             ImGui::SetScrollY(ImGui::GetScrollY() + dy);
             shortcuts::highlight(ImGui::GetWindowScrollbarID(ImGui::GetCurrentWindowRead(), ImGuiAxis_Y));
@@ -261,6 +263,40 @@ inline void set_scroll_by_up_down(float dy) {
             shortcuts::highlight(ImGui::GetWindowScrollbarID(ImGui::GetCurrentWindowRead(), ImGuiAxis_Y));
         }
     }
+}
+
+inline void global_tooltip(const bool highlight, const std::function<void()> func) {
+    // TODO: are there simpler ways to prevent inheriting styles?
+    const ImGuiStyle old_style = GImGui->Style;
+    auto old_stack = GImGui->StyleVarStack;
+    ImGui::PopStyleVar(GImGui->StyleVarStack.size()); // Restore style vars.
+
+    if (highlight) {
+        ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(0, 128, 255, 255));
+    }
+    // (The position will be finally rounded in `SetWindowPos`.)
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, {0.5, 0.5});
+    // Multiple tooltips: https://github.com/ocornut/imgui/issues/1345
+    if (auto tooltip = imgui_Window("global_tooltip", nullptr,
+                                    ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoTitleBar |
+                                        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
+                                        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize)) {
+        if (ImGui::IsWindowAppearing() ||
+            ((ImGui::GetFrameCount() % 32) == 0) /*As normal tooltips may appear after this*/) {
+            ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+        }
+        func();
+        if (highlight) {
+            const auto [min, max] = imgui_GetWindowRect();
+            ImGui::GetWindowDrawList()->AddRectFilled(min, max, IM_COL32(0, 128, 255, 16));
+        }
+    }
+    if (highlight) {
+        ImGui::PopStyleColor();
+    }
+
+    GImGui->Style = old_style;
+    GImGui->StyleVarStack.swap(old_stack);
 }
 
 #if 0
@@ -734,6 +770,9 @@ private:
 
     static void _preview(uint64_t id, const configT& config, const aniso::ruleT& rule, bool interactive,
                          ImU32& border_col);
+
+    // TODO: declared here for minimal exposure, but looks strange...
+    static void _identify_rule(const aniso::ruleT& rule);
 };
 
 class sync_point {
@@ -754,40 +793,6 @@ public:
         out_rule.emplace(rule);
         rec_type = type;
     }
-};
-
-// TODO: ideally this should attach to a `sync_point` object.
-// (Would require previewer::preview to take `sync_point` parameter.)
-// However, as there is only one `sync_point` in the program, it makes no actual difference for now.
-class sync_point_override : no_create {
-public:
-    inline static aniso::ruleT rule{};
-    inline static bool want_test_set = false;
-    inline static bool want_test_run = false;
-
-    static bool set(const aniso::ruleT& r, bool test_set, bool test_run) {
-        want_test_set_next = test_set;
-        want_test_run_next = test_run;
-        if (want_test_set_next || want_test_run_next) {
-            rule_next = r;
-            return true;
-        }
-        return false;
-    }
-
-private:
-    friend void frame_main();
-    static void begin_frame() {
-        want_test_set = std::exchange(want_test_set_next, false);
-        want_test_run = std::exchange(want_test_run_next, false);
-        if (want_test_set || want_test_run) {
-            rule = rule_next;
-        }
-    }
-
-    inline static aniso::ruleT rule_next{};
-    inline static bool want_test_set_next = false;
-    inline static bool want_test_run_next = false;
 };
 
 inline void set_clipboard_and_notify(const std::string& str) {

@@ -571,8 +571,7 @@ public:
     // For example, there are a lot of static variables in `display`, and the keyboard controls are not designed
     // for per-object use.
     void display(sync_point& sync) {
-        const bool rule_changed =
-            m_torus.begin_frame(sync_point_override::want_test_run ? sync_point_override::rule : sync.rule);
+        const bool rule_changed = m_torus.begin_frame(sync.rule);
         if (rule_changed) {
             // m_sel.reset();
             m_paste.reset();
@@ -1147,11 +1146,6 @@ public:
                 drawlist->PopClipRect();
             }
 
-            if (sync_point_override::want_test_run) {
-                imgui_ItemRectFilled(IM_COL32(0, 128, 255, 16));
-                imgui_ItemRect(IM_COL32(0, 128, 255, 255));
-            }
-
             {
                 // `skip` is a workaround to make the highlight appear in the same frame with the tooltip.
                 // (Tooltips will be hidden for one extra frame before appearing.)
@@ -1490,10 +1484,9 @@ void previewer::configT::_set() {
         "Operations:\n"
         "- Right-click to copy the rule.\n"
         "- Left-click and hold to pause.\n"
-        "- Hover and press 'R' to restart. ('T' for all preview windows)\n" // TODO: currently no '.' as it will introduce a new line...
+        "- Hover + 'R' to restart. ('T' for all preview windows.)\n"
         "- 'F' to speed up. ('G' for all preview windows.)\n"
-        "- 'Z' to see which subsets the previewed rule belongs to in the subset table.\n"
-        "- 'X' to temporarily override the current rule with the previewed one in the space window. The previewed rule will not be recorded in this case.\n\n"
+        "- 'Z' to see which subsets the rule belongs to.\n\n"
         "If the rule belongs to 'Hex' subset:\n"
         "- '6' to see the projected view in the real hexagonal space. (This also applies to the space window.)");
 #if 0
@@ -1641,14 +1634,16 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
         ImGui::PopStyleVar();
     }
 
-    if (hovered) {
-        // TODO: 'X' mode is problematic (inconvenient and hard to doc)...
+    if (hovered && shortcuts::global_flag(ImGuiKey_Z)) {
+        // !!TODO: recheck (when does window-scrolling happen?); also hide zoom tooltip in this case?
+        // (This seems also able to block sequence shortcuts, which is ideal, but how does it work?)
+        ImGui::SetKeyOwner(ImGuiKey_MouseWheelY, 0, ImGuiInputFlags_LockThisFrame);
+
+        imgui_ItemRectFilled(IM_COL32(0, 128, 255, 16));
+        border_col = IM_COL32(0, 128, 255, 255);
+        _identify_rule(rule);
+        // TODO: 'X' -> create a temp editable space with the same init?
         // TODO: support 'M' for 'Match'? Then 'Z'->'M' can be very convenient...
-        if (sync_point_override::set(term.rule, shortcuts::global_flag(ImGuiKey_Z) /*test-set*/,
-                                     shortcuts::global_flag(ImGuiKey_X) /*test-run*/)) {
-            imgui_ItemRectFilled(IM_COL32(0, 128, 255, 16));
-            border_col = IM_COL32(0, 128, 255, 255);
-        }
     }
 
     if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {

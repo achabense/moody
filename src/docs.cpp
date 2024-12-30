@@ -320,7 +320,7 @@ Below is the same rule shown in the 'About this program' section. It turns out t
 MAP+sQSUIzICkiQgAiAEKBAhrIGFgAUbAAA4AChgnAAAw6CAkAIgKCAlASgIACgIQBbqCqhEQAAkFQAARIDAQQRBA
 For example, the following rule has distance = 1 to it, and has amazingly large oscillators.
 MAP+sASUIjICkiAgAiAEKBAhrIGFgAUbAAAoAChgnAAAw6AAkAIgKCAlAQgIAAgIQBboCqhEQAAkFQAARIDAQQRBA
-(A lot of neighboring rules involve complex dynamics. To avoid missing important discoveries, you may set a larger space for preview windows (e.g. setting zoom to 0.5), or press 'X' on the windows to override the current rule temporarily. And there is also 'F' to accelerate the space. The full list of preview-window operations is recorded in 'Settings'.)
+(A lot of neighboring rules involve complex dynamics. To avoid missing important discoveries, you may set a larger space for preview windows (e.g. setting zoom to 0.5). And there is also 'F' to accelerate the space. The full list of preview-window operations is recorded in 'Settings'.)
 
 Once you find other interesting rules, you can move on starting from the new rules instead. Here is another rule that has dist = 1 to the above one. If properly pasted (into white background), the pattern is able to split into two huge spaceships.
 x = 5, y = 27, rule = MAP+sASUIjICmiAgAiAEKBAhrIGFiAUbCCAoAChgnAAAw6AAkAIgKCAlAQgIAAgIQBboCqhEQAAkFQAARIDAQQRBA
