@@ -250,11 +250,22 @@ public:
     }
 };
 
+// Prevent window scrolling for one frame.
+inline void lock_scroll() {
+    // ImGui::SetKeyOwner(ImGuiKey_MouseWheelY, ImGuiKeyOwner_NoOwner, ImGuiInputFlags_LockThisFrame); Doesn't work.
+    ImGui::SetKeyOwner(ImGuiKey_MouseWheelY, ImGuiKeyOwner_Any, ImGuiInputFlags_LockThisFrame);
+    // After this call: LockThisFrame ~ true, OwnerCur ~ Any, OwnerNext ~ Any
+    // Then in the next frame, when calling `NewFrame`:
+    // In `UpdateKeyboardInputs`: LockThisFrame ~ false, OwnerCurr <- OwnerNext (Any).
+    // Then in `UpdateMouseWheel`, `TestKeyOwner` requires !LockThisFrame && OwnerCurr == NoOwner.
+    // So it's `Any != NoOwner` that prevents window scrolling.
+}
+
+inline bool may_scroll() { return ImGui::TestKeyOwner(ImGuiKey_MouseWheelY, ImGuiKeyOwner_NoOwner); }
+
 // There is intended to be at most one call to this function in each window hierarchy.
 inline void set_scroll_by_up_down(float dy) {
-    // !!TODO: recheck owner test...
-    if (shortcuts::keys_avail() && shortcuts::window_focused() &&
-        ImGui::TestKeyOwner(ImGuiKey_MouseWheelY, ImGuiKeyOwner_NoOwner)) {
+    if (may_scroll() && shortcuts::keys_avail() && shortcuts::window_focused()) {
         if (shortcuts::test(ImGuiKey_DownArrow, true)) {
             ImGui::SetScrollY(ImGui::GetScrollY() + dy);
             shortcuts::highlight(ImGui::GetWindowScrollbarID(ImGui::GetCurrentWindowRead(), ImGuiAxis_Y));
@@ -443,8 +454,8 @@ inline bool imgui_SelectableStyledButtonEx(const int id, const std::string_view 
 }
 
 class sequence : no_create {
-    // Workaround to avoid the current rule being changed in override mode.
-    static bool extra_cond() { return !ImGui::IsKeyDown(ImGuiKey_Z) && !ImGui::IsKeyDown(ImGuiKey_X); }
+    // Workaround to avoid previewed rule being changed by shortcut.
+    static bool extra_cond() { return may_scroll(); }
 
     inline static ImGuiID bound_id = 0;
     inline static ImGuiID bound_id_next = 0;

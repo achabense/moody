@@ -1635,9 +1635,8 @@ void previewer::_preview(uint64_t id, const configT& config, const aniso::ruleT&
     }
 
     if (hovered && shortcuts::global_flag(ImGuiKey_Z)) {
-        // !!TODO: recheck (when does window-scrolling happen?); also hide zoom tooltip in this case?
-        // (This seems also able to block sequence shortcuts, which is ideal, but how does it work?)
-        ImGui::SetKeyOwner(ImGuiKey_MouseWheelY, 0, ImGuiInputFlags_LockThisFrame);
+        // TODO: also hide zoom tooltip in this case?
+        lock_scroll();
 
         imgui_ItemRectFilled(IM_COL32(0, 128, 255, 16));
         border_col = IM_COL32(0, 128, 255, 255);

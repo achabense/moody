@@ -722,8 +722,8 @@ public:
             // Otherwise, for some reason the parent window will still be collapsed if its
             // title bar is double-clicked.
             // Related: https://github.com/ocornut/imgui/issues/7841
-            ImGui::SetKeyOwner(ImGui::MouseButtonToKey(ImGuiMouseButton_Left), claim);
-            // ImGui::SetKeyOwner(ImGui::MouseButtonToKey(ImGuiMouseButton_Right), claim);
+            ImGui::SetKeyOwner(ImGuiKey_MouseLeft, claim);
+            // ImGui::SetKeyOwner(ImGuiKey_MouseRight, claim);
         }
     }
 
