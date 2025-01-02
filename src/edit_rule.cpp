@@ -332,12 +332,12 @@ private:
     enum centerE { Selected, Including, Disabled, None }; // TODO: add "equals" relation?
 
     // (Follows `ImGui::Dummy` or `ImGui::InvisibleButton`.)
-    static void put_term(bool contained, centerE center, char title /* '\0' ~ no title */, bool button_mode) {
+    static void put_term(bool set_contains, centerE center, char title /* '\0' ~ no title */, bool button_mode) {
         const ImU32 cent_col = center == Selected    ? IM_COL32(65, 150, 255, 255) // Roughly _ButtonHovered
                                : center == Including ? IM_COL32(25, 60, 100, 255)  // Roughly _Button
                                                      : IM_COL32_BLACK_TRANS;
-        const ImU32 ring_col = contained ? IM_COL32(0, 255, 0, 255)  // Light green
-                                         : IM_COL32(0, 100, 0, 255); // Dull green
+        const ImU32 ring_col = set_contains ? IM_COL32(0, 255, 0, 255)  // Light green
+                                            : IM_COL32(0, 100, 0, 255); // Dull green
         ImU32 title_col = IM_COL32_WHITE;
         if (center == Disabled) {
             title_col = IM_COL32_GREY(150, 255);
@@ -362,9 +362,9 @@ public:
     // Mainly about `select`.
     // TODO: some descriptions rely too much on "current rule"...
     static void about() {
-        auto explain = [](bool contained, centerE center, const char* desc) {
+        auto explain = [](bool set_contains, centerE center, const char* desc) {
             ImGui::Dummy(square_size());
-            put_term(contained, center, '\0', false);
+            put_term(set_contains, center, '\0', false);
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
             ImGui::AlignTextToFramePadding(); // `Dummy` does not align automatically.
             imgui_Str(": ");
@@ -445,11 +445,11 @@ public:
                               ImGuiTableFlags_BordersInner | ImGuiTableFlags_SizingFixedFit |
                                   ImGuiTableFlags_NoKeepColumnsVisible)) {
             auto check = [&, id = 0](termT& term, const bool show_title = false) mutable {
-                const bool contained = mode.rule && term.set->contains(*mode.rule);
+                const bool set_contains = mode.rule && term.set->contains(*mode.rule);
                 const char title = show_title ? term.title[0] : '\0';
                 if (!mode.select) {
                     ImGui::Dummy(square_size());
-                    put_term(contained, None, title, false);
+                    put_term(set_contains, None, title, false);
                     return;
                 }
 
@@ -464,7 +464,7 @@ public:
                 }
                 ImGui::EndDisabled();
                 ImGui::PopID();
-                put_term(contained,
+                put_term(set_contains,
                          term.selected    ? Selected
                          : term.including ? Including
                          : !selectable    ? Disabled
@@ -582,16 +582,15 @@ public:
             "As a result, the \"distance\" between two rules (in the set) can be defined as the number of groups where they have different values, and any rule in the set can act as an observer (called the \"mask\") to do XOR masking for other rules.\n\n"
             "The 'Zero' and 'Identity' rules are special as the values masked by them have natural interpretations (actual mapped value and flip-ness). 'Fallback' is provided to guarantee there is at least one rule known to belong to the working set. Any other rule in the working set can serve as a mask via 'Custom' and '<< Cur'.\n\n"
             "Both 'Traverse' and 'Random' generate rules based on the distance to the masking rule. In the random-access section, the values of the current rule are viewed through the mask (shown as masked values), but the result of random-access editing is unrelated to the masking rule.");
-        // "(For more details see the 'Subset, mask ...' section in 'Documents'.)"
         // !!TODO: rewrite...
     }
 
-    // `subset` must not be a temporary.
-    const aniso::maskT& select(const aniso::subsetT& subset, const sync_point& sync) {
-        const aniso::maskT* const mask_ptrs[]{&aniso::mask_zero, &aniso::mask_identity, &subset.get_mask(),
+    // `working_set` must not be a temporary.
+    const aniso::maskT& select(const aniso::subsetT& working_set, const sync_point& sync) {
+        const aniso::maskT* const mask_ptrs[]{&aniso::mask_zero, &aniso::mask_identity, &working_set.get_mask(),
                                               &mask_custom};
 
-        if (!subset.contains(*mask_ptrs[mask_tag])) {
+        if (!working_set.contains(*mask_ptrs[mask_tag])) {
             assert(mask_tag != Fallback);
             mask_tag = Fallback;
         }
@@ -599,7 +598,7 @@ public:
         ImGui::AlignTextToFramePadding();
         imgui_Str("Mask ~");
         for (const maskE m : {Zero, Identity, Fallback, Custom}) {
-            const bool m_avail = subset.contains(*mask_ptrs[m]);
+            const bool m_avail = working_set.contains(*mask_ptrs[m]);
 
             ImGui::SameLine(0, imgui_ItemInnerSpacingX());
             ImGui::BeginDisabled(!m_avail);
@@ -620,8 +619,8 @@ public:
                 ImGui::SameLine();
                 const int radio_id = ImGui::GetItemID();
                 // TODO: share with `edit_rule`?
-                const bool contained = subset.contains(sync.rule);
-                ImGui::BeginDisabled(!contained);
+                const bool working_contains = working_set.contains(sync.rule);
+                ImGui::BeginDisabled(!working_contains);
                 if (ImGui::Button("<< Cur")) {
                     mask_custom = {sync.rule};
                     mask_tag = Custom;
@@ -633,14 +632,14 @@ public:
                     messenger::set_msg("Updated.");
                 }
                 ImGui::EndDisabled();
-                if (!contained) {
+                if (!working_contains) {
                     imgui_ItemTooltip("The current rule does not belong to the working set.");
                 }
                 guide_mode::item_tooltip("Update the custom masking rule to the current rule.");
             }
         }
 
-        assert(subset.contains(*mask_ptrs[mask_tag]));
+        assert(working_set.contains(*mask_ptrs[mask_tag]));
         return *mask_ptrs[mask_tag];
     }
 
@@ -716,7 +715,8 @@ struct page_adapter {
     }
 };
 
-static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subsetT& subset, const aniso::maskT& mask) {
+static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subsetT& working_set,
+                            const aniso::maskT& mask) {
     assert(show_trav);
     static ImVec2 size_constraint_min{};
     ImGui::SetNextWindowSizeConstraints(size_constraint_min, ImVec2(FLT_MAX, FLT_MAX));
@@ -730,7 +730,7 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
         auto fill_next = [&](int size) {
             assert(!page.empty());
             for (int i = 0; i < size; ++i) {
-                const aniso::ruleT rule = aniso::seq_mixed::next(subset, mask, page.back());
+                const aniso::ruleT rule = aniso::seq_mixed::next(working_set, mask, page.back());
                 if (rule == page.back()) {
                     break;
                 }
@@ -741,7 +741,7 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
         auto fill_prev = [&](int size) {
             assert(!page.empty());
             for (int i = 0; i < size; ++i) {
-                const aniso::ruleT rule = aniso::seq_mixed::prev(subset, mask, page.front());
+                const aniso::ruleT rule = aniso::seq_mixed::prev(working_set, mask, page.front());
                 if (rule == page.front()) {
                     break;
                 }
@@ -764,8 +764,8 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
             static aniso::subsetT cmp_set{};
             static aniso::maskT cmp_mask{};
             bool changed = false;
-            if (cmp_set != subset) {
-                cmp_set = subset;
+            if (cmp_set != working_set) {
+                cmp_set = working_set;
                 changed = true;
             }
             if (cmp_mask != mask) {
@@ -781,16 +781,16 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
 
         // TODO: improve...
         // TODO: share with `edit_rule`?
-        const bool contained = subset.contains(sync.rule);
-        ImGui::BeginDisabled(!contained);
+        const bool working_contains = working_set.contains(sync.rule);
+        ImGui::BeginDisabled(!working_contains);
         if (ImGui::Button("Locate")) {
-            assert(subset.contains(sync.rule));
+            assert(working_set.contains(sync.rule));
             page.clear();
             page.push_back(sync.rule);
             fill_page(adapter.page_size);
         }
         ImGui::EndDisabled();
-        if (!contained) {
+        if (!working_contains) {
             imgui_ItemTooltip("The current rule does not belong to the working set.");
         }
         guide_mode::item_tooltip("Go to where the current rule belongs in the sequence.");
@@ -800,9 +800,9 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
         imgui_Str("Go to dist ~ ");
         ImGui::SameLine(0, 0);
         ImGui::SetNextItemWidth(imgui_CalcButtonSize("Max:0000").x);
-        if (const auto dist = input_dist.input("##Seek", std::format("Max:{}", subset.get_par().k()).c_str())) {
+        if (const auto dist = input_dist.input("##Seek", std::format("Max:{}", working_set.get_par().k()).c_str())) {
             page.clear();
-            page.push_back(aniso::seq_mixed::seek_n(subset, mask, *dist));
+            page.push_back(aniso::seq_mixed::seek_n(working_set, mask, *dist));
             fill_page(adapter.page_size);
         }
         ImGui::SameLine();
@@ -819,7 +819,7 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
         switch (sequence::seq("<00..", "Prev", "Next", "11..>", disable_prev_next)) {
             case 0:
                 page.clear();
-                page.push_back(aniso::seq_mixed::first(subset, mask));
+                page.push_back(aniso::seq_mixed::first(working_set, mask));
                 fill_next(adapter.page_size - 1);
                 break;
             case 1:
@@ -836,7 +836,7 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
                 break;
             case 3:
                 page.clear();
-                page.push_back(aniso::seq_mixed::last(subset, mask));
+                page.push_back(aniso::seq_mixed::last(working_set, mask));
                 fill_prev(adapter.page_size - 1);
                 break;
         }
@@ -847,8 +847,8 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
         if (page.empty()) {
             imgui_Str("Dist:N/A");
         } else {
-            const int min_dist = aniso::distance(subset, mask, page.front());
-            const int max_dist = aniso::distance(subset, mask, page.back());
+            const int min_dist = aniso::distance(working_set, mask, page.front());
+            const int max_dist = aniso::distance(working_set, mask, page.back());
             assert(min_dist <= max_dist);
             if (min_dist == max_dist) {
                 ImGui::Text("Dist:%d", min_dist);
@@ -882,14 +882,14 @@ static void traverse_window(bool& show_trav, sync_point& sync, const aniso::subs
     }
 }
 
-static void random_rule_window(bool& show_rand, sync_point& sync, const aniso::subsetT& subset,
+static void random_rule_window(bool& show_rand, sync_point& sync, const aniso::subsetT& working_set,
                                const aniso::maskT& mask) {
     assert(show_rand);
     static ImVec2 size_constraint_min{};
     ImGui::SetNextWindowSizeConstraints(size_constraint_min, ImVec2(FLT_MAX, FLT_MAX));
     if (auto window =
             imgui_Window("Random rules", &show_rand, ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar)) {
-        const int c_group = subset.get_par().k();
+        const int c_group = working_set.get_par().k();
         const int c_free = c_group; // TODO: temporarily preserved.
         const bool has_lock = false;
 
@@ -927,8 +927,8 @@ static void random_rule_window(bool& show_rand, sync_point& sync, const aniso::s
                 const int count =
                     (rules.size() / adapter.page_size) * adapter.page_size + adapter.page_size - rules.size();
                 for (int i = 0; i < count; ++i) {
-                    rules.push_back(exact_mode ? aniso::randomize_c(subset, mask, global_mt19937(), free_dist)
-                                               : aniso::randomize_p(subset, mask, global_mt19937(), rate));
+                    rules.push_back(exact_mode ? aniso::randomize_c(working_set, mask, global_mt19937(), free_dist)
+                                               : aniso::randomize_p(working_set, mask, global_mt19937(), rate));
                 }
                 assert((rules.size() % adapter.page_size) == 0);
                 page_no = (rules.size() / adapter.page_size) - 1;
@@ -983,16 +983,15 @@ void previewer::_identify_rule(const aniso::ruleT& rule) {
     });
 }
 
-// TODO: rename some variables for better clarity. (e.g. `subset` -> `working_set`, `contained` -> `working_contains`)
 void edit_rule(sync_point& sync) {
     // Select subsets.
-    static subset_selector select_set{&aniso::_subsets::native_isotropic};
-    const auto rep_before = select_set.rep();
+    static subset_selector select_working{&aniso::_subsets::native_isotropic};
+    const auto rep_before = select_working.rep();
     {
         ImGui::AlignTextToFramePadding();
         imgui_StrTooltip("(...)", subset_selector::about);
         ImGui::SameLine();
-        select_set.show_working(sync);
+        select_working.show_working(sync);
 
         static bool collapse = false;
         ImGui::SameLine();
@@ -1000,17 +999,17 @@ void edit_rule(sync_point& sync) {
 
         auto select = [&] {
             if (ImGui::Button("Clear##Sets")) {
-                select_set.clear();
+                select_working.clear();
             }
             guide_mode::item_tooltip("Unselect all subsets. The resulting working set will be the entire MAP set.");
             ImGui::SameLine();
             if (ImGui::Button("Match")) {
-                select_set.match(sync);
+                select_working.match(sync);
             }
             guide_mode::item_tooltip("Select every subset that contains the current rule.");
 
             ImGui::Separator();
-            select_set.select({.rule = &sync.rule, .select = true, .tooltip = true});
+            select_working.select({.rule = &sync.rule, .select = true, .tooltip = true});
         };
 
         if (!collapse) {
@@ -1025,9 +1024,9 @@ void edit_rule(sync_point& sync) {
             }
         }
     }
-    const aniso::subsetT& subset = select_set.get();
-    assert(!subset.empty());
-    const bool contained = subset.contains(sync.rule);
+    const aniso::subsetT& working_set = select_working.get();
+    assert(!working_set.empty());
+    const bool working_contains = working_set.contains(sync.rule);
 
     ImGui::Separator();
 
@@ -1036,7 +1035,7 @@ void edit_rule(sync_point& sync) {
     ImGui::AlignTextToFramePadding();
     imgui_StrTooltip("(...)", mask_selector::about);
     ImGui::SameLine();
-    const aniso::maskT& mask = select_mask.select(subset, sync);
+    const aniso::maskT& mask = select_mask.select(working_set, sync);
     const auto [chr_0, chr_1] = select_mask.masked_char();
 
     ImGui::Separator();
@@ -1045,8 +1044,8 @@ void edit_rule(sync_point& sync) {
     static bool show_rand = false;
     static bool preview_mode = init_random_access_preview_mode;
     static previewer::configT config{previewer::configT::_220_160};
-    static bool show_super_set = false;
-    static subset_selector select_set_super;
+    static bool show_superset = false;
+    static subset_selector select_super;
     bool set_superset_example = false;
     {
         const bool clicked = ImGui::Checkbox("Traverse", &show_trav);
@@ -1058,7 +1057,7 @@ void edit_rule(sync_point& sync) {
             ImGui::SetNextWindowPos(ImGui::GetItemRectMax() + ImVec2(30, -120), ImGuiCond_FirstUseEver);
         }
         if (show_trav) {
-            traverse_window(show_trav, sync, subset, mask);
+            traverse_window(show_trav, sync, working_set, mask);
         }
     }
     ImGui::SameLine();
@@ -1070,7 +1069,7 @@ void edit_rule(sync_point& sync) {
             ImGui::SetNextWindowPos(ImGui::GetItemRectMax() + ImVec2(30, -120), ImGuiCond_FirstUseEver);
         }
         if (show_rand) {
-            random_rule_window(show_rand, sync, subset, mask);
+            random_rule_window(show_rand, sync, working_set, mask);
         }
     }
     ImGui::SameLine(0, ImGui::CalcTextSize(" ").x * 3);
@@ -1078,33 +1077,33 @@ void edit_rule(sync_point& sync) {
     guide_mode::item_tooltip("Preview the effect of random-access flipping.\n\n"
                              "(You may 'Collapse' the subset table to leave more room for the preview windows.)");
 
-    if (select_set.rep() != rep_before) {
-        /* working-set changes -> */ show_super_set = false;
+    if (select_working.rep() != rep_before) {
+        /* working-set changes -> */ show_superset = false;
     }
 
     ImGui::SameLine();
-    if (ImGui::Checkbox("Superset", &show_super_set) && show_super_set) {
-        select_set_super = select_set;
+    if (ImGui::Checkbox("Superset", &show_superset) && show_superset) {
+        select_super = select_working;
     }
     guide_mode::item_tooltip(
         "Compare the working set with its superset.\n\n"
         "The superset will initially be the same as the working set (and has no effect) after you turn on this mode. Select a strict superset to see the difference.\n\n"
         "The mode will be turned off automatically if the working set changes.");
-    if (show_super_set) {
-        if (!select_set_super.get().includes(subset)) {
-            select_set_super = select_set;
+    if (show_superset) {
+        if (!select_super.get().includes(working_set)) {
+            select_super = select_working;
         }
 
         ImGui::SameLine();
         ImGui::Button("Select##Super"); // TODO: this is a bit awkward...
         if (begin_popup_for_item()) {
             if (ImGui::Button("Clear##Super")) {
-                select_set_super.clear();
+                select_super.clear();
             }
             guide_mode::item_tooltip("Unselect all.");
             ImGui::SameLine();
             if (ImGui::Button("Reset##Super")) {
-                select_set_super = select_set;
+                select_super = select_working;
             }
             guide_mode::item_tooltip("Reset to be the same as the working set.");
             ImGui::SameLine();
@@ -1116,13 +1115,13 @@ void edit_rule(sync_point& sync) {
                 set_superset_example = true;
             }
             ImGui::Separator();
-            select_set_super.select({.select = true, .subset = &subset /*no tooltip*/});
+            select_super.select({.select = true, .subset = &working_set /*no tooltip*/});
 
             ImGui::EndPopup();
         }
 
-        assert(select_set_super.get().includes(subset));
-        assert(select_set_super.get().contains(mask));
+        assert(select_super.get().includes(working_set));
+        assert(select_super.get().contains(mask));
     }
 
     // (Shown after 'Select' for better visual.)
@@ -1132,10 +1131,10 @@ void edit_rule(sync_point& sync) {
     }
 
     {
-        const int c_group = subset.get_par().k();
+        const int c_group = working_set.get_par().k();
 
-        if (contained) {
-            const int dist = aniso::distance(subset, mask, sync.rule);
+        if (working_contains) {
+            const int dist = aniso::distance(working_set, mask, sync.rule);
             std::string str = std::format("Groups:{} ({}:{} {}:{})", c_group, chr_1, dist, chr_0, c_group - dist);
 
             // v (Preserved for reference.)
@@ -1161,19 +1160,19 @@ void edit_rule(sync_point& sync) {
                 imgui_Str("Preview:");
                 ImGui::SameLine();
                 previewer::preview(-1, previewer::configT::_220_160,
-                                   aniso::approximate(subset.get_par(), mask, sync.rule), false);
+                                   aniso::approximate(working_set.get_par(), mask, sync.rule), false);
             });
             if (imgui_ItemClickableDouble()) {
-                sync.set(aniso::approximate(subset.get_par(), mask, sync.rule));
+                sync.set(aniso::approximate(working_set.get_par(), mask, sync.rule));
             }
         }
 
-        if (show_super_set) {
+        if (show_superset) {
             ImGui::SameLine(0, ImGui::CalcTextSize(" ").x * 3);
 
-            const aniso::subsetT& superset = select_set_super.get();
+            const aniso::subsetT& superset = select_super.get();
             // TODO: avoid repeated calculations...
-            if (subset.includes(superset)) { // ==
+            if (working_set.includes(superset)) { // ==
                 imgui_Str("vs superset: Same");
                 ImGui::SameLine();
                 imgui_StrTooltip("(?)", "Select a strict superset ('Select') to see the difference.");
@@ -1324,11 +1323,11 @@ void edit_rule(sync_point& sync) {
             }
         };
 
-        if (!show_super_set || subset.includes(select_set_super.get()) /*==*/) {
+        if (!show_superset || working_set.includes(select_super.get()) /*==*/) {
             const int perline = calc_perline(ImGui::GetContentRegionAvail().x);
 
-            std::vector<aniso::groupT> working_set_groups = subset.get_par().groups();
-            if (!contained) {
+            std::vector<aniso::groupT> working_set_groups = working_set.get_par().groups();
+            if (!working_contains) {
                 std::ranges::stable_partition(working_set_groups, [&](const aniso::groupT& group) {
                     return !aniso::all_same_or_different(group, mask, sync.rule);
                 });
@@ -1341,7 +1340,7 @@ void edit_rule(sync_point& sync) {
                 } else {
                     ImGui::Separator();
                 }
-                show_group(contained, !contained ? "working set" : nullptr, this_n, group);
+                show_group(working_contains, !working_contains ? "working set" : nullptr, this_n, group);
             }
         } else {
             // (This ensures the positions are not affected by the table.)
@@ -1355,16 +1354,16 @@ void edit_rule(sync_point& sync) {
                                         group_size_x /*provides stable visual when the layout switches*/);
                 ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
 
-                const aniso::subsetT& super_set = select_set_super.get();
-                const bool super_contains = super_set.contains(sync.rule);
+                const aniso::subsetT& superset = select_super.get();
+                const bool super_contains = superset.contains(sync.rule);
                 aniso::codeT::map_to<bool> visited;
                 visited.fill(false);
                 std::vector<aniso::groupT> subgroups; // Superset has smaller groups.
-                subset.get_par().for_each_group([&](const int j, const aniso::groupT& group) {
+                working_set.get_par().for_each_group([&](const int j, const aniso::groupT& group) {
                     subgroups.clear();
                     for (const aniso::codeT code : group) {
                         if (!visited[code]) {
-                            const aniso::groupT subgroup = super_set.get_par().group_for(code);
+                            const aniso::groupT subgroup = superset.get_par().group_for(code);
                             for (const aniso::codeT c : subgroup) {
                                 visited[c] = true;
                             }
@@ -1377,7 +1376,7 @@ void edit_rule(sync_point& sync) {
                     // TODO: the ctrl-check for superset case is somewhat under-documented...
                     // It's fine to require superset-contains here (especially when subgroups.size = 1, the group is shown on the working set's side),
                     // but this may be a bit confusing to users...
-                    show_group(contained, !super_contains ? "superset" : nullptr, j, group);
+                    show_group(working_contains, !super_contains ? "superset" : nullptr, j, group);
                     ImGui::TableNextColumn();
                     if (subgroups.size() == 1) {
                         // The same as the working set's group; no need to display.
@@ -1414,8 +1413,8 @@ void edit_rule(sync_point& sync) {
     ImGui::PopStyleColor();
 
     if (set_superset_example) {
-        select_set.select_single(&aniso::_subsets::native_tot_exc_s);
-        select_set_super.select_single(&aniso::_subsets::native_isotropic);
+        select_working.select_single(&aniso::_subsets::native_tot_exc_s);
+        select_super.select_single(&aniso::_subsets::native_isotropic);
         preview_mode = false;
     }
 }
