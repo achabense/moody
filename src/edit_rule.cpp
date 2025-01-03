@@ -206,7 +206,7 @@ public:
             "rule|a 0 d| = rule|a 1 d|\n"
             "    |z x c|       |z x c|\n\n"
             "So when the surrounding cells are the same, there must be: either s:0->1, s:1->1 or s:0->0, s:1->0.\n\n"
-            "(Though this is defined in the same way as other independence subsets, it's strange to treat this as \"independent of 's'\".)");
+            "(Though this is defined in the same way as other independence sets, it's strange to treat this as \"independent of 's'\".)");
         terms_ignore.emplace_back("d", &ignore_d, "See 'q' for details.");
         terms_ignore.emplace_back("z", &ignore_z, "See 'q' for details.");
         terms_ignore.emplace_back("x", &ignore_x, "See 'q' for details.");
@@ -225,18 +225,18 @@ public:
             "Rules that emulate hexagonal neighborhood, by making the values independent of 'e' and 'z'. "
             "See the last line for illustration.\n\n"
             "For windows displaying hexagonal rules, you can hover on them and press '6' to see "
-            "what \"actually\" happens in the corresponding hexagonal space.");
+            "the projected view in the corresponding hexagonal space.");
         terms_misc.emplace_back(
             "Von", &ignore_von,
             "Rules in the von-Neumann neighborhood. (In other words, their values are independent of 'q', 'e', 'z' and 'c'.)\n\n"
-            "(For symmetric von-Neumann rules you can directly combine this with native-symmetry subsets.)");
+            "(For symmetric von-Neumann rules you can directly combine this with native-symmetry sets.)");
         terms_misc.emplace_back(
             "Comp", &self_complementary,
             "Self-complementary rules. That is, their 0/1 reversal duals are just themselves - for any pattern, [apply such a rule] has the same effect as [flip all values -> apply the same rule -> flip all values].");
 
         terms_native.emplace_back("All", &native_isotropic,
-                                  "Isotropic MAP rules. (Rules that preserve all symmetries.)\n\n"
-                                  "(This is equal to the intersection of the following subsets in this line.)");
+                                  "Isotropic MAP rules, i.e. rules that preserve all symmetries.\n\n"
+                                  "(This is equal to the intersection of the following sets in this line.)");
         terms_native.emplace_back("|", &native_refl_wsx,
                                   "Rules that preserve reflection symmetry, taking '|' as the axis.");
         terms_native.emplace_back("-", &native_refl_asd, "Ditto, the reflection axis is '-'.");
@@ -264,10 +264,10 @@ public:
         // - x c    x c
         terms_hex.emplace_back("All", &hex_isotropic,
                                "Rules that emulate isotropic hexagonal rules. "
-                               "You can hover on the displaying windows for such rules and press '6' to "
+                               "For windows displaying such rules, you can hover and press '6' to "
                                "better view the symmetries in the corresponding hexagonal space.\n\n"
-                               "(Notice that these subsets have no direct relation with native symmetries, and their "
-                               "intersection with native-symmetry subsets will typically be very small.)");
+                               "(Note that these sets have no direct relation with native symmetries, and their "
+                               "intersection with native-symmetry sets will typically be very small.)");
         terms_hex.emplace_back(
             "a-d", &hex_refl_asd,
             "Rules that emulate reflection symmetry in the hexagonal tiling, taking the axis from 'a' to 'd' (a-to-d).");
@@ -374,20 +374,20 @@ public:
 
         imgui_Str(
             "The buttons stand for subsets of MAP rules. You can select them freely - the program "
-            "will calculate the intersection of selected subsets (with the entire MAP set), and help you explore rules in it.\n\n"
+            "will calculate the intersection of selected sets (with the entire MAP set), and help you explore rules in it.\n\n"
             "This intersection is called the \"working set\". For example, if a rule is said to belong to the "
-            "working set, it should also belong to every selected subset. If nothing is selected, the working set will be the entire MAP set.");
+            "working set, it should also belong to every selected set. If nothing is selected, the working set will be the entire MAP set.");
         ImGui::Separator();
-        imgui_Str("For each subset:\n\n"
-                  "The ring color represents whether the current rule belongs to the subset:");
-        explain(true, None, "The rule belongs to this subset.");
-        explain(false, None, "The rule does not belong to this subset.");
+        imgui_Str("For each set:\n\n"
+                  "The ring color represents whether the current rule belongs to the set:");
+        explain(true, None, "The rule belongs to this set.");
+        explain(false, None, "The rule does not belong to this set.");
         // ImGui::Separator();
-        imgui_Str("\nThe center mark is unrelated to the ring, and represents selection details:");
+        imgui_Str("\nThe center mark represents selection details (unrelated to the ring):");
         explain(false, None, "Not selected.");
         explain(false, Selected, "Selected.");
         explain(false, Including,
-                "Not selected, but the working set already belongs to this subset, so it will behave "
+                "Not selected, but the working set already belongs to this set, so it will behave "
                 "as if this is selected too.");
         explain(false, Disabled, "Not selectable. (If selected, the resulting working set will be empty.)");
     }
@@ -418,8 +418,8 @@ public:
         ImGui::Dummy(square_size());
         put_term(current.contains(target.rule), None, '\0', false);
         guide_mode::item_tooltip(
-            "This stands for the intersection of selected subsets; will be light green if the current rule belongs to every selected "
-            "subset. See '(...)' for details.");
+            "This stands for the intersection of selected sets; will be light green if the current rule belongs to every selected "
+            "set. See '(...)' for details.");
     }
 
     struct select_mode {
@@ -558,7 +558,7 @@ class mask_selector {
          '.', 'f'},
 
         {"Fallback",
-         "A rule known to belong to the working set. Depending on what subsets are selected, it may "
+         "A rule known to belong to the working set. Depending on what sets are selected, it may "
          "be the same as zero-rule, or identity-rule, or another rule in the working set if neither works.\n\n"
          "This is provided in case there are no other rules known to belong to the working set. It will not "
          "change unless the working set is updated.\n\n"
@@ -566,9 +566,7 @@ class mask_selector {
          'o', 'i'},
 
         {"Custom",
-         "This is initially the Game of Life rule, and can be updated to the current rule by clicking '<< Cur'. "
-         "So for example, if you want to get some random rules close to the current rule, you "
-         "can do '<< Cur' and generate random rules with a low distance in the 'Random' window.\n\n"
+         "This is initially the Game of Life rule, and can be updated to the current rule by clicking '<< Cur' (and will not change before next '<< Cur').\n\n"
          "Masked value: same ~ 'o', different ~ 'i'.",
          'o', 'i'}};
 
@@ -577,12 +575,13 @@ class mask_selector {
 
 public:
     static void about() {
+        // TODO: retire the notion of "masking" on user side?
         imgui_Str(
-            "The working set divides all cases into different groups. For any two rules in the set, they must have either all-same or all-different values in each group.\n\n"
-            "As a result, the \"distance\" between two rules (in the set) can be defined as the number of groups where they have different values, and any rule in the set can act as an observer (called the \"mask\") to do XOR masking for other rules.\n\n"
-            "The 'Zero' and 'Identity' rules are special as the values masked by them have natural interpretations (actual mapped value and flip-ness). 'Fallback' is provided to guarantee there is at least one rule known to belong to the working set. Any other rule in the working set can serve as a mask via 'Custom' and '<< Cur'.\n\n"
-            "Both 'Traverse' and 'Random' generate rules based on the distance to the masking rule. In the random-access section, the values of the current rule are viewed through the mask (shown as masked values), but the result of random-access editing is unrelated to the masking rule.");
-        // !!TODO: rewrite...
+            "The working set divides all cases into different groups. For any two rules in the set, their values must be either all-same or all-different in each group.\n\n"
+            "As a result, the \"distance\" between two rules (in the set) can be defined as the number of groups where they have different values, and any rule in the set can act as an observer (currently called the \"mask\") to measure relative distance and do XOR masking (comparing same or different) for other rules.\n\n"
+            "The 'Zero' and 'Identity' rules are special in the sense that, the values masked by them have natural interpretations (actual mapped value and flip-ness). 'Fallback' is provided to guarantee there is at least one rule known to belong to the working set. Any other rule in the working set can serve as a mask via 'Custom' and '<< Cur'.\n\n"
+            "Both 'Traverse' and 'Random' generate rules based on the distance to the masking rule.\n\n"
+            "The group table lists every group of the working set. The values of the current rule are viewed through the mask and shown as masked values. By clicking a group, you will flip all values of the current rule (in that group); the result is unrelated to the masking rule.");
     }
 
     // `working_set` must not be a temporary.
@@ -910,7 +909,7 @@ static void random_rule_window(bool& show_rand, sync_point& sync, const aniso::s
         imgui_StrTooltip(
             "(...)",
             "The sequence serves as the record of generated rules - when you are at the last page ('At' ~ 'Pages' or 'N/A'), '>>>' will generate pages of random rules (in the working set) with intended distance around/exactly to the masking rule.\n\n"
-            "For example, if you are using the 'Zero' mask and distance = 'Around' 30, when at the last page, '>>>' will generate pages of rules with around 30 groups having '1'. Also, if the current rule already belongs to the working set, to get some random rules close to it, you can set it to the custom mask and '>>>' in a low distance.");
+            "For example, if you are using the 'Zero' mask and distance = 'Around' 30, when at the last page, '>>>' will generate pages of rules with around 30 groups having '1'. Also, to get some random rules close to the current rule (suppose it belongs to the working set), you can set it to the custom mask and '>>>' in a low distance.");
 
         static std::vector<aniso::ruleT> rules{};
         static page_adapter adapter{};
@@ -946,8 +945,9 @@ static void random_rule_window(bool& show_rand, sync_point& sync, const aniso::s
         ImGui::EndGroup();
         imgui_ItemTooltip_StrID = "Seq##Pages";
         guide_mode::item_tooltip(
-            "'>>>' will generate pages of rules when you are at the last page. See '(...)' for details.");
-        // TODO: tooltip: it's especially convenient to control the sequence with shortcuts ('Left/Right').
+            "'>>>' will generate pages of rules when you are at the last page. See '(...)' for details.\n\n"
+            "(When a button is clicked, or when the window is focused and you press the left/right arrow key, the left/right arrow keys will begin to serve as the shortcuts for '<</>>>'. The same applies to sequences in other places.)");
+        // TODO: still not the best place to record this...
 
         ImGui::SameLine();
         if (!rules.empty()) {
@@ -1001,12 +1001,12 @@ void edit_rule(sync_point& sync) {
             if (ImGui::Button("Clear##Sets")) {
                 select_working.clear();
             }
-            guide_mode::item_tooltip("Unselect all subsets. The resulting working set will be the entire MAP set.");
+            guide_mode::item_tooltip("Unselect all sets. The resulting working set will be the entire MAP set.");
             ImGui::SameLine();
             if (ImGui::Button("Match")) {
                 select_working.match(sync);
             }
-            guide_mode::item_tooltip("Select every subset that contains the current rule.");
+            guide_mode::item_tooltip("Select every set that contains the current rule.");
 
             ImGui::Separator();
             select_working.select({.rule = &sync.rule, .select = true, .tooltip = true});
@@ -1051,7 +1051,7 @@ void edit_rule(sync_point& sync) {
         const bool clicked = ImGui::Checkbox("Traverse", &show_trav);
         guide_mode::item_tooltip(
             "Iterate through all rules in the working set.\n\n"
-            "(The page can be resized by resizing the window. And also, the window can be resized to fit the page by double-clicking its resize border. The same applies to 'Random'.)");
+            "(The page can be resized by resizing the window. And conversely, the window can be resized to fit the page by double-clicking its resize border. The same applies to 'Random'.)");
         if (clicked && show_trav) {
             ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
             ImGui::SetNextWindowPos(ImGui::GetItemRectMax() + ImVec2(30, -120), ImGuiCond_FirstUseEver);
@@ -1075,7 +1075,7 @@ void edit_rule(sync_point& sync) {
     ImGui::SameLine(0, ImGui::CalcTextSize(" ").x * 3);
     ImGui::Checkbox("Preview", &preview_mode);
     guide_mode::item_tooltip("Preview the effect of random-access flipping.\n\n"
-                             "(You may 'Collapse' the subset table to leave more room for the preview windows.)");
+                             "(You may 'Collapse' the set table to leave more room for the preview windows.)");
 
     if (select_working.rep() != rep_before) {
         /* working-set changes -> */ show_superset = false;

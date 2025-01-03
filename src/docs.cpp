@@ -136,6 +136,7 @@ constexpr const char* doc_exploring_rules = R"(
 !!TODO: lacks introduction...
 This section covers how to explore rules with this program.
 ... - 'Rules in different subsets'
+!!TODO: whether to rename to '... in different sets'?
 ... - rules found during the development of this program
 
 
@@ -174,16 +175,16 @@ MAP20aAERwgAyCQ4AASAAkWUABgASUooCWkwgEEyIQAWECCAAAWqEESCgCDEiiRAWAgmIQESgEAyAiAF
 
 So these are the typical ways to explore isotropic rules in this program - you can generate random rules in the set, and if you find some interesting rules, you can have a look at their neighboring ones.
 
-The program supports many different subsets, and has a way to traverse the entire set suitable for smaller sets ('Traverse'). The following parts will cover all details for exploring rules with this program.
+The program supports many different sets [TODO: "many subsets of MAP rules"? but that gives an impression that the program doesn't support all MAP rules...], and has a way to traverse the entire set suitable for smaller sets ('Traverse'). The following parts will cover all details for exploring rules with this program.
 
 
 @@The subsets
 
 The program works with subsets of MAP rules, each of which represents certain properties. For example, a rule is isotropic iff it belongs to the isotropic set ('Native symmetry/All'), and a rule is self-complementary iff it belongs to the 'Comp' set.
 
-The subsets that the current rule belongs to will show light-green borders. Take the Game of Life rule for example, it's outer-totalistic and therefore satisfies all symmetries, so every set in the 'Native symmetry' line, and the first set ('Tot') in the 'Totalistic' line will be highlighted for it.
+The sets that the current rule belongs to will show light-green borders. Take the Game of Life rule for example, it's outer-totalistic and therefore satisfies all symmetries, so every set in the 'Native symmetry' line, and the first set ('Tot') in the 'Totalistic' line will be highlighted for it.
 
-All these subsets share a common structure - they can be composed as a rule M and a partition P that divides all cases into distinct groups - let a set S ~ (M, P), then a rule belongs to S iff it's either all-same or all-different than M in every group of P. (M itself certainly belongs to the set.)
+All these sets share a common structure - they can be composed as a rule M and a partition P that divides all cases into distinct groups - let a set S ~ (M, P), then a rule belongs to S iff it's either all-same or all-different than M in every group of P. (M itself certainly belongs to the set.)
 
 Take the isotropic set for example. For the following group, an isotropic rule must map the cell to the same value (either all-0 or all-1) - in other words, it must be either all-same or all-different than the "all-zero" rule.
 1 0 0 | 1 1 0 | 0 1 1 | 0 0 1 | 0 0 0 | 0 0 0 | 0 0 0 | 0 0 0
@@ -193,18 +194,18 @@ The same applies to other groups. Therefore, the isotropic set can be composed a
 
 The entire MAP set certainly can be composed this way - the defining rule can be any MAP rule, and the partition has 512 groups, each having exactly one case.
 
-For subsets of such structure:
+For sets of such structure:
 1. For any two rules in a set, they must be either all-same or all-different than each other in each group. (In this sense, the initial defining rule is no more special than other rules in the set.)
 2. If a set has k groups, then there are exactly 2^k rules in the set, and for any rule in the set, there are exactly C(k,j) (combination number) rules with dist = j to it.
 3. For any rule in a set, by flipping all values in a group, you will get another rule in the set with dist = 1 to it.
-4. The intersection of these sets can always be composed as another rule-partition pair (if not empty). As a result, all these properties apply to these subsets' intersections as well.
+4. The intersection of these sets can always be composed as another rule-partition pair (if not empty). As a result, all these properties apply to these sets' intersections as well.
 
 About "dist" (distance): due to 1, for any two rules in the same set, it's natural to define their distance (specific to this set) as the number of groups where they have different values. When talking about "neighboring rules", it refers to rules with small distance to a rule.
 
 
 @@The working set
 
-The subset table serves two unrelated functions: the border color identifies which subsets the current rule belongs to, while the center color stands for what subsets you have selected.
+The set table serves two unrelated functions: the border color identifies which sets the current rule belongs to, while the center color stands for what sets you have selected.
 
 The "working set" refers to the intersection of selected sets (with the entire MAP set):
 1. If nothing is selected, the working set is the entire MAP set.
@@ -267,7 +268,7 @@ However, for large sets it's only practical to traverse a small distance around 
 
 @@Generating random rules - 'Random'
 
-The 'Random' window is able to generate random rules in the working set with any distance to the masking rule. For large subsets, it's infeasible to fully explore even a small area, so this becomes an important way for getting new rules.
+The 'Random' window is able to generate random rules in the working set with any distance to the masking rule. For large sets, it's infeasible to fully explore even a small area, so this becomes an important way for getting new rules.
 
 In the window, the sequence ('<| <</>>> |>') represents the rules generated by '>>>' - you can iterate back and forth using '<</>>>', and when you are at the last page (or when the page is empty), '>>>' will generate new pages of rules automatically. The effect is specified by 'Around/Exactly' and the slider (for distance).
 
@@ -280,15 +281,13 @@ For large sets, this can help to collect many "mildly" interesting rules, and ba
 
 @@Random-access editing
 
-The random-access table lists all groups of the working set. Based on the groups, the table is able to observe the current rule and generate its closest neighboring rules in the set.
+The group table lists all groups of the working set. Based on the groups, the table is able to observe the current rule and perform random-access editing to the current rule, i.e. generating its closest neighboring rules in the set.
 
 For each group, the values of the current rule are shown as whether they are all-same or all-different than the mask, or neither ('-x'), which means the current rule does not belong to the working set. Suppose the 'Zero' mask is selected, the table effectively displays the actual values for the current rule (as same ~ 0, different ~ 1).
 
 By clicking a group, you will flip the values of the current rule for all cases. The result is unrelated to which mask is selected, and by clicking the same group again, you will switch to the previous rule.
 
-By turning on 'Preview' (after 'Random'), the table will display the flipping result for every group. If the current rule already belongs to the working set, this effectively presents all rules in the set with dist = 1 to it.
-
-Take the Game of Life rule for example. All of the following rules has dist = 1 to GoL in the isotropic set, and can be found this way:
+By turning on 'Preview' (after 'Random'), the table will display the flipping result for every group. If the current rule already belongs to the working set, this effectively presents all rules in the set with dist = 1 to it. Take the Game of Life rule for example. All of the following rules have dist = 1 to GoL in the isotropic set, and can be found in the group table when the current rule is GoL:
 MAPARYXbhZofOgWaH7oaIDogBZofuhogOiAaIDoAIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAAACAAIAAAAAAAA
 (The default initial state is not suitable for the first rule. To see how it's interesting, you may specify a different seed e.g. 1 in 'Settings'.)
 MAPARYXfhbofugWaH7oaIDogDZofuhogOiAaIDogIAAgAAWaH7oaIDogGiA6ICAAIAAaIDogIAAgACAAIAAAAAAAA
@@ -307,7 +306,7 @@ The table also has a mode to compare the working set with its superset ('Superse
 To explore rules, firstly you need to specify the working set and a masking rule in the set. Based on them:
 1. 'Traverse' can iterate through all rules in the working set, ordered by distance to the masking rule.
 2. 'Random' can generate random rules in the working set with specified distance to the mask.
-3. The random-access table can observe the current rule by comparing with the mask, and generate new rules by flipping values. If the current rule already belongs to the working set, the result must belong to the set as well, having dist = 1 to it.
+3. The group table can observe the current rule by comparing with the mask, and generate new rules by flipping values. If the current rule already belongs to the working set, the result must belong to the set as well, having dist = 1 to it.
 
 With these tools, for a small set, you can traverse the set directly using 'Traverse', and for large sets, you may generate random rules using the 'Random' window. If you find something interesting, you can further inspect their neighboring rules; often this can lead to better discoveries.
 
@@ -333,7 +332,7 @@ By "wandering" in the set this way, you can collect a series of rules that are c
 // TODO: replace some examples with more interesting ones.
 constexpr const char* doc_rules = R"(
 !!TODO: rewrite introduction...
-The following rules are selected from different subsets. For each preview window you can press 'Z' to see which subsets the rule belongs to; the full list of preview-window operations is recorded in 'Settings'. If you are interested in a specific rule, you can click its rule string for more actions (for example, 'Match' to select related subsets).
+The following rules come from different sets. For each preview window you can press 'Z' to see which sets the rule belongs to; the full list of preview-window operations is recorded in 'Settings'. If you are interested in a specific rule, you can click its rule string for more actions (for example, 'Match' to select related sets).
 
 
 @@Symmetric rules
@@ -380,7 +379,7 @@ MAPAxEkiDlAgEIC2mcMDTWcNhDDmAcEHBZKjUUNInwAZqgRQggGb5AAtAJqmisCKGlJYJIlOJh5EFnCy
 
 @@Self-complementary rules
 
-Self-complementary rules ('Comp') can work naturally with many other subsets. For example, the following rule is an isotropic self-complementary rule ('All & Comp').
+Self-complementary rules ('Comp') can work naturally with many other sets. For example, the following rule is an isotropic self-complementary rule ('All & Comp').
 MAPARcTZhegPEwRdxPuFCBIzyBmF8A8+4g3RMD7A+03nz8DBhNIPyD83RPuIMP8F5n7DO3714g3EXfNw/oXmTcXfw
 As you see, both black and white "gliders" occur easily in this rule. The rule was found using a feature removed in v0.9.7 (due to some design flaws). The feature will be re-supported in the future, hopefully in the next version.
 
@@ -409,9 +408,9 @@ MAPAAAAEQAREXcAAAARABERdwAREXcRd3f/ABERdxF3d/8AERF3EXd3/wAREXcRd3f/EXd3/3f///8Rd
 
 @@Rules emulating hexagonal neighborhood
 
-For every rule in the 'Hex' subset, when viewed through hexagonal projection ('6'), the dynamics will behave as if produced by a real hexagonal rule. For convenience, these rules are referred to as hexagonal rules directly.
+For every rule in the 'Hex' set, when viewed through hexagonal projection ('6'), the dynamics will behave as if produced by a real hexagonal rule. For convenience, these rules are referred to as hexagonal rules directly.
 
-The subsets at the last line emulate symmetries in the hexagonal space. For example, the following (hex-isotropic) rule has spaceships of different shapes moving in different directions - however, if you hover on the preview window and press '6' to apply the projection, you will find they turn out to be the same thing (with the same shape) in the projected space.
+The sets at the last line emulate symmetries in the hexagonal space. For example, the following (hex-isotropic) rule has spaceships of different shapes moving in different directions - however, if you hover on the preview window and press '6' to apply the projection, you will find they turn out to be the same thing (with the same shape) in the projected space.
 MAPEUQAIiIARGYRRAAiIgBEZgCIVSIAAO6IAIhVIgAA7ogAADPuiABEiAAAM+6IAESIiABmAAAAAACIAGYAAAAAAA
 Also, if you identify those spaceships in the right panel (select a spaceship and press 'I'), you will find that they all have the same period.
 
@@ -459,7 +458,7 @@ MAPAGYRImbuRO4AZhEiZu5E7mYRZpmqAP9VZhFmmaoA/1VmzGb/EQCZM2bMZv8RAJkz7gBmMwCIVe7uA
 
 @@Rules emulating von-Neumann neighborhood
 
-Von-Neumann neighborhood works naturally with native symmetries - you can combine 'Von' with native symmetry subsets directly. (Von-Neumann rules are also a strict subset of 'Hex', so the hexagonal projection ('6') applies to them as well.)
+Von-Neumann neighborhood works naturally with native symmetries - you can combine 'Von' with native symmetry sets directly. (Von-Neumann rules are also a strict subset of 'Hex', so the hexagonal projection ('6') applies to them as well.)
 
 Isotropic ('Von & All'):
 MAPzADMAAD/AADMAMwAAP8AADMzAAAzzAAAMzMAADPMAADMAMwAAP8AAMwAzAAA/wAAMzMAADPMAAAzMwAAM8wAAA
@@ -485,7 +484,7 @@ MAP+vqlpfr6paWlpVBQpaVQUPr6paX6+qWlpaVQUKWlUFClpQoKpaUKCl9foKBfX6CgpaUKCqWlCgpfX
 MAPBQWgoAUFoKBfXwAAX18AAAUFoKAFBaCgX18AAF9fAABfXwAAX18AAP//AAD//wAAX18AAF9fAAD//wAA//8AAA
 MAPBQWgoAUFoKBfXwoKX18KCgUFoKAFBaCgX18KCl9fCgpfX1BQX19QUP//AAD//wAAX19QUF9fUFD//wAA//8AAA
 
-It's reluctant to regard 's' as "independent of the center cell". However, there are a lot of strange rules in the 's & Comp' subset.
+It's reluctant to regard 's' as "independent of the center cell". However, there are a lot of strange rules in the 's & Comp' set.
 's & Comp & /':
 MAPBQEFARUeFR4HQQdBHz0fPQcBBwEHBQcFBwEHASUFJQVfW19bfx9/H18fXx9/H38fQwdDB30ffR+HV4dXf19/Xw
 MAPAUABQFUVVRUZkRmRNZ41nlEAUQAVFRUVogGiARYRFhF3l3eXf7p/uldXV1f/df91hlOGU3ZndmdXVVdV/X/9fw
@@ -495,9 +494,10 @@ MAPACEAIYCBgIFVVVVVX3dfdxGdEZ0BVQFVd313fUN/Q38BPQE9QRFBEVV/VX9Gd0Z3EQURBVVVVVV+/
 MAPEgASAAEJAQk1bzVvHVYdVlVFVUUZERkR9hH2EX1/fX8BQQFBd5B3kHdnd2ddVV1VlUeVRwlTCVNvf29//7f/tw
 
 
-Finally, it's possible to get non-trivial rules that do not belong to any pre-defined subset. See the next section ('More about random-access editing') for more info.
+Finally, it's possible to get non-trivial rules that do not belong to any pre-defined set. See the next section ('More about random-access editing') for more info.
 )";
 
+// !!TODO: rewrite...
 constexpr const char* doc_random_access = R"(
 This section covers more aspects about random-access editing (as explained in 'Subset, mask and rule operations'). To recap, for the current rule C and working set W = (M, P), the operation flips all the values in a group in W.P, and therefore, the result belongs to S' = (C, W.P), which is W itself if C already belongs to W.
 

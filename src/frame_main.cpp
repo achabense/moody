@@ -169,19 +169,17 @@ void frame_main() {
 
         ImGui::Separator();
 
-        // !!TODO: rewrite...
+        // TODO: recheck usage of '-': MAP-rule/MAP rule, MAP-string/MAP string.
+        // !!TODO: about 'Record' (should be redesigned)...
+        // TODO: 'other windows' is obscure, but 'preview windows' doesn't work well either as they are not shown initially...
         ImGui::AlignTextToFramePadding();
         imgui_StrTooltip(
             "(...)",
-            "(Press 'H' to enter help mode for more tooltips; press 'H' again to quit the mode.)\n\n"
-            "'<| Prev/Next |>' represents the record for the current rule (as shown in the right panel). You can switch to previously tested rules with it.\n\n"
-            "Right-click 'Total:.. At:..' to clear the record.\n\n"
-            "Right-click the MAP-string (for the current rule) to copy to the clipboard.");
-
-        // !!TODO: find a new place for this...
-        // When a button is clicked, or when the window is focused and you press the left/right arrow key, the
-        // left/right arrow key will begin to serve as the shortcuts for 'Prev/Next'. This also applies to sequences
-        // in other windows.
+            "(Press 'H' for more tooltips; 'H' again to quit the mode.)\n\n"
+            "The \"current rule\" is shown in the right panel. The left panel highlights which sets the current rule belongs to, and can generate new rules based on the \"working set\".\n\n"
+            "To save rules: right-click the current rule's MAP-string to copy it to the clipboard; for rules shown in other windows, right-click the window to copy the rule to the clipboard.\n\n"
+            "To load rules: 'Files' can load rules from files; 'Clipboard' can load rules from the clipboard (shortcut: 'W').\n\n"
+            "(See 'Documents' for more info.)");
 
         ImGui::SameLine();
         imgui_Str("Current rule ~");
